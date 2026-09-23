@@ -79,7 +79,7 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
                      "available": docker and image_available(key)} for key, value in IMAGES.items()}
     rules = rule_counts()
     languages = Counter()
-    manifests, iac = [], []
+    manifests, iac, pipelines = [], [], []
     for path in paths or []:
         name = path.rsplit("/", 1)[-1]
         suffix = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
@@ -87,9 +87,13 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
             languages[EXTENSIONS[suffix]] += 1
         if LOCKFILES.fullmatch(name):
             manifests.append(path)
-        if name == "Dockerfile" or name.endswith((".tf", ".tfvars")) or name in ("Chart.yaml", "kustomization.yaml") \
+        if name == "Dockerfile" or name.endswith((".tf", ".tfvars", ".bicep")) or name in ("Chart.yaml", "kustomization.yaml", "serverless.yml") \
                 or re.fullmatch(r"(docker-)?compose[\w.-]*\.ya?ml", name):
             iac.append(path)
+        if re.fullmatch(r"\.github/workflows/[^/]+\.ya?ml", path) or name in ("action.yml", "action.yaml", ".gitlab-ci.yml",
+                                                                             "bitbucket-pipelines.yml", "azure-pipelines.yml") \
+                or path == ".circleci/config.yml":
+            pipelines.append(path)
     detected = [{"name": name, "files": count, "rules": rules.get(name, 0)} for name, count in languages.most_common()]
     runs, skips = ["Snapshot de solo lectura del repositorio y hash SHA-256 del contenido"], [
         "No se instala ni se ejecuta el código del repositorio: el análisis es estático"]
@@ -122,10 +126,23 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
         runs.append("Dependencias con OSV solo si lo autorizas (Trivy no está disponible)")
         if iac:
             skips.append(f"Infraestructura como código: hay {_n(len(iac), 'fichero', 'ficheros')}, pero Trivy no está disponible")
+    checkov, zizmor = engines["checkov"], engines["zizmor"]
+    if iac or pipelines or paths is None:
+        if checkov["available"]:
+            runs.append(f"Infraestructura y pipelines con {checkov['name']} {checkov['version']} (Terraform, CloudFormation, Kubernetes, "
+                        "Helm, Dockerfile, GitHub Actions, GitLab CI…), sin red; lo que ya ve Trivy se une al mismo hallazgo")
+        else:
+            skips.append("Checkov no está disponible: la infraestructura se revisa solo con Trivy")
+    if pipelines or paths is None:
+        if zizmor["available"]:
+            runs.append(f"GitHub Actions con {zizmor['name']} {zizmor['version']}: inyección en plantillas, disparadores peligrosos, "
+                        "permisos y acciones sin fijar" + (f" ({_n(len(pipelines), 'workflow', 'workflows')})" if pipelines else ""))
+        elif pipelines:
+            skips.append("zizmor no está disponible: los workflows de GitHub Actions solo los revisa Checkov")
     skips += ["Sin pruebas dinámicas: no se envía tráfico a ninguna aplicación",
               "Sin IA: no se envía código fuente a OpenAI ni a Anthropic"]
     if paths is None:
         runs.insert(1, "Los lenguajes se conocerán al descargar el snapshot (este proveedor no permite listarlos antes)")
     return {"source_id": source_id, "languages": detected, "engines": list(engines.values()), "manifests": manifests[:50],
-            "iac": iac[:50], "runs": runs, "skips": skips, "osv_needed": not trivy["available"],
+            "iac": iac[:50], "pipelines": pipelines[:50], "runs": runs, "skips": skips, "osv_needed": not trivy["available"],
             "files": len(paths) if paths is not None else None}

@@ -1,6 +1,6 @@
 # Arquitectura
 
-AppSec Agent es un único proceso Python (solo biblioteca estándar más `cryptography`) que sirve el panel web, la API y los trabajos en segundo plano. Los motores de análisis corren como contenedores hermanos efímeros con el código montado en solo lectura, sin capacidades y con límites de memoria, CPU y procesos.
+Tamandua es un único proceso Python (solo biblioteca estándar más `cryptography`) que sirve el panel web, la API y los trabajos en segundo plano. Los motores de análisis corren como contenedores hermanos efímeros con el código montado en solo lectura, sin capacidades y con límites de memoria, CPU y procesos.
 
 ```mermaid
 flowchart LR
@@ -13,6 +13,8 @@ flowchart LR
       trivy["Trivy<br/>SCA · IaC · secretos"]
       gitleaks["Gitleaks<br/>secretos"]
       opengrep["Opengrep<br/>SAST, 58 reglas propias"]
+      checkov["Checkov<br/>IaC · pipelines"]
+      zizmor["zizmor<br/>GitHub Actions"]
     end
     data[("data/<br/>ejecuciones · hallazgos · NVD")]
     config[("config/<br/>secretos cifrados")]
@@ -47,7 +49,7 @@ flowchart LR
 1. Pulsas **Analizar** o se abre un PR en un repositorio vigilado.
 2. La API encola el trabajo y responde al momento; el panel muestra el progreso en vivo.
 3. El trabajador pide a GitHub un token de instalación de una hora (en memoria) y descarga una instantánea del repositorio en `data/work/`.
-4. Se calcula el plan (lenguajes, reglas aplicables, manifiestos, IaC) y se lanzan los motores uno a uno: instantánea en solo lectura, `--cap-drop ALL`, `no-new-privileges`, 3 GB de memoria, 2 CPU y 512 procesos como máximo. Gitleaks y Opengrep van **sin red**; Trivy la necesita para descargar su base de vulnerabilidades (cacheada en `data/trivy-cache/`) y no envía nada del repositorio.
+4. Se calcula el plan (lenguajes, reglas aplicables, manifiestos, IaC) y se lanzan los motores uno a uno: instantánea en solo lectura, `--cap-drop ALL`, `no-new-privileges`, 3 GB de memoria, 2 CPU y 512 procesos como máximo. Gitleaks, Opengrep, Checkov y zizmor van **sin red**; Trivy la necesita para descargar su base de vulnerabilidades (cacheada en `data/trivy-cache/`) y no envía nada del repositorio.
 5. Los resultados se normalizan, se deduplican por huella estable, se enriquecen con KEV/EPSS y se incorporan al registro del repositorio: lo que ya no aparece queda **remediado**.
 6. Si era un PR, se publica un comentario único y un estado de commit según el umbral configurado.
 7. La instantánea se borra.

@@ -1,13 +1,17 @@
-# AppSec Agent
+<p align="center"><img src="docs/assets/tamandua.svg" width="112" alt="Tamandua, un oso hormiguero de collar atrapando un bug con la lengua"></p>
 
-Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Conectas tus repositorios de GitHub y AppSec Agent los analiza, comenta en tus pull requests lo que introducen y lleva el estado de cada hallazgo hasta que se corrige. Todo corre en tu máquina, con tus credenciales: tu código no va a ningún servicio nuestro.
+<h1 align="center">Tamandua</h1>
+
+<p align="center"><strong>Se come tus bugs.</strong> Seguridad de aplicaciones autoalojada, libre y sin enviar tu código a nadie.</p>
+
+Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Conectas tus repositorios de GitHub y Tamandua los analiza, comenta en tus pull requests lo que introducen y lleva el estado de cada hallazgo hasta que se corrige. Todo corre en tu máquina, con tus credenciales: tu código no va a ningún servicio nuestro.
 
 > Estado: **beta (v0.9)**. Funcional y con pruebas, pero la API y los formatos de `data/` aún pueden cambiar entre versiones.
 
 ## Qué hace
 
-- **Análisis de código** con Trivy (dependencias, IaC, secretos), Gitleaks (secretos) y Opengrep con 58 reglas SAST propias en JavaScript/TypeScript, Python, Java, Go, PHP, Ruby y C#. El código nunca se ejecuta.
-- **Imágenes de contenedor** desde su registro (Docker Hub, GHCR, ECR…), sin ejecutarlas: paquetes con **Trivy + Grype**, secretos en capas, en `ENV` y en el historial de construcción, y configuración (root, `HEALTHCHECK`, `ADD` remoto).
+- **Análisis de código** con Trivy (dependencias, IaC, secretos), Gitleaks (secretos), Opengrep con 58 reglas SAST propias en JavaScript/TypeScript, Python, Java, Go, PHP, Ruby y C#, **Checkov** (Terraform, CloudFormation, Kubernetes, Helm, pipelines…) y **zizmor** (GitHub Actions). Si dos motores ven lo mismo, queda un solo hallazgo. El código nunca se ejecuta.
+- **Imágenes de contenedor** desde su registro (Docker Hub, GHCR, ECR…), sin ejecutarlas: paquetes con **Trivy + Grype**, secretos en capas, en `ENV` y en el historial de construcción, y configuración con reglas propias y **Checkov** sobre el historial de construcción.
 - **Priorización real**: cada aviso de dependencia se cruza con CISA KEV (explotación activa) y EPSS (probabilidad de explotación), con la versión exacta que lo corrige.
 - **Revisión de pull requests**: solo cuenta lo que el PR introduce; publica un comentario y un estado de commit que puede bloquear el merge según el umbral que elijas.
 - **Ciclo de vida de hallazgos** por repositorio: remediación automática cuando un escaneo o un commit del PR ya no lo encuentra, triage con motivo e historial.
@@ -84,8 +88,8 @@ Issues y PRs son bienvenidos: lee [CONTRIBUTING.md](CONTRIBUTING.md). En el prim
 
 ## Licencia
 
-AppSec Agent es software libre bajo la [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only): puedes usarlo, estudiarlo, modificarlo y redistribuirlo. Si ofreces una versión modificada a otras personas a través de la red, tienes que poner a su disposición el código fuente de esa versión con la misma licencia.
+Tamandua es software libre bajo la [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only): puedes usarlo, estudiarlo, modificarlo y redistribuirlo. Si ofreces una versión modificada a otras personas a través de la red, tienes que poner a su disposición el código fuente de esa versión con la misma licencia.
 
 Las reglas SAST de [`rules/`](rules/) tienen su propia licencia MIT, para que puedas reutilizarlas en otras herramientas.
 
-Copyright © 2026 BrayansStivens y colaboradores de AppSec Agent.
+Copyright © 2026 BrayansStivens y colaboradores de Tamandua.

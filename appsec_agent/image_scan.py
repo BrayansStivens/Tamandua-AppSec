@@ -8,8 +8,10 @@ Qué se revisa de una imagen (`registry/repositorio:etiqueta` o `@sha256:…`):
 * **Secretos** dentro de las capas y en la **configuración de la imagen**: variables de
   entorno (`ENV`) e historial de construcción (`ARG` usados en `RUN`), que es donde acaban
   las credenciales que se pasan para descargar dependencias privadas.
-* **Configuración**: usuario root, falta de `HEALTHCHECK` y demás reglas de Dockerfile que
-  Trivy aplica a la configuración reconstruida de la imagen.
+* **Configuración**: usuario root, falta de `HEALTHCHECK` y demás reglas propias sobre la
+  configuración, más Checkov sobre un Dockerfile reconstruido del historial (descargas sin
+  verificar TLS, `sudo`, gestores de paquetes sin firma…). Sin duplicar lo que ya ven las
+  reglas propias (`config_scanners.merge_image`).
 
 La imagen nunca se ejecuta ni se construye: los motores leen el manifiesto y las capas del
 registro. Las credenciales de registros privados se guardan cifradas (`vault`) y llegan a
@@ -30,6 +32,7 @@ from pathlib import Path
 from . import logging_setup
 from .advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
 from .coverage import owasp_coverage
+from .config_scanners import merge_image, run_checkov_image
 from .scanners import _pick_fixed, _result, _run, docker_available, parse_trivy
 
 _log = logging_setup.get("images")
@@ -403,9 +406,19 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
     grype = run_grype_image(image["reference"], data_dir / "grype-cache", feeds, credentials, image["registry"])
     report("ok" if grype["status"] == "completed" else "warn", f"Grype: {grype['detail']}")
 
+    if metadata:
+        report("info", "Checkov sobre el Dockerfile reconstruido del historial de la imagen…")
+        checkov = run_checkov_image(metadata, image, data_dir / "tmp")
+    else:
+        checkov = _result("checkov", "not_tested", "Sin la configuración de la imagen (Trivy no pudo leerla), Checkov no tiene qué revisar.")
+    report("ok" if checkov["status"] == "completed" else "warn", f"Checkov: {checkov['detail']}")
+
     packages, agreement = merge_packages([item for item in trivy["findings"] if item["scanner"] == "sca"], grype["findings"])
-    findings = ([_finish_package(item) for item in packages] + [item for item in trivy["findings"] if item["scanner"] != "sca"]
-                + (config_findings(metadata, image) if metadata else []))
+    # Configuración: las reglas propias mandan; Trivy y Checkov solo suman lo que ellas no cubren.
+    configuration, joined = merge_image(config_findings(metadata, image) if metadata else [],
+                                        [item for item in trivy["findings"] if item["scanner"] == "iac"], checkov["findings"])
+    findings = ([_finish_package(item) for item in packages] + [item for item in trivy["findings"] if item["scanner"] == "secrets"]
+                + configuration)
     unique, seen = [], set()
     for finding in findings:
         if finding["fingerprint"] not in seen:
@@ -432,8 +445,12 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
          "detail": (f"{sca_count} avisos: {agreement['both']} los ven ambos motores, {agreement['only_trivy']} solo Trivy y "
                     f"{agreement['only_grype']} solo Grype. Prioridad con CVSS, KEV y EPSS.")
                    if len(engines_ok) == 2 else f"{sca_count} avisos con un solo motor: " + " · ".join(f"{tool['name']}: {tool['detail']}" for tool in (trivy, grype))},
-        {"id": "config", "name": "Configuración de la imagen", "status": "completed" if trivy["status"] == "completed" else "not_tested",
-         "detail": f"{iac_count} problemas (usuario root, HEALTHCHECK, instrucciones inseguras) en la configuración reconstruida."},
+        {"id": "config", "name": "Configuración de la imagen · reglas propias + Checkov",
+         "status": "completed" if trivy["status"] == "completed" else "not_tested",
+         "detail": f"{iac_count} problemas (usuario root, HEALTHCHECK, instrucciones inseguras) en la configuración y el historial."
+                   + (f" Checkov revisó el Dockerfile reconstruido: {len(checkov['findings'])} fallos, {joined} ya cubiertos por otra regla."
+                      if checkov["status"] == "completed" else f" {checkov['detail']}"),
+         "tool": {"name": "checkov", "version": checkov["version"], "image": checkov["image"], "duration_s": checkov["duration_s"]}},
         {"id": "secrets", "name": "Secretos en capas, ENV e historial", "status": "completed" if trivy["status"] == "completed" else "not_tested",
          "detail": f"{secret_count} secretos; valores redactados. Incluye variables de entorno y argumentos de construcción que quedaron en la imagen."},
         {"id": "review", "name": "Triage humano", "status": "pending", "detail": "Confirma que los paquetes se usan y prioriza por exposición de la imagen."},
@@ -443,7 +460,7 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
                               iac_files=1, secrets_ran=trivy["status"] == "completed", engines=bool(engines_ok))
     severities = {level: sum(1 for item in findings if item["severity"] == level) for level in ("critical", "high", "medium", "low", "info")}
     priorities = {action: sum(1 for item in findings if (item.get("priority") or {}).get("action") == action) for action in ("act", "attend", "track")}
-    tools = [trivy, grype]
+    tools = [trivy, grype, checkov]
     return {"type": "image_scan", "status": "completed" if trivy["status"] == "completed" and grype["status"] == "completed" else "incomplete",
             "source": {"id": image["asset"], "uid": None, "name": image["name"], "provider": "registry", "image": image_meta},
             "fixture": image["reference"], "variant": "image", "context": " ".join(str(context).split())[:400],

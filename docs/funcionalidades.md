@@ -37,7 +37,8 @@ Lanzar un escaneo devuelve al instante `202` con su identificador y lo encola; u
 | Secretos en capas | Trivy busca credenciales en los ficheros de cada capa. |
 | Credenciales en `ENV` | Variables con nombre de secreto (`*_TOKEN`, `*_PASSWORD`, `API_KEY`…) y valor fijo: cualquiera que descargue la imagen las lee con `docker inspect`. |
 | Credenciales en el historial | `ARG` usados en un `RUN` (p. ej. `NPM_TOKEN=… npm ci`), URLs con usuario y contraseña y cabeceras `Authorization` fijas: quedan en la imagen y se leen con `docker history`. La corrección recomendada es `RUN --mount=type=secret` de BuildKit. |
-| Configuración | Usuario root, falta de `HEALTHCHECK`, `ADD` desde una URL, SSH expuesto, etiqueta `latest` e imagen de más de un año. |
+| Configuración | Reglas propias: usuario root, falta de `HEALTHCHECK`, `ADD` desde una URL, SSH expuesto, etiqueta `latest` e imagen de más de un año. |
+| Instrucciones del historial | **Checkov** sobre un Dockerfile reconstruido a partir del historial de la imagen: descargas con TLS desactivado (`curl -k`, `wget --no-check-certificate`, `NODE_TLS_REJECT_UNAUTHORIZED=0`), `pip --trusted-host`, gestores de paquetes sin firma, `sudo`, `chpasswd`… Cada hallazgo apunta al paso del historial. El modo de imágenes propio de Checkov necesita una cuenta de Prisma Cloud, por eso se reconstruye el Dockerfile. |
 
 Ningún valor secreto se guarda: solo el nombre de la variable o el paso del historial. Las imágenes privadas necesitan un token de **solo lectura** del registro, que un administrador guarda en **Integraciones → Registros de contenedores** (cifrado). Cada imagen es un activo propio en **Hallazgos**, identificado por registro y repositorio, sin la etiqueta: al analizar `api:1.5`, lo que ya no aparece respecto a `api:1.4` queda remediado.
 
@@ -92,17 +93,42 @@ En la tabla de hallazgos, **Crear en Jira** convierte la selección en incidenci
 
 ## Motores de análisis
 
-La revisión de código corre tres motores externos, cada uno en su contenedor pinneado por digest, sin capacidades, sin escalada de privilegios y con el snapshot montado en solo lectura:
+La revisión de código corre cinco motores externos, cada uno en su contenedor pinneado por digest, sin capacidades, sin escalada de privilegios y con el snapshot montado en solo lectura:
 
 | Motor | Frente | Red | Imagen |
 | --- | --- | --- | --- |
 | **Trivy 0.74.0** | dependencias de cualquier ecosistema, configuración de infraestructura (Dockerfile, Kubernetes, Terraform) y secretos | solo para bajar su base de vulnerabilidades, cacheada en `data/trivy-cache/`; no envía nada del repositorio | `aquasec/trivy@sha256:62b1e65e…` |
 | **Gitleaks 8.30.1** | secretos, alta precisión, valores redactados | ninguna | `ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0…` |
 | **Opengrep 1.30.0** | SAST con **reglas propias** (`rules/`, MIT) para JavaScript, TypeScript, Python, Java, Go, PHP, Ruby y C# | ninguna | `appsec-agent/opengrep:1.30.0`, construida localmente |
+| **Checkov 3.3.19** | infraestructura como código (Terraform, CloudFormation, Kubernetes, Helm, Kustomize, ARM, Bicep, Serverless, OpenAPI, Ansible, Dockerfile) y pipelines (GitHub Actions, GitLab CI, Bitbucket, Azure Pipelines, CircleCI, Argo) | ninguna (`--skip-download`, sin módulos externos) | `bridgecrew/checkov@sha256:d3e96ada…` |
+| **zizmor 1.30.1** | GitHub Actions a fondo: inyección en plantillas, disparadores peligrosos (`pull_request_target`), permisos del token, acciones sin fijar por SHA o archivadas, credenciales que persisten tras `checkout` | ninguna (`--offline`) | `ghcr.io/zizmorcore/zizmor@sha256:a2eb396d…` |
 
 La imagen de Opengrep la construye `make build` (o `make up`): descarga el binario oficial y lo compara con su SHA-256 fijado (la verificación Cosign está documentada en `containers/opengrep/VERIFY.md`).
 
 Las reglas son nuestras porque las del registry de Semgrep no pueden usarse en un producto (licencia de uso interno desde diciembre de 2024). Son 58, orientadas a sumideros concretos con análisis de taint donde el lenguaje lo permite, y se validan contra `fixtures/sast-samples/`: las 58 disparan sobre código vulnerable de los siete lenguajes. Cada paso declara qué lenguajes del repositorio tienen reglas y cuáles no. No hay análisis entre archivos: es una limitación de todo SAST open source y se dice en los límites de cada ejecución.
+
+### Varios motores, un solo hallazgo
+
+Trivy y Checkov revisan la misma infraestructura y se solapan en muchas reglas, igual que Checkov y zizmor en GitHub Actions. Cuando dos motores ven **el mismo problema en el mismo sitio** (mismo archivo, líneas que se solapan y regla equivalente) queda **un único hallazgo**: el del motor principal, con «Detectado por Trivy y Checkov», las reglas equivalentes a la vista y un punto más de confianza. Lo que solo ve uno se añade tal cual.
+
+| Frente | Manda | Suma |
+| --- | --- | --- |
+| Infraestructura como código | Trivy | Checkov |
+| GitHub Actions y otros pipelines | zizmor | Checkov |
+| Configuración de imágenes | reglas propias | Trivy y Checkov |
+
+La equivalencia entre reglas es una tabla medida sobre repositorios vulnerables de referencia (TerraGoat, CfnGoat, KubernetesGoat y CI/CD-Goat) y revisada pareja por pareja; cuando la tabla no conoce la pareja se comparan los títulos. Medido en esos repositorios, Checkov añade entre un 39 % más de fallos (Kubernetes) y más del doble (Terraform) sobre lo que ya encuentra Trivy:
+
+| Repositorio | Trivy | Checkov | Se unen | Nuevos de Checkov | zizmor |
+| --- | --- | --- | --- | --- | --- |
+| TerraGoat (Terraform) | 244 | 472 | 196 | 276 | 13 |
+| KubernetesGoat (Kubernetes, Helm) | 321 | 349 | 225 | 124 | 0 |
+| CfnGoat (CloudFormation) | 67 | 70 | 42 | 28 | 9 |
+| CI/CD-Goat (pipelines) | 45 | 90 | 69 | 21 | 209 |
+
+La edición libre de Checkov no trae severidad (la da su plataforma de pago). Para las reglas con pareja en Trivy se usa la de Trivy; para el resto, una regla visible en el código (`checkov_severity`): exposición pública, privilegios, credenciales o TLS desactivado suben a alta; etiquetas, monitorización, copias o claves gestionadas por el cliente bajan a baja; lo demás queda en media. zizmor sí da severidad; «acción sin fijar por SHA» se rebaja a media porque explotarla exige comprometer antes la acción de terceros.
+
+Ni Checkov ni zizmor guardan fragmentos de código en el informe: solo regla, archivo y líneas, porque el fragmento puede contener un secreto.
 
 Si Docker no está disponible, el paso lo declara como `not_tested` con el motivo y la revisión sigue con las reglas internas de Python y los patrones de secretos, etiquetados como tales. Cuando Trivy resuelve las dependencias, OSV no se consulta: menos egress y sin enviar nombres de paquetes a nadie.
 

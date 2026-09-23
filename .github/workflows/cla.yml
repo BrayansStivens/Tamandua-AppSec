@@ -22,7 +22,7 @@ jobs:
       github.event_name == 'pull_request_target' ||
       (github.event.issue.pull_request &&
         (github.event.comment.body == 'recheck' ||
-         github.event.comment.body == 'He leído el CLA de AppSec Agent y lo acepto'))
+         github.event.comment.body == 'He leído el CLA de Tamandua y lo acepto'))
     steps:
       - name: CLA Assistant Lite
         # v2.6.1, fijada por commit
@@ -34,7 +34,7 @@ jobs:
           path-to-signatures: signatures/v1/cla.json
           branch: cla-signatures
           allowlist: BrayansStivens,dependabot[bot],github-actions[bot]
-          custom-pr-sign-comment: He leído el CLA de AppSec Agent y lo acepto
+          custom-pr-sign-comment: He leído el CLA de Tamandua y lo acepto
           custom-notsigned-prcomment: >-
             ¡Gracias por tu contribución! Antes de poder aceptarla necesitamos que leas y aceptes el
             [Acuerdo de Licencia de Contribución](https://github.com/BrayansStivens/appsec-agent/blob/main/CLA.md).

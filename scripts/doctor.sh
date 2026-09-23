@@ -1,5 +1,5 @@
 #!/bin/sh
-# Comprueba que la máquina puede ejecutar AppSec Agent y dice cómo arreglar lo que falte.
+# Comprueba que la máquina puede ejecutar Tamandua y dice cómo arreglar lo que falte.
 # Uso: make doctor   (o sh scripts/doctor.sh)
 set -u
 
@@ -12,7 +12,7 @@ version_ge() { # ¿$1 >= $2? comparando números separados por puntos
   [ "$(printf '%s\n%s\n' "$2" "$1" | sort -t. -k1,1n -k2,2n -k3,3n | head -n1)" = "$2" ]
 }
 
-echo "AppSec Agent · comprobación del entorno"
+echo "Tamandua · comprobación del entorno"
 echo
 
 echo "Herramientas"
@@ -68,7 +68,7 @@ if [ -f .env ]; then
 fi
 port=${port:-8766}
 if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx appsec-agent; then
-  pass "AppSec Agent ya está en marcha (puerto $port)"
+  pass "Tamandua ya está en marcha (puerto $port)"
 elif (command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 "$port" 2>/dev/null); then
   bad "el puerto $port está ocupado por otro programa" "Cambia APPSEC_PORT, APPSEC_AGENT_PUBLIC_URL y APPSEC_AGENT_ALLOWED_ORIGINS en .env."
 else
@@ -79,7 +79,7 @@ echo
 echo "Motores de análisis"
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   for image in $(sed -n 's/.*"image": "\([^"]*\)".*/\1/p' appsec_agent/scanners.py); do
-    if docker image inspect "$image" >/dev/null 2>&1; then pass "$image"; else note "falta $image" "'make build' construye Opengrep y 'make engines' descarga Trivy, Gitleaks y Grype (si no, se bajan en el primer análisis)."; fi
+    if docker image inspect "$image" >/dev/null 2>&1; then pass "$image"; else note "falta $image" "'make build' construye Opengrep y 'make engines' descarga Trivy, Gitleaks, Grype, Checkov y zizmor (si no, se bajan en el primer análisis)."; fi
   done
 fi
 

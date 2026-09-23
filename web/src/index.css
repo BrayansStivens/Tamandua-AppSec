@@ -77,7 +77,7 @@
     --app-muted: var(--muted-foreground);
     --app-subtle: oklch(0.6 0 0);
     --app-faint: oklch(0.72 0 0);
-    --brand: oklch(0.5 0.1 180);
+    --brand: oklch(0.52 0.21 293);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -126,7 +126,7 @@
     --app-muted: var(--muted-foreground);
     --app-subtle: oklch(0.6 0 0);
     --app-faint: oklch(0.45 0 0);
-    --brand: oklch(0.8 0.12 180);
+    --brand: oklch(0.78 0.14 293);
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);

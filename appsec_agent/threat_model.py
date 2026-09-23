@@ -664,7 +664,7 @@ def to_pytm(model: dict) -> str:
     member_of = {member: boundary["id"] for boundary in model.get("boundaries", []) for member in boundary["components"]}
     classes = {"actor": "Actor", "external": "ExternalEntity", "identity": "ExternalEntity", "web_app": "Server",
                "api": "Server", "service": "Process", "function": "Lambda", **{kind: "Datastore" for kind in STORES}}
-    lines = ["#!/usr/bin/env python3", f"# Generado por AppSec Agent a partir del modelo {name(model['name'])}.",
+    lines = ["#!/usr/bin/env python3", f"# Generado por Tamandua a partir del modelo {name(model['name'])}.",
              "# Requiere OWASP pytm: pip install pytm · uso: python3 tm.py --report docs/basic_template.md",
              "from pytm import TM, Actor, Boundary, Dataflow, Datastore, ExternalEntity, Lambda, Process, Server", "",
              f"tm = TM({name(model['name'])})", f"tm.description = {name(model.get('description') or model['name'])}",

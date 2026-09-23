@@ -1,0 +1,350 @@
+{
+ "check_type": "dockerfile",
+ "results": {
+  "failed_checks": [
+   {
+    "check_id": "CKV_DOCKER_1",
+    "bc_check_id": null,
+    "check_name": "Ensure port 22 is not exposed",
+    "check_result": {
+     "result": "FAILED",
+     "results_configuration": [
+      {
+       "instruction": "EXPOSE",
+       "startline": 8,
+       "endline": 8,
+       "content": "EXPOSE 22/tcp 8080/tcp\n",
+       "value": "22/tcp 8080/tcp"
+      }
+     ]
+    },
+    "file_line_range": [
+     9,
+     9
+    ],
+    "resource": "/src/Dockerfile.EXPOSE",
+    "evaluations": null,
+    "check_class": "checkov.dockerfile.checks.ExposePort22",
+    "fixed_definition": null,
+    "entity_tags": null,
+    "caller_file_path": null,
+    "caller_file_line_range": null,
+    "resource_address": null,
+    "severity": null,
+    "bc_category": null,
+    "benchmarks": null,
+    "description": null,
+    "short_description": null,
+    "vulnerability_details": null,
+    "connected_node": null,
+    "guideline": null,
+    "details": [],
+    "check_len": null,
+    "definition_context_file_path": null,
+    "file_path": "/Dockerfile"
+   },
+   {
+    "check_id": "CKV_DOCKER_8",
+    "bc_check_id": null,
+    "check_name": "Ensure the last USER is not root",
+    "check_result": {
+     "result": "FAILED",
+     "results_configuration": [
+      {
+       "instruction": "USER",
+       "startline": 9,
+       "endline": 9,
+       "content": "USER root",
+       "value": "root"
+      }
+     ]
+    },
+    "file_line_range": [
+     10,
+     10
+    ],
+    "resource": "/src/Dockerfile.USER",
+    "evaluations": null,
+    "check_class": "checkov.dockerfile.checks.RootUser",
+    "fixed_definition": null,
+    "entity_tags": null,
+    "caller_file_path": null,
+    "caller_file_line_range": null,
+    "resource_address": null,
+    "severity": null,
+    "bc_category": null,
+    "benchmarks": null,
+    "description": null,
+    "short_description": null,
+    "vulnerability_details": null,
+    "connected_node": null,
+    "guideline": null,
+    "details": [],
+    "check_len": null,
+    "definition_context_file_path": null,
+    "file_path": "/Dockerfile"
+   },
+   {
+    "check_id": "CKV_DOCKER_2",
+    "bc_check_id": null,
+    "check_name": "Ensure that HEALTHCHECK instructions have been added to container images",
+    "check_result": {
+     "result": "FAILED",
+     "results_configuration": null
+    },
+    "file_line_range": [
+     1,
+     10
+    ],
+    "resource": "/src/Dockerfile.",
+    "evaluations": null,
+    "check_class": "checkov.dockerfile.checks.HealthcheckExists",
+    "fixed_definition": null,
+    "entity_tags": null,
+    "caller_file_path": null,
+    "caller_file_line_range": null,
+    "resource_address": null,
+    "severity": null,
+    "bc_category": null,
+    "benchmarks": null,
+    "description": null,
+    "short_description": null,
+    "vulnerability_details": null,
+    "connected_node": null,
+    "guideline": null,
+    "details": [],
+    "check_len": null,
+    "definition_context_file_path": null,
+    "file_path": "/Dockerfile"
+   },
+   {
+    "check_id": "CKV2_DOCKER_6",
+    "bc_check_id": null,
+    "check_name": "Ensure that certificate validation isn't disabled with the NODE_TLS_REJECT_UNAUTHORIZED environment variable",
+    "check_result": {
+     "result": "FAILED",
+     "entity": {
+      "block_name_": "ENV",
+      "block_type_": "resource",
+      "file_path_": "/src/Dockerfile",
+      "config_": {
+       "content": "ENV NODE_TLS_REJECT_UNAUTHORIZED=0\n",
+       "value": "NODE_TLS_REJECT_UNAUTHORIZED=0",
+       "__startline__": 3,
+       "__endline__": 3
+      },
+      "label_": "resource: ENV",
+      "id_": "ENV",
+      "source_": "Dockerfile",
+      "content": "ENV NODE_TLS_REJECT_UNAUTHORIZED=0\n",
+      "value": "NODE_TLS_REJECT_UNAUTHORIZED=0",
+      "__startline__": 3,
+      "__endline__": 3,
+      "resource_type": "ENV",
+      "hash": "bf1627398848083edfc92ed25bfc24de65e93a7f5c2fe5952982b3b879546686"
+     },
+     "evaluated_keys": [
+      "value"
+     ]
+    },
+    "file_line_range": [
+     4,
+     4
+    ],
+    "resource": "/src/Dockerfile.ENV",
+    "evaluations": null,
+    "check_class": "checkov.common.graph.checks_infra.base_check",
+    "fixed_definition": null,
+    "entity_tags": null,
+    "caller_file_path": null,
+    "caller_file_line_range": null,
+    "resource_address": null,
+    "severity": null,
+    "bc_category": null,
+    "benchmarks": null,
+    "description": null,
+    "short_description": null,
+    "vulnerability_details": null,
+    "connected_node": null,
+    "guideline": null,
+    "details": [],
+    "check_len": null,
+    "definition_context_file_path": null,
+    "file_path": "/Dockerfile"
+   },
+   {
+    "check_id": "CKV2_DOCKER_1",
+    "bc_check_id": null,
+    "check_name": "Ensure that sudo isn't used",
+    "check_result": {
+     "result": "FAILED",
+     "entity": {
+      "block_name_": "RUN",
+      "block_type_": "resource",
+      "file_path_": "/src/Dockerfile",
+      "config_": {
+       "content": "RUN sudo chmod 777 /app\n",
+       "value": "sudo chmod 777 /app",
+       "__startline__": 7,
+       "__endline__": 7
+      },
+      "label_": "resource: RUN",
+      "id_": "RUN",
+      "source_": "Dockerfile",
+      "content": "RUN sudo chmod 777 /app\n",
+      "value": "sudo chmod 777 /app",
+      "__startline__": 7,
+      "__endline__": 7,
+      "resource_type": "RUN",
+      "hash": "96885be43712ab5c75bc5dcfa97b448a570748c9c1b43d91f72e80b363e28a2f"
+     },
+     "evaluated_keys": [
+      "value"
+     ]
+    },
+    "file_line_range": [
+     8,
+     8
+    ],
+    "resource": "/src/Dockerfile.RUN",
+    "evaluations": null,
+    "check_class": "checkov.common.graph.checks_infra.base_check",
+    "fixed_definition": null,
+    "entity_tags": null,
+    "caller_file_path": null,
+    "caller_file_line_range": null,
+    "resource_address": null,
+    "severity": null,
+    "bc_category": null,
+    "benchmarks": null,
+    "description": null,
+    "short_description": null,
+    "vulnerability_details": null,
+    "connected_node": null,
+    "guideline": null,
+    "details": [],
+    "check_len": null,
+    "definition_context_file_path": null,
+    "file_path": "/Dockerfile"
+   },
+   {
+    "check_id": "CKV2_DOCKER_4",
+    "bc_check_id": null,
+    "check_name": "Ensure that certificate validation isn't disabled with the pip '--trusted-host' option",
+    "check_result": {
+     "result": "FAILED",
+     "entity": {
+      "block_name_": "RUN",
+      "block_type_": "resource",
+      "file_path_": "/src/Dockerfile",
+      "config_": {
+       "content": "RUN pip install --trusted-host pypi.example.com flask\n",
+       "value": "pip install --trusted-host pypi.example.com flask",
+       "__startline__": 6,
+       "__endline__": 6
+      },
+      "label_": "resource: RUN",
+      "id_": "RUN",
+      "source_": "Dockerfile",
+      "content": "RUN pip install --trusted-host pypi.example.com flask\n",
+      "value": "pip install --trusted-host pypi.example.com flask",
+      "__startline__": 6,
+      "__endline__": 6,
+      "resource_type": "RUN",
+      "hash": "9fb8b4f1ca27b1a87320b2388f4c782967a2ee846a1c466e132430c3bbd5e607"
+     },
+     "evaluated_keys": [
+      "value"
+     ]
+    },
+    "file_line_range": [
+     7,
+     7
+    ],
+    "resource": "/src/Dockerfile.RUN",
+    "evaluations": null,
+    "check_class": "checkov.common.graph.checks_infra.base_check",
+    "fixed_definition": null,
+    "entity_tags": null,
+    "caller_file_path": null,
+    "caller_file_line_range": null,
+    "resource_address": null,
+    "severity": null,
+    "bc_category": null,
+    "benchmarks": null,
+    "description": null,
+    "short_description": null,
+    "vulnerability_details": null,
+    "connected_node": null,
+    "guideline": null,
+    "details": [],
+    "check_len": null,
+    "definition_context_file_path": null,
+    "file_path": "/Dockerfile"
+   },
+   {
+    "check_id": "CKV2_DOCKER_2",
+    "bc_check_id": null,
+    "check_name": "Ensure that certificate validation isn't disabled with curl",
+    "check_result": {
+     "result": "FAILED",
+     "entity": {
+      "block_name_": "RUN",
+      "block_type_": "resource",
+      "file_path_": "/src/Dockerfile",
+      "config_": {
+       "content": "RUN curl -k https://example.com/install.sh | sh\n",
+       "value": "curl -k https://example.com/install.sh | sh",
+       "__startline__": 5,
+       "__endline__": 5
+      },
+      "label_": "resource: RUN",
+      "id_": "RUN",
+      "source_": "Dockerfile",
+      "content": "RUN curl -k https://example.com/install.sh | sh\n",
+      "value": "curl -k https://example.com/install.sh | sh",
+      "__startline__": 5,
+      "__endline__": 5,
+      "resource_type": "RUN",
+      "hash": "00268cc56cbe4dd0440287ded105475e3328e678e37bbf1b7478248884c56959"
+     },
+     "evaluated_keys": [
+      "value"
+     ]
+    },
+    "file_line_range": [
+     6,
+     6
+    ],
+    "resource": "/src/Dockerfile.RUN",
+    "evaluations": null,
+    "check_class": "checkov.common.graph.checks_infra.base_check",
+    "fixed_definition": null,
+    "entity_tags": null,
+    "caller_file_path": null,
+    "caller_file_line_range": null,
+    "resource_address": null,
+    "severity": null,
+    "bc_category": null,
+    "benchmarks": null,
+    "description": null,
+    "short_description": null,
+    "vulnerability_details": null,
+    "connected_node": null,
+    "guideline": null,
+    "details": [],
+    "check_len": null,
+    "definition_context_file_path": null,
+    "file_path": "/Dockerfile"
+   }
+  ]
+ },
+ "summary": {
+  "passed": 74,
+  "failed": 7,
+  "skipped": 0,
+  "parsing_errors": 0,
+  "resource_count": 1,
+  "checkov_version": "3.3.19"
+ }
+}

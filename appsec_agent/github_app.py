@@ -1,6 +1,6 @@
 """GitHub App propia de cada instalación: la creas en GitHub y la conectas aquí.
 
-AppSec Agent es autoalojado: cada persona o equipo crea **su** GitHub App (privada,
+Tamandua es autoalojado: cada persona o equipo crea **su** GitHub App (privada,
 «Only on this account») siguiendo la guía del panel y pega aquí dos datos: el App ID
 y la clave privada (.pem). El panel las verifica contra GitHub antes de guardarlas y
 de ahí saca el nombre, la cuenta y los permisos; no hace falta client secret, OAuth

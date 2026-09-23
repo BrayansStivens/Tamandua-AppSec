@@ -58,6 +58,10 @@ TEXT_SUFFIXES = {
 SECRET_NAMES = {".npmrc", ".pypirc", ".netrc", ".dockercfg", ".git-credentials", ".htpasswd", "id_rsa", "id_dsa",
                 "id_ecdsa", "id_ed25519", "credentials", "authorized_keys", "known_hosts", ".s3cfg", ".boto"}
 SKIP_NAME_PARTS = (".min.js", ".min.css", ".bundle.js", "-bundle.js", ".chunk.js", ".d.ts")
+# Lo que empieza por punto se descarta salvo los pipelines de CI/CD (Checkov, zizmor). Los ficheros de
+# credenciales (.env, .npmrc…) siguen fuera de la instantánea a propósito.
+DOT_FOLDERS = {".github", ".gitlab", ".circleci", ".buildkite", ".tekton", ".devcontainer"}
+DOT_FILES = {".gitlab-ci.yml", ".gitlab-ci.yaml", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml"}
 
 
 class SourceError(ValueError):
@@ -204,9 +208,18 @@ def _safe_name(name: str) -> Path | None:
     relative = parts[1:]
     if any(part in ("", ".", "..") or part in IGNORED for part in relative):
         return None
-    if any(part.startswith(".") and part not in (".github",) for part in relative):
+    if any(part.startswith(".") and not _dot_allowed(part, last=index == len(relative) - 1, secrets=False)
+           for index, part in enumerate(relative)):
         return None
     return Path(*relative)
+
+
+def _dot_allowed(part: str, *, last: bool, secrets: bool = False) -> bool:
+    """Carpetas de CI/CD y, como último tramo, sus ficheros; con `secrets`, también los de credenciales."""
+    name = part.lower()
+    if not last:
+        return name in DOT_FOLDERS
+    return name in DOT_FILES or (secrets and (name in SECRET_NAMES or name.startswith(".env")))
 
 
 def _analyzable(relative: Path) -> bool:
@@ -285,11 +298,13 @@ def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | 
         total = count = skipped = 0
         truncated = False
         for directory, folders, filenames in os.walk(source, followlinks=False):
-            folders[:] = [folder for folder in folders if folder not in IGNORED and not folder.startswith(".")
+            folders[:] = [folder for folder in folders if folder not in IGNORED
+                          and (not folder.startswith(".") or _dot_allowed(folder, last=False))
                           and not (Path(directory) / folder).is_symlink()]
             for filename in filenames:
                 path = Path(directory) / filename
-                if path.is_symlink() or not path.is_file() or (filename.startswith(".") and filename != ".env.example"):
+                if path.is_symlink() or not path.is_file() or (filename.startswith(".") and filename != ".env.example"
+                                                                        and not _dot_allowed(filename, last=True)):
                     continue
                 relative = path.relative_to(source)
                 size = path.stat().st_size

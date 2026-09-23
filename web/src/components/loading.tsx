@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { BrandMark } from '@/components/brand-mark'
+import { BRAND } from '@/lib/brand'
 import { LOADING_EVENT } from '@/lib/api'
 
 // Pantalla de arranque: la marca en el centro, con un pulso suave mientras se comprueba la sesión.
 export function Splash() {
-  return <div className="grid min-h-screen place-items-center bg-app" role="status" aria-label="Cargando AppSec Agent">
+  return <div className="grid min-h-screen place-items-center bg-app" role="status" aria-label={`Cargando ${BRAND.name}`}>
     <div className="flex animate-[appsec-breathe_1.8s_ease-in-out_infinite] items-center gap-3 opacity-80">
-      <BrandMark size={40} /><span className="text-2xl font-semibold tracking-tight text-app-fg">AppSec Agent</span>
+      <BrandMark size={40} /><span className="text-2xl font-semibold tracking-tight text-app-fg">{BRAND.name}</span>
     </div>
   </div>
 }

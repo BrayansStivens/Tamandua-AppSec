@@ -19,7 +19,7 @@ fi
 
 mkdir -p "$target"
 chmod 700 backups "$target"
-tar czf "$target/data.tgz" --exclude=data/feeds --exclude=data/trivy-cache --exclude=data/grype-cache --exclude=data/work data
+tar czf "$target/data.tgz" --exclude=data/feeds --exclude=data/trivy-cache --exclude=data/grype-cache --exclude=data/work --exclude=data/tmp data
 tar czf "$target/config.tgz" config
 chmod 600 "$target"/*.tgz
 

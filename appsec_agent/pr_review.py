@@ -146,7 +146,7 @@ def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str 
     engines = ", ".join(f"{item['name'].capitalize()} {item['version']}" for item in (tools or []) if item.get("status") in ("completed", "partial"))
     basis = ("comparado con el último escaneo de la rama principal" if baseline_run
              else "sin escaneo previo de la rama principal: cuenta todo lo que cae en líneas cambiadas")
-    where = f"[en el panel]({panel_url})" if panel_url else "en el panel de AppSec Agent"
+    where = f"[en el panel]({panel_url})" if panel_url else "en el panel de Tamandua"
     lines += ["", f"<sub>Commit {commit} · {basis} · bloquea desde severidad {GATE_LABEL.get(gate, gate)}"
               + (f" · {engines}" if engines else "") + f". Detalle, triage y exportación a Jira {where} (ejecución `{run_id[:12]}`). "
               "Los secretos se citan por regla y ubicación; su valor nunca se publica.</sub>"]

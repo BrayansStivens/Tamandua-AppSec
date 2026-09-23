@@ -11,3 +11,4 @@
 | [Arquitectura](arquitectura.md) | Componentes, flujo de un análisis y datos en disco. |
 | [Solución de problemas](solucion-problemas.md) | Errores frecuentes y cómo resolverlos. |
 | [Desarrollo](desarrollo.md) | Ejecutar sin contenedores, CLI y pruebas. |
+| [Marca](marca.md) | Nombre, mascota, logo, colores y voz de Tamandua. |

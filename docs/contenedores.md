@@ -1,6 +1,6 @@
 # Contenedores y Makefile
 
-Todo AppSec Agent corre en Docker. El `Makefile` de la raíz envuelve los comandos de `docker compose` para que levantarlo, actualizarlo o hacer copias sea una sola orden.
+Todo Tamandua corre en Docker. El `Makefile` de la raíz envuelve los comandos de `docker compose` para que levantarlo, actualizarlo o hacer copias sea una sola orden.
 
 ## Qué necesitas
 
@@ -44,12 +44,12 @@ make up
 | `make status` | Estado de los contenedores y de las imágenes de los motores. |
 | `make logs` | Sigue los logs de la app. |
 | `make setup-code` | Vuelve a mostrar el código de configuración. |
-| `make engines` | Descarga por adelantado Trivy, Gitleaks y Grype (si no, se bajan en el primer análisis). |
+| `make engines` | Descarga por adelantado Trivy, Gitleaks, Grype, Checkov y zizmor (si no, se bajan en el primer análisis). |
 | `make update` | `git pull` y vuelve a levantar con la versión nueva. |
 | `make backup` | Copia `data/` y `config/` en `backups/<fecha>/`. Se niega si hay análisis en curso (salvo `FORCE=1`). |
 | `make shell` | Terminal dentro del contenedor. |
 | `make cli ARGS="…"` | CLI de la app, p. ej. `make cli ARGS="user list"` o `make cli ARGS="user reset-totp --username ana"`. |
-| `make clean` | Para todo y borra las imágenes de AppSec Agent. |
+| `make clean` | Para todo y borra las imágenes de Tamandua. |
 | `make purge CONFIRM=borrar` | **Borra `data/` y `config/`**: ejecuciones, usuarios y secretos. |
 | `make dev-setup` · `make dev` | Entorno de desarrollo sin contenedor (ver [desarrollo.md](desarrollo.md)). |
 | `make test` · `make lint` · `make check` | Pruebas del backend, lint del panel y ambos. |
@@ -81,6 +81,8 @@ scripts/
 | `aquasec/trivy` | Docker Hub, fijada por digest | 240 MB |
 | `ghcr.io/gitleaks/gitleaks` | GHCR, fijada por digest | 80 MB |
 | `anchore/grype` | Docker Hub, fijada por digest; solo para imágenes de contenedor | 110 MB (+2,1 GB de base) |
+| `bridgecrew/checkov` | Docker Hub, fijada por digest | 200 MB |
+| `ghcr.io/zizmorcore/zizmor` | GHCR, fijada por digest | 15 MB |
 
 Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos construcciones de la misma versión usan exactamente las mismas capas. Las etiquetas OCI de la imagen de la app declaran versión, licencia y repositorio (`docker inspect appsec-agent`).
 
@@ -95,7 +97,7 @@ Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos c
 | Puerto en `127.0.0.1` | Nadie fuera de tu máquina llega al panel salvo que lo configures (y entonces exige HTTPS). |
 | Logs rotados (10 MB × 5) | Los logs de Docker no llenan el disco. |
 
-Los motores se lanzan por cada análisis como contenedores efímeros (`--rm`) con el código en solo lectura, `--cap-drop ALL`, `no-new-privileges`, 3 GB de memoria, 2 CPU y 512 procesos como máximo; Gitleaks y Opengrep sin red.
+Los motores se lanzan por cada análisis como contenedores efímeros (`--rm`) con el código en solo lectura, `--cap-drop ALL`, `no-new-privileges`, 3 GB de memoria, 2 CPU y 512 procesos como máximo; Gitleaks, Opengrep, Checkov y zizmor sin red.
 
 **La concesión que queda:** para lanzar los motores, la app monta `/var/run/docker.sock`, lo que equivale a root en el host. Por eso el panel solo escucha en `127.0.0.1` por defecto. Si lo abres a más gente, pon un socket-proxy con lista blanca de operaciones delante del socket (está en el plan de trabajo).
 

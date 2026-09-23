@@ -88,7 +88,7 @@ class LogicTests(unittest.TestCase):
         row = next(line for line in body.splitlines() if "click" in line)
         self.assertEqual(row.count("`"), 2)       # solo los del propio código
         self.assertNotIn("\n[click]", body)
-        self.assertIn("el panel de AppSec Agent", body)
+        self.assertIn("el panel de Tamandua", body)
 
     def test_comment_escapes_tables_and_mentions_preexisting(self):
         outcome = {"introduced": [finding("a")], "preexisting": [finding("b")], "verdict": pr_review.verdict([finding("a")])}

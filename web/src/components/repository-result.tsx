@@ -12,7 +12,7 @@ import { SUPPRESSED, TriageActions, TriageBadge, TriageDialog, TriageHistory, tr
 export type Priority = { action: 'act' | 'attend' | 'track'; factors: string[] }
 export type Package = { ecosystem: string; name: string; version: string; fixed_version: string | null; introduced: string | null; dev?: boolean; direct?: boolean | null }
 export type Advisory = { id: string; aliases: string[]; summary: string; details: string; cvss_vector: string | null; cvss_score: number | null; published: string | null; modified: string | null; references: string[] }
-export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle }
+export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; related_rules?: string[]; framework?: string; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle }
 export type Lifecycle = { status: 'open' | 'fixed'; origin?: { kind: 'scan' | 'pr'; pr?: number; branch?: string; merged?: boolean }; first_seen?: string; last_seen?: string; fixed?: { at: string; how: string; auto: boolean } | null; reopened_at?: string | null }
 export type ScanStep = { id: string; name: string; status: string; detail: string }
 export type PullReview = { baseline_run: string | null; gate: string; verdict: { state: 'success' | 'failure'; description: string; blocking: number }; delivery: { comment?: string; status?: string } }
@@ -22,8 +22,8 @@ const SEVERITY_ORDER: Record<string, number> = { critical: 0, high: 1, medium: 2
 const ACTION_ORDER: Record<string, number> = { act: 0, attend: 1, track: 2 }
 const severityLabel: Record<string, string> = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja', info: 'Info' }
 const actionLabel: Record<string, string> = { act: 'Actuar ya', attend: 'Atender', track: 'Seguimiento' }
-const scannerLabel: Record<string, string> = { sca: 'Dependencia', sast: 'Código', secrets: 'Secreto', iac: 'Infraestructura' }
-const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', 'appsec-agent': 'Reglas propias' }
+const scannerLabel: Record<string, string> = { sca: 'Dependencia', sast: 'Código', secrets: 'Secreto', iac: 'Infraestructura', cicd: 'CI/CD' }
+const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', checkov: 'Checkov', zizmor: 'zizmor', 'appsec-agent': 'Reglas propias' }
 // Motor y, si otro lo confirmó, también ese: «Trivy + Grype».
 const toolsOf = (finding: { tool?: string; also_detected_by?: string[] }) => [finding.tool, ...(finding.also_detected_by ?? [])].filter(Boolean).map(tool => toolLabel[tool as string] ?? tool).join(' + ')
 const stepLabel = (status: string) => ({ completed: 'Completado', partial: 'Parcial', not_tested: 'No probado', inconclusive: 'Inconcluso', pending: 'Pendiente' }[status] ?? status)
@@ -120,7 +120,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
         <Filter value={triageView} onChange={value => { setTriageView(value === 'all' ? 'all' : value); setOffset(0) }} all="Todos los estados" options={[['active', 'Pendientes'], ['open', 'Abiertos'], ['in_progress', 'En curso'], ['fixed', 'Remediados'], ['false_positive', 'Falsos positivos'], ['accepted', 'Riesgo aceptado']]} />
         <Filter value={action} onChange={setAction} all="Toda prioridad" options={[['act', 'Actuar ya'], ['attend', 'Atender'], ['track', 'Seguimiento']]} />
         <Filter value={severity} onChange={setSeverity} all="Toda severidad" options={[['critical', 'Crítica'], ['high', 'Alta'], ['medium', 'Media'], ['low', 'Baja']]} />
-        <Filter value={scanner} onChange={setScanner} all="Toda fuente" options={[['sca', 'Dependencias'], ['sast', 'Código'], ['iac', 'Infraestructura'], ['secrets', 'Secretos']]} />
+        <Filter value={scanner} onChange={setScanner} all="Toda fuente" options={[['sca', 'Dependencias'], ['sast', 'Código'], ['iac', 'Infraestructura'], ['cicd', 'Pipelines CI/CD'], ['secrets', 'Secretos']]} />
       </div>
       {selected.size > 0 && <div className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-panel px-4 py-2.5 shadow-lg">
         <span className="text-sm font-medium">{selected.size} {selected.size === 1 ? 'seleccionado' : 'seleccionados'}</span>
@@ -176,13 +176,14 @@ function FindingDetail({ finding, canAccept, onPick }: { finding: RepositoryFind
       {pkg?.dev && <Fact label="Tipo"><span className="rounded border border-app-line px-1.5 py-0.5 text-xs">Dependencia de desarrollo</span> <span className="text-xs text-app-subtle">no llega a producción, pero se ejecuta en tu equipo y en la CI</span></Fact>}
       {pkg && <Fact label="Corrección">{pkg.fixed_version ? <><span className="font-mono">{pkg.version}</span> → <span className="font-mono font-medium text-brand">{pkg.fixed_version}</span></> : 'Sin versión corregida publicada'}</Fact>}
       {!pkg && <Fact label="Ubicación"><span className="font-mono text-xs">{finding.path}:{finding.line}</span></Fact>}
+      {finding.framework && <Fact label="Tecnología">{finding.framework}</Fact>}
       {finding.epss && <Fact label="EPSS · probabilidad de explotación en 30 días">{(finding.epss.score * 100).toFixed(2)}% <span className="text-app-subtle">(percentil {(finding.epss.percentile * 100).toFixed(0)})</span></Fact>}
       {finding.kev && <Fact label="CISA KEV">En el catálogo desde {finding.kev.date_added}{finding.kev.ransomware ? ' · usado en campañas de ransomware' : ''}</Fact>}
       {advisory?.cvss_vector && <Fact label="Vector CVSS"><span className="font-mono text-xs break-all">{advisory.cvss_vector}</span></Fact>}
     </div>
     <div className="mt-3 rounded-lg border border-brand/20 bg-brand/[0.06] p-3 text-sm"><span className="font-medium text-brand">Remediación · </span>{finding.remediation}</div>
     {finding.priority && <p className="mt-3 text-xs leading-5 text-app-subtle"><span className="font-medium text-app-muted">Por qué esta prioridad: </span>{finding.priority.factors.join(' · ')}</p>}
-    {(finding.tool || finding.also_detected_by?.length) && <p className="mt-2 text-xs text-app-subtle">Detectado por {toolLabel[finding.tool ?? ''] ?? finding.tool}{finding.also_detected_by?.length ? ` y ${finding.also_detected_by.map(tool => toolLabel[tool] ?? tool).join(', ')}` : ''}.</p>}
+    {(finding.tool || finding.also_detected_by?.length) && <p className="mt-2 text-xs text-app-subtle">Detectado por {toolLabel[finding.tool ?? ''] ?? finding.tool}{finding.also_detected_by?.length ? ` y ${finding.also_detected_by.map(tool => toolLabel[tool] ?? tool).join(', ')}` : ''}{finding.related_rules?.length ? <> · mismo problema que <span className="font-mono">{finding.related_rules.join(', ')}</span>, unido para no duplicarlo</> : null}.</p>}
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-app-line bg-inset p-3">
       <div className="min-w-0 text-xs text-app-muted"><span className="font-medium text-app-secondary">Triage: {finding.triage?.expired ? 'Abierto (la aceptación caducó)' : triageLabel[statusOf(finding)]}</span>{finding.triage?.by ? ` · ${finding.triage.by}` : ''}{finding.triage?.expires_at ? ` · caduca ${finding.triage.expires_at}` : ''}{finding.triage?.reason ? <span className="mt-0.5 block">{finding.triage.reason}</span> : null}</div>
       <div className="flex flex-wrap items-center gap-2">{finding.ticket && <a href={finding.ticket.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:underline"><Ticket className="size-3" />{finding.ticket.key}</a>}<TriageActions current={statusOf(finding)} canAccept={canAccept} onPick={onPick} size="xs" /></div>

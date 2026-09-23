@@ -1,0 +1,521 @@
+{
+ "Results": [
+  {
+   "Target": "terraform/aws/s3.tf",
+   "Class": "config",
+   "Type": "terraform",
+   "Misconfigurations": [
+    {
+     "ID": "AWS-0086",
+     "Title": "S3 Access block should block public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable blocking any PUT calls with a public ACL specified",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0086",
+     "Title": "S3 Access block should block public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable blocking any PUT calls with a public ACL specified",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data_science",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 89,
+      "EndLine": 111
+     }
+    },
+    {
+     "ID": "AWS-0086",
+     "Title": "S3 Access block should block public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable blocking any PUT calls with a public ACL specified",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0086",
+     "Title": "S3 Access block should block public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable blocking any PUT calls with a public ACL specified",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.logs",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 113,
+      "EndLine": 141
+     }
+    },
+    {
+     "ID": "AWS-0086",
+     "Title": "S3 Access block should block public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable blocking any PUT calls with a public ACL specified",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.operations",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 65,
+      "EndLine": 87
+     }
+    },
+    {
+     "ID": "AWS-0087",
+     "Title": "S3 Access block should block public policy",
+     "Message": "No public access block so not blocking public policies",
+     "Resolution": "Prevent policies that allow public access being PUT",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0087",
+     "Title": "S3 Access block should block public policy",
+     "Message": "No public access block so not blocking public policies",
+     "Resolution": "Prevent policies that allow public access being PUT",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data_science",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 89,
+      "EndLine": 111
+     }
+    },
+    {
+     "ID": "AWS-0087",
+     "Title": "S3 Access block should block public policy",
+     "Message": "No public access block so not blocking public policies",
+     "Resolution": "Prevent policies that allow public access being PUT",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0087",
+     "Title": "S3 Access block should block public policy",
+     "Message": "No public access block so not blocking public policies",
+     "Resolution": "Prevent policies that allow public access being PUT",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.logs",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 113,
+      "EndLine": 141
+     }
+    },
+    {
+     "ID": "AWS-0087",
+     "Title": "S3 Access block should block public policy",
+     "Message": "No public access block so not blocking public policies",
+     "Resolution": "Prevent policies that allow public access being PUT",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.operations",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 65,
+      "EndLine": 87
+     }
+    },
+    {
+     "ID": "AWS-0089",
+     "Title": "S3 Bucket Logging",
+     "Message": "Bucket has logging disabled",
+     "Resolution": "Add a logging block to the resource to enable access logging",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0089",
+     "Title": "S3 Bucket Logging",
+     "Message": "Bucket has logging disabled",
+     "Resolution": "Add a logging block to the resource to enable access logging",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0089",
+     "Title": "S3 Bucket Logging",
+     "Message": "Bucket has logging disabled",
+     "Resolution": "Add a logging block to the resource to enable access logging",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.operations",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 65,
+      "EndLine": 87
+     }
+    },
+    {
+     "ID": "AWS-0090",
+     "Title": "S3 Data should be versioned",
+     "Message": "Bucket does not have versioning enabled",
+     "Resolution": "Enable versioning to protect against accidental/malicious removal or modification",
+     "Severity": "MEDIUM",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0090",
+     "Title": "S3 Data should be versioned",
+     "Message": "Bucket does not have versioning enabled",
+     "Resolution": "Enable versioning to protect against accidental/malicious removal or modification",
+     "Severity": "MEDIUM",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0091",
+     "Title": "S3 Access Block should Ignore Public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable ignoring the application of public ACLs in PUT calls",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0091",
+     "Title": "S3 Access Block should Ignore Public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable ignoring the application of public ACLs in PUT calls",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data_science",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 89,
+      "EndLine": 111
+     }
+    },
+    {
+     "ID": "AWS-0091",
+     "Title": "S3 Access Block should Ignore Public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable ignoring the application of public ACLs in PUT calls",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0091",
+     "Title": "S3 Access Block should Ignore Public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable ignoring the application of public ACLs in PUT calls",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.logs",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 113,
+      "EndLine": 141
+     }
+    },
+    {
+     "ID": "AWS-0091",
+     "Title": "S3 Access Block should Ignore Public ACL",
+     "Message": "No public access block so not blocking public acls",
+     "Resolution": "Enable ignoring the application of public ACLs in PUT calls",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.operations",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 65,
+      "EndLine": 87
+     }
+    },
+    {
+     "ID": "AWS-0093",
+     "Title": "S3 Access block should restrict public bucket to limit access",
+     "Message": "No public access block so not restricting public buckets",
+     "Resolution": "Limit the access to public buckets to only the owner or AWS Services (eg; CloudFront)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0093",
+     "Title": "S3 Access block should restrict public bucket to limit access",
+     "Message": "No public access block so not restricting public buckets",
+     "Resolution": "Limit the access to public buckets to only the owner or AWS Services (eg; CloudFront)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data_science",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 89,
+      "EndLine": 111
+     }
+    },
+    {
+     "ID": "AWS-0093",
+     "Title": "S3 Access block should restrict public bucket to limit access",
+     "Message": "No public access block so not restricting public buckets",
+     "Resolution": "Limit the access to public buckets to only the owner or AWS Services (eg; CloudFront)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0093",
+     "Title": "S3 Access block should restrict public bucket to limit access",
+     "Message": "No public access block so not restricting public buckets",
+     "Resolution": "Limit the access to public buckets to only the owner or AWS Services (eg; CloudFront)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.logs",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 113,
+      "EndLine": 141
+     }
+    },
+    {
+     "ID": "AWS-0093",
+     "Title": "S3 Access block should restrict public bucket to limit access",
+     "Message": "No public access block so not restricting public buckets",
+     "Resolution": "Limit the access to public buckets to only the owner or AWS Services (eg; CloudFront)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.operations",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 65,
+      "EndLine": 87
+     }
+    },
+    {
+     "ID": "AWS-0094",
+     "Title": "S3 buckets should each define an aws_s3_bucket_public_access_block",
+     "Message": "Bucket does not have a corresponding public access block.",
+     "Resolution": "Define a aws_s3_bucket_public_access_block for the given bucket to control public access policies",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0094",
+     "Title": "S3 buckets should each define an aws_s3_bucket_public_access_block",
+     "Message": "Bucket does not have a corresponding public access block.",
+     "Resolution": "Define a aws_s3_bucket_public_access_block for the given bucket to control public access policies",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data_science",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 89,
+      "EndLine": 111
+     }
+    },
+    {
+     "ID": "AWS-0094",
+     "Title": "S3 buckets should each define an aws_s3_bucket_public_access_block",
+     "Message": "Bucket does not have a corresponding public access block.",
+     "Resolution": "Define a aws_s3_bucket_public_access_block for the given bucket to control public access policies",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0094",
+     "Title": "S3 buckets should each define an aws_s3_bucket_public_access_block",
+     "Message": "Bucket does not have a corresponding public access block.",
+     "Resolution": "Define a aws_s3_bucket_public_access_block for the given bucket to control public access policies",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.logs",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 113,
+      "EndLine": 141
+     }
+    },
+    {
+     "ID": "AWS-0094",
+     "Title": "S3 buckets should each define an aws_s3_bucket_public_access_block",
+     "Message": "Bucket does not have a corresponding public access block.",
+     "Resolution": "Define a aws_s3_bucket_public_access_block for the given bucket to control public access policies",
+     "Severity": "LOW",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.operations",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 65,
+      "EndLine": 87
+     }
+    },
+    {
+     "ID": "AWS-0132",
+     "Title": "S3 encryption should use Customer Managed Keys",
+     "Message": "Bucket does not encrypt data with a customer managed key.",
+     "Resolution": "Use SSE-KMS with a customer managed key (CMK)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 1,
+      "EndLine": 21
+     }
+    },
+    {
+     "ID": "AWS-0132",
+     "Title": "S3 encryption should use Customer Managed Keys",
+     "Message": "Bucket does not encrypt data with a customer managed key.",
+     "Resolution": "Use SSE-KMS with a customer managed key (CMK)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.data_science",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 89,
+      "EndLine": 111
+     }
+    },
+    {
+     "ID": "AWS-0132",
+     "Title": "S3 encryption should use Customer Managed Keys",
+     "Message": "Bucket does not encrypt data with a customer managed key.",
+     "Resolution": "Use SSE-KMS with a customer managed key (CMK)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.financials",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 42,
+      "EndLine": 63
+     }
+    },
+    {
+     "ID": "AWS-0132",
+     "Title": "S3 encryption should use Customer Managed Keys",
+     "Message": "Bucket does not encrypt data with a customer managed key.",
+     "Resolution": "Use SSE-KMS with a customer managed key (CMK)",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "CauseMetadata": {
+      "Resource": "aws_s3_bucket.operations",
+      "Provider": "AWS",
+      "Service": "s3",
+      "StartLine": 65,
+      "EndLine": 87
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -132,7 +132,7 @@ def totp_matches(secret: bytes, code: str, moment: int, last_step: int | None) -
     return None
 
 
-def otpauth_uri(secret: bytes, username: str, issuer: str = "AppSec Agent") -> str:
+def otpauth_uri(secret: bytes, username: str, issuer: str = "Tamandua") -> str:
     encoded = base64.b32encode(secret).decode("ascii").rstrip("=")
     return (f"otpauth://totp/{quote(issuer)}:{quote(username)}?secret={encoded}&issuer={quote(issuer)}"
             f"&algorithm=SHA1&digits={TOTP_DIGITS}&period={TOTP_STEP}")

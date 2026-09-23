@@ -1,6 +1,6 @@
 # Seguridad
 
-AppSec Agent lee el código de tus repositorios y guarda credenciales de GitHub, IA y Jira. Este documento explica cómo protege esa información, qué sale de tu máquina y qué concesiones hace. Para reportar una vulnerabilidad, ve a [SECURITY.md](../SECURITY.md).
+Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA y Jira. Este documento explica cómo protege esa información, qué sale de tu máquina y qué concesiones hace. Para reportar una vulnerabilidad, ve a [SECURITY.md](../SECURITY.md).
 
 ## Secretos
 
@@ -63,9 +63,9 @@ No hay telemetría.
 ## Análisis del código
 
 - El código de los repositorios **nunca se ejecuta**: se analiza una instantánea en solo lectura.
-- Los motores corren en contenedores efímeros con `--cap-drop ALL`, `no-new-privileges` y límites de memoria, CPU y procesos. Gitleaks y Opengrep no tienen red; Trivy y Grype solo la usan para su base de vulnerabilidades y, al analizar una imagen, para leerla del registro.
+- Los motores corren en contenedores efímeros con `--cap-drop ALL`, `no-new-privileges` y límites de memoria, CPU y procesos. Gitleaks, Opengrep, Checkov y zizmor no tienen red; Trivy y Grype solo la usan para su base de vulnerabilidades y, al analizar una imagen, para leerla del registro.
 - Las imágenes de contenedor que analizas **no se ejecutan ni se construyen**: los motores leen el manifiesto y las capas.
-- Las imágenes de Trivy, Gitleaks y Grype van fijadas por digest. La de Opengrep se construye con el binario oficial comprobado contra su SHA-256.
+- Las imágenes de Trivy, Gitleaks, Grype, Checkov y zizmor van fijadas por digest. La de Opengrep se construye con el binario oficial comprobado contra su SHA-256.
 - Los valores de los secretos encontrados en tu código se redactan: en los hallazgos queda la ubicación y el tipo, no el valor.
 
 ## Concesiones conocidas

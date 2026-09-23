@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import { BRAND } from '@/lib/brand'
 import { CircleAlert, CircleCheck, LoaderCircle, Terminal } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -48,7 +49,7 @@ export function useToasts() {
     setToasts(previous => [...previous, { id, tone, text }])
     window.setTimeout(() => setToasts(previous => previous.filter(item => item.id !== id)), 8000)
     // Aviso del navegador solo si el usuario ya lo permitió; nunca se pide permiso sin acción suya.
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') { try { new Notification('AppSec Agent', { body: text }) } catch { /* sin notificaciones */ } }
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') { try { new Notification(BRAND.name, { body: text, icon: '/assets/favicon.svg' }) } catch { /* sin notificaciones */ } }
   }
   const view = <div className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-80 flex-col gap-2">{toasts.map(item => <div key={item.id} className={`pointer-events-auto rounded-xl border px-4 py-3 text-sm shadow-xl ${item.tone === 'ok' ? 'border-brand/30 bg-panel text-app-fg' : 'border-rose-500/30 bg-panel text-rose-700 dark:text-rose-300'}`}>{item.text}</div>)}</div>
   return { push, view }

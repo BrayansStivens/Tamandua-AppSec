@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { KeyRound, LoaderCircle, LockKeyhole, LogOut, ShieldCheck, TerminalSquare, UserPlus } from 'lucide-react'
-import { BrandMark } from '@/components/brand-mark'
+import { BrandLockup } from '@/components/brand-mark'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -53,7 +53,7 @@ export function SessionGate({ children }: { children: (user: SessionUser, action
 
 function Shell({ children, narrow }: { children: ReactNode; narrow?: boolean }) {
   return <div className="grid min-h-screen place-items-center bg-app px-4 py-10 text-app-fg"><div className={`w-full space-y-6 ${narrow ? 'max-w-sm' : 'max-w-xl'}`}>
-    <div className="flex items-center gap-3"><BrandMark size={40} /><div><div className="text-sm font-semibold tracking-wide">APPSEC AGENT</div><div className="text-xs text-app-subtle">Acceso al workspace</div></div></div>
+    <BrandLockup subtitle="Acceso al workspace" />
     {children}
   </div></div>
 }
@@ -127,7 +127,7 @@ function LoginView({ setupRequired, notice, onDone }: { setupRequired: boolean; 
 
   return <div className="grid min-h-screen place-items-center bg-app px-4 py-10 text-app-fg">
     <div className="w-full max-w-sm space-y-6">
-      <div className="flex items-center gap-3"><BrandMark size={40} /><div><div className="text-sm font-semibold tracking-wide">APPSEC AGENT</div><div className="text-xs text-app-subtle">Acceso al workspace</div></div></div>
+      <BrandLockup subtitle="Acceso al workspace" />
       {setupRequired ? <SetupCard onDone={onDone} />
       : <Card className="border-app-line bg-panel"><CardHeader><CardTitle className="flex items-center gap-2">{challenge ? <><ShieldCheck className="size-4" />Segundo factor</> : <><LockKeyhole className="size-4" />Iniciar sesión</>}</CardTitle><CardDescription>{challenge ? 'Escribe el código de 6 dígitos de tu app de autenticación, o uno de tus códigos de respaldo.' : 'Usa las credenciales que te dio el administrador.'}</CardDescription></CardHeader>
         <CardContent><form className="space-y-4" onSubmit={submit}>

@@ -1,4 +1,4 @@
-# Acuerdo de Licencia de Contribución (CLA) · AppSec Agent
+# Acuerdo de Licencia de Contribución (CLA) · Tamandua
 
 Versión 1.0 · 23 de septiembre de 2026
 
@@ -8,10 +8,10 @@ Se firma una sola vez comentando en tu primer pull request, tal y como indica el
 
 ## 1. Definiciones
 
-- **«Titular»**: quien mantiene el proyecto AppSec Agent, hoy la persona que controla la cuenta de GitHub [BrayansStivens](https://github.com/BrayansStivens), y cualquier sucesor o cesionario conforme a la sección 8.
+- **«Titular»**: quien mantiene el proyecto Tamandua, hoy la persona que controla la cuenta de GitHub [BrayansStivens](https://github.com/BrayansStivens), y cualquier sucesor o cesionario conforme a la sección 8.
 - **«Tú»**: la persona física que acepta este acuerdo o, si contribuyes en nombre de una organización, esa organización.
 - **«Contribución»**: cualquier obra (código, documentación, reglas, diseños u otro material) que envíes al Titular para su inclusión en el proyecto, por pull request, issue, parche o cualquier otro medio, salvo que la marques claramente por escrito como «No es una contribución».
-- **«Proyecto»**: el software AppSec Agent y su documentación, en cualquier versión o edición.
+- **«Proyecto»**: el software Tamandua (antes llamado AppSec Agent; repositorio `appsec-agent`) y su documentación, en cualquier versión o edición.
 
 ## 2. Licencia de derechos de autor
 
@@ -56,19 +56,19 @@ El Titular puede ceder este acuerdo y los derechos que le otorga a un sucesor, p
 
 En tu primer pull request, el bot *CLA Assistant* te pedirá que comentes exactamente:
 
-> He leído el CLA de AppSec Agent y lo acepto
+> He leído el CLA de Tamandua y lo acepto
 
 Tu usuario de GitHub, la fecha y el pull request quedan registrados en la rama `cla-signatures` de este repositorio. La firma vale para todas tus contribuciones futuras bajo esta versión del acuerdo.
 
 ---
 
-# Contributor License Agreement (CLA) · AppSec Agent: English translation
+# Contributor License Agreement (CLA) · Tamandua: English translation
 
 *This translation is provided for convenience only. The Spanish version above is the binding one.*
 
 You keep the copyright of your contribution. You grant a broad license instead of transferring it.
 
-1. **Definitions.** "Owner" means the maintainer of AppSec Agent, currently the person controlling the GitHub account BrayansStivens, and any successor or assignee. "You" means the individual or organization accepting this agreement. "Contribution" means any work you submit to the Owner for inclusion in the Project, unless you mark it in writing as "Not a Contribution". "Project" means AppSec Agent and its documentation, in any version or edition.
+1. **Definitions.** "Owner" means the maintainer of Tamandua, currently the person controlling the GitHub account BrayansStivens, and any successor or assignee. "You" means the individual or organization accepting this agreement. "Contribution" means any work you submit to the Owner for inclusion in the Project, unless you mark it in writing as "Not a Contribution". "Project" means Tamandua and its documentation, in any version or edition.
 2. **Copyright license.** You grant the Owner and recipients of software distributed by the Owner a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable license to reproduce, prepare derivative works of, publicly display, publicly perform, sublicense and distribute your Contribution and derivative works. This includes distribution under any license, free (such as the AGPL-3.0) or commercial/proprietary.
 3. **Patent license.** You grant a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except as stated here) patent license to make, have made, use, offer to sell, sell, import and otherwise transfer your Contribution, alone or combined with the Project. It covers only patent claims licensable by you that are necessarily infringed by your Contribution or its combination with the Project. If anyone starts patent litigation alleging that your Contribution or the Project infringes a patent, the patent licenses granted to that party end on the date the litigation is filed.
 4. **Owner's commitment.** As long as a free edition of the Project exists, your Contribution will remain available in it under the AGPL-3.0 or another OSI-approved license. The Owner is not required to use your Contribution.
@@ -76,4 +76,4 @@ You keep the copyright of your contribution. You grant a broad license instead o
 6. **No warranty.** Except for section 5, your Contribution is provided "as is", without warranties or conditions of any kind. You are not required to support it.
 7. **Notice.** You will notify the Owner if any of your representations becomes inaccurate.
 8. **Assignment.** The Owner may assign this agreement to a successor, such as a company formed to maintain the Project. Section 4 binds that successor too.
-9. **Signing.** Comment exactly `He leído el CLA de AppSec Agent y lo acepto` on your first pull request. Your GitHub username, the date and the pull request are recorded in the `cla-signatures` branch.
+9. **Signing.** Comment exactly `He leído el CLA de Tamandua y lo acepto` on your first pull request. Your GitHub username, the date and the pull request are recorded in the `cla-signatures` branch.

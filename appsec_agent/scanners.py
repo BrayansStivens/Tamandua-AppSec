@@ -5,6 +5,7 @@
   base de vulnerabilidades, que se cachea; no envía nada del repositorio.
 - Gitleaks: secretos con alta precisión. Sin red.
 - Opengrep: SAST multi-lenguaje con nuestras propias reglas (`rules/`). Sin red.
+- Checkov y zizmor: infraestructura como código y pipelines de CI/CD (`config_scanners`). Sin red.
 
 Cada contenedor corre sin capacidades, sin escalada de privilegios y con el
 snapshot montado en solo lectura. Si Docker o una imagen no están, el paso se
@@ -38,6 +39,12 @@ IMAGES = {
     # Segunda opinión en imágenes de contenedor: discrepa con Trivy sobre todo en paquetes del sistema.
     "grype": {"name": "Grype", "version": "0.119.0",
               "image": "anchore/grype@sha256:8c2c9234a345577a6d321a4753aa3ee1276d8975c8452d2344a56b57733ecad3"},
+    # Infraestructura como código y pipelines: casi el doble de reglas que Trivy en Terraform y CloudFormation.
+    "checkov": {"name": "Checkov", "version": "3.3.19",
+                "image": "bridgecrew/checkov@sha256:d3e96adafdb315ca82e792ca8708c01adae85292800fb064c8b309b3d0cb7b80"},
+    # GitHub Actions a fondo: inyección en plantillas, disparadores peligrosos, permisos y acciones sin fijar.
+    "zizmor": {"name": "zizmor", "version": "1.30.1",
+               "image": "ghcr.io/zizmorcore/zizmor@sha256:a2eb396d886c053073405c7a980f2139ba2248ec172243cfa3841e57196e8101"},
 }
 # Lenguajes con reglas propias y las extensiones por las que se reconocen en el snapshot.
 RULE_LANGUAGES = {
@@ -287,11 +294,14 @@ def _trivy_misconfiguration(entry: dict, target: str) -> dict:
     rule = str(entry.get("AVDID") or entry.get("ID") or "misconfig")
     severity = SEVERITY_LABEL.get(str(entry.get("Severity", "")).upper(), "medium")
     resource = str(cause.get("Resource") or cause.get("Provider") or "")
-    return _base("iac", rule, f"{entry.get('Title', rule)}", target, line, severity, tool="trivy",
-                 reason=str(entry.get("Message") or entry.get("Description") or "").strip(),
-                 remediation=str(entry.get("Resolution") or "Revisa la configuración según la referencia del aviso.").strip(),
-                 cwe=[], owasp="A02:2025", confidence=8,
-                 digest=_stable("iac", rule, target, resource or str(line)))
+    finding = _base("iac", rule, f"{entry.get('Title', rule)}", target, line, severity, tool="trivy",
+                    reason=str(entry.get("Message") or entry.get("Description") or "").strip(),
+                    remediation=str(entry.get("Resolution") or "Revisa la configuración según la referencia del aviso.").strip(),
+                    cwe=[], owasp="A02:2025", confidence=8,
+                    digest=_stable("iac", rule, target, resource or str(line)))
+    # Rango de líneas: con él se reconoce el mismo fallo cuando Checkov lo señala en el bloque del recurso.
+    finding["end_line"] = max(line, int(cause.get("EndLine") or line))
+    return finding
 
 
 def _trivy_secret(entry: dict, target: str) -> dict:

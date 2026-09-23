@@ -38,8 +38,13 @@ def rules_by_category() -> dict[str, int]:
     return counts
 
 
+def _names(tools: tuple[str, ...]) -> str:
+    return " y ".join(tools) if len(tools) <= 2 else ", ".join(tools[:-1]) + f" y {tools[-1]}"
+
+
 def owasp_coverage(findings: list[dict], *, sast_ran: bool, sca_status: str, iac_ran: bool,
-                   iac_files: int, secrets_ran: bool, engines: bool) -> list[dict]:
+                   iac_files: int, secrets_ran: bool, engines: bool, iac_tools: tuple[str, ...] = ("Trivy",),
+                   cicd_tools: tuple[str, ...] = (), pipeline_files: int = 0) -> list[dict]:
     rules = rules_by_category() if sast_ran else {}
     per_category: dict[str, int] = {}
     for finding in findings:
@@ -59,12 +64,16 @@ def owasp_coverage(findings: list[dict], *, sast_ran: bool, sca_status: str, iac
                 parts.append("la consulta de dependencias no concluyó")
             else:
                 parts.append("sin manifiestos de dependencias analizables o sin autorización para consultarlos")
+            if cicd_tools and pipeline_files:
+                status = "partial" if status == "not_tested" else status
+                parts.append(f"pipelines de CI/CD revisados por {_names(cicd_tools)} en {pipeline_files} archivo(s)")
         if identifier == "A02":
             if iac_ran and iac_files:
                 status = "partial"
-                parts.append(f"configuración de infraestructura revisada por Trivy en {iac_files} archivo(s)")
+                parts.append(f"configuración de infraestructura revisada por {_names(iac_tools)} en {iac_files} archivo(s)")
             elif iac_ran:
-                parts.append("Trivy no encontró archivos de infraestructura (Dockerfile, Kubernetes, Terraform) en el snapshot")
+                parts.append(f"{_names(iac_tools)} no encontraron archivos de infraestructura (Dockerfile, Kubernetes, Terraform, CloudFormation) en el snapshot"
+                             if len(iac_tools) > 1 else f"{_names(iac_tools)} no encontró archivos de infraestructura (Dockerfile, Kubernetes, Terraform) en el snapshot")
             if rules.get("A02"):
                 status = "partial"
                 parts.append(f"{rules['A02']} reglas propias de configuración")

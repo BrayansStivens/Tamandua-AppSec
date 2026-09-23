@@ -1,0 +1,356 @@
+[
+ {
+  "check_type": "github_actions",
+  "results": {
+   "failed_checks": [
+    {
+     "check_id": "CKV2_GHA_1",
+     "check_name": "Ensure top-level permissions are not set to write-all",
+     "file_path": "/.github/workflows/semgrep.yml",
+     "file_line_range": [
+      0,
+      1
+     ],
+     "resource": "on(Semgrep)"
+    },
+    {
+     "check_id": "CKV2_GHA_1",
+     "check_name": "Ensure top-level permissions are not set to write-all",
+     "file_path": "/.github/workflows/pull_request.yaml",
+     "file_line_range": [
+      0,
+      1
+     ],
+     "resource": "on(build)"
+    },
+    {
+     "check_id": "CKV2_GHA_1",
+     "check_name": "Ensure top-level permissions are not set to write-all",
+     "file_path": "/.github/workflows/build.yaml",
+     "file_line_range": [
+      0,
+      1
+     ],
+     "resource": "on(build)"
+    }
+   ]
+  }
+ },
+ {
+  "check_type": "terraform",
+  "results": {
+   "failed_checks": [
+    {
+     "check_id": "CKV_AWS_186",
+     "check_name": "Ensure S3 bucket Object is encrypted by KMS using a customer managed Key (CMK)",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      23,
+      40
+     ],
+     "resource": "aws_s3_bucket_object.data_object"
+    },
+    {
+     "check_id": "CKV2_AWS_62",
+     "check_name": "Ensure S3 buckets should have event notifications enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      1,
+      21
+     ],
+     "resource": "aws_s3_bucket.data"
+    },
+    {
+     "check_id": "CKV2_AWS_62",
+     "check_name": "Ensure S3 buckets should have event notifications enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      42,
+      63
+     ],
+     "resource": "aws_s3_bucket.financials"
+    },
+    {
+     "check_id": "CKV2_AWS_62",
+     "check_name": "Ensure S3 buckets should have event notifications enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      65,
+      87
+     ],
+     "resource": "aws_s3_bucket.operations"
+    },
+    {
+     "check_id": "CKV2_AWS_62",
+     "check_name": "Ensure S3 buckets should have event notifications enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      89,
+      111
+     ],
+     "resource": "aws_s3_bucket.data_science"
+    },
+    {
+     "check_id": "CKV2_AWS_62",
+     "check_name": "Ensure S3 buckets should have event notifications enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      113,
+      141
+     ],
+     "resource": "aws_s3_bucket.logs"
+    },
+    {
+     "check_id": "CKV2_AWS_6",
+     "check_name": "Ensure that S3 bucket has a Public Access block",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      1,
+      21
+     ],
+     "resource": "aws_s3_bucket.data"
+    },
+    {
+     "check_id": "CKV2_AWS_6",
+     "check_name": "Ensure that S3 bucket has a Public Access block",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      42,
+      63
+     ],
+     "resource": "aws_s3_bucket.financials"
+    },
+    {
+     "check_id": "CKV2_AWS_6",
+     "check_name": "Ensure that S3 bucket has a Public Access block",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      65,
+      87
+     ],
+     "resource": "aws_s3_bucket.operations"
+    },
+    {
+     "check_id": "CKV2_AWS_6",
+     "check_name": "Ensure that S3 bucket has a Public Access block",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      89,
+      111
+     ],
+     "resource": "aws_s3_bucket.data_science"
+    },
+    {
+     "check_id": "CKV2_AWS_6",
+     "check_name": "Ensure that S3 bucket has a Public Access block",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      113,
+      141
+     ],
+     "resource": "aws_s3_bucket.logs"
+    },
+    {
+     "check_id": "CKV2_AWS_61",
+     "check_name": "Ensure that an S3 bucket has a lifecycle configuration",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      1,
+      21
+     ],
+     "resource": "aws_s3_bucket.data"
+    },
+    {
+     "check_id": "CKV2_AWS_61",
+     "check_name": "Ensure that an S3 bucket has a lifecycle configuration",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      42,
+      63
+     ],
+     "resource": "aws_s3_bucket.financials"
+    },
+    {
+     "check_id": "CKV2_AWS_61",
+     "check_name": "Ensure that an S3 bucket has a lifecycle configuration",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      65,
+      87
+     ],
+     "resource": "aws_s3_bucket.operations"
+    },
+    {
+     "check_id": "CKV2_AWS_61",
+     "check_name": "Ensure that an S3 bucket has a lifecycle configuration",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      89,
+      111
+     ],
+     "resource": "aws_s3_bucket.data_science"
+    },
+    {
+     "check_id": "CKV2_AWS_61",
+     "check_name": "Ensure that an S3 bucket has a lifecycle configuration",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      113,
+      141
+     ],
+     "resource": "aws_s3_bucket.logs"
+    },
+    {
+     "check_id": "CKV_AWS_144",
+     "check_name": "Ensure that S3 bucket has cross-region replication enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      1,
+      21
+     ],
+     "resource": "aws_s3_bucket.data"
+    },
+    {
+     "check_id": "CKV_AWS_144",
+     "check_name": "Ensure that S3 bucket has cross-region replication enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      42,
+      63
+     ],
+     "resource": "aws_s3_bucket.financials"
+    },
+    {
+     "check_id": "CKV_AWS_144",
+     "check_name": "Ensure that S3 bucket has cross-region replication enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      65,
+      87
+     ],
+     "resource": "aws_s3_bucket.operations"
+    },
+    {
+     "check_id": "CKV_AWS_144",
+     "check_name": "Ensure that S3 bucket has cross-region replication enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      89,
+      111
+     ],
+     "resource": "aws_s3_bucket.data_science"
+    },
+    {
+     "check_id": "CKV_AWS_144",
+     "check_name": "Ensure that S3 bucket has cross-region replication enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      113,
+      141
+     ],
+     "resource": "aws_s3_bucket.logs"
+    },
+    {
+     "check_id": "CKV_AWS_145",
+     "check_name": "Ensure that S3 buckets are encrypted with KMS by default",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      1,
+      21
+     ],
+     "resource": "aws_s3_bucket.data"
+    },
+    {
+     "check_id": "CKV_AWS_145",
+     "check_name": "Ensure that S3 buckets are encrypted with KMS by default",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      42,
+      63
+     ],
+     "resource": "aws_s3_bucket.financials"
+    },
+    {
+     "check_id": "CKV_AWS_145",
+     "check_name": "Ensure that S3 buckets are encrypted with KMS by default",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      65,
+      87
+     ],
+     "resource": "aws_s3_bucket.operations"
+    },
+    {
+     "check_id": "CKV_AWS_145",
+     "check_name": "Ensure that S3 buckets are encrypted with KMS by default",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      89,
+      111
+     ],
+     "resource": "aws_s3_bucket.data_science"
+    },
+    {
+     "check_id": "CKV_AWS_18",
+     "check_name": "Ensure the S3 bucket has access logging enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      1,
+      21
+     ],
+     "resource": "aws_s3_bucket.data"
+    },
+    {
+     "check_id": "CKV_AWS_18",
+     "check_name": "Ensure the S3 bucket has access logging enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      42,
+      63
+     ],
+     "resource": "aws_s3_bucket.financials"
+    },
+    {
+     "check_id": "CKV_AWS_18",
+     "check_name": "Ensure the S3 bucket has access logging enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      65,
+      87
+     ],
+     "resource": "aws_s3_bucket.operations"
+    },
+    {
+     "check_id": "CKV_AWS_18",
+     "check_name": "Ensure the S3 bucket has access logging enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      113,
+      141
+     ],
+     "resource": "aws_s3_bucket.logs"
+    },
+    {
+     "check_id": "CKV_AWS_21",
+     "check_name": "Ensure all data stored in the S3 bucket have versioning enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      1,
+      21
+     ],
+     "resource": "aws_s3_bucket.data"
+    },
+    {
+     "check_id": "CKV_AWS_21",
+     "check_name": "Ensure all data stored in the S3 bucket have versioning enabled",
+     "file_path": "/terraform/aws/s3.tf",
+     "file_line_range": [
+      42,
+      63
+     ],
+     "resource": "aws_s3_bucket.financials"
+    }
+   ]
+  }
+ }
+]

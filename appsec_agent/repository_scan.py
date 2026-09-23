@@ -16,7 +16,8 @@ from .unused_deps import analyze as unused_dependencies
 from .advisories import MAX_DETAILS, dependency_finding, fetch_advisory, load_feeds
 from .coverage import owasp_coverage
 from .engine import WEB_TOP_10_2025
-from .scanners import docker_available, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from .config_scanners import merge_repository, run_checkov, run_zizmor
+from .scanners import IMAGES, docker_available, merge_secrets, run_gitleaks, run_opengrep, run_trivy
 
 
 SECRET_RULES = (
@@ -184,11 +185,24 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         report("info", "Trivy 0.74.0: dependencias, infraestructura y secretos…")
         trivy = run_trivy(root, (data_dir or Path("data")) / "trivy-cache", feeds)
         report("ok" if trivy["status"] != "inconclusive" else "warn", f"Trivy: {trivy['detail']}")
-        tools = [sast, secrets_gitleaks, trivy]
+        report("info", f"Checkov {IMAGES['checkov']['version']}: infraestructura como código y pipelines…")
+        checkov = run_checkov(root)
+        report("info", f"zizmor {IMAGES['zizmor']['version']}: seguridad de GitHub Actions…")
+        zizmor = run_zizmor(root)
+        tools = [sast, secrets_gitleaks, trivy, checkov, zizmor]
         findings.extend(sast["findings"])
         trivy_secrets = [item for item in trivy["findings"] if item["scanner"] == "secrets"]
         findings.extend(merge_secrets(secrets_gitleaks["findings"], trivy_secrets))
-        findings.extend(item for item in trivy["findings"] if item["scanner"] in ("sca", "iac"))
+        findings.extend(item for item in trivy["findings"] if item["scanner"] == "sca")
+        # Lo que Trivy y Checkov (o zizmor y Checkov) ven a la vez queda como un solo hallazgo con los dos motores.
+        configuration, joined = merge_repository([item for item in trivy["findings"] if item["scanner"] == "iac"],
+                                                 checkov["findings"], zizmor["findings"])
+        findings.extend(configuration)
+        if checkov["status"] == "completed" and checkov["findings"]:
+            checkov["detail"] += (f" {joined['joined']} coinciden con Trivy o zizmor y se unieron al mismo hallazgo; "
+                                  f"{joined['checkov_new']} son nuevos.")
+        report("ok" if checkov["status"] != "inconclusive" else "warn", f"Checkov: {checkov['detail']}")
+        report("ok" if zizmor["status"] != "inconclusive" else "warn", f"zizmor: {zizmor['detail']}")
         for tool in tools:
             steps.append({"id": tool["tool"], "name": f"{tool['name']} {tool['version']}", "status": tool["status"],
                           "detail": tool["detail"], "tool": {"name": tool["tool"], "version": tool["version"],
@@ -273,13 +287,20 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             sca_status, sca_detail = "inconclusive", "No se pudo completar la consulta a OSV. No equivale a cero vulnerabilidades."
     steps.append({"id": "sca", "name": "Dependencias · Trivy" if trivy_sca else "Dependencias · OSV", "status": sca_status, "detail": sca_detail})
     steps.append({"id": "review", "name": "Triage humano", "status": "pending", "detail": "Los resultados estáticos son candidatos; revisar flujo, alcanzabilidad y aplicabilidad."})
-    iac_ran = engines and any(tool["tool"] == "trivy" and tool["status"] == "completed" for tool in tools)
+    iac_tools = tuple(tool["name"] for tool in tools if tool["tool"] in ("trivy", "checkov") and tool["status"] == "completed")
+    iac_ran = engines and bool(iac_tools)
+    cicd_tools = tuple(tool["name"] for tool in tools if tool["tool"] in ("checkov", "zizmor") and tool["status"] == "completed")
     sast_ran = engines and any(tool["tool"] == "opengrep" and tool["status"] in ("completed", "partial") for tool in tools)
-    iac_files = sum(1 for path in files if path.name.lower() in ("dockerfile", "containerfile") or path.suffix.lower() in (".tf", ".tfvars")
-                    or (path.suffix.lower() in (".yml", ".yaml") and any(marker in path.read_text(encoding="utf-8", errors="ignore")[:4000]
-                                                                        for marker in ("apiVersion:", "AWSTemplateFormatVersion", "services:"))))
+    iac_files = sum(1 for path in files if path.name.lower() in ("dockerfile", "containerfile") or path.suffix.lower() in (".tf", ".tfvars", ".bicep")
+                    or (path.suffix.lower() in (".yml", ".yaml", ".json") and any(marker in path.read_text(encoding="utf-8", errors="ignore")[:4000]
+                                                                                 for marker in ("apiVersion:", "AWSTemplateFormatVersion", "services:",
+                                                                                                "deploymentTemplate.json"))))
+    pipelines = sum(1 for path in files if ".github/workflows/" in path.relative_to(root).as_posix()
+                    or path.name in ("action.yml", "action.yaml", ".gitlab-ci.yml", "bitbucket-pipelines.yml", "azure-pipelines.yml")
+                    or path.relative_to(root).as_posix() == ".circleci/config.yml")
     coverage = owasp_coverage(findings, sast_ran=bool(sast_ran), sca_status=sca_status, iac_ran=bool(iac_ran),
-                              iac_files=iac_files, secrets_ran=True, engines=bool(engines))
+                              iac_files=iac_files, secrets_ran=True, engines=bool(engines), iac_tools=iac_tools,
+                              cicd_tools=cicd_tools if engines else (), pipeline_files=pipelines)
     source = {**source, "sha256": digest.hexdigest()}
     declared = " ".join(str(context).split())[:400]
     severities = {level: sum(1 for item in findings if item["severity"] == level)
@@ -299,6 +320,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                                                     "kev": sum(1 for item in findings if item.get("kev")),
                                                     "fixable": sum(1 for item in findings if (item.get("package") or {}).get("fixed_version")),
                                                     "iac": sum(item["scanner"] == "iac" for item in findings),
+                                                    "cicd": sum(item["scanner"] == "cicd" for item in findings),
                                                     "tools": [{"name": tool["tool"], "version": tool["version"], "status": tool["status"]} for tool in tools],
                                                     "planned": 3, "executed": 2 + (sca_status == "partial"),
                                                     "confirmed": 0},

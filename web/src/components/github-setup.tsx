@@ -3,6 +3,7 @@ import { Check, CircleCheck, Copy, ExternalLink, FileKey2, LoaderCircle, Refresh
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
+import { BRAND } from '@/lib/brand'
 
 export type PermissionReview = { required: Record<string, string>; declared: Record<string, string>; granted: Record<string, string>; excess: string[]; missing: string[]; pending_acceptance: string[] }
 export type GitHubStatus = {
@@ -70,7 +71,7 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
           <a href={createUrl} target="_blank" rel="noopener noreferrer"><Button type="button" size="sm" variant="outline" className="border-app-line bg-app-soft">Abrir en GitHub <ExternalLink /></Button></a></div>
       </Step>
       <Step number={2} title="Nombre y página de inicio">
-        <p><strong className="font-medium text-app-secondary">GitHub App name:</strong> el que quieras, p. ej. <CopyValue value="AppSec Agent" /> (debe ser único en GitHub; añade tu equipo si ya existe).</p>
+        <p><strong className="font-medium text-app-secondary">GitHub App name:</strong> el que quieras, p. ej. <CopyValue value={`${BRAND.name} de mi equipo`} /> (debe ser único en GitHub; añade tu equipo si ya existe).</p>
         <p><strong className="font-medium text-app-secondary">Homepage URL:</strong> cualquier URL tuya, p. ej. <CopyValue value={base.startsWith('https://') ? base : `https://github.com/${org.trim() || 'tu-usuario'}`} /></p>
       </Step>
       <Step number={3} title="Sin OAuth ni webhooks">

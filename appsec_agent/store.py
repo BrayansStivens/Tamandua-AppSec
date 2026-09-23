@@ -294,7 +294,7 @@ def render_repository_sarif(record: dict) -> dict:
                 "properties": {"verdict": "candidate", "scanner": item["scanner"], "cwe": item["cwe"],
                                "owasp": item["owasp"]}} for item in findings]
     return {"$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
-            "version": "2.1.0", "runs": [{"tool": {"driver": {"name": "AppSec Agent Repository", "version": "0.3.0",
+            "version": "2.1.0", "runs": [{"tool": {"driver": {"name": "Tamandua", "version": "0.3.0",
                                                      "rules": list(rules.values())}}, "results": results}]}
 
 
@@ -404,7 +404,7 @@ def render_sarif(record: dict) -> dict:
                            "labVariant": record["variant"]},
         })
     return {"$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json", "version": "2.1.0",
-            "runs": [{"tool": {"driver": {"name": "AppSec Agent Lab", "version": record["engine_version"],
+            "runs": [{"tool": {"driver": {"name": "Tamandua Lab", "version": record["engine_version"],
                                            "rules": rules}}, "results": results}]}
 
 

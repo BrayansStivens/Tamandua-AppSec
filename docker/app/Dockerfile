@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Imagen de AppSec Agent: panel web, API y cola de análisis en un solo proceso.
+# Imagen de Tamandua: panel web, API y cola de análisis en un solo proceso.
 # Se construye desde la raíz del repositorio:  make build   (o docker compose build)
 #
 # Dos etapas: el panel se compila con Node y solo sus estáticos pasan a la imagen final,
@@ -19,7 +19,7 @@ RUN mkdir -p /src/appsec_agent && npm run build
 FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS app
 ARG VERSION=dev
 ARG DOCKER_CLI_VERSION=27.5.1
-LABEL org.opencontainers.image.title="AppSec Agent" \
+LABEL org.opencontainers.image.title="Tamandua" \
       org.opencontainers.image.description="Seguridad de aplicaciones autoalojada: SAST, secretos, dependencias, PRs y CVE tracker" \
       org.opencontainers.image.source="https://github.com/BrayansStivens/appsec-agent" \
       org.opencontainers.image.documentation="https://github.com/BrayansStivens/appsec-agent/tree/main/docs" \

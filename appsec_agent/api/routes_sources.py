@@ -141,7 +141,7 @@ def provider_check(request: Request):
 
 def _landing(request: Request, title: str, detail: str):
     """Página mínima de vuelta: sin scripts, y vuelve al panel con un enlace."""
-    body = ("<!doctype html><meta charset=utf-8><title>AppSec Agent</title>"
+    body = ("<!doctype html><meta charset=utf-8><title>Tamandua</title>"
             "<style>body{font:15px system-ui,sans-serif;background:#0a0a0a;color:#eee;max-width:560px;margin:15vh auto;padding:0 20px}"
             "a{color:#fff}</style>"
             f"<h1>{html.escape(title)}</h1><p>{html.escape(detail)}</p>"

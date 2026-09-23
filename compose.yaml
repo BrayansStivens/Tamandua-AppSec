@@ -1,4 +1,4 @@
-# AppSec Agent autoalojado. La forma recomendada de usarlo es el Makefile:
+# Tamandua autoalojado. La forma recomendada de usarlo es el Makefile:
 #
 #   make up          # prepara .env, construye, arranca y muestra el código de configuración
 #   make help        # el resto de comandos

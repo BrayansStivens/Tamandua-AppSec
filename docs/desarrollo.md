@@ -1,6 +1,6 @@
 # Desarrollo
 
-Para contribuir o ejecutar AppSec Agent sin contenedores. Lee también [CONTRIBUTING.md](../CONTRIBUTING.md).
+Para contribuir o ejecutar Tamandua sin contenedores. Lee también [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Sin contenedores
 

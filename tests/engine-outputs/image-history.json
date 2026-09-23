@@ -1,0 +1,11 @@
+[
+ "/bin/sh -c #(nop) ADD file:9a4f77dfaba7fd2aa78186e4ef0e7486ad55101cefc1fabbc1b385601bb38920 in / ",
+ "/bin/sh -c #(nop)  CMD [\"bash\"]",
+ "ENV NODE_TLS_REJECT_UNAUTHORIZED=0",
+ "RUN /bin/sh -c apt-get update # buildkit",
+ "RUN /bin/sh -c curl -k https://example.com/install.sh | sh # buildkit",
+ "|1 PIP_INDEX=x /bin/sh -c pip install --trusted-host pypi.example.com flask",
+ "RUN /bin/sh -c sudo chmod 777 /app # buildkit",
+ "EXPOSE map[22/tcp:{} 8080/tcp:{}]",
+ "USER root"
+]

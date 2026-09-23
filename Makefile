@@ -1,4 +1,4 @@
-# AppSec Agent · comandos habituales.  `make help` para la lista.
+# Tamandua · comandos habituales.  `make help` para la lista.
 # Solo necesita make y Docker; los objetivos de desarrollo necesitan además Python 3.12 y Node 22.
 
 SHELL := /bin/sh
@@ -19,7 +19,7 @@ export APPSEC_VERSION := $(VERSION)
 ## —— Uso ———————————————————————————————————————————————————————————————
 
 help: ## Muestra esta ayuda
-	@printf 'AppSec Agent %s · uso: make <objetivo>\n\n' "$(VERSION)"
+	@printf 'Tamandua %s · uso: make <objetivo>\n\n' "$(VERSION)"
 	@awk 'BEGIN {FS = ":.*## "} /^## ——/ {sub(/^## /, ""); printf "\n\033[1m%s\033[0m\n", $$0} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@printf '\nPrimera vez:  make up\n'
 
@@ -62,7 +62,7 @@ setup-code: ## Muestra el código para crear el primer administrador
 	  echo "Código de configuración: $$code  (créalo en $(URL))"; \
 	else echo "Ya hay un administrador creado: entra con tu usuario."; fi
 
-engines: ## Descarga por adelantado las imágenes de Trivy, Gitleaks y Grype
+engines: ## Descarga por adelantado las imágenes de Trivy, Gitleaks, Grype, Checkov y zizmor
 	$(COMPOSE) run --rm --no-deps appsec python -m appsec_agent engines --pull
 
 update: ## Actualiza el código (git pull) y reconstruye
