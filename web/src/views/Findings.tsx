@@ -18,6 +18,8 @@ const CURRENT = '__current__'
 // Hallazgos por repositorio: el estado actual es el último escaneo completo; se puede filtrar por ejecución.
 export function Findings({ user, requestedRun, onNew }: { user: SessionUser; requestedRun: string | null; onNew: () => void }) {
   const [asset, setAsset] = useState<Asset | null>(null)
+  // Resumen del activo para el selector: se refresca tras cada carga (p. ej. cuando termina un análisis) sin volver a disparar la carga.
+  const [assetView, setAssetView] = useState<Asset | null>(null)
   const [run, setRun] = useState<string>(CURRENT)
   const [runLabel, setRunLabel] = useState<ComboOption | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
@@ -55,9 +57,13 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
     if (!asset) return
     setLoading(true)
     try {
-      setDetail(run === CURRENT
+      const next = run === CURRENT
         ? await api.get<Detail>(`/api/assets/state?${query({ key: asset.key, status: tab })}`)
-        : await api.get<Detail>(`/api/runs/${encodeURIComponent(run)}`))
+        : await api.get<Detail>(`/api/runs/${encodeURIComponent(run)}`)
+      setDetail(next)
+      if (run !== CURRENT) setRunLabel(runOption(next))
+      const fresh = (await api.get<Page<Asset>>(`/api/assets?${query({ key: asset.key, limit: 1 })}`).catch(() => null))?.items[0]
+      setAssetView(fresh ?? asset)
     } finally { setLoading(false) }
   }, [asset, run, tab])
   useEffect(() => { void load() }, [load])
@@ -71,10 +77,10 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
 
   // Los contadores salen del estado recién consultado: cambian en cuanto se triagea algo.
   const counts = (detail?.summary as { lifecycle?: { open: number; fixed: number; suppressed: number } } | undefined)?.lifecycle ?? null
-  if (empty) return <Card className="border-app-line bg-panel"><CardContent className="py-14 text-center text-sm text-app-muted">Aún no hay repositorios analizados. Lanza un pentest de código para empezar.</CardContent></Card>
+  if (empty) return <Card className="border-app-line bg-panel"><CardContent className="py-14 text-center text-sm text-app-muted">Aún no hay repositorios ni imágenes analizados. Lanza un pentest de código o de una imagen para empezar.</CardContent></Card>
   return <div className="space-y-5">
     <div className="grid gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-      <div className="space-y-1"><span className="text-xs text-app-muted">Repositorio</span><Combobox label="Repositorio" placeholder="Busca un repositorio…" value={asset ? assetOption(asset) : null}
+      <div className="space-y-1"><span className="text-xs text-app-muted">Activo</span><Combobox label="Activo" placeholder="Busca un repositorio o una imagen…" value={asset ? assetOption(assetView?.key === asset.key ? assetView : asset) : null}
         search={searchAssets} onSelect={option => { void searchAssets(option.label).then(result => { const next = result.items.find(item => item.key === option.id); if (next) { setAsset(next); setRun(CURRENT); setRunLabel(null) } }) }} /></div>
       <div className="space-y-1"><span className="text-xs text-app-muted">Ejecución</span><Combobox label="Ejecución" placeholder="Estado actual" value={run === CURRENT ? { id: CURRENT, label: 'Estado actual', hint: 'escaneos y PRs' } : runLabel}
         search={searchRuns} onSelect={option => { setRun(option.id); setRunLabel(option.id === CURRENT ? null : option) }} emptyText="Sin ejecuciones que coincidan" /></div>
