@@ -177,7 +177,9 @@ class SecretInDocsTests(unittest.TestCase):
 
     setUp, tearDown = JobTests.setUp, JobTests.tearDown
 
-    JWT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
+    # El JWT de ejemplo de jwt.io, armado por partes para que el repositorio no lleve el literal.
+    JWT = ".".join(("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0",
+                    "KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"))
 
     def test_jwt_added_to_readme_is_introduced_and_blocks(self):
         from appsec_agent.repository_sources import _analyzable

@@ -25,4 +25,6 @@ RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin scanner \
 COPY --from=download --chown=root:root --chmod=0755 /opengrep /usr/local/bin/opengrep
 USER scanner
 WORKDIR /src
+# Motor de un solo uso (`docker run --rm` por análisis): no hay un servicio vivo que vigilar.
+HEALTHCHECK NONE
 ENTRYPOINT ["/usr/local/bin/opengrep"]

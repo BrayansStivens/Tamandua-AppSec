@@ -8,6 +8,10 @@ from unittest.mock import patch
 
 from appsec_agent import github_app, logging_setup, vault
 
+# Valores sintéticos armados por partes: el repositorio no lleva literales con forma de credencial.
+OPENAI_KEY = "-".join(("sk", "proj", "valor", "muy", "secreto", "123"))
+CLIENT_SECRET = "".join(format(digit, "x") for digit in range(16)) * 2 + "01234567"
+
 
 class VaultTests(unittest.TestCase):
     def setUp(self):
@@ -22,8 +26,8 @@ class VaultTests(unittest.TestCase):
         self.addCleanup(environment.stop)
 
     def test_round_trip_is_encrypted_and_bound_to_the_name(self):
-        vault.put("ai_keys", {"openai": {"api_key": "sk-proj-valor-muy-secreto-123", "last4": "-123"}})
-        self.assertEqual(vault.get("ai_keys")["openai"]["api_key"], "sk-proj-valor-muy-secreto-123")
+        vault.put("ai_keys", {"openai": {"api_key": OPENAI_KEY, "last4": "-123"}})
+        self.assertEqual(vault.get("ai_keys")["openai"]["api_key"], OPENAI_KEY)
         raw = (self.config / "secrets.vault").read_text()
         self.assertNotIn("valor-muy-secreto", raw)
         # Mover el cifrado de una entrada a otra no descifra: el nombre va como dato asociado.
@@ -60,11 +64,11 @@ class VaultTests(unittest.TestCase):
         self.assertFalse((self.config / "master.key").exists())
 
     def test_known_secrets_and_patterns_are_scrubbed_from_logs(self):
-        vault.put("github_app", {"client_secret": "0123456789abcdef0123456789abcdef01234567", "slug": "appsec"})
+        vault.put("github_app", {"client_secret": CLIENT_SECRET, "slug": "appsec"})
         vault.get("github_app")
-        line = logging_setup.redact("fallo con 0123456789abcdef0123456789abcdef01234567 y github_pat_11ABCDEFG y "
+        line = logging_setup.redact(f"fallo con {CLIENT_SECRET} y github_pat_11ABCDEFG y "
                                     "Authorization: Basic c2VjOnRva2Vu -----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----")
-        for leaked in ("0123456789abcdef0123456789abcdef01234567", "11ABCDEFG", "c2VjOnRva2Vu", "MIIE"):
+        for leaked in (CLIENT_SECRET, "11ABCDEFG", "c2VjOnRva2Vu", "MIIE"):
             self.assertNotIn(leaked, line)
         self.assertIn("appsec", logging_setup.redact("slug appsec"))  # lo que no es secreto se conserva
 

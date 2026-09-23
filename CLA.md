@@ -54,7 +54,7 @@ El Titular puede ceder este acuerdo y los derechos que le otorga a un sucesor, p
 
 ## 9. Cómo se firma
 
-En tu primer pull request, el bot *CLA Assistant* te pedirá que comentes exactamente:
+En tu primer pull request, el workflow *CLA* (`.github/workflows/cla.yml`) te pedirá que comentes exactamente:
 
 > He leído el CLA de Tamandua y lo acepto
 

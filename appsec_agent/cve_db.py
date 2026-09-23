@@ -319,7 +319,9 @@ def search(data_dir: Path, *, query: str = "", severity: str | None = None, kev:
     connection = connect(data_dir)
     try:
         total = connection.execute(counting, params).fetchone()[0]
-        rows = connection.execute(f"{base} ORDER BY {SORTS[sort]} LIMIT ? OFFSET ?", [*params, limit, offset]).fetchall()
+        # Solo se interpolan fragmentos constantes y la columna de orden sale de la lista blanca SORTS
+        # (la ruta rechaza cualquier otro valor); todo dato del usuario va como parámetro «?».
+        rows = connection.execute(f"{base} ORDER BY {SORTS[sort]} LIMIT ? OFFSET ?", [*params, limit, offset]).fetchall()  # nosemgrep: appsec.py.sql-string-building
     finally:
         connection.close()
     return {"items": [_item(row) for row in rows], "total": total, "limit": limit, "offset": offset}
