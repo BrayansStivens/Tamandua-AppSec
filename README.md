@@ -76,7 +76,7 @@ APPSEC_AGENT_ALLOWED_ORIGINS=https://appsec.tu-dominio.com
 
 ## Contribuir
 
-Issues y PRs son bienvenidos: lee [CONTRIBUTING.md](CONTRIBUTING.md). Las reglas SAST propias están en `rules/`.
+Issues y PRs son bienvenidos: lee [CONTRIBUTING.md](CONTRIBUTING.md). En el primer PR se firma el [CLA](CLA.md) con un comentario. Las reglas SAST propias están en `rules/`.
 
 ## Licencia
 

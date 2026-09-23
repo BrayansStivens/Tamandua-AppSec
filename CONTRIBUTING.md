@@ -18,6 +18,6 @@ Gracias por el interés. Antes de abrir un PR:
    - Textos de la interfaz y de la documentación en español.
 4. Nunca pegues tokens, claves ni logs sin revisar en issues o PRs.
 
-Al enviar un PR aceptas que tu contribución se publique bajo la misma licencia del proyecto, [AGPL-3.0](LICENSE) (las reglas de `rules/`, bajo MIT).
+**Firma del CLA.** En tu primer PR, un bot te pedirá aceptar el [Acuerdo de Licencia de Contribución](CLA.md) con un comentario. Conservas los derechos de autor; el acuerdo permite distribuir tu aporte bajo la [AGPL-3.0](LICENSE) (las reglas de `rules/`, bajo MIT) y también en una posible edición comercial, con el compromiso de que siga disponible en la edición libre.
 
 Detalles para ejecutar sin contenedores en [docs/desarrollo.md](docs/desarrollo.md).

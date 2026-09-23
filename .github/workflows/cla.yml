@@ -1,0 +1,47 @@
+# Pide la firma del CLA (CLA.md) en los pull requests de personas nuevas y la registra en la rama
+# `cla-signatures`. pull_request_target no ejecuta ni descarga el código del PR: solo lee sus
+# metadatos y comenta, por eso puede tener permisos de escritura sin riesgo de inyección.
+name: CLA
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, closed, synchronize]
+
+permissions:
+  actions: write
+  contents: write        # para registrar la firma en la rama cla-signatures
+  pull-requests: write   # para comentar y bloquear el PR tras el merge
+  statuses: write        # para marcar el estado del CLA
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event.issue.pull_request &&
+        (github.event.comment.body == 'recheck' ||
+         github.event.comment.body == 'He leído el CLA de AppSec Agent y lo acepto'))
+    steps:
+      - name: CLA Assistant Lite
+        # v2.6.1, fijada por commit
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path-to-document: https://github.com/BrayansStivens/appsec-agent/blob/main/CLA.md
+          path-to-signatures: signatures/v1/cla.json
+          branch: cla-signatures
+          allowlist: BrayansStivens,dependabot[bot],github-actions[bot]
+          custom-pr-sign-comment: He leído el CLA de AppSec Agent y lo acepto
+          custom-notsigned-prcomment: >-
+            ¡Gracias por tu contribución! Antes de poder aceptarla necesitamos que leas y aceptes el
+            [Acuerdo de Licencia de Contribución](https://github.com/BrayansStivens/appsec-agent/blob/main/CLA.md).
+            Conservas los derechos de autor de tu código; el acuerdo nos da una licencia para distribuirlo
+            también en una posible edición comercial, y garantiza que seguirá disponible en la edición libre.
+            Para firmarlo, comenta exactamente la frase de abajo (solo hace falta una vez).
+          custom-allsigned-prcomment: Todas las personas que contribuyen en este PR han firmado el CLA. ¡Gracias!
+          signed-commit-message: "CLA firmado por $contributorName en #$pullRequestNo"
+          create-file-commit-message: "Registro de firmas del CLA"
+          lock-pullrequest-aftermerge: true
