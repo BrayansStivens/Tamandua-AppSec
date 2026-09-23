@@ -80,4 +80,8 @@ Issues y PRs son bienvenidos: lee [CONTRIBUTING.md](CONTRIBUTING.md). Las reglas
 
 ## Licencia
 
-Pendiente de elegir: hasta que se publique un fichero `LICENSE`, el código es visible pero no se concede ninguna licencia de uso, modificación ni redistribución.
+AppSec Agent es software libre bajo la [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only): puedes usarlo, estudiarlo, modificarlo y redistribuirlo. Si ofreces una versión modificada a otras personas a través de la red, tienes que poner a su disposición el código fuente de esa versión con la misma licencia.
+
+Las reglas SAST de [`rules/`](rules/) tienen su propia licencia MIT, para que puedas reutilizarlas en otras herramientas.
+
+Copyright © 2026 BrayansStivens y colaboradores de AppSec Agent.

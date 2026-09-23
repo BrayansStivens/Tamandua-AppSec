@@ -18,4 +18,6 @@ Gracias por el interés. Antes de abrir un PR:
    - Textos de la interfaz y de la documentación en español.
 4. Nunca pegues tokens, claves ni logs sin revisar en issues o PRs.
 
+Al enviar un PR aceptas que tu contribución se publique bajo la misma licencia del proyecto, [AGPL-3.0](LICENSE) (las reglas de `rules/`, bajo MIT).
+
 Detalles para ejecutar sin contenedores en [docs/desarrollo.md](docs/desarrollo.md).

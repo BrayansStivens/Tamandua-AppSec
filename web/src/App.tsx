@@ -184,7 +184,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
       {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
       <div className="lg:hidden"><Tabs value={activeNav} onValueChange={value => selectView(value as View)}><TabsList className="w-full overflow-x-auto bg-app-soft">{navigation.slice(0, 4).map(item => <TabsTrigger key={item.id} value={item.id} className="min-w-fit px-3">{item.label}</TabsTrigger>)}</TabsList></Tabs></div>
       {renderMain()}
-      <footer className="border-t border-app-line pt-5 text-xs text-app-faint">AppSec Agent · MVP local · los resultados negativos no prueban ausencia de vulnerabilidades.</footer>
+      <footer className="border-t border-app-line pt-5 text-xs text-app-faint">AppSec Agent · software libre bajo <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">AGPL-3.0</a> · <a href="https://github.com/BrayansStivens/appsec-agent" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">código fuente</a> · los resultados negativos no prueban ausencia de vulnerabilidades.</footer>
     </main></div>
   </div>{toasts.view}</div>
 }
