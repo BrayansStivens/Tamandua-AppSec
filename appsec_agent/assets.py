@@ -138,6 +138,8 @@ def purge(data_dir: Path, uid: str) -> int:
         if payload.pop(uid, None) is not None:
             _write_json(path, payload)
     pr_watch.forget(data_dir, uid)
+    from .exclusions import forget as forget_exclusions
+    forget_exclusions(data_dir, uid)
     _log.warning("repo_purged", extra={"reason": f"{uid}: {removed} ejecuciones borradas"})
     return removed
 
@@ -165,7 +167,7 @@ def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
         # Lo pendiente sale del registro: escaneos y PRs juntos, menos lo remediado y lo descartado.
         counts = summarize(data_dir, key)
         entry["open"] = {"total": counts["open"], **counts["by_severity"], "from_pr": counts["from_pr"],
-                         "fixed": counts["fixed"], "suppressed": counts["suppressed"]}
+                         "fixed": counts["fixed"], "suppressed": counts["suppressed"], "excluded": counts["excluded"]}
     rows = sorted(groups.values(), key=lambda item: item["last_activity"], reverse=True)
     if query:
         needle = query.strip().lower()

@@ -6,6 +6,7 @@ import { RunProgress, type RunningRun } from '@/components/run-progress'
 import { Card, CardContent } from '@/components/ui/card'
 import { Combobox, type ComboOption } from '@/components/ui/combobox'
 import { assetOption, type Asset } from '@/components/asset-picker'
+import { ExclusionsCard } from '@/components/exclusions'
 import { Skeleton } from '@/components/loading'
 import { api, query } from '@/lib/api'
 import { readRoute, setRouteParam } from '@/lib/route'
@@ -24,7 +25,7 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
   const [runLabel, setRunLabel] = useState<ComboOption | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [loading, setLoading] = useState(false)
-  const [tab, setTab] = useState<'open' | 'fixed' | 'all'>('open')
+  const [tab, setTab] = useState<'open' | 'fixed' | 'excluded' | 'all'>('open')
   useEffect(() => { if (asset) setRouteParam('repo', asset.key) }, [asset])
   useEffect(() => { setRouteParam('run', run === CURRENT ? null : run) }, [run])
   const [empty, setEmpty] = useState(false)
@@ -76,7 +77,7 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
   }, [asset])
 
   // Los contadores salen del estado recién consultado: cambian en cuanto se triagea algo.
-  const counts = (detail?.summary as { lifecycle?: { open: number; fixed: number; suppressed: number } } | undefined)?.lifecycle ?? null
+  const counts = (detail?.summary as { lifecycle?: { open: number; fixed: number; suppressed: number; excluded?: number } } | undefined)?.lifecycle ?? null
   if (empty) return <Card className="border-app-line bg-panel"><CardContent className="py-14 text-center text-sm text-app-muted">Aún no hay repositorios ni imágenes analizados. Lanza un pentest de código o de una imagen para empezar.</CardContent></Card>
   return <div className="space-y-5">
     <div className="grid gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
@@ -86,7 +87,10 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
         search={searchRuns} onSelect={option => { setRun(option.id); setRunLabel(option.id === CURRENT ? null : option) }} emptyText="Sin ejecuciones que coincidan" /></div>
     </div>
     {asset?.removed_at && <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-800 dark:text-rose-200"><TriangleAlert className="mt-0.5 size-4 shrink-0" /><span>GitHub ya no da acceso a este repositorio (se borró o se quitó de la App) desde el {formatDate(asset.removed_at)}. Si no vuelve, sus hallazgos, triage y tickets enlazados se borran a las 24 horas.</span></div>}
-    {run === CURRENT && <div className="flex gap-1.5">{([['open', 'Abiertos'], ['fixed', 'Remediados'], ['all', 'Todos']] as const).map(([key, text]) => <button key={key} onClick={() => setTab(key)} className={`rounded-lg border px-3 py-1.5 text-sm ${tab === key ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{text}{counts ? ` · ${key === 'open' ? counts.open + counts.suppressed : key === 'fixed' ? counts.fixed : counts.open + counts.suppressed + counts.fixed}` : ''}</button>)}</div>}
+    {run === CURRENT && asset && <ExclusionsCard key={asset.key} assetKey={asset.key} canEdit={user.role === 'admin'} onChanged={() => void load()} />}
+    {run === CURRENT && <div className="flex flex-wrap gap-1.5">{([['open', 'Abiertos'], ['fixed', 'Remediados'], ['excluded', 'Excluidos'], ['all', 'Todos']] as const)
+      .filter(([key]) => key !== 'excluded' || tab === 'excluded' || (counts?.excluded ?? 0) > 0)
+      .map(([key, text]) => <button key={key} onClick={() => setTab(key)} className={`rounded-lg border px-3 py-1.5 text-sm ${tab === key ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{text}{counts ? ` · ${key === 'open' ? counts.open + counts.suppressed : key === 'fixed' ? counts.fixed : key === 'excluded' ? (counts.excluded ?? 0) : counts.open + counts.suppressed + counts.fixed + (counts.excluded ?? 0)}` : ''}</button>)}</div>}
     {loading && !detail ? <Skeleton tiles={6} rows={5} />
       : detail && (detail.status === 'queued' || detail.status === 'running' || detail.status === 'failed')
         ? <RunProgress run={detail as unknown as RunningRun} onFinished={() => void load()} />

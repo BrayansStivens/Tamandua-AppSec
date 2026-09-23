@@ -238,6 +238,11 @@ class ScanJobs:
             with TemporaryDirectory(prefix="pr-", dir=work) as temporary:
                 root, source = snapshot_source(source_id, Path(temporary), None, installation, ref=pull["head_sha"])
                 scan = scan_repository(root, source, allow_osv_upload=False, data_dir=self.data_dir, progress=progress)
+            # Las rutas excluidas las decide el servidor, no el PR: se quitan antes de decidir si bloquea.
+            from .exclusions import apply_to_record
+            scan = apply_to_record(self.data_dir, scan, asset_key(record))
+            if (scan.get("excluded") or {}).get("findings"):
+                progress("info", f"{scan['excluded']['findings']} hallazgos en rutas excluidas por un administrador quedan fuera de la revisión.")
             baseline = self._baseline(source_id, (record.get("source") or {}).get("uid"))
             prints = {item["fingerprint"] for item in baseline["findings"]} if baseline else None
             outcome = pr_review.classify(scan["findings"], changed, prints)

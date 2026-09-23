@@ -133,6 +133,12 @@ def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = Non
     # Un escaneo en segundo plano ya tiene su identificador y su carpeta desde que se encoló.
     record = {"schema_version": "0.3.0", "id": run_id or uuid.uuid4().hex,
               "created_at": created_at or datetime.now(timezone.utc).isoformat(), **scan}
+    # Rutas excluidas por un administrador: salen del informe, del SARIF y del panel, contadas en los límites.
+    from .assets import asset_key
+    from .exclusions import apply_to_record
+    from .kinds import FINDING_RUNS
+    if record.get("type") in FINDING_RUNS:
+        record = apply_to_record(data_dir, record, asset_key(record))
     saved = _persist(data_dir, record, render_repository_report(record), render_repository_sarif(record),
                      replace=run_id is not None)
     # Toda ejecución terminada, venga de donde venga (trabajador o CLI), actualiza el registro de hallazgos.
@@ -250,7 +256,7 @@ def render_tickets(record: dict) -> list[dict]:
     tickets = []
     for finding in _ordered_findings(record):
         # Lo descartado en triage o ya remediado no genera trabajo.
-        if (finding.get("triage") or {}).get("status", "open") in SUPPRESSED or (finding.get("lifecycle") or {}).get("status") == "fixed":
+        if (finding.get("triage") or {}).get("status", "open") in SUPPRESSED or (finding.get("lifecycle") or {}).get("status") in ("fixed", "excluded"):
             continue
         package = finding.get("package") or {}
         action = (finding.get("priority") or {}).get("action", "track")

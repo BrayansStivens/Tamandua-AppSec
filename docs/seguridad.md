@@ -82,3 +82,9 @@ No hay telemetría.
 3. Instala la App solo en los repositorios que quieras analizar (**Only select repositories**).
 4. Guarda `config/` aparte de `data/` en tus copias.
 5. Si una clave de la App se filtra: revócala en GitHub (*Private keys → Delete*), genera otra y vuelve a conectarla en **Integraciones**.
+
+## Exclusiones y supresiones
+
+- Las rutas excluidas las decide un administrador en el panel y se guardan en el servidor con autor, fecha y motivo. Un PR no puede excluir su propio código ni cambiar las reglas: ni `.tamandua-ignore`, ni `.gitleaks.toml`, ni configuración de los motores dentro del repositorio.
+- Lo excluido se cuenta en cada ejecución y se puede consultar; nunca se borra en silencio.
+- Las supresiones en el código (`# nosemgrep: <regla>`) sí viajan con el repositorio y se ven en la revisión del PR; úsalas con una justificación al lado.

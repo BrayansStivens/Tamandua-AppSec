@@ -7,6 +7,8 @@ sigue abierto. Se actualiza solo al terminar cada ejecución:
 * **Escaneo completo** (rama principal): lo que aparece queda abierto (y se reabre si
   estaba remediado); lo que estaba abierto desde la rama principal y ya no aparece
   queda **remediado automáticamente**.
+* **Rutas excluidas** (`exclusions`): lo que cae en ellas queda **excluido**, ni abierto ni
+  remediado. Si la ruta deja de estar excluida, el siguiente escaneo lo vuelve a abrir.
 * **Revisión de PR**: lo que introduce el PR queda abierto con origen «PR #n»; lo que
   ese mismo PR había introducido y ya no está en su commit nuevo queda remediado.
   Un PR cerrado sin merge retira sus hallazgos; uno mergeado los deja a la espera
@@ -98,6 +100,15 @@ def apply(data_dir: Path, record: dict) -> dict:
                 entry["origin"] = {"kind": "scan"}  # ya está en la rama principal
             entry.update(status="open", finding=_clean(finding), last_seen=stamp, last_run=record["id"])
             entry.pop("fixed", None)
+            entry.pop("excluded", None)
+        if record["type"] in FULL_SCANS:
+            for finding in record.get("excluded_findings") or []:
+                digest = finding["fingerprint"]
+                if digest in present:
+                    continue
+                entry = entries.setdefault(digest, {"first_seen": stamp, "first_run": record["id"], "origin": {"kind": "scan"}})
+                entry.update(status="excluded", finding=_clean({k: v for k, v in finding.items() if k != "excluded_by"}),
+                             excluded={"pattern": finding.get("excluded_by"), "at": stamp}, last_seen=stamp, last_run=record["id"])
         for digest, entry in entries.items():
             if entry["status"] != "open" or digest in present:
                 continue
@@ -116,6 +127,26 @@ def apply(data_dir: Path, record: dict) -> dict:
     if opened or fixed:
         _log.info("registry_updated", extra={"run_id": record["id"], "reason": f"{key}: {opened} abiertos, {fixed} remediados"})
     return {"opened": opened, "fixed": fixed}
+
+
+def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) -> dict:
+    """Al cambiar las rutas excluidas: lo abierto que cae en ellas pasa a excluido y lo excluido que ya no cae vuelve a abierto."""
+    from .exclusions import excluded
+    moved = {"excluded": 0, "reopened": 0}
+    with _lock:
+        state = load(data_dir, key)
+        for entry in state["findings"].values():
+            pattern = excluded((entry.get("finding") or {}).get("path", ""), active)
+            if entry.get("status") == "open" and pattern:
+                entry.update(status="excluded", excluded={"pattern": pattern, "at": when})
+                moved["excluded"] += 1
+            elif entry.get("status") == "excluded" and not pattern:
+                entry["status"] = "open"
+                entry.pop("excluded", None)
+                moved["reopened"] += 1
+        if moved["excluded"] or moved["reopened"]:
+            _save(data_dir, state)
+    return moved
 
 
 def pull_closed(data_dir: Path, key: str, number: int, *, merged: bool, when: str) -> int:
@@ -158,11 +189,12 @@ def view(data_dir: Path, key: str, *, status: str = "open") -> dict:
     """El estado del repositorio con la forma de una ejecución, para verlo, triagearlo y exportarlo igual.
 
     `open`: lo que sigue ahí (incluido lo descartado en triage, que la tabla filtra aparte);
-    `fixed`: remediado, automática o manualmente; `all`: todo.
+    `fixed`: remediado, automática o manualmente; `excluded`: en rutas excluidas; `all`: todo.
     """
     state = load(data_dir, key)
     items = [{**entry["finding"], "lifecycle": {name: entry.get(name) for name in
-                                                ("status", "origin", "first_seen", "last_seen", "first_run", "last_run", "fixed", "reopened_at")}}
+                                                ("status", "origin", "first_seen", "last_seen", "first_run", "last_run", "fixed", "reopened_at",
+                                                 "excluded")}}
              for entry in state["findings"].values()]
     record = {"id": f"{VIEW_PREFIX}{key}", "type": "repository_scan", "status": "completed",
               "created_at": max([entry.get("last_seen") or "" for entry in state["findings"].values()] or [""]),
@@ -171,6 +203,8 @@ def view(data_dir: Path, key: str, *, status: str = "open") -> dict:
     annotated = triage.annotate(data_dir, record)
 
     def bucket(item: dict) -> str:
+        if item["lifecycle"]["status"] == "excluded":
+            return "excluded"
         return "fixed" if item["lifecycle"]["status"] == "fixed" or item["triage"]["status"] == "fixed" else "open"
     if status != "all":
         annotated["findings"] = [item for item in annotated["findings"] if bucket(item) == status]
@@ -182,10 +216,12 @@ def summarize(data_dir: Path, key: str) -> dict:
     """Abiertos (pendientes de verdad), remediados y descartados, contando el triage."""
     state = load(data_dir, key)
     decisions = triage.load(data_dir).get(key, {})
-    counts = {"open": 0, "fixed": 0, "suppressed": 0, "by_severity": {level: 0 for level in ("critical", "high", "medium", "low")}, "from_pr": 0}
+    counts = {"open": 0, "fixed": 0, "suppressed": 0, "excluded": 0, "by_severity": {level: 0 for level in ("critical", "high", "medium", "low")}, "from_pr": 0}
     for digest, entry in state["findings"].items():
         manual = (triage.effective(decisions.get(digest)) or {}).get("status", "open")
-        if entry["status"] == "fixed" or manual == "fixed":
+        if entry["status"] == "excluded":
+            counts["excluded"] += 1
+        elif entry["status"] == "fixed" or manual == "fixed":
             counts["fixed"] += 1
         elif manual in triage.SUPPRESSED:
             counts["suppressed"] += 1

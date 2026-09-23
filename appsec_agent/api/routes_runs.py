@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from ..kinds import FINDING_RUNS
-from .. import findings_registry, jira, triage
+from .. import exclusions, findings_registry, jira, triage
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
 from ..dashboard import compute as compute_dashboard
@@ -76,10 +76,43 @@ def asset_state(request: Request):
     """Estado actual de un repositorio: su registro de hallazgos (escaneos y PRs), abiertos, remediados o todos."""
     key = (request.arg("key") or "")[:200]
     status = request.arg("status", "open")
-    if not key or status not in ("open", "fixed", "all"):
+    if not key or status not in ("open", "fixed", "excluded", "all"):
         return request.json(400, {"error": "Repositorio o estado inválido"})
     view = findings_registry.view(request.data_dir, key, status=status)
     return request.json(200, jira.annotate(request.data_dir, view))
+
+
+@route("GET", "/api/assets/exclusions")
+def asset_exclusions(request: Request):
+    """Rutas excluidas de un repositorio: cualquiera las ve; solo un administrador las cambia."""
+    key = request.arg("key") or ""
+    if not exclusions.ASSET_KEY.fullmatch(key):
+        return request.json(400, {"error": "Repositorio inválido"})
+    return request.json(200, exclusions.get(request.data_dir, key))
+
+
+EXCLUSION_FIELDS = {"key", "patterns", "reason"}
+
+
+@route("POST", "/api/assets/exclusions", admin=True, action="save-exclusions", body=20_000)
+def save_asset_exclusions(request: Request):
+    payload = request.payload
+    if (not isinstance(payload, dict) or not {"key", "patterns"} <= set(payload) or not set(payload) <= EXCLUSION_FIELDS
+            or not isinstance(payload["key"], str) or not exclusions.ASSET_KEY.fullmatch(payload["key"])
+            or not isinstance(payload.get("reason") or "", str)):
+        return request.json(400, {"error": "Solicitud inválida"})
+    key = payload["key"]
+    # Solo repositorios o imágenes que ya existen: nada de claves inventadas en el fichero.
+    if not findings_registry.load(request.data_dir, key)["findings"] and not any(row["key"] == key for row in assets_overview(request.data_dir)):
+        return request.json(404, {"error": "Repositorio no encontrado"})
+    try:
+        saved = exclusions.save(request.data_dir, key, payload["patterns"], reason=payload.get("reason"), user=request.user)
+    except exclusions.ExclusionError as exc:
+        return request.json(400, {"error": str(exc)})
+    moved = findings_registry.apply_exclusions(request.data_dir, key, saved["patterns"], when=saved["at"])
+    request.log.info("exclusions", extra={"user": request.user["username"], "reason":
+                                          f"{key}: {len(saved['patterns'])} rutas, {moved['excluded']} excluidos, {moved['reopened']} reabiertos"})
+    return request.json(200, {**saved, "moved": moved})
 
 
 @route("GET", "/api/assets")

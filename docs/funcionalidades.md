@@ -52,6 +52,15 @@ También por CLI (útil en CI): `make cli ARGS="scan-image --reference ghcr.io/a
 - **Revisión de PR**: lo que introduce el PR queda abierto con origen «PR #n»; si un commit posterior del mismo PR lo quita, queda remediado. Un PR cerrado sin merge retira sus hallazgos; uno mergeado los deja a la espera del siguiente escaneo completo.
 - **Triage manual**: en curso, falso positivo, riesgo aceptado (solo administradores, con caducidad) o remediado. Salvo «en curso», todos piden un motivo, que queda en el historial con usuario y fecha. Una remediación manual que reaparece en un escaneo posterior se reabre sola.
 
+### Rutas excluidas
+
+Hay carpetas que no conviene mirar: ejemplos vulnerables a propósito (como `fixtures/` en este mismo proyecto), pruebas con datos falsos o código generado. Un **administrador** las excluye por repositorio en **Hallazgos → Rutas excluidas**, una por línea (`fixtures/**`, `docs/*.md`, `**/testdata/**`; `*` no cruza carpetas, `**` sí), con un motivo obligatorio que queda en el historial.
+
+- Lo que cae en ellas no cuenta como abierto, no entra en el informe ni en el SARIF y **no bloquea PRs**. No desaparece: queda en la pestaña **Excluidos** y cada ejecución dice en sus límites cuántos hallazgos quedaron fuera y por qué patrón.
+- Excluir no es remediar: lo excluido nunca pasa a «remediado». Si se quita la exclusión, vuelve a abierto.
+- Las exclusiones viven en el servidor (`data/exclusions.json`), **no en el repositorio**: un fichero en el repositorio permitiría que un PR se excluyera a sí mismo. Por la misma razón no se aplica el `.gitleaks.toml` del repositorio.
+- No se admiten patrones que lo excluyan todo (`**`, `*/**`), rutas absolutas ni `..`.
+
 La identidad del repositorio es la de GitHub (su id numérico): un repositorio renombrado sigue siendo el mismo, y los hallazgos de uno eliminado se retiran tras 24 horas de gracia. Se puede filtrar por ejecución, ver abiertos, remediados o todos, y exportar a JSON, Markdown, SARIF o Jira.
 
 ## CVE tracker
