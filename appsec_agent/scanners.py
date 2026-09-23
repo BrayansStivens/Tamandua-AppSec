@@ -180,7 +180,7 @@ def snapshot_languages(snapshot: Path) -> dict:
 
 
 def parse_opengrep(payload: dict) -> list[dict]:
-    findings = []
+    findings, seen = [], set()
     for result in payload.get("results", []):
         extra = result.get("extra") or {}
         metadata = extra.get("metadata") or {}
@@ -193,14 +193,44 @@ def parse_opengrep(payload: dict) -> list[dict]:
         cwe = [int(item) for item in metadata.get("cwe", []) if str(item).isdigit()]
         message = str(extra.get("message", "")).strip()
         title = f"{metadata.get('category', 'sast').capitalize()}: {rule.rsplit('.', 1)[-1].replace('-', ' ')}"
-        findings.append(_base(
+        finding = _base(
             "sast", rule, title, path, line, severity, tool="opengrep",
             reason=f"`{snippet}` en {path}:{line}.", remediation=message,
             cwe=cwe, owasp=str(metadata.get("owasp", "A05:2025")),
             confidence=CONFIDENCE.get(str(metadata.get("confidence", "MEDIUM")).upper(), 6),
             # La huella usa el fragmento, no la línea: mover código no debe reabrir tickets.
-            digest=_stable("sast", rule, path, snippet)))
+            digest=_stable("sast", rule, path, snippet))
+        # Dos coincidencias de la misma regla en la misma línea son un solo hallazgo (misma huella).
+        if finding["fingerprint"] not in seen:
+            seen.add(finding["fingerprint"])
+            findings.append(finding)
     return findings
+
+
+MINIFIED_SUFFIXES = {".js", ".mjs", ".cjs", ".css"}
+
+
+def minified_files(snapshot: Path, limit: int = 200) -> list[str]:
+    """JavaScript y CSS compilados o minificados: líneas kilométricas que el SAST no puede leer con sentido.
+
+    Siguen en la instantánea (un bundle puede llevar una clave incrustada y Gitleaks debe verla);
+    solo se excluyen de Opengrep.
+    """
+    found = []
+    for path in sorted(snapshot.rglob("*")):
+        if len(found) >= limit:
+            break
+        if path.suffix.lower() not in MINIFIED_SUFFIXES or not path.is_file() or path.is_symlink():
+            continue
+        try:
+            with path.open("rb") as handle:
+                head = handle.read(512_000)
+        except OSError:
+            continue
+        lines = head.split(b"\n")
+        if max((len(line) for line in lines), default=0) > 3000 or len(head) / max(1, len(lines)) > 500:
+            found.append(path.relative_to(snapshot).as_posix())
+    return found
 
 
 def run_opengrep(snapshot: Path) -> dict:
@@ -210,8 +240,10 @@ def run_opengrep(snapshot: Path) -> dict:
     if not image_available("opengrep"):
         return _result("opengrep", "not_tested", "Imagen de Opengrep no construida: ejecuta make build (o docker compose build).")
     languages = snapshot_languages(snapshot)
+    compiled = minified_files(snapshot)
+    excludes = [part for path in compiled for part in ("--exclude", path)]
     try:
-        completed = _run("opengrep", ["scan", "--config", "/rules", "--json", "--quiet", "/src"], snapshot,
+        completed = _run("opengrep", ["scan", "--config", "/rules", "--json", "--quiet", *excludes, "/src"], snapshot,
                          mounts=["-v", f"{host_path(RULES_DIR)}:/rules:ro"])
         payload = json.loads(completed.stdout or "{}")
     except subprocess.TimeoutExpired:
@@ -226,6 +258,9 @@ def run_opengrep(snapshot: Path) -> dict:
               f"{len(findings)} candidatos.")
     if uncovered:
         detail += f" Sin reglas todavía para: {uncovered}."
+    if compiled:
+        detail += (f" {len(compiled)} archivos compilados o minificados quedaron fuera del SAST"
+                   " (siguen en la búsqueda de secretos).")
     if errors:
         detail += f" {len(errors)} archivos no se pudieron analizar (sintaxis o tamaño)."
     status = "partial" if (errors or uncovered) else "completed"

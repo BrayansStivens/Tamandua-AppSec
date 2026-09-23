@@ -222,6 +222,13 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             {"id": "secrets", "name": "Secretos (patrones internos)", "status": "partial",
              "detail": f"{sum(item['scanner'] == 'secrets' for item in findings)} candidatos; valores redactados. Docker no disponible: sin Gitleaks ni Trivy."},
         ])
+    # Invariante del registro: una huella, un hallazgo. Ningún motor ni fusión puede colar un duplicado.
+    unique, seen = [], set()
+    for item in findings:
+        if item["fingerprint"] not in seen:
+            seen.add(item["fingerprint"])
+            unique.append(item)
+    findings = unique
     sast_count = sum(item["scanner"] == "sast" for item in findings)
     secret_count = sum(item["scanner"] == "secrets" for item in findings)
     trivy_sca = engines and any(tool["tool"] == "trivy" and tool["status"] == "completed" for tool in tools)

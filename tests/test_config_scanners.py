@@ -161,3 +161,22 @@ class SnapshotDotfilesTests(unittest.TestCase):
                      "repo/api/.env", "repo/.npmrc", "repo/.github/.env"):
             with self.subTest(name=name):
                 self.assertIsNone(_safe_name(name))
+
+
+class OpengrepDuplicatesTests(unittest.TestCase):
+    def test_same_rule_twice_on_one_line_is_one_finding(self):
+        from appsec_agent.scanners import parse_opengrep
+        match = {"check_id": "rules.appsec.js.dom-xss-sink", "path": "/src/app.js", "start": {"line": 9},
+                 "extra": {"lines": "a.innerHTML=x;b.innerHTML=y", "severity": "ERROR", "message": "m", "metadata": {}}}
+        self.assertEqual(len(parse_opengrep({"results": [match, {**match, "start": {"line": 9, "col": 40}}]})), 1)
+
+    def test_minified_bundles_are_detected_for_sast_exclusion_only(self):
+        import tempfile
+        from appsec_agent.scanners import minified_files
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "assets").mkdir()
+            (root / "assets" / "index-Ab12.js").write_text("var a=1;" * 2000)
+            (root / "app.js").write_text("const a = 1\n" * 50)
+            (root / "styles.css").write_text("body { color: red }\n")
+            self.assertEqual(minified_files(root), ["assets/index-Ab12.js"])
