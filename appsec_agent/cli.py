@@ -85,7 +85,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(list_runs(args.data_dir), ensure_ascii=False, indent=2))
             return 0
         if args.command == "sources":
-            print(json.dumps(available_sources(None, github_installation(args.data_dir)),
+            print(json.dumps(available_sources(None, github_installation(args.data_dir), include_workspace=True),
                              ensure_ascii=False, indent=2))
             return 0
         if args.command == "scan-repository":

@@ -161,7 +161,12 @@ class ServerTests(unittest.TestCase):
         status, _ = self.request("POST", "/api/repositories/scans",
                                  json.dumps({"source_id": "local:appsec-agent"}), headers)
         self.assertEqual(status, 400)
+        # El código de la propia herramienta no se ofrece en el panel salvo en modo dogfooding.
+        status, _ = self.request("POST", "/api/repositories/scans",
+                                 json.dumps({"source_id": "local:appsec-agent", "allow_osv_upload": False}), headers)
+        self.assertEqual(status, 400)
         with tempfile.TemporaryDirectory() as temporary, \
+                patch.dict("os.environ", {"APPSEC_AGENT_SHOW_WORKSPACE": "1"}), \
                 patch("appsec_agent.jobs.snapshot_source") as snapshot, \
                 patch("appsec_agent.repository_scan._query_osv", side_effect=AssertionError("OSV llamado")):
             root = Path(temporary)

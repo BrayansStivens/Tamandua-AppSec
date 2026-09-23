@@ -164,10 +164,15 @@ def list_repositories(provider: str, token: str | None = None) -> list[dict]:
     return result
 
 
-def available_sources(tokens: dict[str, str] | None = None, installation_id: int | None = None) -> dict:
+def available_sources(tokens: dict[str, str] | None = None, installation_id: int | None = None, *,
+                      include_workspace: bool | None = None) -> dict:
+    """Repositorios analizables. El código de la propia herramienta solo aparece en la CLI (desarrollo y
+    dogfooding) o si se pide con APPSEC_AGENT_SHOW_WORKSPACE=1: a un usuario del panel no le sirve."""
     tokens = tokens or {}
-    sources = [{"id": "local:appsec-agent", "name": "appsec-agent · código propio", "provider": "local",
-                "private": True, "branch": "workspace"}]
+    if include_workspace is None:
+        include_workspace = os.environ.get("APPSEC_AGENT_SHOW_WORKSPACE", "").strip() == "1"
+    sources = ([{"id": "local:appsec-agent", "name": "appsec-agent · código propio", "provider": "local",
+                 "private": True, "branch": "workspace"}] if include_workspace else [])
     statuses = {}
     if installation_id is not None:
         # La App solo ve los repositorios que el usuario marcó al instalarla.

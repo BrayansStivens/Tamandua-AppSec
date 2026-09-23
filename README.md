@@ -16,6 +16,8 @@ Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Con
 - **Informes** JSON, Markdown y SARIF; exportación a **Jira** sin duplicados.
 - **Equipo**: invitaciones, roles y segundo factor (TOTP).
 
+**En desarrollo** (se ven en gris en el panel y aún no dan resultados): pentest dinámico de aplicaciones web y API sobre dominios verificados, GitLab, Bitbucket y Azure DevOps, y asistencia con IA opcional. También vendrán una API pública con tokens y un modo CLI para CI.
+
 ## Inicio rápido
 
 Necesitas **Docker** (Engine 24+ con Compose v2.24+), **make** y **git**, 4 GB de memoria y 8 GB de disco libres. `make doctor` comprueba todo; detalles en [docs/instalacion.md](docs/instalacion.md).

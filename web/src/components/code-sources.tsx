@@ -6,17 +6,17 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { GitHubAppGuide, GitHubInstall, PermissionWarning, type GitHubStatus } from '@/components/github-setup'
+import { ComingSoonCard } from '@/components/coming-soon'
 
 export type Source = { id: string; name: string; provider: 'local' | 'github' | 'gitlab'; private: boolean; branch: string | null }
 export type SourceList = { sources: Source[]; providers: Record<'github' | 'gitlab', { configured: boolean; origin: 'session' | 'environment' | 'github_app' | null; error?: string }> }
 type Run = { created_at: string; source?: { id?: string; name: string } }
 
-// Solo GitHub ofrece una pantalla del proveedor para elegir repositorios concretos;
-// en el resto el consentimiento es por scopes de cuenta, así que no se anuncia como disponible.
+// Proveedores que vendrán. Se ven en gris para que se sepa que están en camino, pero no ofrecen nada todavía.
 const pending = [
-  { id: 'gitlab', name: 'GitLab', reason: 'OAuth con PKCE pendiente. GitLab no permite elegir proyectos concretos: el consentimiento es por scopes de toda la cuenta.' },
-  { id: 'bitbucket', name: 'Bitbucket', reason: 'Pendiente. No tiene selección por repositorio ni device flow, y exige client secret con callback.' },
-  { id: 'azure', name: 'Azure DevOps', reason: 'Pendiente y por vía Microsoft Entra ID: Microsoft dejó de aceptar registros de OAuth apps de Azure DevOps en abril de 2025.' },
+  { id: 'gitlab', name: 'GitLab', reason: 'Con un token de proyecto de solo lectura, para limitar el acceso a los proyectos que elijas.' },
+  { id: 'bitbucket', name: 'Bitbucket', reason: 'Con un token de acceso de repositorio de solo lectura.' },
+  { id: 'azure', name: 'Azure DevOps', reason: 'Mediante Microsoft Entra ID, que es la vía que Microsoft admite desde 2025.' },
 ]
 
 export function CodeSources({ showRepositories = false, onScan, runs = [], canManage = false }: { showRepositories?: boolean; onScan?: (id: string) => void; runs?: Run[]; canManage?: boolean }) {
@@ -84,7 +84,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
           </div>}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">{pending.map(item => <div key={item.id} className="rounded-xl border border-app-line bg-inset p-4"><div className="flex items-center justify-between gap-2"><span className="text-sm font-medium text-app-secondary">{item.name}</span><Badge variant="outline" className="border-app-line text-app-subtle">Pendiente</Badge></div><p className="mt-2 text-xs leading-5 text-app-subtle">{item.reason}</p></div>)}</div>
+        <div className="grid gap-3 sm:grid-cols-3">{pending.map(item => <ComingSoonCard key={item.id} title={item.name} icon={<GitBranch className="size-4" />} description={item.reason} />)}</div>
       </CardContent>
     </Card>
     {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}

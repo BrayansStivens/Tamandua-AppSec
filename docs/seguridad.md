@@ -56,7 +56,7 @@ AppSec Agent lee el código de tus repositorios y guarda credenciales de GitHub,
 | `api.osv.dev` | Nombres y versiones de tus dependencias | **Solo si lo autorizas** en cada análisis. Por defecto no se usa. |
 | Tu sitio de Jira | Título, descripción y prioridad de las incidencias que exportas | Solo si conectas Jira y pulsas exportar. |
 | `api.openai.com`, `api.anthropic.com` | Tu clave, para comprobar que es válida | Solo al guardarla o probarla. Hoy la IA no recibe código ni hallazgos. |
-| Tus dominios | Un `HEAD` HTTPS y una consulta DNS TXT | Al registrar y verificar un dominio. Solo a direcciones públicas. |
+| Tus dominios | Un `HEAD` HTTPS y una consulta DNS TXT | Solo cuando esté disponible el pentest web (en desarrollo). Solo a direcciones públicas. |
 
 No hay telemetría.
 

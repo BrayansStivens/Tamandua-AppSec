@@ -2,6 +2,17 @@
 
 Qué hace cada parte del panel y con qué criterio. Para instalarlo, ve a [instalacion.md](instalacion.md).
 
+## En desarrollo
+
+Se ven en el panel en gris, con la marca **En desarrollo**, para que se sepa que vienen. Hoy no dan resultados y no se pueden usar:
+
+| Función | Qué hará |
+| --- | --- |
+| Pentest de aplicaciones web y API | Pruebas dinámicas (DAST) con ZAP o Nuclei en un contenedor aislado, solo sobre dominios cuya propiedad hayas verificado por DNS. |
+| GitLab, Bitbucket, Azure DevOps | Conectar repositorios con tokens de solo lectura del proyecto. |
+| Asistencia con IA | Explicación de hallazgos y propuesta de parche con tu propia clave, con consentimiento en cada ejecución. |
+| API pública y CLI para CI | Tokens personales con ámbitos, `/api/v1` documentada y un comando para CI que envía los resultados a tu instancia y rompe el build según un umbral. |
+
 ## Panel
 
 El **Resumen** se calcula a partir de las ejecuciones (`GET /api/dashboard?days=7|30|90|365`) con definiciones explícitas: *abierto* es lo que hay en la última ejecución de cada activo; *corregido* es una huella que estaba en una ejecución anterior de ese activo y ya no aparece; el tiempo medio de corrección va de la primera detección a la primera ausencia. La puntuación es un resumen con su fórmula al lado (`100·e^(−riesgo/150)`, riesgo ponderado por severidad, KEV y EPSS), no una certificación. Las gráficas son SVG sin dependencias: hallazgos nuevos por día apilados por severidad, abiertos por severidad, hallados frente a corregidos, CWE, activos más afectados, exploitabilidad (KEV y EPSS ≥ 10 %), mapa de actividad anual, y dos paneles de novedades: altas en CISA KEV y CVEs publicados en los últimos 7 días según NVD, marcando los que mencionan un paquete o CVE de tus hallazgos abiertos.
