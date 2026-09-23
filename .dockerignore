@@ -1,0 +1,12 @@
+.git
+.venv
+data
+web/node_modules
+web/dist
+appsec_agent/static
+config
+backups
+.env
+**/__pycache__
+**/*.pyc
+.pytest_cache

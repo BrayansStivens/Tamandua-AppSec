@@ -1,0 +1,198 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --color-app: var(--app-bg);
+    --color-panel: var(--app-panel);
+    --color-inset: var(--app-inset);
+    --color-console: var(--app-console);
+    --color-console-top: var(--app-console-top);
+    --color-app-line: var(--app-line);
+    --color-app-soft: var(--app-soft);
+    --color-app-fg: var(--app-fg);
+    --color-app-primary: var(--app-primary);
+    --color-app-secondary: var(--app-secondary);
+    --color-app-muted: var(--app-muted);
+    --color-app-subtle: var(--app-subtle);
+    --color-app-faint: var(--app-faint);
+    --color-brand: var(--brand);
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    /* Los tokens propios del panel salen de los de shadcn: un solo sistema de color. */
+    --app-bg: var(--background);
+    --app-panel: var(--card);
+    --app-inset: oklch(0.985 0 0);
+    --app-console: oklch(0.985 0 0);
+    --app-console-top: oklch(0.97 0 0);
+    --app-line: var(--border);
+    --app-soft: oklch(0.97 0 0);
+    --app-fg: var(--foreground);
+    --app-primary: oklch(0.205 0 0);
+    --app-secondary: oklch(0.32 0 0);
+    --app-muted: var(--muted-foreground);
+    --app-subtle: oklch(0.6 0 0);
+    --app-faint: oklch(0.72 0 0);
+    --brand: oklch(0.5 0.1 180);
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+    --app-bg: var(--background);
+    --app-panel: var(--card);
+    --app-inset: oklch(0.175 0 0);
+    --app-console: oklch(0.16 0 0);
+    --app-console-top: oklch(0.19 0 0);
+    --app-line: var(--border);
+    --app-soft: oklch(1 0 0 / 5%);
+    --app-fg: var(--foreground);
+    --app-primary: oklch(0.93 0 0);
+    --app-secondary: oklch(0.85 0 0);
+    --app-muted: var(--muted-foreground);
+    --app-subtle: oklch(0.6 0 0);
+    --app-faint: oklch(0.45 0 0);
+    --brand: oklch(0.8 0.12 180);
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: var(--brand);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+}
+
+html { background: var(--app-bg); color-scheme: light; }
+html.dark { color-scheme: dark; }
+body { min-width: 320px; }
+::selection { background: color-mix(in oklch, var(--brand) 35%, transparent); }
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
+  html {
+    @apply font-sans;
+    }
+}
+
+/* Gráficas: severidad como rampa ordinal de un solo tono (baja → crítica), validada con el
+   validador de paleta en ambos modos; dos series categóricas para hallados/corregidos;
+   azul secuencial para el mapa de actividad. Los textos nunca usan el color de la serie. */
+:root {
+  --sev-low: #e29b9a; --sev-medium: #d66f6e; --sev-high: #c34443; --sev-critical: #921a1a;
+  --series-found: #2a78d6; --series-fixed: #1baf7a;
+  --seq-1: #9ec5f4; --seq-2: #6da7ec; --seq-3: #3987e5; --seq-4: #256abf; --seq-5: #184f95;
+  --grid-line: #e1e0d9; --axis-line: #c3c2b7;
+}
+.dark {
+  --sev-low: #f3b3b2; --sev-medium: #e98988; --sev-high: #dc5f5e; --sev-critical: #c23c3c;
+  --series-found: #3987e5; --series-fixed: #199e70;
+  --seq-1: #184f95; --seq-2: #256abf; --seq-3: #3987e5; --seq-4: #6da7ec; --seq-5: #9ec5f4;
+  --grid-line: #2c2c2a; --axis-line: #383835;
+}
+
+@keyframes appsec-breathe { 0%, 100% { opacity: .45; transform: scale(.985) } 50% { opacity: .95; transform: scale(1) } }
+@keyframes appsec-progress { 0% { transform: translateX(-100%) } 100% { transform: translateX(300%) } }
+@media (prefers-reduced-motion: reduce) { [class*="animate-[appsec"] { animation: none !important } }

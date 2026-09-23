@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+data/
+config/
+backups/
+.env
+web/node_modules/
+web/dist/
+

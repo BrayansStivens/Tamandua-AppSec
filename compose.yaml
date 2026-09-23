@@ -1,0 +1,63 @@
+# AppSec Agent autoalojado. Arranque:
+#
+#   cp .env.example .env        # opcional: puerto, URL pública, TLS…
+#   docker compose up --build -d
+#   docker compose logs appsec  # ahí sale el código para crear el administrador
+#
+# Los motores de análisis (Trivy, Gitleaks, Opengrep) son contenedores hermanos que la app
+# lanza por el socket de Docker: por eso se monta, y por eso la carpeta de datos se comparte
+# con la MISMA ruta absoluta del host (APPSEC_AGENT_HOST_DATA_DIR).
+#
+# El socket de Docker equivale a root en el host. Es la concesión para no instalar nada más
+# que Docker; si lo expones a más gente, ponlo detrás de un socket-proxy o un runner aparte.
+services:
+  appsec:
+    build: .
+    image: appsec-agent/app:0.9
+    container_name: appsec-agent
+    # Tu UID/GID para que los ficheros de ./data y ./config sean tuyos (ver .env.example).
+    user: "${APPSEC_UID:-10001}:${APPSEC_GID:-10001}"
+    ports:
+      # Solo en esta máquina por defecto. Para exponerlo en la red usa HTTPS (ver README).
+      - "${APPSEC_BIND:-127.0.0.1}:${APPSEC_PORT:-8766}:8766"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APPSEC_AGENT_DATA_DIR: /data
+      APPSEC_AGENT_HOST_DATA_DIR: ${PWD}/data
+      APPSEC_AGENT_HOST_RULES_DIR: ${PWD}/rules
+      APPSEC_AGENT_CONFIG_DIR: /config
+      APPSEC_AGENT_PUBLIC_URL: ${APPSEC_AGENT_PUBLIC_URL:-http://127.0.0.1:8766}
+      APPSEC_AGENT_ALLOWED_ORIGINS: ${APPSEC_AGENT_ALLOWED_ORIGINS:-http://127.0.0.1:8766,http://localhost:8766}
+      APPSEC_AGENT_LOG_LEVEL: ${APPSEC_AGENT_LOG_LEVEL:-INFO}
+      # admins (por defecto): TOTP obligatorio para administradores · all: para todos · none: opcional
+      APPSEC_AGENT_REQUIRE_TOTP: ${APPSEC_AGENT_REQUIRE_TOTP:-admins}
+      APPSEC_AGENT_PR_POLL_SECONDS: ${APPSEC_AGENT_PR_POLL_SECONDS:-300}
+      HOME: /home/appsec
+    volumes:
+      - ./data:/data
+      - ./rules:/app/rules:ro
+      # Secretos cifrados (GitHub App, claves de IA, Jira) y su clave maestra. Nunca en ./data.
+      - ${APPSEC_CONFIG_DIR:-./config}:/config
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "0"
+    depends_on:
+      opengrep:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/api/health', headers={'Host':'127.0.0.1:8766'}), timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Solo construye la imagen del motor SAST (con su binario verificado por SHA-256) y comprueba
+  # que arranca; la app la lanza después por cada análisis. Termina al momento: es normal.
+  opengrep:
+    build: containers/opengrep
+    image: appsec-agent/opengrep:1.30.0
+    command: ["--version"]
+    network_mode: none
+    restart: "no"

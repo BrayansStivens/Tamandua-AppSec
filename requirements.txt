@@ -1,0 +1,3 @@
+# Firma RS256 del JWT de la GitHub App (token de instalación).
+# Es la única dependencia externa: el resto del proyecto usa solo la stdlib.
+cryptography>=43,<47

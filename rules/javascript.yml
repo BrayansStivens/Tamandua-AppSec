@@ -1,0 +1,149 @@
+rules:
+  - id: appsec.js.eval-non-literal
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "eval() sobre una expresión no literal ejecuta código arbitrario. Sustituye por JSON.parse o una tabla de funciones permitidas."
+    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL}
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: new Function($X)
+      - pattern-not: eval("...")
+      - pattern-not: new Function("...")
+  - id: appsec.js.command-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "Entrada de la petición llega a la ejecución de un comando del sistema. Usa execFile/spawn sin shell con argumentos separados y valida contra una lista permitida."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: req.query
+          - pattern: req.body
+          - pattern: req.params
+          - pattern: req.headers
+          - pattern: process.argv
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $CP.exec($CMD, ...)
+              - pattern: $CP.execSync($CMD, ...)
+              - pattern: exec($CMD, ...)
+              - pattern: execSync($CMD, ...)
+          - focus-metavariable: $CMD
+  - id: appsec.js.sql-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "Entrada de la petición llega a una consulta SQL. Usa consultas parametrizadas ($1 / ?) y nunca concatenes ni interpoles la entrada en el SQL."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: req.query
+          - pattern: req.body
+          - pattern: req.params
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $DB.query($Q, ...)
+              - pattern: $DB.execute($Q, ...)
+              - pattern: $DB.raw($Q, ...)
+              - pattern: $SEQ.query($Q, ...)
+          - focus-metavariable: $Q
+  - id: appsec.js.dom-xss-sink
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "Escritura de HTML sin escapar en el DOM desde una variable. Usa textContent, o sanitiza con DOMPurify si necesitas HTML."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $X
+          - pattern: $EL.outerHTML = $X
+          - pattern: document.write($X)
+          - pattern: $EL.insertAdjacentHTML($POS, $X)
+      - pattern-not: $EL.innerHTML = "..."
+      - pattern-not: $EL.outerHTML = "..."
+      - pattern-not: document.write("...")
+      - pattern-not: $EL.insertAdjacentHTML($POS, "...")
+  - id: appsec.js.react-dangerously-set-inner-html
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "dangerouslySetInnerHTML con contenido no literal: XSS si el valor viene de datos externos. Sanitiza con DOMPurify o renderiza texto."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    # JSX no se parsea como patrón estructural; se detecta por regex y se excluye el literal.
+    pattern-regex: 'dangerouslySetInnerHTML=\{\{\s*__html:\s*(?!["\x27`])[^}]+\}\}'
+  - id: appsec.js.path-traversal
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "Ruta de archivo construida con entrada de la petición. Normaliza con path.resolve y comprueba que quede dentro del directorio permitido, o usa path.basename."
+    metadata: {cwe: [22], owasp: "A01:2025", category: path-traversal, confidence: HIGH}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: req.query
+          - pattern: req.params
+          - pattern: req.body
+    pattern-sanitizers:
+      - pattern: path.basename(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: fs.readFile($P, ...)
+              - pattern: fs.readFileSync($P, ...)
+              - pattern: fs.createReadStream($P, ...)
+              - pattern: fs.writeFile($P, ...)
+              - pattern: fs.writeFileSync($P, ...)
+              - pattern: res.sendFile($P, ...)
+          - focus-metavariable: $P
+  - id: appsec.js.open-redirect
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "Redirección con destino tomado de la petición. Valida contra una lista de rutas permitidas o usa rutas relativas."
+    metadata: {cwe: [601], owasp: "A01:2025", category: redirect, confidence: HIGH}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: req.query
+          - pattern: req.body
+    pattern-sinks:
+      - patterns:
+          - pattern: res.redirect($U, ...)
+          - focus-metavariable: $U
+  - id: appsec.js.jwt-none-algorithm
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "Verificación JWT que admite el algoritmo 'none': cualquier token sin firma será aceptado. Fija una lista explícita de algoritmos seguros."
+    metadata: {cwe: [347], owasp: "A07:2025", category: auth, confidence: HIGH}
+    pattern-either:
+      - pattern: |
+          jwt.verify($T, $S, {..., algorithms: [..., "none", ...], ...}, ...)
+      - pattern: |
+          jwt.verify($T, $S, {..., algorithms: [..., 'none', ...], ...}, ...)
+  - id: appsec.js.jwt-hardcoded-secret
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: "Secreto JWT escrito en el código. Muévelo a configuración/secretos y rótalo: ya está expuesto en el repositorio."
+    metadata: {cwe: [798], owasp: "A04:2025", category: secrets, confidence: HIGH}
+    pattern-either:
+      - pattern: jwt.sign($P, "...", ...)
+      - pattern: jwt.verify($T, "...", ...)
+  - id: appsec.js.tls-reject-unauthorized-false
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: "Validación de certificados TLS desactivada: permite interceptar el tráfico. Usa una CA propia en lugar de deshabilitar la verificación."
+    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    pattern-either:
+      - pattern: |
+          {..., rejectUnauthorized: false, ...}
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"
+      - pattern: process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+  - id: appsec.js.weak-hash
+    languages: [javascript, typescript]
+    severity: INFO
+    message: "MD5/SHA-1 no sirven para contraseñas ni firmas. Para contraseñas usa bcrypt/scrypt/argon2; para integridad, SHA-256."
+    metadata: {cwe: [328], owasp: "A04:2025", category: crypto, confidence: LOW}
+    pattern-either:
+      - pattern: crypto.createHash("md5")
+      - pattern: crypto.createHash("sha1")
+      - pattern: crypto.createHash('md5')
+      - pattern: crypto.createHash('sha1')

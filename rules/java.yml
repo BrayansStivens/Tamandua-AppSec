@@ -1,0 +1,114 @@
+rules:
+  - id: appsec.java.sql-concatenation
+    languages: [java]
+    severity: ERROR
+    message: "SQL construido por concatenación o String.format. Usa PreparedStatement con parámetros (?) o consultas JPA con parámetros nombrados."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    patterns:
+      - pattern-either:
+          - pattern: $ST.executeQuery($Q, ...)
+          - pattern: $ST.executeUpdate($Q, ...)
+          - pattern: $ST.execute($Q, ...)
+          - pattern: $CON.prepareStatement($Q, ...)
+          - pattern: $EM.createQuery($Q, ...)
+          - pattern: $EM.createNativeQuery($Q, ...)
+          - pattern: $JT.query($Q, ...)
+          - pattern: $JT.update($Q, ...)
+      - metavariable-pattern:
+          metavariable: $Q
+          pattern-either:
+            - pattern: '"..." + $X'
+            - pattern: $X + "..."
+            - pattern: String.format("...", ...)
+  - id: appsec.java.runtime-exec-concatenation
+    languages: [java]
+    severity: ERROR
+    message: "Comando del sistema construido por concatenación. Usa ProcessBuilder con la lista de argumentos separada y valida la entrada."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH}
+    patterns:
+      - pattern-either:
+          - pattern: Runtime.getRuntime().exec($C, ...)
+          - pattern: new ProcessBuilder("sh", "-c", $C, ...)
+          - pattern: new ProcessBuilder("bash", "-c", $C, ...)
+      - metavariable-pattern:
+          metavariable: $C
+          pattern-either:
+            - pattern: '"..." + $X'
+            - pattern: $X + "..."
+            - pattern: String.format("...", ...)
+  - id: appsec.java.objectinputstream-readobject
+    languages: [java]
+    severity: WARNING
+    message: "Deserialización Java nativa: con datos no confiables es ejecución remota. Usa un formato sin ejecución (JSON) o un ObjectInputFilter con lista permitida."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: MEDIUM}
+    pattern: (ObjectInputStream $O).readObject()
+  - id: appsec.java.xxe-documentbuilder
+    languages: [java]
+    severity: WARNING
+    message: "DocumentBuilderFactory sin deshabilitar DOCTYPE: XXE al parsear XML externo. Activa disallow-doctype-decl o desactiva entidades externas."
+    metadata: {cwe: [611], owasp: "A02:2025", category: xxe, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: $DBF = DocumentBuilderFactory.newInstance();
+          - pattern: $DBF = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+      - pattern-not-inside: |
+          $DBF = $FACTORY.newInstance();
+          ...
+          $DBF.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      - pattern-not-inside: |
+          $DBF = $FACTORY.newInstance();
+          ...
+          $DBF.setFeature("http://xml.org/sax/features/external-general-entities", false);
+  - id: appsec.java.trust-all-certificates
+    languages: [java]
+    severity: ERROR
+    message: "TrustManager que acepta cualquier certificado: el TLS deja de proteger. Confía en una CA concreta con un KeyStore."
+    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    pattern-either:
+      - pattern: |
+          public void checkServerTrusted(X509Certificate[] $C, String $A) { }
+      - pattern: |
+          public void checkClientTrusted(X509Certificate[] $C, String $A) { }
+  - id: appsec.java.hostname-verifier-allow-all
+    languages: [java]
+    severity: ERROR
+    message: "HostnameVerifier que devuelve true siempre: cualquier certificado válido sirve para cualquier host."
+    metadata: {cwe: [297], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    pattern-either:
+      - pattern: |
+          public boolean verify(String $H, SSLSession $S) { return true; }
+      - pattern: $C.setHostnameVerifier((hostname, session) -> true)
+  - id: appsec.java.weak-cipher
+    languages: [java]
+    severity: WARNING
+    message: "Algoritmo o modo de cifrado débil (DES, RC4, ECB). Usa AES/GCM/NoPadding con claves de 256 bits."
+    metadata: {cwe: [327], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    patterns:
+      - pattern-either:
+          - pattern: Cipher.getInstance("$ALG", ...)
+          - pattern: javax.crypto.Cipher.getInstance("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(DES|DESede|RC4|RC2|Blowfish)(/.*)?$|.*/ECB/.*
+  - id: appsec.java.hardcoded-password
+    languages: [java]
+    severity: WARNING
+    message: "Contraseña o secreto escrito en el código. Muévelo a configuración externa y rótalo: ya está expuesto en el repositorio."
+    metadata: {cwe: [798], owasp: "A04:2025", category: secrets, confidence: MEDIUM}
+    patterns:
+      - pattern: String $NAME = "$VALUE";
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: (?i).*(password|passwd|pwd|secret|apikey|api_key|token).*
+      - metavariable-regex:
+          metavariable: $VALUE
+          regex: .{8,}
+  - id: appsec.java.spring-csrf-disabled
+    languages: [java]
+    severity: WARNING
+    message: "Protección CSRF desactivada en Spring Security. Correcto solo en APIs sin sesión de navegador; si hay cookies de sesión, es una vulnerabilidad."
+    metadata: {cwe: [352], owasp: "A01:2025", category: misconfig, confidence: MEDIUM}
+    pattern-either:
+      - pattern: $H.csrf().disable()
+      - pattern: $H.csrf(AbstractHttpConfigurer::disable)
+      - pattern: $H.csrf($C -> $C.disable())

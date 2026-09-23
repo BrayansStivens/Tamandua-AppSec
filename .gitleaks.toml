@@ -1,0 +1,8 @@
+# Reglas por defecto de gitleaks, sin las carpetas que contienen secretos FALSOS a propósito:
+# las pruebas y las muestras con las que se comprueba que los escáneres los detectan.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores sintéticos de pruebas y fixtures"
+paths = ['''^tests/''', '''^fixtures/scanner-samples/''']

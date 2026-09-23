@@ -1,0 +1,12 @@
+{
+  "fixture": "tenant-api-lab",
+  "version": "0.1.0",
+  "created_utc_date": "2026-09-22",
+  "provenance": "Código propio creado para este proyecto; datos y credenciales sintéticos",
+  "distribution": "Uso interno durante el experimento; licencia de distribución pendiente",
+  "files_sha256": {
+    "app.py": "b2423f5b1c823d343370a46cb5c2db45fa3ec2f63d67745ed14c35765348eeb7",
+    "cases.json": "d43a1fb4e3cb395a9a8d205c87ee99e53ae8dbd724c46166372bd23b88fae20e",
+    "test_app.py": "2cfb981525f7556c0b45d049dab5b73685dc74188bc7bb338427c464cd4f05a5"
+  }
+}

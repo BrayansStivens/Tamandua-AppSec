@@ -1,0 +1,191 @@
+rules:
+  - id: appsec.py.eval-exec-non-literal
+    languages: [python]
+    severity: ERROR
+    message: "eval()/exec() sobre una expresión no literal ejecuta código arbitrario. Usa ast.literal_eval o una tabla de operaciones permitidas."
+    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL}
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: exec($X)
+      - pattern-not: eval("...")
+      - pattern-not: exec("...")
+  - id: appsec.py.shell-command-non-literal
+    languages: [python]
+    severity: ERROR
+    message: "Comando de sistema construido dinámicamente con shell. Pasa una lista de argumentos sin shell=True y valida la entrada."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: subprocess.$F($CMD, ..., shell=True, ...)
+          - pattern: os.system($CMD)
+          - pattern: os.popen($CMD, ...)
+      - pattern-not: subprocess.$F("...", ..., shell=True, ...)
+      - pattern-not: os.system("...")
+      - pattern-not: os.popen("...", ...)
+  - id: appsec.py.sql-string-building
+    languages: [python]
+    severity: ERROR
+    message: "SQL construido con f-string, %, format o concatenación. Usa parámetros del driver (execute(sql, params)) o el ORM."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    pattern-either:
+      - pattern: $CUR.execute(f"...", ...)
+      - pattern: $CUR.execute("..." % $X, ...)
+      - pattern: $CUR.execute("...".format(...), ...)
+      - pattern: $CUR.execute("..." + $X, ...)
+      - pattern: $CUR.executemany(f"...", ...)
+      - pattern: $CUR.executemany("..." % $X, ...)
+      - pattern: $CUR.executemany("...".format(...), ...)
+      - pattern: $CUR.executemany("..." + $X, ...)
+  - id: appsec.py.sql-injection-from-request
+    languages: [python]
+    severity: ERROR
+    message: "Entrada de la petición llega a una consulta SQL. Usa parámetros del driver o el ORM; nunca la entrada dentro del texto SQL."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.json
+          - pattern: request.values
+          - pattern: request.GET
+          - pattern: request.POST
+          - pattern: request.data
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: $CUR.execute($Q, ...)
+              - pattern: $CUR.executemany($Q, ...)
+              - pattern: $M.objects.raw($Q, ...)
+              - pattern: $S.execute(text($Q), ...)
+          - focus-metavariable: $Q
+  - id: appsec.py.ssti-render-template-string
+    languages: [python]
+    severity: ERROR
+    message: "Entrada de la petición en render_template_string: inyección de plantillas (SSTI) con ejecución de código. Renderiza plantillas fijas y pasa la entrada como variable."
+    metadata: {cwe: [1336], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.json
+          - pattern: request.values
+    pattern-sinks:
+      - patterns:
+          - pattern: render_template_string($S, ...)
+          - focus-metavariable: $S
+  - id: appsec.py.pickle-load
+    languages: [python]
+    severity: ERROR
+    message: "pickle deserializa código: con datos no confiables es ejecución remota. Usa JSON o un formato sin ejecución."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: MEDIUM}
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: cPickle.loads(...)
+      - pattern: dill.loads(...)
+      - pattern: shelve.open(...)
+  - id: appsec.py.yaml-load-unsafe
+    languages: [python]
+    severity: ERROR
+    message: "yaml.load sin SafeLoader instancia objetos arbitrarios. Usa yaml.safe_load."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH}
+    patterns:
+      - pattern: yaml.load($X, ...)
+      - pattern-not: yaml.load($X, Loader=yaml.SafeLoader)
+      - pattern-not: yaml.load($X, yaml.SafeLoader)
+      - pattern-not: yaml.load($X, Loader=yaml.CSafeLoader)
+      - pattern-not: yaml.load($X, Loader=SafeLoader)
+  - id: appsec.py.flask-debug-true
+    languages: [python]
+    severity: WARNING
+    message: "Flask con debug=True expone la consola de Werkzeug: ejecución de código si llega a producción. Controla el modo por variable de entorno."
+    metadata: {cwe: [489], owasp: "A02:2025", category: misconfig, confidence: HIGH}
+    pattern: $APP.run(..., debug=True, ...)
+  - id: appsec.py.requests-verify-false
+    languages: [python]
+    severity: ERROR
+    message: "Validación TLS desactivada (verify=False): el tráfico puede interceptarse. Usa verify=/ruta/a/ca.pem."
+    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    pattern-either:
+      - pattern: requests.$M(..., verify=False, ...)
+      - pattern: $S.$M(..., verify=False, ...)
+      - pattern: httpx.$M(..., verify=False, ...)
+  - id: appsec.py.jwt-decode-unverified
+    languages: [python]
+    severity: ERROR
+    message: "JWT decodificado sin verificar la firma: cualquier token forjado será aceptado. Verifica siempre con algoritmos explícitos."
+    metadata: {cwe: [347], owasp: "A07:2025", category: auth, confidence: HIGH}
+    pattern-either:
+      - pattern: jwt.decode($T, ..., verify=False, ...)
+      - pattern: |
+          jwt.decode($T, ..., options={..., "verify_signature": False, ...}, ...)
+      - pattern: jwt.decode($T, ..., algorithms=[..., "none", ...], ...)
+  - id: appsec.py.weak-password-hash
+    languages: [python]
+    severity: WARNING
+    message: "MD5/SHA-1 aplicado a algo que parece una contraseña o secreto. Usa argon2, bcrypt o scrypt (por ejemplo, hashlib.scrypt o passlib)."
+    metadata: {cwe: [916], owasp: "A04:2025", category: crypto, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.md5($P, ...)
+          - pattern: hashlib.sha1($P, ...)
+          - pattern: hashlib.md5($P.encode(...), ...)
+          - pattern: hashlib.sha1($P.encode(...), ...)
+      - metavariable-regex:
+          metavariable: $P
+          regex: (?i).*(pass|pwd|secret|token|credential).*
+  - id: appsec.py.django-mark-safe-non-literal
+    languages: [python]
+    severity: WARNING
+    message: "mark_safe sobre un valor dinámico desactiva el escape de Django: XSS si contiene datos externos. Escapa con format_html."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    patterns:
+      - pattern: mark_safe($X)
+      - pattern-not: mark_safe("...")
+  - id: appsec.py.path-traversal-from-request
+    languages: [python]
+    severity: ERROR
+    message: "Ruta de archivo construida con entrada de la petición. Usa secure_filename / os.path.basename y comprueba que la ruta resuelta quede dentro del directorio permitido."
+    metadata: {cwe: [22], owasp: "A01:2025", category: path-traversal, confidence: HIGH}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.values
+          - pattern: request.GET
+          - pattern: request.POST
+    pattern-sanitizers:
+      - pattern: os.path.basename(...)
+      - pattern: secure_filename(...)
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: open($P, ...)
+              - pattern: send_file($P, ...)
+              - pattern: os.remove($P)
+          - focus-metavariable: $P
+  - id: appsec.py.ssrf-from-request
+    languages: [python]
+    severity: WARNING
+    message: "URL de una petición saliente tomada de la entrada del usuario (SSRF). Valida esquema y host contra una lista permitida y bloquea rangos internos."
+    metadata: {cwe: [918], owasp: "A01:2025", category: ssrf, confidence: MEDIUM}
+    mode: taint
+    pattern-sources:
+      - pattern-either:
+          - pattern: request.args
+          - pattern: request.form
+          - pattern: request.json
+          - pattern: request.GET
+          - pattern: request.POST
+    pattern-sinks:
+      - patterns:
+          - pattern-either:
+              - pattern: requests.get($U, ...)
+              - pattern: requests.post($U, ...)
+              - pattern: urllib.request.urlopen($U, ...)
+              - pattern: httpx.get($U, ...)
+          - focus-metavariable: $U

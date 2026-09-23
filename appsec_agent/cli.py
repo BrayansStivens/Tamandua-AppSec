@@ -1,0 +1,151 @@
+"""Punto de entrada para evaluar el fixture y ver sus artefactos."""
+
+from __future__ import annotations
+
+import argparse
+import getpass
+import json
+import sys
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from .auth import AuthError, Sessions, Users
+from .engine import scan_fixture
+from .fixture import FixtureError, verify_fixture
+from .github_app import GitHubAppError, config as github_config
+from .integrations import github_installation
+from .providers import PROVIDERS, check_provider, provider_status
+from .repository_scan import scan_repository
+from .repository_sources import SourceError, available_sources, snapshot_source
+from .server import serve
+from .store import list_runs, save_repository_scan, save_run, save_scan
+
+
+DEFAULT_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "tenant-api-lab"
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="appsec-agent", description="Prototipo local de evaluación AppSec")
+    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="Directorio de artefactos locales")
+    commands = parser.add_subparsers(dest="command", required=True)
+    verify = commands.add_parser("verify-fixture", help="Ejecutar los casos conocidos del laboratorio sintético")
+    verify.add_argument("--fixture", type=Path, required=True)
+    scan = commands.add_parser("scan-fixture", help="Detectar y reproducir cinco fallos en el laboratorio aprobado")
+    scan.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
+    scan.add_argument("--variant", choices=("vulnerable", "fixed", "both"), default="both")
+    commands.add_parser("runs", help="Listar ejecuciones guardadas")
+    commands.add_parser("sources", help="Listar repositorios disponibles en el workspace, GitHub y GitLab")
+    repository = commands.add_parser("scan-repository", help="Analizar un repositorio seleccionado sin ejecutar su código")
+    repository.add_argument("--source-id", required=True, help="ID devuelto por sources")
+    repository.add_argument("--allow-osv-upload", action="store_true",
+                            help="Autorizar el envío de nombres y versiones de dependencias a api.osv.dev")
+    commands.add_parser("providers", help="Mostrar qué proveedores de IA tienen credencial en el servidor")
+    commands.add_parser("github-app", help="Estado de la GitHub App de este servidor (sin secretos)")
+    ai_check = commands.add_parser("ai-check", help="Comprobar autenticación con OpenAI o Claude sin generar tokens")
+    ai_check.add_argument("--provider", choices=tuple(PROVIDERS), required=True)
+    users = commands.add_parser("user", help="Gestionar usuarios del panel (tarea de operación)")
+    user_commands = users.add_subparsers(dest="user_command", required=True)
+    create = user_commands.add_parser("create", help="Crear un usuario; el primero debería ser --admin")
+    create.add_argument("--username", required=True)
+    create.add_argument("--display-name", default="")
+    create.add_argument("--admin", action="store_true", help="Rol administrador: conecta proveedores y claves")
+    create.add_argument("--password-stdin", action="store_true",
+                        help="Leer la contraseña de stdin (automatización); por defecto se pide sin eco")
+    user_commands.add_parser("list", help="Listar usuarios, rol, TOTP y último acceso")
+    for name, text in (("reset-password", "Poner una contraseña nueva y cerrar sus sesiones"),
+                       ("reset-totp", "Quitar el TOTP (dispositivo perdido) y cerrar sus sesiones"),
+                       ("disable", "Bloquear el acceso y cerrar sus sesiones"), ("enable", "Reactivar el acceso")):
+        action = user_commands.add_parser(name, help=text)
+        action.add_argument("--username", required=True)
+        if name == "reset-password":
+            action.add_argument("--password-stdin", action="store_true")
+    panel = commands.add_parser("serve", help="Abrir el panel web local de solo lectura")
+    panel.add_argument("--port", type=int, default=8766)
+    panel.add_argument("--bind", default=None, help="Interfaz de escucha; por defecto 127.0.0.1 (o APPSEC_AGENT_BIND)")
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "verify-fixture":
+            record = save_run(args.data_dir, verify_fixture(args.fixture))
+            print(json.dumps({"id": record["id"], "status": record["status"], "summary": record["summary"]}, ensure_ascii=False))
+            return 0 if record["status"] == "completed" else 2
+        if args.command == "scan-fixture":
+            variants = ("vulnerable", "fixed") if args.variant == "both" else (args.variant,)
+            records = [save_scan(args.data_dir, scan_fixture(args.fixture, variant)) for variant in variants]
+            print(json.dumps([{"id": record["id"], "variant": record["variant"],
+                               "status": record["status"], "summary": record["summary"]} for record in records],
+                             ensure_ascii=False, indent=2))
+            if any(record["status"] == "incomplete" for record in records):
+                return 3
+            return 2 if any(record["summary"]["confirmed"] for record in records) else 0
+        if args.command == "runs":
+            print(json.dumps(list_runs(args.data_dir), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "sources":
+            print(json.dumps(available_sources(None, github_installation(args.data_dir)),
+                             ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "scan-repository":
+            (args.data_dir / "work").mkdir(parents=True, exist_ok=True)
+            with TemporaryDirectory(prefix="snapshot-", dir=args.data_dir / "work") as temporary:
+                root, source = snapshot_source(args.source_id, Path(temporary), None,
+                                               github_installation(args.data_dir))
+                record = save_repository_scan(args.data_dir, scan_repository(root, source,
+                                                                            allow_osv_upload=args.allow_osv_upload,
+                                                                            data_dir=args.data_dir))
+            print(json.dumps({"id": record["id"], "status": record["status"],
+                              "source": record["source"]["name"], "summary": record["summary"]}, ensure_ascii=False, indent=2))
+            return 3 if record["status"] == "incomplete" else 2 if record["summary"]["candidates"] else 0
+        if args.command == "providers":
+            print(json.dumps(provider_status(), ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "github-app":
+            state = github_config()
+            print(json.dumps(state, ensure_ascii=False, indent=2))
+            return 0 if state["configured"] else 3
+        if args.command == "user":
+            return _user_command(args)
+        if args.command == "ai-check":
+            result = check_provider(args.provider)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0 if result["status"] == "connected" else 3
+        serve(args.data_dir, args.port, args.bind)
+        return 0
+    except (FixtureError, SourceError, GitHubAppError, FileNotFoundError, ValueError) as exc:
+        parser.exit(1, f"Error: {exc}\n")
+
+
+def _read_password(from_stdin: bool) -> str:
+    # Nunca por argumento: quedaría en el historial del shell y en la lista de procesos.
+    if from_stdin:
+        return sys.stdin.readline().rstrip("\n")
+    first = getpass.getpass("Contraseña (mínimo 12 caracteres): ")
+    if first != getpass.getpass("Repite la contraseña: "):
+        raise AuthError("Las contraseñas no coinciden")
+    return first
+
+
+def _user_command(args) -> int:
+    users = Users(args.data_dir)
+    if args.user_command == "list":
+        print(json.dumps(users.list(), ensure_ascii=False, indent=2))
+        return 0
+    if args.user_command == "create":
+        created = users.create(args.username, _read_password(args.password_stdin),
+                               role="admin" if args.admin else "member", display_name=args.display_name)
+        print(json.dumps(created, ensure_ascii=False, indent=2))
+        print("Inicia sesión en el panel y activa el TOTP desde Cuenta.", file=sys.stderr)
+        return 0
+    user = users.get(args.username)
+    if user is None:
+        raise AuthError("Usuario no encontrado")
+    if args.user_command == "reset-password":
+        users.set_password(user["id"], _read_password(args.password_stdin))
+    elif args.user_command == "reset-totp":
+        users.reset_totp(user["id"])
+    elif args.user_command in ("disable", "enable"):
+        users.set_disabled(user["id"], args.user_command == "disable")
+    if args.user_command != "enable":
+        closed = Sessions(args.data_dir).revoke_user(user["id"])
+        print(f"Sesiones cerradas: {closed}", file=sys.stderr)
+    print(json.dumps(users.public(users.by_id(user["id"])), ensure_ascii=False, indent=2))
+    return 0

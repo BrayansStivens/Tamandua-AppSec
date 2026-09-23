@@ -1,0 +1,74 @@
+rules:
+  - id: appsec.cs.sql-string-building
+    languages: [csharp]
+    severity: ERROR
+    message: "SQL construido por concatenación o interpolación. Usa parámetros (SqlParameter) o FromSqlInterpolated, que parametriza."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    patterns:
+      - pattern-either:
+          - pattern: new SqlCommand($Q, ...)
+          - pattern: $CMD.CommandText = $Q;
+          - pattern: $DB.ExecuteSqlRaw($Q, ...)
+          - pattern: $SET.FromSqlRaw($Q, ...)
+      - metavariable-pattern:
+          metavariable: $Q
+          pattern-either:
+            - pattern: '"..." + $X'
+            - pattern: $X + "..."
+            - pattern: '$"..."'
+  - id: appsec.cs.process-start-concatenation
+    languages: [csharp]
+    severity: ERROR
+    message: "Comando del sistema con argumentos construidos por concatenación. Usa ArgumentList con cada argumento separado."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH}
+    patterns:
+      - pattern-either:
+          - pattern: Process.Start("...", $A)
+          - pattern: new ProcessStartInfo("...", $A)
+      - metavariable-pattern:
+          metavariable: $A
+          pattern-either:
+            - pattern: '"..." + $X'
+            - pattern: $X + "..."
+            - pattern: '$"..."'
+  - id: appsec.cs.insecure-deserialization
+    languages: [csharp]
+    severity: ERROR
+    message: "Deserializador que instancia tipos arbitrarios (BinaryFormatter, TypeNameHandling.All): ejecución remota con datos no confiables. Usa System.Text.Json sin tipos polimórficos."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH}
+    pattern-either:
+      - pattern: new BinaryFormatter()
+      - pattern: new NetDataContractSerializer()
+      - pattern: new LosFormatter()
+      - pattern: new SoapFormatter()
+      - pattern: TypeNameHandling.All
+      - pattern: TypeNameHandling.Auto
+  - id: appsec.cs.certificate-validation-bypass
+    languages: [csharp]
+    severity: ERROR
+    message: "Callback de validación de certificado que devuelve true siempre: el TLS deja de proteger."
+    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    pattern-either:
+      - pattern: ServicePointManager.ServerCertificateValidationCallback = (...) => true;
+      - pattern: ServicePointManager.ServerCertificateValidationCallback += (...) => true;
+      - pattern: $H.ServerCertificateCustomValidationCallback = (...) => true;
+      - pattern: $H.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+  - id: appsec.cs.razor-html-raw-non-literal
+    languages: [csharp]
+    severity: WARNING
+    message: "Html.Raw sobre un valor dinámico desactiva el escape de Razor: XSS si contiene datos externos."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    patterns:
+      - pattern: Html.Raw($X)
+      - pattern-not: Html.Raw("...")
+  - id: appsec.cs.weak-hash
+    languages: [csharp]
+    severity: INFO
+    message: "MD5/SHA-1 no sirven para contraseñas ni firmas. Para contraseñas usa PBKDF2/Argon2; para integridad, SHA-256."
+    metadata: {cwe: [328], owasp: "A04:2025", category: crypto, confidence: LOW}
+    pattern-either:
+      - pattern: MD5.Create()
+      - pattern: SHA1.Create()
+      - pattern: new MD5CryptoServiceProvider()
+      - pattern: new SHA1CryptoServiceProvider()
+      - pattern: new SHA1Managed()

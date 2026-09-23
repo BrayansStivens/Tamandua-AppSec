@@ -1,0 +1,64 @@
+rules:
+  - id: appsec.rb.sql-interpolation
+    languages: [ruby]
+    severity: ERROR
+    message: "SQL con interpolación de cadenas. Usa condiciones parametrizadas: where('col = ?', valor) o hashes."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    pattern-either:
+      - pattern: $M.where("...#{$X}...", ...)
+      - pattern: $M.find_by_sql("...#{$X}...", ...)
+      - pattern: $M.order("...#{$X}...")
+      - pattern: $M.group("...#{$X}...")
+      - pattern: $C.execute("...#{$X}...", ...)
+      - pattern: $M.joins("...#{$X}...")
+      - pattern: $M.select("...#{$X}...")
+  - id: appsec.rb.command-injection
+    languages: [ruby]
+    severity: ERROR
+    message: "Comando del sistema con interpolación de cadenas. Usa la forma con argumentos separados: system('cmd', arg1, arg2)."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH}
+    pattern-either:
+      - pattern: system("...#{$X}...")
+      - pattern: exec("...#{$X}...")
+      - pattern: IO.popen("...#{$X}...", ...)
+      - pattern: Open3.capture3("...#{$X}...", ...)
+      - pattern: Open3.capture2("...#{$X}...", ...)
+      - pattern: Kernel.system("...#{$X}...")
+      - pattern: "`...#{$X}...`"
+  - id: appsec.rb.unsafe-deserialization
+    languages: [ruby]
+    severity: ERROR
+    message: "Marshal.load / YAML.load instancian objetos arbitrarios: ejecución de código con datos no confiables. Usa YAML.safe_load o JSON."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: MEDIUM}
+    pattern-either:
+      - pattern: Marshal.load(...)
+      - pattern: YAML.load(...)
+      - pattern: YAML.unsafe_load(...)
+      - pattern: Psych.load(...)
+  - id: appsec.rb.html-safe-non-literal
+    languages: [ruby]
+    severity: WARNING
+    message: "html_safe / raw sobre un valor dinámico desactiva el escape de Rails: XSS si contiene datos externos. Usa sanitize."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    patterns:
+      - pattern-either:
+          - pattern: $X.html_safe
+          - pattern: raw($X)
+      - pattern-not: |
+          "...".html_safe
+      - pattern-not: raw("...")
+  - id: appsec.rb.mass-assignment-permit-all
+    languages: [ruby]
+    severity: WARNING
+    message: "params.permit! acepta cualquier atributo: asignación masiva de campos sensibles (rol, admin). Permite atributos explícitos."
+    metadata: {cwe: [915], owasp: "A01:2025", category: mass-assignment, confidence: HIGH}
+    pattern: $P.permit!
+  - id: appsec.rb.open-redirect
+    languages: [ruby]
+    severity: WARNING
+    message: "redirect_to con destino de params: redirección abierta. Valida contra rutas permitidas o usa only_path: true."
+    metadata: {cwe: [601], owasp: "A01:2025", category: redirect, confidence: HIGH}
+    pattern-either:
+      - pattern: redirect_to params[$K]
+      - pattern: redirect_to params[$K], ...
+      - pattern: redirect_to params.fetch($K, ...)

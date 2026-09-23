@@ -1,0 +1,22 @@
+[
+ {
+  "RuleID": "slack-bot-token",
+  "Description": "Identified a Slack Bot token, which may compromise bot integrations and communication channel security.",
+  "StartLine": 4,
+  "EndLine": 4,
+  "StartColumn": 17,
+  "EndColumn": 72,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": "/src/config.py",
+  "SymlinkFile": "",
+  "Commit": "",
+  "Entropy": 4.9812,
+  "Author": "",
+  "Email": "",
+  "Date": "",
+  "Message": "",
+  "Tags": [],
+  "Fingerprint": "/src/config.py:slack-bot-token:4"
+ }
+]
