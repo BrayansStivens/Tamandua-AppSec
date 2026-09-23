@@ -16,6 +16,22 @@ La matriz de la ejecución se calcula de lo que corrió: cuántas reglas propias
 
 Lanzar un escaneo devuelve al instante `202` con su identificador y lo encola; un único trabajador los procesa en orden. Mientras corre, la ejecución existe con estado `queued` o `running` y un registro de progreso pensado para el usuario —qué paso empezó, qué terminó y con qué cuenta— que el panel muestra como consola en vivo y conserva plegado al terminar. El progreso nunca incluye rutas internas, salidas crudas de herramientas ni trazas: si algo falla, se dice en qué fase y que el equipo puede revisar los logs con el identificador. Al terminar, el panel avisa con un aviso flotante (y una notificación del navegador si ya diste permiso).
 
+## Imágenes de contenedor
+
+**Nuevo pentest → Imagen de contenedor** analiza una imagen tal como la usas en `docker pull` (`ghcr.io/acme/api:1.4`, `nginx:1.27`, `…@sha256:…`), leyéndola directamente del registro. **No se ejecuta ni se construye**, y no ocupa espacio en tu Docker.
+
+| Qué | Cómo |
+| --- | --- |
+| Paquetes del sistema y de la aplicación | **Trivy y Grype**. En código fuente coinciden casi por completo, pero en imágenes discrepan en los paquetes con parches retroportados por la distribución (en `nginx:1.21`: 781 avisos en común, 99 solo de Trivy y 11 solo de Grype, uno crítico). Los avisos se fusionan por paquete, versión e identificador (CVE/GHSA); los que ven ambos suben de confianza. |
+| Secretos en capas | Trivy busca credenciales en los ficheros de cada capa. |
+| Credenciales en `ENV` | Variables con nombre de secreto (`*_TOKEN`, `*_PASSWORD`, `API_KEY`…) y valor fijo: cualquiera que descargue la imagen las lee con `docker inspect`. |
+| Credenciales en el historial | `ARG` usados en un `RUN` (p. ej. `NPM_TOKEN=… npm ci`), URLs con usuario y contraseña y cabeceras `Authorization` fijas: quedan en la imagen y se leen con `docker history`. La corrección recomendada es `RUN --mount=type=secret` de BuildKit. |
+| Configuración | Usuario root, falta de `HEALTHCHECK`, `ADD` desde una URL, SSH expuesto, etiqueta `latest` e imagen de más de un año. |
+
+Ningún valor secreto se guarda: solo el nombre de la variable o el paso del historial. Las imágenes privadas necesitan un token de **solo lectura** del registro, que un administrador guarda en **Integraciones → Registros de contenedores** (cifrado). Cada imagen es un activo propio en **Hallazgos**, identificado por registro y repositorio, sin la etiqueta: al analizar `api:1.5`, lo que ya no aparece respecto a `api:1.4` queda remediado.
+
+También por CLI (útil en CI): `make cli ARGS="scan-image --reference ghcr.io/acme/api:1.4"`. Devuelve `2` si hay hallazgos.
+
 ## Hallazgos y su ciclo de vida
 
 **Hallazgos** agrupa por repositorio. Cada repositorio tiene un **registro** con el estado actual de cada hallazgo (por su huella estable), su origen, cuándo se vio por primera y por última vez y si sigue abierto. Se actualiza solo:

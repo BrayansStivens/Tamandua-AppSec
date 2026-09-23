@@ -64,7 +64,7 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
 
   const searchRuns = useCallback(async (text: string) => {
     if (!asset) return { options: [], total: 0 }
-    const page = await api.get<Page<RunRow>>(`/api/runs/page?${query({ asset: asset.key, type: 'repository_scan,pr_review', q: text || undefined, limit: 50 })}`)
+    const page = await api.get<Page<RunRow>>(`/api/runs/page?${query({ asset: asset.key, type: 'repository_scan,image_scan,pr_review', q: text || undefined, limit: 50 })}`)
     const current: ComboOption = { id: CURRENT, label: 'Estado actual', hint: 'escaneos y PRs juntos, con lo remediado aparte' }
     return { options: [...(text ? [] : [current]), ...page.items.map(runOption)], total: page.total + (text ? 0 : 1) }
   }, [asset])

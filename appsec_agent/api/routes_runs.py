@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import mimetypes
 import re
 from pathlib import Path
 
+from ..kinds import FINDING_RUNS
 from .. import findings_registry, jira, triage
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
@@ -102,7 +104,7 @@ def run_detail(request: Request):
     try:
         # Las vistas de una revisión de código reflejan el triage actual, no el del día del escaneo.
         record = jira.annotate(request.data_dir, triage.annotate(request.data_dir, load_run(request.data_dir, run_id)))
-        repository = record.get("type") in ("repository_scan", "pr_review")
+        repository = record.get("type") in FINDING_RUNS
         if not separator:
             return request.json(200, record)
         if artifact == "tickets.json":
@@ -173,8 +175,8 @@ def triage_findings(request: Request):
         record = findings_registry.resolve(request.data_dir, payload["run_id"])
     except (ValueError, OSError, json.JSONDecodeError):
         return request.json(404, {"error": "Ejecución no encontrada"})
-    if record.get("type") not in ("repository_scan", "pr_review", "asset_state"):
-        return request.json(400, {"error": "El triage aplica a revisiones de código"})
+    if record.get("type") not in (*FINDING_RUNS, "asset_state"):
+        return request.json(400, {"error": "El triage aplica a revisiones de código e imágenes"})
     try:
         updated = triage.decide(request.data_dir, record, payload["fingerprints"], payload["status"],
                                 reason=payload.get("reason"), note=payload.get("note"),
@@ -233,6 +235,52 @@ def repository_scan(request: Request):
                                                 context=payload.get("context", ""), tokens=tokens,
                                                 installation_id=installation, uid=source.get("uid"))
     return request.json(202, {"run": queued})
+
+
+IMAGE_SCAN_FIELDS = {"reference", "context"}
+
+
+@route("POST", "/api/images/scans", action="scan-image", body=1024)
+def image_scan(request: Request):
+    """Encola el análisis de una imagen de contenedor desde su registro."""
+    from ..image_scan import ImageError, check_registry_address, parse_reference
+    payload, state = request.payload, request.state
+    if (not isinstance(payload, dict) or "reference" not in payload or not set(payload) <= IMAGE_SCAN_FIELDS
+            or not isinstance(payload["reference"], str) or not isinstance(payload.get("context", ""), str)):
+        return request.json(400, {"error": "Imagen inválida"})
+    try:
+        image = parse_reference(payload["reference"])
+        check_registry_address(image["registry"])
+    except ImageError as exc:
+        return request.json(400, {"error": str(exc)})
+    if state.jobs.pending() >= 20:
+        return request.json(429, {"error": "Demasiados escaneos en cola"})
+    queued = state.jobs.enqueue_image_scan(image=image, context=payload.get("context", ""), requested_by=request.user["username"])
+    return request.json(202, {"run": queued, "image": image})
+
+
+@route("GET", "/api/registries")
+def registry_list(request: Request):
+    from ..image_scan import registries
+    return request.json(200, {"registries": registries(), "allow_private": os.environ.get("APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES", "").strip() == "1"})
+
+
+@route("POST", "/api/registries", admin=True, action="save-registry", body=6000)
+def registry_save(request: Request):
+    """Credenciales de solo lectura de un registro privado: se guardan cifradas y nunca vuelven al navegador."""
+    from ..image_scan import ImageError, forget_registry, save_registry
+    payload = request.payload
+    if not isinstance(payload, dict) or payload.get("action") not in ("save", "remove") or not isinstance(payload.get("registry"), str):
+        return request.json(400, {"error": "Solicitud inválida"})
+    try:
+        if payload["action"] == "remove":
+            return request.json(200, {"registries": forget_registry(payload["registry"])})
+        if set(payload) != {"action", "registry", "username", "token"}:
+            return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(200, {"registries": save_registry(payload["registry"], payload["username"], payload["token"],
+                                                              by=request.user["username"])})
+    except ImageError as exc:
+        return request.json(400, {"error": str(exc)})
 
 
 @route("POST", "/api/lab/scans", action="scan-lab")

@@ -24,6 +24,7 @@ import os
 import threading
 from pathlib import Path
 
+from .kinds import FINDING_RUNS, FULL_SCANS
 from . import logging_setup, triage
 from .assets import asset_key
 
@@ -70,7 +71,7 @@ def _reopen_manual(data_dir: Path, record: dict, fingerprints: set[str]) -> None
 
 def apply(data_dir: Path, record: dict) -> dict:
     """Incorpora una ejecución terminada al registro de su repositorio. Idempotente por ejecución."""
-    if record.get("type") not in ("repository_scan", "pr_review") or record.get("status") not in ("completed", "incomplete"):
+    if record.get("type") not in FINDING_RUNS or record.get("status") not in ("completed", "incomplete"):
         return {}
     key = asset_key(record)
     stamp = record.get("finished_at") or record["created_at"]
@@ -93,7 +94,7 @@ def apply(data_dir: Path, record: dict) -> dict:
             elif entry["status"] == "fixed":
                 opened += 1
                 entry["reopened_at"] = stamp
-            if record["type"] == "repository_scan":
+            if record["type"] in FULL_SCANS:
                 entry["origin"] = {"kind": "scan"}  # ya está en la rama principal
             entry.update(status="open", finding=_clean(finding), last_seen=stamp, last_run=record["id"])
             entry.pop("fixed", None)
@@ -101,7 +102,7 @@ def apply(data_dir: Path, record: dict) -> dict:
             if entry["status"] != "open" or digest in present:
                 continue
             origin = entry.get("origin") or {}
-            if record["type"] == "repository_scan" and (origin.get("kind") == "scan" or origin.get("merged")):
+            if record["type"] in FULL_SCANS and (origin.get("kind") == "scan" or origin.get("merged")):
                 how = f"Ya no aparece en el escaneo completo del {stamp[:10]}"
             elif record["type"] == "pr_review" and origin.get("kind") == "pr" and origin.get("pr") == pull.get("number"):
                 how = f"Corregido en el commit {str(pull.get('head_sha') or '')[:7]} del PR #{pull.get('number')}"

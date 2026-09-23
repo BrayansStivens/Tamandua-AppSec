@@ -35,6 +35,9 @@ IMAGES = {
     "gitleaks": {"name": "Gitleaks", "version": "8.30.1",
                  "image": "ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"},
     "opengrep": {"name": "Opengrep", "version": "1.30.0", "image": "appsec-agent/opengrep:1.30.0"},
+    # Segunda opinión en imágenes de contenedor: discrepa con Trivy sobre todo en paquetes del sistema.
+    "grype": {"name": "Grype", "version": "0.119.0",
+              "image": "anchore/grype@sha256:8c2c9234a345577a6d321a4753aa3ee1276d8975c8452d2344a56b57733ecad3"},
 }
 # Lenguajes con reglas propias y las extensiones por las que se reconocen en el snapshot.
 RULE_LANGUAGES = {
@@ -117,13 +120,20 @@ def _result(key: str, status: str, detail: str, findings: list | None = None, st
             "duration_s": round(time.time() - started, 1) if started else None}
 
 
-def _run(key: str, arguments: list[str], snapshot: Path, *, network: bool = False,
-         mounts: list[str] | None = None, timeout: int = 900) -> subprocess.CompletedProcess:
+def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool = False,
+         mounts: list[str] | None = None, timeout: int = 900, env: dict[str, str] | None = None,
+         secret_env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+    """Contenedor efímero del motor. `secret_env` viaja por el entorno del cliente de Docker
+    (`-e NOMBRE` sin valor), nunca en la línea de comandos, para que no se vea en `ps` ni en los logs."""
+    environment = [part for name, value in (env or {}).items() for part in ("-e", f"{name}={value}")]
+    environment += [part for name in (secret_env or {}) for part in ("-e", name)]
+    source = ["-v", f"{host_path(snapshot)}:/src:ro"] if snapshot is not None else []
     command = [shutil.which("docker"), "run", "--rm", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                "--pids-limit", "512", "--memory", "3g", "--cpus", "2",
                "--network", "bridge" if network else "none",
-               "-v", f"{host_path(snapshot)}:/src:ro", *(mounts or []), IMAGES[key]["image"], *arguments]
-    return subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+               *source, *environment, *(mounts or []), IMAGES[key]["image"], *arguments]
+    process_env = {**os.environ, **(secret_env or {})} if secret_env else None
+    return subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=process_env)
 
 
 def _relative(path: str) -> str:

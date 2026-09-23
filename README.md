@@ -7,6 +7,7 @@ Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Con
 ## Qué hace
 
 - **Análisis de código** con Trivy (dependencias, IaC, secretos), Gitleaks (secretos) y Opengrep con 58 reglas SAST propias en JavaScript/TypeScript, Python, Java, Go, PHP, Ruby y C#. El código nunca se ejecuta.
+- **Imágenes de contenedor** desde su registro (Docker Hub, GHCR, ECR…), sin ejecutarlas: paquetes con **Trivy + Grype**, secretos en capas, en `ENV` y en el historial de construcción, y configuración (root, `HEALTHCHECK`, `ADD` remoto).
 - **Priorización real**: cada aviso de dependencia se cruza con CISA KEV (explotación activa) y EPSS (probabilidad de explotación), con la versión exacta que lo corrige.
 - **Revisión de pull requests**: solo cuenta lo que el PR introduce; publica un comentario y un estado de commit que puede bloquear el merge según el umbral que elijas.
 - **Ciclo de vida de hallazgos** por repositorio: remediación automática cuando un escaneo o un commit del PR ya no lo encuentra, triage con motivo e historial.
@@ -17,7 +18,7 @@ Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Con
 
 ## Inicio rápido
 
-Necesitas **Docker** (Engine 24+ con Compose v2.24+), **make** y **git**, 4 GB de memoria y 5 GB de disco libres. `make doctor` comprueba todo; detalles en [docs/instalacion.md](docs/instalacion.md).
+Necesitas **Docker** (Engine 24+ con Compose v2.24+), **make** y **git**, 4 GB de memoria y 8 GB de disco libres. `make doctor` comprueba todo; detalles en [docs/instalacion.md](docs/instalacion.md).
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git
@@ -52,6 +53,7 @@ Abre <http://127.0.0.1:8766> y:
 - Secretos (clave de la GitHub App, claves de IA, token de Jira) **cifrados con AES-256-GCM** en `config/`, separado de `data/`. Nunca vuelven al navegador ni aparecen en los logs.
 - GitHub App **privada** con solo cuatro permisos (`contents: read`, `metadata: read`, `pull_requests: write`, `statuses: write`), sin webhooks ni OAuth; tokens de una hora en memoria.
 - Panel en `127.0.0.1` por defecto. Si lo publicas fuera de tu máquina sin **HTTPS**, el servidor no arranca.
+- Credenciales de registros privados cifradas y pasadas a los motores por variable de entorno; los registros de red interna se bloquean salvo permiso expreso.
 - Sin telemetría. Solo se consulta OSV con los nombres de tus dependencias si lo autorizas en cada análisis.
 - **Concesión:** la app lanza los motores por el socket de Docker, lo que equivale a root en el host. Expón el panel solo a gente de confianza.
 

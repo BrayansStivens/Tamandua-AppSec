@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 import json
 
+from ..kinds import FINDING_RUNS
 from .. import jira, logging_setup, triage
 from ..domains import DomainError, check_reachability, list_domains, register_domain, verify_domain
 from ..github_app import REQUIRED_PERMISSIONS, GitHubAppError, app_installations, app_permissions, config as github_config, forget as forget_installation
@@ -289,7 +290,7 @@ def jira_export(request: Request):
         record = record if record.get("type") == "asset_state" else triage.annotate(request.data_dir, record)
     except (ValueError, OSError, json.JSONDecodeError):
         return request.json(404, {"error": "Ejecución no encontrada"})
-    if record.get("type") not in ("repository_scan", "pr_review", "asset_state"):
+    if record.get("type") not in (*FINDING_RUNS, "asset_state"):
         return request.json(400, {"error": "Solo las revisiones de código generan tickets"})
     try:
         return request.json(200, jira.export(request.data_dir, record, render_tickets(record), payload["fingerprints"],

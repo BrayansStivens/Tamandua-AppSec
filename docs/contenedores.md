@@ -44,7 +44,7 @@ make up
 | `make status` | Estado de los contenedores y de las imágenes de los motores. |
 | `make logs` | Sigue los logs de la app. |
 | `make setup-code` | Vuelve a mostrar el código de configuración. |
-| `make engines` | Descarga por adelantado Trivy y Gitleaks (si no, se bajan en el primer análisis). |
+| `make engines` | Descarga por adelantado Trivy, Gitleaks y Grype (si no, se bajan en el primer análisis). |
 | `make update` | `git pull` y vuelve a levantar con la versión nueva. |
 | `make backup` | Copia `data/` y `config/` en `backups/<fecha>/`. Se niega si hay análisis en curso (salvo `FORCE=1`). |
 | `make shell` | Terminal dentro del contenedor. |
@@ -80,6 +80,7 @@ scripts/
 | `appsec-agent/opengrep:1.30.0` | Se construye de `docker/engines/opengrep/` | 230 MB |
 | `aquasec/trivy` | Docker Hub, fijada por digest | 240 MB |
 | `ghcr.io/gitleaks/gitleaks` | GHCR, fijada por digest | 80 MB |
+| `anchore/grype` | Docker Hub, fijada por digest; solo para imágenes de contenedor | 110 MB (+2,1 GB de base) |
 
 Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos construcciones de la misma versión usan exactamente las mismas capas. Las etiquetas OCI de la imagen de la app declaran versión, licencia y repositorio (`docker inspect appsec-agent`).
 

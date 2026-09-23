@@ -3,6 +3,7 @@ import { ExternalLink, KeyRound, PlugZap, RefreshCw } from 'lucide-react'
 import type { SessionUser } from '@/components/auth/session'
 import { CodeSources } from '@/components/code-sources'
 import { JiraCard } from '@/components/jira'
+import { RegistriesCard } from '@/components/registries'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,6 +51,7 @@ export function Integrations({ user }: { user: SessionUser }) {
       {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
       {user.role !== 'admin' && <div className="rounded-xl border border-app-line bg-app-soft px-4 py-3 text-sm text-app-muted">Conectar proveedores y guardar claves es cosa de un administrador; aquí ves su estado.</div>}
       <CodeSources canManage={user.role === 'admin'} />
+      <RegistriesCard canManage={user.role === 'admin'} />
       <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Gestión de incidencias</CardTitle><CardDescription>Convierte hallazgos pendientes en incidencias de tu equipo, sin duplicados entre escaneos.</CardDescription></CardHeader><CardContent><JiraCard canManage={user.role === 'admin'} /></CardContent></Card>
       <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Asistencia con IA</CardTitle><CardDescription>Usa tu propia clave de API: el consumo se factura a tu cuenta y puedes retirarla cuando quieras. La clave se queda en este servidor y nunca vuelve al navegador.</CardDescription></CardHeader><CardContent className="grid gap-4 lg:grid-cols-2">{(['openai', 'anthropic'] as const).map(id => {
         const provider = providers.find(item => item.id === id)

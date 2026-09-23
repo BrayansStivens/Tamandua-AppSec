@@ -12,6 +12,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .kinds import FULL_SCANS
 from .advisories import load_feeds, load_recent_cves
 from .assets import asset_key
 from .store import list_runs, load_run
@@ -54,7 +55,7 @@ def compute(data_dir: Path, days: int = 30) -> dict:
     decisions = load_triage(data_dir)
     triage_totals: Counter = Counter()
     for row in rows:
-        if row["type"] != "repository_scan" or row["status"] not in ("completed", "incomplete"):
+        if row["type"] not in FULL_SCANS or row["status"] not in ("completed", "incomplete"):
             continue
         try:
             records.append(annotate(data_dir, load_run(data_dir, row["id"]), decisions))

@@ -13,6 +13,7 @@ Todas las variables son opcionales y se ponen en `.env` (copia de `.env.example`
 | `APPSEC_AGENT_NVD_API_KEY` | — | API key de NVD: descarga de CVE más rápida. Va en cabecera y nunca se registra. |
 | `APPSEC_AGENT_CVE_SYNC` | `on` | `off` desactiva la copia local de NVD. |
 | `APPSEC_AGENT_PR_POLL_SECONDS` | `300` | Cada cuánto se consultan los PRs vigilados. |
+| `APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES` | — | `1` permite analizar imágenes de registros con IP privada (tu red interna). Por defecto se bloquean para evitar SSRF. |
 | `APPSEC_AGENT_TLS_CERT` / `_KEY` | — | TLS sin proxy. |
 | `GITHUB_APP_ID` + `GITHUB_APP_SLUG` + `GITHUB_APP_PRIVATE_KEY_FILE` | — | Alternativa al formulario: montar la App como secreto del despliegue. Manda sobre el almacén. |
 | `APPSEC_CONFIG_DIR` | `./config` | Carpeta del host con los secretos cifrados. |

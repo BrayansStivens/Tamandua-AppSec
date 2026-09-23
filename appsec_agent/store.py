@@ -203,8 +203,11 @@ def render_repository_report(record: dict) -> str:
     severities = summary.get("severities") or {}
     priorities = summary.get("priorities") or {}
     findings = _ordered_findings(record)
-    lines = [f"# Revisión de código · {source['name']}", "",
-             f"Run `{record['id']}` · {record['created_at']} · fuente `{source['provider']}` · snapshot SHA-256 `{source['sha256']}`",
+    image = source.get("image") or {}
+    identity = (f"imagen `{image.get('reference')}`" + (f" · digest `{image['resolved_digest']}`" if image.get("resolved_digest") else "")
+                if image else f"snapshot SHA-256 `{source.get('sha256')}`")
+    lines = [f"# {'Análisis de imagen' if image else 'Revisión de código'} · {source['name']}", "",
+             f"Run `{record['id']}` · {record['created_at']} · fuente `{source['provider']}` · {identity}",
              f"Estado: **{record['status']}** · {summary['files']} archivos · {summary['dependencies']} dependencias examinadas.", "",
              "## Resumen ejecutivo", "",
              "| Prioridad | Cantidad | | Severidad | Cantidad |", "|---|---|---|---|---|"]
@@ -362,14 +365,15 @@ def render_profile_report(record: dict, profile: str, title: str = "") -> str:
         "iso27001": "ISO/IEC 27001:2022",
         "custom": "Personalizado",
     }
-    if profile not in labels or record.get("type") not in ("lab_scan", "repository_scan"):
+    if profile not in labels or record.get("type") not in ("lab_scan", "repository_scan", "image_scan"):
         raise ValueError("Perfil o ejecución no compatible")
     if title and (len(title) > 100 or not all(ch.isprintable() and ch not in "#`[]<>" for ch in title)):
         raise ValueError("Título inválido")
     heading = title.strip() if title else f"Evidencia técnica para {labels[profile]}"
-    is_repository = record["type"] == "repository_scan"
+    is_repository = record["type"] in ("repository_scan", "image_scan")
     technical_report = render_repository_report(record) if is_repository else render_scan_report(record)
-    scope = (f"`{record['source']['name']}`, snapshot SHA-256 `{record['source']['sha256']}`; análisis estático puntual."
+    scope = (f"`{record['source']['name']}`, " + (f"imagen `{record['source']['image'].get('reference')}` leída del registro"
+             if record["source"].get("image") else f"snapshot SHA-256 `{record['source'].get('sha256')}`") + "; análisis estático puntual."
              if is_repository else "`tenant-api-lab`, variante sintética indicada abajo; no incluye producción ni terceros.")
     lines = [f"# {heading}", "", f"Perfil: **{labels[profile]}** · Run: `{record['id']}` · UTC: `{record['created_at']}`", "",
              "> Documento de apoyo para el equipo de seguridad. No es una auditoría SOC 2, una certificación ISO 27001 ni una opinión de cumplimiento.", "",

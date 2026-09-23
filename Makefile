@@ -62,7 +62,7 @@ setup-code: ## Muestra el código para crear el primer administrador
 	  echo "Código de configuración: $$code  (créalo en $(URL))"; \
 	else echo "Ya hay un administrador creado: entra con tu usuario."; fi
 
-engines: ## Descarga por adelantado las imágenes de Trivy y Gitleaks
+engines: ## Descarga por adelantado las imágenes de Trivy, Gitleaks y Grype
 	$(COMPOSE) run --rm --no-deps appsec python -m appsec_agent engines --pull
 
 update: ## Actualiza el código (git pull) y reconstruye

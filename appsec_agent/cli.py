@@ -39,6 +39,8 @@ def main(argv: list[str] | None = None) -> int:
     repository.add_argument("--source-id", required=True, help="ID devuelto por sources")
     repository.add_argument("--allow-osv-upload", action="store_true",
                             help="Autorizar el envío de nombres y versiones de dependencias a api.osv.dev")
+    image = commands.add_parser("scan-image", help="Analizar una imagen de contenedor desde su registro, sin ejecutarla")
+    image.add_argument("--reference", required=True, help="registro/repositorio:etiqueta, p. ej. ghcr.io/acme/api:1.4")
     commands.add_parser("providers", help="Mostrar qué proveedores de IA tienen credencial en el servidor")
     commands.add_parser("github-app", help="Estado de la GitHub App de este servidor (sin secretos)")
     engines = commands.add_parser("engines", help="Estado de las imágenes de los motores de análisis")
@@ -96,6 +98,18 @@ def main(argv: list[str] | None = None) -> int:
                                                                             data_dir=args.data_dir))
             print(json.dumps({"id": record["id"], "status": record["status"],
                               "source": record["source"]["name"], "summary": record["summary"]}, ensure_ascii=False, indent=2))
+            return 3 if record["status"] == "incomplete" else 2 if record["summary"]["candidates"] else 0
+        if args.command == "scan-image":
+            from .image_scan import ImageError, check_registry_address, parse_reference, scan_image
+            try:
+                target = parse_reference(args.reference)
+                check_registry_address(target["registry"])
+            except ImageError as exc:
+                parser.exit(1, f"Error: {exc}\n")
+            record = save_repository_scan(args.data_dir, scan_image(target, data_dir=args.data_dir))
+            print(json.dumps({"id": record["id"], "status": record["status"], "image": target["reference"],
+                              "summary": {key: record["summary"].get(key) for key in ("candidates", "severities", "agreement", "kev")}},
+                             ensure_ascii=False, indent=2))
             return 3 if record["status"] == "incomplete" else 2 if record["summary"]["candidates"] else 0
         if args.command == "providers":
             print(json.dumps(provider_status(), ensure_ascii=False, indent=2))

@@ -48,7 +48,7 @@ esac
 free_kb=$(df -Pk . 2>/dev/null | awk 'NR==2 {print $4}')
 if [ -n "${free_kb:-}" ]; then
   free_gb=$((free_kb / 1024 / 1024))
-  if [ "$free_gb" -ge 5 ]; then pass "espacio libre: ${free_gb} GB"; else note "solo ${free_gb} GB libres" "Se recomiendan 5 GB (imágenes, caché de Trivy y copia de NVD)."; fi
+  if [ "$free_gb" -ge 8 ]; then pass "espacio libre: ${free_gb} GB"; else note "solo ${free_gb} GB libres" "Se recomiendan 8 GB (imágenes, bases de Trivy y Grype, copia de NVD)."; fi
 fi
 
 echo
@@ -79,7 +79,7 @@ echo
 echo "Motores de análisis"
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   for image in $(sed -n 's/.*"image": "\([^"]*\)".*/\1/p' appsec_agent/scanners.py); do
-    if docker image inspect "$image" >/dev/null 2>&1; then pass "$image"; else note "falta $image" "'make build' construye Opengrep y 'make engines' descarga Trivy y Gitleaks (si no, se bajan en el primer análisis)."; fi
+    if docker image inspect "$image" >/dev/null 2>&1; then pass "$image"; else note "falta $image" "'make build' construye Opengrep y 'make engines' descarga Trivy, Gitleaks y Grype (si no, se bajan en el primer análisis)."; fi
   done
 fi
 

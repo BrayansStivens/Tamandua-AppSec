@@ -9,6 +9,7 @@ AppSec Agent lee el código de tus repositorios y guarda credenciales de GitHub,
 | Clave privada de la GitHub App | `config/secrets.vault`, cifrada | Solo el proceso del servidor. A GitHub va un JWT firmado, nunca la clave. |
 | Claves de OpenAI / Anthropic | `config/secrets.vault`, cifradas | Solo el servidor; se validan contra el proveedor antes de guardarse. El panel muestra los 4 últimos caracteres. |
 | Token de Jira | `config/secrets.vault`, cifrado | Igual que las anteriores. |
+| Tokens de registros de contenedores | `config/secrets.vault`, cifrados | Solo el servidor. Llegan a Trivy y Grype por variable de entorno (`-e NOMBRE` sin valor en la orden), nunca en la línea de comandos. |
 | Tokens de instalación de GitHub | Memoria, 1 h | Se renuevan solos; nunca se escriben en disco. |
 | Clave maestra | `config/master.key` (0400) o `APPSEC_AGENT_MASTER_KEY` | Quien administra el servidor. |
 | Contraseñas de usuarios | `data/auth/users.json`, solo hash scrypt | Nadie: no son recuperables. |
@@ -51,6 +52,7 @@ AppSec Agent lee el código de tus repositorios y guarda credenciales de GitHub,
 | `services.nvd.nist.gov` | Rangos de índices y de fechas | Copia local de CVE, en segundo plano. |
 | `www.cisa.gov`, `epss.empiricalsecurity.com` | Nada: descarga de feeds públicos completos | Una vez al día. Se descargan enteros para no revelar qué CVE te interesan. |
 | Registro de imágenes y base de Trivy | Nada propio | Al construir y cuando Trivy actualiza su base. |
+| Registros de contenedores (Docker Hub, GHCR, ECR…) | Petición de la imagen que pides analizar, con tu token si lo guardaste | Al analizar una imagen. Los registros con IP privada se bloquean salvo `APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES=1`, para que el formulario no sirva de puente a tu red interna (SSRF). |
 | `api.osv.dev` | Nombres y versiones de tus dependencias | **Solo si lo autorizas** en cada análisis. Por defecto no se usa. |
 | Tu sitio de Jira | Título, descripción y prioridad de las incidencias que exportas | Solo si conectas Jira y pulsas exportar. |
 | `api.openai.com`, `api.anthropic.com` | Tu clave, para comprobar que es válida | Solo al guardarla o probarla. Hoy la IA no recibe código ni hallazgos. |
@@ -61,8 +63,9 @@ No hay telemetría.
 ## Análisis del código
 
 - El código de los repositorios **nunca se ejecuta**: se analiza una instantánea en solo lectura.
-- Los motores corren en contenedores efímeros con `--cap-drop ALL`, `no-new-privileges` y límites de memoria, CPU y procesos. Gitleaks y Opengrep no tienen red; Trivy solo la usa para su base de vulnerabilidades.
-- Las imágenes de Trivy y Gitleaks van fijadas por digest. La de Opengrep se construye con el binario oficial comprobado contra su SHA-256.
+- Los motores corren en contenedores efímeros con `--cap-drop ALL`, `no-new-privileges` y límites de memoria, CPU y procesos. Gitleaks y Opengrep no tienen red; Trivy y Grype solo la usan para su base de vulnerabilidades y, al analizar una imagen, para leerla del registro.
+- Las imágenes de contenedor que analizas **no se ejecutan ni se construyen**: los motores leen el manifiesto y las capas.
+- Las imágenes de Trivy, Gitleaks y Grype van fijadas por digest. La de Opengrep se construye con el binario oficial comprobado contra su SHA-256.
 - Los valores de los secretos encontrados en tu código se redactan: en los hallazgos queda la ubicación y el tipo, no el valor.
 
 ## Concesiones conocidas
@@ -70,6 +73,7 @@ No hay telemetría.
 - **Socket de Docker.** La app lanza los motores a través de `/var/run/docker.sock`, lo que equivale a root en el host. Es el precio de no instalar nada más que Docker. Si abres el panel a más gente, ponlo detrás de un socket-proxy con lista blanca o separa el runner. Está en el plan de trabajo.
 - **Clave maestra junto al almacén** si no defines `APPSEC_AGENT_MASTER_KEY`. Protege frente a una copia suelta de `secrets.vault`, no frente a alguien con acceso completo a `config/`.
 - **Un solo workspace** por instalación: todos los usuarios ven todos los repositorios conectados.
+- **Token de registro visible para root.** Mientras dura el análisis de una imagen privada, el token está en la configuración del contenedor del motor: lo puede leer quien tenga acceso a Docker en el host (que ya es root). Usa tokens de solo lectura.
 
 ## Recomendaciones
 

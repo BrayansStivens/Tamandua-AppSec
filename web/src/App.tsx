@@ -78,7 +78,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
         const data = await refresh()
         for (const row of data) if (known.has(row.id) && row.status !== 'queued' && row.status !== 'running') {
           known.delete(row.id)
-          const name = row.type === 'repository_scan' ? row.source?.name ?? 'repositorio' : row.fixture
+          const name = row.type === 'repository_scan' ? row.source?.name ?? 'repositorio' : row.type === 'image_scan' ? row.fixture ?? 'imagen' : row.fixture
           toasts.push(row.status === 'failed' ? 'error' : 'ok', row.status === 'failed'
             ? `El escaneo de ${name} falló.`
             : `Escaneo de ${name} terminado: ${row.summary.candidates ?? 0} hallazgos${row.summary.severities ? ` (${row.summary.severities.critical ?? 0} críticos, ${row.summary.severities.high ?? 0} altos)` : ''}.`)

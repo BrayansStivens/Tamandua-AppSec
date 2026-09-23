@@ -28,6 +28,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from .kinds import FINDING_RUNS
 from . import logging_setup
 from .advisories import compare_versions
 from .triage import asset_key
@@ -188,7 +189,7 @@ def _remember(data_dir: Path, asset: str, fingerprint: str, link: dict) -> None:
 
 def annotate(data_dir: Path, record: dict) -> dict:
     """Añade a cada hallazgo el ticket ya creado, si lo hay."""
-    if record.get("type") not in ("repository_scan", "pr_review", "asset_state"):
+    if record.get("type") not in (*FINDING_RUNS, "asset_state"):
         return record
     links = load_links(data_dir).get(asset_key(record), {})
     if not links:

@@ -20,6 +20,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from .kinds import FINDING_RUNS, FULL_SCANS
 from . import logging_setup
 
 GRACE = timedelta(hours=24)
@@ -149,15 +150,15 @@ def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
     decisions = triage.load(data_dir)
     groups: dict[str, dict] = {}
     for row in list_runs(data_dir):  # del más reciente al más antiguo
-        if row["type"] not in ("repository_scan", "pr_review"):
+        if row["type"] not in FINDING_RUNS:
             continue
         key = asset_key(row)
         entry = groups.setdefault(key, {"key": key, "name": (row.get("source") or {}).get("name"), "provider": (row.get("source") or {}).get("provider"),
                                         "source_id": (row.get("source") or {}).get("id"), "scans": 0, "pr_reviews": 0,
                                         "last_activity": row["created_at"], "latest_scan": None,
                                         "removed_at": (registry.get(key) or {}).get("removed_at")})
-        entry["scans" if row["type"] == "repository_scan" else "pr_reviews"] += 1
-        if row["type"] == "repository_scan" and entry["latest_scan"] is None and row["status"] in ("completed", "incomplete"):
+        entry["scans" if row["type"] in FULL_SCANS else "pr_reviews"] += 1
+        if row["type"] in FULL_SCANS and entry["latest_scan"] is None and row["status"] in ("completed", "incomplete"):
             entry["latest_scan"] = {"run_id": row["id"], "created_at": row["created_at"], "status": row["status"]}
     from .findings_registry import summarize
     for key, entry in groups.items():

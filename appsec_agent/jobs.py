@@ -99,6 +99,23 @@ class ScanJobs:
         log.info("revisión de PR encolada", extra={"run_id": run_id, "path": f"{source_id}#{pull['number']}"})
         return {"id": run_id, "status": "queued"}
 
+    def enqueue_image_scan(self, *, image: dict, context: str, requested_by: str) -> dict:
+        """Análisis de una imagen de contenedor leída del registro: no se ejecuta ni se construye."""
+        run_id = uuid.uuid4().hex
+        record = {"schema_version": "0.3.0", "id": run_id, "type": "image_scan", "status": "queued", "created_at": _now(),
+                  "fixture": image["reference"], "variant": "image",
+                  "source": {"id": image["asset"], "uid": None, "name": image["name"], "provider": "registry", "image": image},
+                  "requested_by": requested_by, "context": " ".join(context.split())[:400],
+                  "summary": {"candidates": 0, "files": 0, "dependencies": 0},
+                  "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
+                  "progress": [{"at": _now(), "level": "info", "message": f"En cola: análisis de la imagen {image['reference']}."}]}
+        self._save(record)
+        with self._lock:
+            self._records[run_id] = record
+        self._queue.put({"kind": "image_scan", "run_id": run_id, "image": image, "context": context})
+        log.info("análisis de imagen encolado", extra={"run_id": run_id, "path": image["reference"]})
+        return {"id": run_id, "status": "queued"}
+
     def pending(self) -> int:
         return self._queue.qsize()
 
@@ -117,6 +134,8 @@ class ScanJobs:
     def _execute(self, job: dict) -> None:
         if job.get("kind") == "pr_review":
             return self._execute_pr(job)
+        if job.get("kind") == "image_scan":
+            return self._execute_image(job)
         run_id = job["run_id"]
         record = self._records.get(run_id) or json.loads((_run_dir(self.data_dir, run_id) / "run.json").read_text(encoding="utf-8"))
         record["status"] = "running"
@@ -153,6 +172,34 @@ class ScanJobs:
             log.error("escaneo fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
             # Al usuario se le dice que falló y en qué fase, nunca la traza ni rutas del servidor.
             self._fail(record, "El análisis falló por un error interno; el equipo puede revisar los logs del servidor con el identificador de la ejecución.")
+            del exc
+
+    def _execute_image(self, job: dict) -> None:
+        from .image_scan import scan_image
+        run_id = job["run_id"]
+        record = self._records.get(run_id) or json.loads((_run_dir(self.data_dir, run_id) / "run.json").read_text(encoding="utf-8"))
+        record["status"] = "running"
+        record["started_at"] = _now()
+
+        def progress(level: str, message: str) -> None:
+            record["progress"].append({"at": _now(), "level": level, "message": message[:300]})
+            self._save(record)
+            log.info(message, extra={"run_id": run_id, "step": level})
+
+        try:
+            scan = scan_image(job["image"], data_dir=self.data_dir, context=job["context"], progress=progress)
+            summary = scan["summary"]
+            progress("ok", f"Terminado: {summary['candidates']} hallazgos "
+                           f"({summary['severities'].get('critical', 0)} críticos, {summary['severities'].get('high', 0)} altos).")
+            final = save_repository_scan(self.data_dir, {**scan, "requested_by": record.get("requested_by"), "progress": record["progress"],
+                                                         "started_at": record["started_at"], "finished_at": _now()},
+                                         run_id=run_id, created_at=record["created_at"])
+            with self._lock:
+                self._records[run_id] = final
+            log.info("análisis de imagen terminado", extra={"run_id": run_id, "status": final["status"]})
+        except Exception as exc:  # noqa: BLE001
+            log.error("análisis de imagen fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
+            self._fail(record, "El análisis de la imagen falló por un error interno; revisa los logs con el identificador de la ejecución.")
             del exc
 
     def _baseline(self, source_id: str, uid: str | None = None) -> dict | None:

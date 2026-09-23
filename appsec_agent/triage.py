@@ -25,6 +25,7 @@ import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from .kinds import FINDING_RUNS
 from .assets import asset_key
 
 
@@ -100,7 +101,7 @@ def effective(entry: dict | None, today: date | None = None) -> dict:
 
 def annotate(data_dir: Path, record: dict, decisions: dict | None = None) -> dict:
     """Copia de la ejecución con el estado de triage en cada hallazgo y el recuento en el resumen."""
-    if record.get("type") not in ("repository_scan", "pr_review"):
+    if record.get("type") not in FINDING_RUNS:
         return record
     asset = (decisions if decisions is not None else load(data_dir)).get(asset_key(record), {})
     counts = {status: 0 for status in STATUSES}

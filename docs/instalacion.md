@@ -8,7 +8,7 @@
 | Docker | Engine 24+ y Compose v2.24+ | Docker Desktop, OrbStack o Docker Engine. |
 | make y git | cualquiera | `make` ya viene en macOS; en Debian/Ubuntu `sudo apt install make git`. En Windows, dentro de WSL2. |
 | Memoria | 4 GB libres | La app usa ~200 MB en reposo; cada análisis lanza un motor a la vez, limitado a 3 GB. |
-| Disco | 5 GB libres | Imágenes (~0,9 GB), caché de vulnerabilidades de Trivy (~1,3 GB), copia local de NVD (~0,7 GB) y tus ejecuciones. |
+| Disco | 8 GB libres | Imágenes (~1 GB), bases de vulnerabilidades de Trivy (~1,3 GB) y de Grype (~2,1 GB, solo si analizas imágenes de contenedor), copia local de NVD (~0,7 GB) y tus ejecuciones. |
 | Red de salida | HTTPS a GitHub, NVD, CISA y EPSS | Detalle en [seguridad.md](seguridad.md#qué-sale-de-tu-máquina). No hace falta ninguna entrada desde internet. |
 | Cuenta | GitHub (personal u organización que administres) | Para crear tu GitHub App. |
 
@@ -59,7 +59,7 @@ make update
 
 | Carpeta | Qué contiene | Cómo tratarla |
 | --- | --- | --- |
-| `data/` | Ejecuciones, hallazgos, usuarios (contraseñas con scrypt), logs, copia de NVD y cachés | Sin secretos en claro. Se puede excluir `data/feeds/` y `data/trivy-cache/`: se vuelven a descargar. |
+| `data/` | Ejecuciones, hallazgos, usuarios (contraseñas con scrypt), logs, copia de NVD y cachés | Sin secretos en claro. Se pueden excluir `data/feeds/`, `data/trivy-cache/` y `data/grype-cache/`: se vuelven a descargar. |
 | `config/` | `secrets.vault` (cifrado) y `master.key` | **Es la llave de tus credenciales.** Guárdala aparte de `data/` y con el mismo cuidado que una contraseña. |
 
 ```bash
