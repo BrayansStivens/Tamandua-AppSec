@@ -2,13 +2,15 @@
 
 Qué hace cada parte del panel y con qué criterio. Para instalarlo, ve a [instalacion.md](instalacion.md).
 
+**Vocabulario.** Tamandua hace **análisis**: lee el código, las dependencias, la configuración y las imágenes sin ejecutarlos ni atacar nada, y sus hallazgos son candidatos que hay que confirmar. No es un *pentest*: un pentest intenta explotar los fallos contra un sistema en marcha y demuestra el impacto. Las futuras **pruebas dinámicas** (DAST) serán escaneos activos, tampoco un pentest; solo cuando un agente intente explotar y confirme el impacto hablaremos de *pentest asistido por IA*. Un informe de Tamandua no sustituye al pentest que piden SOC 2 o ISO 27001.
+
 ## En desarrollo
 
 Se ven en el panel en gris, con la marca **En desarrollo**, para que se sepa que vienen. Hoy no dan resultados y no se pueden usar:
 
 | Función | Qué hará |
 | --- | --- |
-| Pentest de aplicaciones web y API | Pruebas dinámicas (DAST) con ZAP o Nuclei en un contenedor aislado, solo sobre dominios cuya propiedad hayas verificado por DNS. |
+| Pruebas dinámicas de aplicaciones web y API | Escaneo activo (DAST) con ZAP o Nuclei en un contenedor aislado, solo sobre dominios cuya propiedad hayas verificado por DNS. |
 | GitLab, Bitbucket, Azure DevOps | Conectar repositorios con tokens de solo lectura del proyecto. |
 | Asistencia con IA | Explicación de hallazgos y propuesta de parche con tu propia clave, con consentimiento en cada ejecución. |
 | API pública y CLI para CI | Tokens personales con ámbitos, `/api/v1` documentada y un comando para CI que envía los resultados a tu instancia y rompe el build según un umbral. |
@@ -29,7 +31,7 @@ Lanzar un escaneo devuelve al instante `202` con su identificador y lo encola; u
 
 ## Imágenes de contenedor
 
-**Nuevo pentest → Imagen de contenedor** analiza una imagen tal como la usas en `docker pull` (`ghcr.io/acme/api:1.4`, `nginx:1.27`, `…@sha256:…`), leyéndola directamente del registro. **No se ejecuta ni se construye**, y no ocupa espacio en tu Docker.
+**Nuevo análisis → Imagen de contenedor** analiza una imagen tal como la usas en `docker pull` (`ghcr.io/acme/api:1.4`, `nginx:1.27`, `…@sha256:…`), leyéndola directamente del registro. **No se ejecuta ni se construye**, y no ocupa espacio en tu Docker.
 
 | Qué | Cómo |
 | --- | --- |

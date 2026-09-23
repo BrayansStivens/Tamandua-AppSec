@@ -25,7 +25,7 @@ const IMAGE_REFERENCE = /^(?:((?:[a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]+(?::\d{1,5})?|loc
 const registryOf = (reference: string) => { const match = reference.trim().match(IMAGE_REFERENCE); return match ? (match[1]?.toLowerCase() ?? 'docker.io') : null }
 const TARGET_LIMIT = 5
 
-export function PentestWizard({ onComplete, onManageConnections, onCancel, initialSourceId }: { onComplete: (id: string) => Promise<void>; onManageConnections: () => void; onCancel: () => void; initialSourceId: string | null }) {
+export function AnalysisWizard({ onComplete, onManageConnections, onCancel, initialSourceId }: { onComplete: (id: string) => Promise<void>; onManageConnections: () => void; onCancel: () => void; initialSourceId: string | null }) {
   const [kind, setKind] = useState<Kind | null>(initialSourceId ? 'code' : null)
   const [choice, setChoice] = useState<Kind>('code')
   const [step, setStep] = useState(0)
@@ -75,11 +75,11 @@ export function PentestWizard({ onComplete, onManageConnections, onCancel, initi
   }
 
   if (!kind) return <div className="space-y-6">
-    <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Elige el tipo de pentest</h2><Button variant="ghost" onClick={onCancel}><ArrowLeft /> Volver</Button></div>
+    <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">Elige el tipo de análisis</h2><Button variant="ghost" onClick={onCancel}><ArrowLeft /> Volver</Button></div>
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {([['code', Code2, 'Revisión de código', 'Analiza un snapshot de tu repositorio sin ejecutar su código ni instalar dependencias.', ['SAST multi-lenguaje (Opengrep)', 'Secretos (Gitleaks)', 'Dependencias (Trivy)', 'Infraestructura y CI/CD (Trivy + Checkov + zizmor)']],
+      {([['code', Code2, 'Análisis de código', 'Analiza un snapshot de tu repositorio sin ejecutar su código ni instalar dependencias.', ['SAST multi-lenguaje (Opengrep)', 'Secretos (Gitleaks)', 'Dependencias (Trivy)', 'Infraestructura y CI/CD (Trivy + Checkov + zizmor)']],
          ['image', Boxes, 'Imagen de contenedor', 'Analiza una imagen desde su registro (Docker Hub, GHCR, ECR…) sin ejecutarla ni construirla.', ['Paquetes: Trivy + Grype', 'Secretos en capas, ENV e historial', 'Configuración: reglas propias + Checkov']],
-         ['web', Globe2, 'Pentest de app web o API', 'Pruebas dinámicas contra tu aplicación en marcha, sobre dominios verificados. Todavía no dan resultados.', ['Verificación de propiedad por DNS', 'DAST en contenedor aislado', 'Evidencia con petición y respuesta']]] as const).map(([id, Icon, title, description, bullets]) => { const soon = id === 'web'; return <button key={id} disabled={soon} onClick={() => setChoice(id)} aria-pressed={choice === id} className={`rounded-2xl border p-6 text-left transition ${soon ? 'cursor-not-allowed border-dashed border-app-line bg-inset/40 opacity-60' : choice === id ? 'border-brand/60 bg-brand/[0.07]' : 'border-app-line bg-panel hover:border-brand/30'}`}>
+         ['web', Globe2, 'Pruebas dinámicas de app web o API', 'Escaneo activo (DAST) contra tu aplicación en marcha, sobre dominios verificados. Todavía no dan resultados.', ['Verificación de propiedad por DNS', 'DAST en contenedor aislado', 'Evidencia con petición y respuesta']]] as const).map(([id, Icon, title, description, bullets]) => { const soon = id === 'web'; return <button key={id} disabled={soon} onClick={() => setChoice(id)} aria-pressed={choice === id} className={`rounded-2xl border p-6 text-left transition ${soon ? 'cursor-not-allowed border-dashed border-app-line bg-inset/40 opacity-60' : choice === id ? 'border-brand/60 bg-brand/[0.07]' : 'border-app-line bg-panel hover:border-brand/30'}`}>
         <div className="flex items-start justify-between gap-3"><div className={`flex size-11 items-center justify-center rounded-2xl ${id === 'code' ? 'bg-brand/15 text-brand' : id === 'image' ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300' : 'bg-sky-400/15 text-sky-700 dark:text-sky-300'}`}><Icon /></div>{soon ? <SoonBadge /> : <span className={`mt-1 flex size-4 items-center justify-center rounded-full border ${choice === id ? 'border-primary bg-primary' : 'border-app-line'}`}>{choice === id && <Check className="size-3 text-primary-foreground" />}</span>}</div>
         <h3 className="mt-6 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-app-muted">{description}</p>
         <ul className="mt-5 space-y-1.5">{bullets.map(item => <li key={item} className="flex items-center gap-2 text-xs text-app-subtle"><SearchCheck className="size-3.5 shrink-0" />{item}</li>)}</ul>
@@ -90,7 +90,7 @@ export function PentestWizard({ onComplete, onManageConnections, onCancel, initi
 
   const current = steps[step].id
   return <div className="space-y-6">
-    <Button variant="ghost" onClick={() => { setKind(null); setStep(0) }}><ArrowLeft /> Volver a tipos de pentest</Button>
+    <Button variant="ghost" onClick={() => { setKind(null); setStep(0) }}><ArrowLeft /> Volver a tipos de análisis</Button>
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_230px]">
       <div className="min-w-0 space-y-5">
         {current === 'source' && <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Código fuente</CardTitle><CardDescription>Elige el repositorio que quieres revisar. Se analiza un snapshot de solo lectura.</CardDescription></CardHeader><CardContent>
@@ -111,7 +111,7 @@ export function PentestWizard({ onComplete, onManageConnections, onCancel, initi
           <p className="text-xs text-app-subtle">Consejo: analiza una etiqueta inmutable (versión o <span className="font-mono">@sha256:</span>) en lugar de <span className="font-mono">latest</span>, para saber exactamente qué revisaste.</p>
         </CardContent></Card>}
 
-        {current === 'targets' && <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Objetivos</CardTitle><CardDescription>Elige los dominios y API registrados que quieres incluir en este pentest.</CardDescription></CardHeader><CardContent className="space-y-4">
+        {current === 'targets' && <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Objetivos</CardTitle><CardDescription>Elige los dominios y API registrados que quieres incluir en estas pruebas.</CardDescription></CardHeader><CardContent className="space-y-4">
           {chosenTargets.length
             ? <div className="space-y-2">{chosenTargets.map(domain => <div key={domain.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-line bg-inset p-4"><span className="flex min-w-0 items-center gap-3"><Globe2 className="size-4 shrink-0 text-app-muted" /><span className="min-w-0"><span className="block truncate text-sm font-medium">{domain.url}</span><span className="text-xs text-app-subtle">{kindLabel[domain.kind ?? 'web']}</span></span></span><span className="flex items-center gap-2"><Badge variant="outline" className={domain.verified ? 'border-brand/30 text-brand' : 'border-amber-500/30 text-amber-700 dark:text-amber-300'}>{domain.verified ? 'Verificado' : 'Sin verificar'}</Badge><Button aria-label={`Quitar ${domain.host}`} variant="ghost" size="icon-sm" onClick={() => setTargets(previous => previous.filter(id => id !== domain.id))}><X /></Button></span></div>)}<Button variant="outline" onClick={() => setPickTargets(true)} className="border-app-line bg-app-soft"><Plus /> Añadir más objetivos</Button></div>
             : <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-app-line py-14 text-center"><Globe2 className="size-6 text-app-faint" /><p className="text-sm font-medium">Todavía no hay objetivos</p><p className="max-w-sm text-sm text-app-muted">Elige entre tus dominios registrados o registra uno nuevo.</p><Button onClick={() => setPickTargets(true)} className="mt-1 bg-primary text-primary-foreground hover:bg-primary/90"><Plus /> Añadir dominios…</Button></div>}
@@ -126,7 +126,7 @@ export function PentestWizard({ onComplete, onManageConnections, onCancel, initi
 
         {current === 'review' && <div className="space-y-5">
           <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Revisar y lanzar</CardTitle><CardDescription>Esto es exactamente lo que se va a ejecutar y lo que no.</CardDescription></CardHeader><CardContent className="space-y-4">
-            <Row label="Tipo" value={kind === 'code' ? 'Revisión de código' : kind === 'image' ? 'Imagen de contenedor' : 'Pentest de app web o API'} />
+            <Row label="Tipo" value={kind === 'code' ? 'Análisis de código' : kind === 'image' ? 'Imagen de contenedor' : 'Pruebas dinámicas de app web o API'} />
             <Row label="Objetivo" value={kind === 'code' ? chosenSource?.name ?? 'sin seleccionar' : kind === 'image' ? reference.trim() || 'sin seleccionar' : chosenTargets.map(item => item.host).join(', ') || 'sin seleccionar'} />
             <Row label="Contexto" value={context.trim() || 'sin contexto declarado'} />
             {kind === 'code' && <>
@@ -142,7 +142,7 @@ export function PentestWizard({ onComplete, onManageConnections, onCancel, initi
               <div className="space-y-2 rounded-xl border border-app-line bg-inset p-4"><p className="text-xs font-medium tracking-widest text-app-subtle uppercase">No se ejecuta</p>{['La imagen no se ejecuta ni se construye', 'No se analiza el código fuente que la generó (lánzalo sobre su repositorio)', 'Ningún valor secreto encontrado se guarda: solo su ubicación'].map(item => <p key={item} className="flex gap-2 text-sm text-app-muted"><X className="mt-0.5 size-4 shrink-0 text-app-faint" />{item}</p>)}</div>
             </>}
             {kind === 'web' && <div className="space-y-3">
-              <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100/90"><TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" /><span>Las pruebas dinámicas todavía no se pueden lanzar: falta el runner aislado y los límites de tasa y alcance. Este pentest queda preparado, no ejecutado.</span></div>
+              <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100/90"><TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" /><span>Las pruebas dinámicas todavía no se pueden lanzar: falta el runner aislado y los límites de tasa y alcance. Esta configuración queda preparada, no ejecutada.</span></div>
               {chosenTargets.some(item => !item.verified) && <div className="flex items-start gap-3 rounded-xl border border-app-line bg-inset p-4 text-sm text-app-muted"><CircleAlert className="mt-0.5 size-4 shrink-0 text-app-subtle" /><span>Hay objetivos sin verificar. La propiedad por DNS TXT es requisito previo a cualquier prueba activa.</span></div>}
             </div>}
           </CardContent></Card>
@@ -154,7 +154,7 @@ export function PentestWizard({ onComplete, onManageConnections, onCancel, initi
           {current === 'review'
             ? kind === 'code' || kind === 'image'
               ? <Button onClick={() => void launch()} disabled={busy || (kind === 'code' ? !source : !imageRegistry)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <SearchCheck />}{busy ? 'Encolando…' : kind === 'image' ? 'Analizar imagen' : 'Iniciar revisión de código'}</Button>
-              : <Button disabled title="El runner aislado de DAST aún no está disponible">Lanzar pentest web</Button>
+              : <Button disabled title="El runner aislado de DAST aún no está disponible">Lanzar pruebas dinámicas</Button>
             : <Button onClick={() => setStep(step + 1)} disabled={step === 0 && !ready} className="bg-primary text-primary-foreground hover:bg-primary/90">Continuar <ArrowRight /></Button>}
         </div>
       </div>

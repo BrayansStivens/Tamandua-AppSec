@@ -212,7 +212,7 @@ def render_repository_report(record: dict) -> str:
     image = source.get("image") or {}
     identity = (f"imagen `{image.get('reference')}`" + (f" · digest `{image['resolved_digest']}`" if image.get("resolved_digest") else "")
                 if image else f"snapshot SHA-256 `{source.get('sha256')}`")
-    lines = [f"# {'Análisis de imagen' if image else 'Revisión de código'} · {source['name']}", "",
+    lines = [f"# {'Análisis de imagen' if image else 'Análisis de código'} · {source['name']}", "",
              f"Run `{record['id']}` · {record['created_at']} · fuente `{source['provider']}` · {identity}",
              f"Estado: **{record['status']}** · {summary['files']} archivos · {summary['dependencies']} dependencias examinadas.", "",
              "## Resumen ejecutivo", "",

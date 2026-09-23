@@ -1,11 +1,13 @@
 // Navegación en la URL (#/hallazgos?repo=…&run=…): refrescar deja al usuario donde estaba y Atrás funciona.
 // El fragmento #link=… de las invitaciones no empieza por «/» y no se toca aquí.
 const SLUGS: Record<string, string> = {
-  overview: 'resumen', pentests: 'pentests', new: 'nuevo', findings: 'hallazgos', coverage: 'cobertura', threats: 'amenazas',
+  overview: 'resumen', analyses: 'analisis', new: 'nuevo', findings: 'hallazgos', coverage: 'cobertura', threats: 'amenazas',
   repositories: 'repositorios', pulls: 'pull-requests', domains: 'dominios', integrations: 'integraciones',
   users: 'usuarios', account: 'cuenta', cves: 'cve-tracker',
 }
-const VIEWS = Object.fromEntries(Object.entries(SLUGS).map(([view, slug]) => [slug, view]))
+// Enlaces guardados de antes del cambio de nombre («Pentests» pasó a «Análisis»): siguen funcionando.
+const LEGACY: Record<string, string> = { pentests: 'analyses' }
+const VIEWS: Record<string, string> = { ...LEGACY, ...Object.fromEntries(Object.entries(SLUGS).map(([view, slug]) => [slug, view])) }
 export const ROUTE_EVENT = 'appsec:route'
 
 export function readRoute(): { view: string | null; params: URLSearchParams } {

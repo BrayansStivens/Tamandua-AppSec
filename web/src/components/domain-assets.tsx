@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 
-export function DomainAssets({ onPentest }: { onPentest: () => void }) {
+export function DomainAssets({ onConfigure }: { onConfigure: () => void }) {
   const [domains, setDomains] = useState<Domain[]>([])
   const [filter, setFilter] = useState('')
   const [adding, setAdding] = useState(false)
@@ -45,7 +45,7 @@ export function DomainAssets({ onPentest }: { onPentest: () => void }) {
           {!visible.length && <p className="p-10 text-center text-sm text-app-muted">{domains.length ? 'Ningún dominio coincide con la búsqueda.' : 'Aún no hay dominios registrados.'}</p>}
           {domains.length > 0 && <div className="px-4 py-3 text-xs text-app-subtle">Mostrando {visible.length} de {domains.length} dominios</div>}
         </div>
-        <Button variant="outline" onClick={onPentest} className="border-app-line bg-app-soft">Configurar pentest web</Button>
+        <Button variant="outline" onClick={onConfigure} className="border-app-line bg-app-soft">Configurar pruebas dinámicas</Button>
       </CardContent>
     </Card>
     {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}

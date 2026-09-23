@@ -113,7 +113,7 @@ export function VerifyDomainDialog({ domain, onOpenChange, onVerified }: { domai
       {([['Nombre del registro', domain.txt_name], ['Valor del registro', domain.txt_value]] as const).map(([label, value]) => <div key={label} className="space-y-1.5"><span className="text-xs text-app-subtle">{label}</span><div className="flex items-center gap-2 rounded-lg border border-app-line bg-app-soft px-3 py-2"><code className="min-w-0 flex-1 break-all font-mono text-xs text-app-secondary">{value}</code><Button type="button" aria-label={`Copiar ${label.toLowerCase()}`} variant="ghost" size="icon-sm" onClick={() => void copy(value)}>{copied === value ? <Check /> : <Copy />}</Button></div></div>)}
       <p className="text-xs text-app-subtle">La propagación puede tardar entre 2 y 10 minutos.</p>
     </div>
-    <p className="text-xs text-app-subtle">Verificar la propiedad no inicia un pentest: habilita el dominio como objetivo elegible.</p>
+    <p className="text-xs text-app-subtle">Verificar la propiedad no lanza ninguna prueba: habilita el dominio como objetivo elegible.</p>
     {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">{error}</p>}
     <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>Omitir</Button><Button disabled={busy} onClick={() => void verify()} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <ShieldCheck />}Verificar ahora</Button></DialogFooter>
   </DialogContent></Dialog>

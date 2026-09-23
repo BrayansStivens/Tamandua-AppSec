@@ -8,38 +8,38 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 
-export type PentestRow = { id: string; type: string; status: string; created_at: string; variant?: string; fixture?: string; source?: { name: string }; summary: { candidates?: number; confirmed?: number; executed?: number; planned?: number; severities?: Record<string, number>; kev?: number } }
+export type AnalysisRow = { id: string; type: string; status: string; created_at: string; variant?: string; fixture?: string; source?: { name: string }; summary: { candidates?: number; confirmed?: number; executed?: number; planned?: number; severities?: Record<string, number>; kev?: number } }
 
-const typeLabel = (type: string) => ({ repository_scan: 'Revisión de código', image_scan: 'Imagen de contenedor', pr_review: 'Revisión de PR', lab_scan: 'Laboratorio API', fixture_evaluation: 'Ground truth' }[type] ?? type)
+const typeLabel = (type: string) => ({ repository_scan: 'Análisis de código', image_scan: 'Imagen de contenedor', pr_review: 'Revisión de PR', lab_scan: 'Laboratorio API', fixture_evaluation: 'Ground truth' }[type] ?? type)
 const statusLabel = (status: string) => ({ completed: 'Completada', incomplete: 'Incompleta', failed: 'Fallida', queued: 'En cola', running: 'Analizando…' }[status] ?? status)
 const typeIcon = (type: string) => type === 'repository_scan' ? Code2 : type === 'image_scan' ? Boxes : type === 'pr_review' ? GitPullRequest : type === 'lab_scan' ? FlaskConical : ShieldCheck
-const rowName = (row: PentestRow) => row.type === 'repository_scan' ? row.source?.name ?? 'Repositorio' : row.type === 'image_scan' ? row.fixture ?? row.source?.name ?? 'Imagen' : row.type === 'pr_review' ? row.fixture ?? row.source?.name ?? 'Pull request' : row.type === 'lab_scan' ? `Laboratorio sintético · ${row.variant}` : 'Evaluación ground truth'
+const rowName = (row: AnalysisRow) => row.type === 'repository_scan' ? row.source?.name ?? 'Repositorio' : row.type === 'image_scan' ? row.fixture ?? row.source?.name ?? 'Imagen' : row.type === 'pr_review' ? row.fixture ?? row.source?.name ?? 'Pull request' : row.type === 'lab_scan' ? `Laboratorio sintético · ${row.variant}` : 'Evaluación ground truth'
 // Un laboratorio reproduce la condición; un análisis estático solo deja candidatos. La columna no los mezcla.
-const rowIssues = (row: PentestRow) => row.type === 'pr_review'
+const rowIssues = (row: AnalysisRow) => row.type === 'pr_review'
   ? { value: row.summary.candidates ?? 0, hint: 'nuevos en el PR' }
   : row.type === 'repository_scan' || row.type === 'image_scan'
   ? { value: row.summary.candidates ?? 0, hint: 'candidatos' }
   : { value: row.summary.confirmed ?? 0, hint: 'reproducidos' }
 
-export function PentestList({ refreshKey, onOpen, onNew }: { refreshKey: number; onOpen: (id: string) => void; onNew: () => void }) {
+export function AnalysisList({ refreshKey, onOpen, onNew }: { refreshKey: number; onOpen: (id: string) => void; onNew: () => void }) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
   // La lista se pide paginada al servidor: con mil ejecuciones no se cargan mil filas.
-  const page = usePaged<PentestRow>('/api/runs/page', { q: query.trim() || undefined, status: status === 'all' ? undefined : status, type: type === 'all' ? undefined : type }, 25, refreshKey)
+  const page = usePaged<AnalysisRow>('/api/runs/page', { q: query.trim() || undefined, status: status === 'all' ? undefined : status, type: type === 'all' ? undefined : type }, 25, refreshKey)
   const visible = page.items
 
   return <Card className="border-app-line bg-panel"><CardContent className="space-y-5 p-5">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      <div className="relative min-w-0 flex-1 sm:max-w-xs"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar pentests" placeholder="Buscar pentests…" value={query} onChange={event => setQuery(event.target.value)} className="border-app-line bg-app-soft pl-9" /></div>
+      <div className="relative min-w-0 flex-1 sm:max-w-xs"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar análisis" placeholder="Buscar análisis…" value={query} onChange={event => setQuery(event.target.value)} className="border-app-line bg-app-soft pl-9" /></div>
       <Select value={status} onValueChange={value => setStatus(value ?? 'all')}><SelectTrigger aria-label="Filtrar por estado" size="sm" className="min-w-40 border-app-line bg-app-soft text-app-secondary">{status === 'all' ? 'Todos los estados' : statusLabel(status)}</SelectTrigger><SelectContent align="start" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="all">Todos los estados</SelectItem><SelectItem value="running">Analizando</SelectItem><SelectItem value="completed">Completada</SelectItem><SelectItem value="incomplete">Incompleta</SelectItem><SelectItem value="failed">Fallida</SelectItem></SelectContent></Select>
-      <Select value={type} onValueChange={value => setType(value ?? 'all')}><SelectTrigger aria-label="Filtrar por tipo" size="sm" className="min-w-44 border-app-line bg-app-soft text-app-secondary">{type === 'all' ? 'Todos los tipos' : typeLabel(type)}</SelectTrigger><SelectContent align="start" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="all">Todos los tipos</SelectItem><SelectItem value="repository_scan">Revisión de código</SelectItem><SelectItem value="image_scan">Imagen de contenedor</SelectItem><SelectItem value="pr_review">Revisión de PR</SelectItem></SelectContent></Select>
+      <Select value={type} onValueChange={value => setType(value ?? 'all')}><SelectTrigger aria-label="Filtrar por tipo" size="sm" className="min-w-44 border-app-line bg-app-soft text-app-secondary">{type === 'all' ? 'Todos los tipos' : typeLabel(type)}</SelectTrigger><SelectContent align="start" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="all">Todos los tipos</SelectItem><SelectItem value="repository_scan">Análisis de código</SelectItem><SelectItem value="image_scan">Imagen de contenedor</SelectItem><SelectItem value="pr_review">Revisión de PR</SelectItem></SelectContent></Select>
     </div>
     {page.error && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{page.error}</p>}
     {page.total === 0 && !page.loading
-      ? <div className="flex flex-col items-center gap-3 py-16 text-center"><Radar className="size-7 text-app-faint" /><p className="font-medium">Aún no hay pentests</p><p className="max-w-sm text-sm text-app-muted">Tus ejecuciones aparecerán aquí. Inicia una para probar un repositorio propio o un objetivo registrado.</p><Button onClick={onNew} className="mt-1 bg-primary text-primary-foreground hover:bg-primary/90"><Plus /> Nuevo pentest</Button></div>
+      ? <div className="flex flex-col items-center gap-3 py-16 text-center"><Radar className="size-7 text-app-faint" /><p className="font-medium">Aún no hay análisis</p><p className="max-w-sm text-sm text-app-muted">Aquí aparecerán tus análisis. Lanza el primero sobre un repositorio o una imagen de contenedor.</p><Button onClick={onNew} className="mt-1 bg-primary text-primary-foreground hover:bg-primary/90"><Plus /> Nuevo análisis</Button></div>
       : <div className="overflow-hidden rounded-xl border border-app-line">
-        <div className="hidden grid-cols-[110px_minmax(0,1fr)_170px_120px_150px] gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid"><span>Estado</span><span>Pentest</span><span>Tipo</span><span>Hallazgos</span><span>Iniciado</span></div>
+        <div className="hidden grid-cols-[110px_minmax(0,1fr)_170px_120px_150px] gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid"><span>Estado</span><span>Análisis</span><span>Tipo</span><span>Hallazgos</span><span>Iniciado</span></div>
         {visible.map(row => { const Icon = typeIcon(row.type); const issues = rowIssues(row)
           return <button key={row.id} onClick={() => onOpen(row.id)} className="grid w-full gap-2 border-b border-app-line px-4 py-3 text-left transition last:border-b-0 hover:bg-app-soft md:grid-cols-[110px_minmax(0,1fr)_170px_120px_150px] md:items-center">
             <Badge variant="outline" className={`w-fit ${row.status === 'completed' ? 'border-brand/30 text-brand' : row.status === 'failed' ? 'border-rose-500/30 text-rose-700 dark:text-rose-300' : row.status === 'running' || row.status === 'queued' ? 'animate-pulse border-brand/30 text-brand' : 'border-amber-500/30 text-amber-700 dark:text-amber-300'}`}>{statusLabel(row.status)}</Badge>
@@ -50,7 +50,7 @@ export function PentestList({ refreshKey, onOpen, onNew }: { refreshKey: number;
               : <span className="text-xs text-app-muted"><span className="font-mono text-sm text-app-secondary">{issues.value}</span> {issues.hint}</span>}
             <span className="text-xs text-app-muted">{new Date(row.created_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}</span>
           </button> })}
-        <Pagination total={page.total} limit={page.limit} offset={page.offset} onPrev={page.prev} onNext={page.next} noun="pentests" />
+        <Pagination total={page.total} limit={page.limit} offset={page.offset} onPrev={page.prev} onNext={page.next} noun="análisis" />
       </div>}
   </CardContent></Card>
 }

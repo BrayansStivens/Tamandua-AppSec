@@ -34,7 +34,7 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
     const page = await api.get<Page<Asset>>(`/api/assets?${query({ q: text || undefined, limit: 50 })}`)
     return { options: page.items.map(assetOption), total: page.total, items: page.items }
   }, [])
-  // Arranque: el repositorio de la ejecución pedida (desde el resumen o Pentests) o el de actividad más reciente.
+  // Arranque: el repositorio de la ejecución pedida (desde el resumen o Análisis) o el de actividad más reciente.
   useEffect(() => {
     (async () => {
       if (requestedRun) {
@@ -78,7 +78,7 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
 
   // Los contadores salen del estado recién consultado: cambian en cuanto se triagea algo.
   const counts = (detail?.summary as { lifecycle?: { open: number; fixed: number; suppressed: number; excluded?: number } } | undefined)?.lifecycle ?? null
-  if (empty) return <Card className="border-app-line bg-panel"><CardContent className="py-14 text-center text-sm text-app-muted">Aún no hay repositorios ni imágenes analizados. Lanza un pentest de código o de una imagen para empezar.</CardContent></Card>
+  if (empty) return <Card className="border-app-line bg-panel"><CardContent className="py-14 text-center text-sm text-app-muted">Aún no hay repositorios ni imágenes analizados. Lanza un análisis de código o de una imagen para empezar.</CardContent></Card>
   return <div className="space-y-5">
     <div className="grid gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
       <div className="space-y-1"><span className="text-xs text-app-muted">Activo</span><Combobox label="Activo" placeholder="Busca un repositorio o una imagen…" value={asset ? assetOption(assetView?.key === asset.key ? assetView : asset) : null}

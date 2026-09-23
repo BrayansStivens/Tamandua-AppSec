@@ -45,7 +45,7 @@ export function CoverageView() {
   const coverage = OWASP_TOP10.map(([id, title]) => detail?.owasp_coverage?.find(item => item.id === id) ?? { id, title, status: 'not_tested' as const, probe_ids: [], reason: 'Sin escaneo completo de este repositorio' })
   return <div className="space-y-5">
     <div className="max-w-xl space-y-1"><span className="text-xs text-app-muted">Repositorio</span><AssetPicker value={asset} onChange={setAsset} /></div>
-    {asset && !runId ? <Card className="border-app-line bg-panel"><CardContent className="py-10 text-center text-sm text-app-muted">Este repositorio aún no tiene un escaneo completo terminado. La cobertura OWASP se mide sobre él: lanza uno desde «Nuevo pentest».</CardContent></Card>
+    {asset && !runId ? <Card className="border-app-line bg-panel"><CardContent className="py-10 text-center text-sm text-app-muted">Este repositorio aún no tiene un escaneo completo terminado. La cobertura OWASP se mide sobre él: lanza uno desde «Nuevo análisis».</CardContent></Card>
       : loading ? <Skeleton rows={6} />
       : <Coverage run={detail} coverage={coverage} steps={detail?.steps ?? []} />}
   </div>

@@ -33,7 +33,7 @@ La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 
 ## Paginación de la API
 
-`GET /api/runs/page?limit&offset&status&type&q` pagina en el servidor sobre `data/runs/index.json`, un índice ligero de una fila por ejecución que se mantiene al guardar y se reconstruye si no cuadra con las carpetas; con mil ejecuciones no se leen mil archivos con sus hallazgos. El panel usa el mismo hook de paginación en la lista de pentests, el selector de ejecución y la tabla de hallazgos.
+`GET /api/runs/page?limit&offset&status&type&q` pagina en el servidor sobre `data/runs/index.json`, un índice ligero de una fila por ejecución que se mantiene al guardar y se reconstruye si no cuadra con las carpetas; con mil ejecuciones no se leen mil archivos con sus hallazgos. El panel usa el mismo hook de paginación en la lista de análisis, el selector de ejecución y la tabla de hallazgos.
 
 ## Logs
 

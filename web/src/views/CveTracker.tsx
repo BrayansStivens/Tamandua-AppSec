@@ -140,7 +140,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
 
     <aside className="space-y-4">
       <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">¿Te afecta?</CardTitle><CardDescription className="text-xs leading-5">Analiza tus repositorios: cruzamos las dependencias con estos CVE, con KEV y EPSS, y te decimos cuáles tienes de verdad.</CardDescription></CardHeader>
-        <CardContent><Button onClick={onNew} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">Nuevo pentest <ArrowRight /></Button></CardContent></Card>
+        <CardContent><Button onClick={onNew} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">Nuevo análisis <ArrowRight /></Button></CardContent></Card>
       <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">Por año</CardTitle><CardDescription className="text-xs">{overview ? `${overview.count.toLocaleString('es-CO')} CVE en la copia local` : 'Cargando…'}</CardDescription></CardHeader>
         <CardContent>{overview?.years.length ? <div className="grid grid-cols-3 gap-1.5">{overview.years.map(item => <button key={item.year} type="button" onClick={() => apply({ year: filters.year === String(item.year) ? '' : String(item.year) })} title={`${item.count.toLocaleString('es-CO')} CVE`}
           className={`rounded-md border px-2 py-1.5 text-center font-mono text-xs transition ${filters.year === String(item.year) ? 'border-primary bg-primary text-primary-foreground' : 'border-app-line bg-app-soft hover:border-app-faint'}`}>{item.year}</button>)}</div>

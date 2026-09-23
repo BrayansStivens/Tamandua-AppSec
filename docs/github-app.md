@@ -48,7 +48,7 @@ La clave no vuelve a salir del servidor. **Borra el `.pem` de tu carpeta de desc
 
 ## 4. Instalarla en tus repositorios
 
-Pulsa **Instalar en GitHub**, elige **Only select repositories** y marca los que quieras analizar. Vuelve al panel y pulsa **Ya la instalé** (si configuraste la Setup URL, vuelves solo). Los repositorios aparecen en **Repositorios** y en **Nuevo pentest**.
+Pulsa **Instalar en GitHub**, elige **Only select repositories** y marca los que quieras analizar. Vuelve al panel y pulsa **Ya la instalé** (si configuraste la Setup URL, vuelves solo). Los repositorios aparecen en **Repositorios** y en **Nuevo análisis**.
 
 Para añadir o quitar repositorios más tarde: **Integraciones → Cambiar repositorios en GitHub**.
 

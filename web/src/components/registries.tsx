@@ -42,7 +42,7 @@ export function RegistriesCard({ canManage }: { canManage: boolean }) {
 
   return <Card className="border-app-line bg-panel">
     <CardHeader><CardTitle className="flex items-center gap-2"><Boxes className="size-5 text-app-muted" />Registros de contenedores</CardTitle>
-      <CardDescription>Para analizar imágenes privadas (Nuevo pentest → Imagen de contenedor). Las públicas no necesitan nada. Usa siempre un token de <strong className="font-medium">solo lectura</strong>.</CardDescription></CardHeader>
+      <CardDescription>Para analizar imágenes privadas (Nuevo análisis → Imagen de contenedor). Las públicas no necesitan nada. Usa siempre un token de <strong className="font-medium">solo lectura</strong>.</CardDescription></CardHeader>
     <CardContent className="space-y-4">
       {rows && rows.length > 0 && <div className="divide-y divide-app-line rounded-xl border border-app-line">{rows.map(row => <div key={row.registry} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
         <span className="min-w-0"><span className="block font-mono text-sm">{row.registry}</span><span className="text-xs text-app-subtle">{row.username} · token ····{row.last4}{row.saved_at ? ` · ${formatDate(row.saved_at)}` : ''}{row.saved_by ? ` por ${row.saved_by}` : ''}</span></span>
