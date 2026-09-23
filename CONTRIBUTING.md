@@ -6,8 +6,8 @@ Gracias por el interés. Antes de abrir un PR:
 2. Corre las pruebas y el lint:
 
    ```bash
-   .venv/bin/python -m unittest discover -s tests
-   (cd web && npm run lint && npm run build)
+   make dev-setup   # una vez
+   make check       # pruebas del backend + tipos y lint del panel
    ```
 
 3. Mantén las reglas de la casa:

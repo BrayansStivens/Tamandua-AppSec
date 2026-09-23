@@ -17,16 +17,15 @@ Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Con
 
 ## Inicio rápido
 
-Necesitas Docker (Engine 24+ con Compose v2.24+), 4 GB de memoria y 5 GB de disco libres. Detalles en [docs/instalacion.md](docs/instalacion.md).
+Necesitas **Docker** (Engine 24+ con Compose v2.24+), **make** y **git**, 4 GB de memoria y 5 GB de disco libres. `make doctor` comprueba todo; detalles en [docs/instalacion.md](docs/instalacion.md).
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git
 cd appsec-agent
-cp .env.example .env        # pon tu UID/GID (id -u / id -g) en APPSEC_UID y APPSEC_GID
-mkdir -p data config
-docker compose up --build -d
-docker compose logs appsec  # copia el código de configuración
+make up
 ```
+
+`make up` crea tu `.env`, construye las imágenes, arranca y te muestra la URL y el **código de configuración**. `make help` lista el resto (logs, copias de seguridad, actualizar…); están todos en [docs/contenedores.md](docs/contenedores.md).
 
 Abre <http://127.0.0.1:8766> y:
 
@@ -40,6 +39,7 @@ Abre <http://127.0.0.1:8766> y:
 | --- | --- |
 | [Instalación](docs/instalacion.md) | Requisitos, primer arranque, actualizar, copias de seguridad, desinstalar |
 | [Conectar GitHub](docs/github-app.md) | Crear la GitHub App paso a paso y revisar PRs |
+| [Contenedores y Makefile](docs/contenedores.md) | Comandos `make`, imágenes y endurecimiento |
 | [Configuración](docs/configuracion.md) | Variables de `.env` |
 | [Seguridad](docs/seguridad.md) | Secretos, transporte, qué sale de tu máquina y concesiones |
 | [Funcionalidades](docs/funcionalidades.md) | Qué hace cada parte y con qué criterio |

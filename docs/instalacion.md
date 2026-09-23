@@ -5,33 +5,28 @@
 | | Mínimo | Notas |
 | --- | --- | --- |
 | Sistema | Linux, macOS o Windows con WSL2 | amd64 o arm64 (Apple Silicon incluido). |
-| Docker | Engine 24+ y Compose v2.24+ | Docker Desktop, OrbStack o Docker Engine. `docker compose version` para comprobarlo. |
+| Docker | Engine 24+ y Compose v2.24+ | Docker Desktop, OrbStack o Docker Engine. |
+| make y git | cualquiera | `make` ya viene en macOS; en Debian/Ubuntu `sudo apt install make git`. En Windows, dentro de WSL2. |
 | Memoria | 4 GB libres | La app usa ~200 MB en reposo; cada análisis lanza un motor a la vez, limitado a 3 GB. |
 | Disco | 5 GB libres | Imágenes (~0,9 GB), caché de vulnerabilidades de Trivy (~1,3 GB), copia local de NVD (~0,7 GB) y tus ejecuciones. |
 | Red de salida | HTTPS a GitHub, NVD, CISA y EPSS | Detalle en [seguridad.md](seguridad.md#qué-sale-de-tu-máquina). No hace falta ninguna entrada desde internet. |
 | Cuenta | GitHub (personal u organización que administres) | Para crear tu GitHub App. |
 
-No hace falta instalar Python, Node ni los motores de análisis: todo va en contenedores.
+No hace falta instalar Python, Node ni los motores de análisis: todo va en contenedores. **`make doctor`** comprueba los requisitos y dice cómo arreglar lo que falte.
 
 ## Primera instalación
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git
 cd appsec-agent
-cp .env.example .env
-mkdir -p data config
+make up
 ```
 
-Edita `.env` y pon tu usuario del host en `APPSEC_UID` y `APPSEC_GID` (salen de `id -u` e `id -g`). Así los ficheros de `data/` y `config/` son tuyos y no de root. Después:
-
-```bash
-docker compose up --build -d
-docker compose logs appsec
-```
+`make up` crea `.env` desde `.env.example` con tu usuario del host (`APPSEC_UID`/`APPSEC_GID`, para que `data/` y `config/` sean tuyas y no de root), construye, arranca y espera a que el panel responda. Sin `make`: `sh scripts/init-env.sh && docker compose up --build -d`.
 
 La primera construcción tarda unos minutos: compila el panel, descarga el binario de Opengrep y comprueba su SHA-256. Verás dos contenedores: `appsec-agent`, que se queda en marcha, y `opengrep`, que solo construye la imagen del motor y **termina enseguida**: es normal.
 
-En los logs aparece un recuadro con el **código de configuración**:
+Al terminar muestra el **código de configuración** (también con `make setup-code`, o en los logs):
 
 ```
 ================================================================
@@ -54,8 +49,8 @@ La copia local de NVD para el CVE tracker se descarga sola en segundo plano: una
 ## Actualizar
 
 ```bash
-git pull
-docker compose up --build -d
+make backup
+make update
 ```
 
 `data/` y `config/` se conservan. Antes de actualizar conviene hacer una copia (ver abajo) y comprobar que no hay análisis en marcha en **Pentests**: un reinicio marca como fallidos los que estuvieran corriendo.
@@ -68,11 +63,10 @@ docker compose up --build -d
 | `config/` | `secrets.vault` (cifrado) y `master.key` | **Es la llave de tus credenciales.** Guárdala aparte de `data/` y con el mismo cuidado que una contraseña. |
 
 ```bash
-docker compose stop appsec
-tar czf appsec-data-$(date +%F).tgz --exclude=data/feeds --exclude=data/trivy-cache data
-tar czf appsec-config-$(date +%F).tgz config        # guárdalo en otro sitio, cifrado
-docker compose start appsec
+make backup        # backups/<fecha>/data.tgz y config.tgz
 ```
+
+La app se detiene unos segundos para que la copia sea coherente, y el comando se niega si hay análisis en curso (`FORCE=1` para forzarlo). `config.tgz` contiene los secretos cifrados **y** la clave maestra: guárdalo fuera de la máquina y protegido. Para restaurar, con la app parada, descomprime ambos en la raíz del repositorio.
 
 Si pierdes `config/master.key` (o cambias `APPSEC_AGENT_MASTER_KEY`), los secretos guardados no se pueden descifrar: tendrás que volver a conectar la GitHub App y las claves de IA y Jira. El resto de datos no se pierde.
 
@@ -85,9 +79,8 @@ Aunque uses HTTPS, ten en cuenta que la app controla Docker a través de su sock
 ## Desinstalar
 
 ```bash
-docker compose down
-docker image rm appsec-agent/app:0.9 appsec-agent/opengrep:1.30.0
-rm -rf data config        # borra tus datos y secretos: hazlo solo si ya no los necesitas
+make clean                   # contenedores e imágenes; conserva data/ y config/
+make purge CONFIRM=borrar    # además borra datos y secretos: solo si ya no los necesitas
 ```
 
 Borra también tu GitHub App en GitHub (*Settings → Developer settings → GitHub Apps → tu App → Advanced → Delete*), o al menos revoca su clave privada.

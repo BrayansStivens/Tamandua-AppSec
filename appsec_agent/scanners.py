@@ -88,6 +88,28 @@ def image_available(key: str) -> bool:
         return False
 
 
+def engine_status() -> list[dict]:
+    """Qué motores hay listos en el Docker del host. Para `make doctor` y el comando `engines`."""
+    return [{"tool": key, "name": meta["name"], "version": meta["version"], "image": meta["image"],
+             "ready": image_available(key), "built_locally": "@sha256:" not in meta["image"]} for key, meta in IMAGES.items()]
+
+
+def pull_engines() -> list[dict]:
+    """Descarga por digest las imágenes publicadas que falten; la de Opengrep se construye con `make build`."""
+    binary = shutil.which("docker")
+    results = []
+    for row in engine_status():
+        if row["ready"] or row["built_locally"] or not binary:
+            results.append({**row, "action": "ninguna" if row["ready"] else "construir con make build" if row["built_locally"] else "docker no disponible"})
+            continue
+        try:
+            done = subprocess.run([binary, "pull", "--quiet", row["image"]], capture_output=True, text=True, timeout=900).returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            done = False
+        results.append({**row, "ready": done, "action": "descargada" if done else "falló la descarga"})
+    return results
+
+
 def _result(key: str, status: str, detail: str, findings: list | None = None, started: float | None = None) -> dict:
     meta = IMAGES[key]
     return {"tool": key, "name": meta["name"], "version": meta["version"], "image": meta["image"],
@@ -169,7 +191,7 @@ def run_opengrep(snapshot: Path) -> dict:
     if not docker_available():
         return _result("opengrep", "not_tested", "Docker no disponible: el SAST multi-lenguaje no se ejecutó.")
     if not image_available("opengrep"):
-        return _result("opengrep", "not_tested", "Imagen de Opengrep no construida: docker build -t appsec-agent/opengrep:1.30.0 containers/opengrep.")
+        return _result("opengrep", "not_tested", "Imagen de Opengrep no construida: ejecuta make build (o docker compose build).")
     languages = snapshot_languages(snapshot)
     try:
         completed = _run("opengrep", ["scan", "--config", "/rules", "--json", "--quiet", "/src"], snapshot,

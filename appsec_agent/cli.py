@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
                             help="Autorizar el envío de nombres y versiones de dependencias a api.osv.dev")
     commands.add_parser("providers", help="Mostrar qué proveedores de IA tienen credencial en el servidor")
     commands.add_parser("github-app", help="Estado de la GitHub App de este servidor (sin secretos)")
+    engines = commands.add_parser("engines", help="Estado de las imágenes de los motores de análisis")
+    engines.add_argument("--pull", action="store_true", help="Descargar por digest las que falten")
     ai_check = commands.add_parser("ai-check", help="Comprobar autenticación con OpenAI o Claude sin generar tokens")
     ai_check.add_argument("--provider", choices=tuple(PROVIDERS), required=True)
     users = commands.add_parser("user", help="Gestionar usuarios del panel (tarea de operación)")
@@ -102,6 +104,13 @@ def main(argv: list[str] | None = None) -> int:
             state = github_config()
             print(json.dumps(state, ensure_ascii=False, indent=2))
             return 0 if state["configured"] else 3
+        if args.command == "engines":
+            from .scanners import engine_status, pull_engines
+            rows = pull_engines() if args.pull else engine_status()
+            for row in rows:
+                print(f"{'listo' if row['ready'] else 'falta':6} {row['name']} {row['version']}  {row['image']}"
+                      + (f"  ({row['action']})" if row.get("action") else ""))
+            return 0 if all(row["ready"] for row in rows) else 3
         if args.command == "user":
             return _user_command(args)
         if args.command == "ai-check":

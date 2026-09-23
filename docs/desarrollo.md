@@ -4,20 +4,23 @@ Para contribuir o ejecutar AppSec Agent sin contenedores. Lee también [CONTRIBU
 
 ## Sin contenedores
 
-Requiere Python 3.12+ y Node 22 para compilar el panel. Sin Docker no corren los motores (Trivy, Gitleaks, Opengrep): el panel lo indica en cada análisis.
+Requiere Python 3.12+ y Node 22. Sin Docker no corren los motores (Trivy, Gitleaks, Opengrep): el panel lo indica en cada análisis.
 
 ```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-(cd web && npm ci && npm run build)
-.venv/bin/python -m appsec_agent serve
+make dev-setup   # .venv con las dependencias de Python y node_modules del panel
+make web         # compila el panel en appsec_agent/static/
+make dev         # servidor en http://127.0.0.1:8767 con datos en .dev/ (no toca los de Docker)
+make check       # pruebas del backend + tipos y lint del panel
 ```
 
-La CLI usa el mismo almacén local que el panel cuando se ejecuta desde esta carpeta:
+`make dev` usa el puerto 8767 y la carpeta `.dev/` para que puedas tenerlo a la vez que la instancia de Docker. Para recarga en caliente del panel, `cd web && npm run dev` (Vite reenvía `/api` al backend).
+
+La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 
 ```bash
-python3 -m appsec_agent sources
-python3 -m appsec_agent scan-repository --source-id local:appsec-agent
-python3 -m appsec_agent runs
+.venv/bin/python -m appsec_agent --data-dir .dev/data sources
+.venv/bin/python -m appsec_agent --data-dir .dev/data scan-repository --source-id local:appsec-agent
+.venv/bin/python -m appsec_agent --data-dir .dev/data runs
 ```
 
 ## Paginación de la API

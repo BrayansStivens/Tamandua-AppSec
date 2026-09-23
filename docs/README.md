@@ -3,6 +3,7 @@
 | Documento | Para qué |
 | --- | --- |
 | [Instalación](instalacion.md) | Requisitos, primer arranque, actualizar, copias de seguridad y desinstalar. |
+| [Contenedores y Makefile](contenedores.md) | Qué necesitas, todos los comandos `make`, imágenes, estructura de `docker/` y endurecimiento. |
 | [Conectar GitHub](github-app.md) | Crear tu GitHub App paso a paso, instalarla y revisar pull requests. |
 | [Configuración](configuracion.md) | Todas las variables de `.env`. |
 | [Seguridad](seguridad.md) | Cómo se guardan los secretos, qué sale de tu máquina y concesiones conocidas. |

@@ -1,8 +1,9 @@
-# AppSec Agent autoalojado. Arranque:
+# AppSec Agent autoalojado. La forma recomendada de usarlo es el Makefile:
 #
-#   cp .env.example .env        # opcional: puerto, URL pública, TLS…
-#   docker compose up --build -d
-#   docker compose logs appsec  # ahí sale el código para crear el administrador
+#   make up          # prepara .env, construye, arranca y muestra el código de configuración
+#   make help        # el resto de comandos
+#
+# Sin make:  cp .env.example .env && mkdir -p data config && docker compose up --build -d
 #
 # Los motores de análisis (Trivy, Gitleaks, Opengrep) son contenedores hermanos que la app
 # lanza por el socket de Docker: por eso se monta, y por eso la carpeta de datos se comparte
@@ -12,9 +13,14 @@
 # que Docker; si lo expones a más gente, ponlo detrás de un socket-proxy o un runner aparte.
 services:
   appsec:
-    build: .
-    image: appsec-agent/app:0.9
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+      args:
+        VERSION: ${APPSEC_VERSION:-0.9}
+    image: appsec-agent/app:${APPSEC_VERSION:-0.9}
     container_name: appsec-agent
+    init: true
     # Tu UID/GID para que los ficheros de ./data y ./config sean tuyos (ver .env.example).
     user: "${APPSEC_UID:-10001}:${APPSEC_GID:-10001}"
     ports:
@@ -43,6 +49,21 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
       - "0"
+    # Endurecimiento: sistema de ficheros de solo lectura (solo se escribe en /data, /config y
+    # temporales en memoria), sin capacidades de Linux y sin escalada de privilegios.
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+      - /home/appsec:size=16m,uid=${APPSEC_UID:-10001},gid=${APPSEC_GID:-10001}
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     depends_on:
       opengrep:
         condition: service_completed_successfully
@@ -56,7 +77,7 @@ services:
   # Solo construye la imagen del motor SAST (con su binario verificado por SHA-256) y comprueba
   # que arranca; la app la lanza después por cada análisis. Termina al momento: es normal.
   opengrep:
-    build: containers/opengrep
+    build: docker/engines/opengrep
     image: appsec-agent/opengrep:1.30.0
     command: ["--version"]
     network_mode: none

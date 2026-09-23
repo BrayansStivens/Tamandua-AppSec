@@ -6,6 +6,7 @@ data/
 config/
 backups/
 .env
+.dev/
 web/node_modules/
 web/dist/
 
