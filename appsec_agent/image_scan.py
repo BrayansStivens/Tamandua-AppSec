@@ -33,7 +33,7 @@ from . import logging_setup
 from .advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
 from .coverage import owasp_coverage
 from .config_scanners import merge_image, run_checkov_image
-from .scanners import _pick_fixed, _result, _run, docker_available, parse_trivy
+from .scanners import _pick_fixed, _result, _run, docker_available, parse_trivy, writable_cache
 
 _log = logging_setup.get("images")
 VAULT_NAME = "registries"
@@ -169,13 +169,13 @@ def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
     started = time.time()
     if not docker_available():
         return _result("trivy", "not_tested", "Docker no disponible: la imagen no se analizó con Trivy."), {}
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir = writable_cache(cache_dir)
     secrets = {"TRIVY_USERNAME": credentials["username"], "TRIVY_PASSWORD": credentials["token"]} if credentials else None
     try:
         completed = _run("trivy", ["image", "--image-src", "remote", "--scanners", "vuln,secret",
-                                   "--image-config-scanners", "misconfig,secret", "--format", "json", "--quiet",
+                                   "--image-config-scanners", "misconfig,secret", "--cache-dir", "/cache", "--format", "json", "--quiet",
                                    "--timeout", "14m", reference], None, network=True, secret_env=secrets,
-                         mounts=["-v", f"{_host(cache_dir)}:/root/.cache/trivy"])
+                         mounts=["-v", f"{_host(cache_dir)}:/cache"])
         if completed.returncode != 0 and not completed.stdout.strip():
             return _result("trivy", "inconclusive", _registry_error(completed.stderr, credentials), started=started), {}
         payload = json.loads(completed.stdout or "{}")
@@ -231,13 +231,16 @@ def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
     started = time.time()
     if not docker_available():
         return _result("grype", "not_tested", "Docker no disponible: la imagen no se analizó con Grype.")
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir = writable_cache(cache_dir)
+    (cache_dir / "tmp").mkdir(exist_ok=True)
     secrets = ({"GRYPE_REGISTRY_AUTH_AUTHORITY": _host_only(registry) if registry != DOCKER_HUB else "index.docker.io",
                 "GRYPE_REGISTRY_AUTH_USERNAME": credentials["username"], "GRYPE_REGISTRY_AUTH_PASSWORD": credentials["token"]}
                if credentials else None)
     try:
         completed = _run("grype", [f"registry:{reference}", "-o", "json", "-q"], None, network=True, secret_env=secrets,
-                         env={"GRYPE_DB_CACHE_DIR": "/cache", "GRYPE_CHECK_FOR_APP_UPDATE": "false"},
+                         # La imagen de Grype no trae un /tmp escribible para usuarios no root: sus temporales
+                         # (capas de la imagen analizada) van a disco, dentro de su caché.
+                         env={"GRYPE_DB_CACHE_DIR": "/cache", "GRYPE_CHECK_FOR_APP_UPDATE": "false", "TMPDIR": "/cache/tmp", "HOME": "/cache/tmp"},
                          mounts=["-v", f"{_host(cache_dir)}:/cache"])
         if completed.returncode != 0 and not completed.stdout.strip():
             return _result("grype", "inconclusive", _registry_error(completed.stderr, credentials), started=started)

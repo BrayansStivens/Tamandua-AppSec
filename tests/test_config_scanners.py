@@ -180,3 +180,29 @@ class OpengrepDuplicatesTests(unittest.TestCase):
             (root / "app.js").write_text("const a = 1\n" * 50)
             (root / "styles.css").write_text("body { color: red }\n")
             self.assertEqual(minified_files(root), ["assets/index-Ab12.js"])
+
+
+class EngineUserTests(unittest.TestCase):
+    """En Linux, root sin capacidades no entra en las carpetas 0700 de la app: los motores corren con su UID."""
+
+    def test_engines_run_as_the_app_user(self):
+        import os
+        from appsec_agent import scanners
+        with patch.object(scanners.subprocess, "run") as run, patch.object(scanners.shutil, "which", return_value="/usr/bin/docker"):
+            scanners._run("gitleaks", ["dir", "/src"], Path("/tmp"))
+        command = run.call_args.args[0]
+        self.assertIn("--cap-drop", command)
+        self.assertEqual(command[command.index("--user") + 1], f"{os.getuid()}:{os.getgid()}")
+        self.assertIn("HOME=/tmp", command)
+
+    def test_unwritable_cache_falls_back_to_a_fresh_one(self):
+        import os
+        import tempfile
+        from appsec_agent.scanners import writable_cache
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder) / "trivy-cache"
+            self.assertEqual(writable_cache(cache), cache)
+            with patch.object(os, "access", side_effect=lambda path, mode: Path(path) != cache):
+                fallback = writable_cache(cache)
+            self.assertNotEqual(fallback, cache)
+            self.assertTrue(fallback.is_dir())

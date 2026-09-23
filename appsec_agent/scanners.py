@@ -7,8 +7,10 @@
 - Opengrep: SAST multi-lenguaje con nuestras propias reglas (`rules/`). Sin red.
 - Checkov y zizmor: infraestructura como código y pipelines de CI/CD (`config_scanners`). Sin red.
 
-Cada contenedor corre sin capacidades, sin escalada de privilegios y con el
-snapshot montado en solo lectura. Si Docker o una imagen no están, el paso se
+Cada contenedor corre sin capacidades, sin escalada de privilegios, con el
+snapshot montado en solo lectura y **con el mismo UID y GID que la app**: en Linux,
+root sin capacidades no puede entrar en las carpetas 0700 de la app y los motores
+devolverían cero hallazgos sin avisar (en macOS Docker Desktop lo oculta). Si Docker o una imagen no están, el paso se
 declara `not_tested` con el motivo: nunca se finge una ejecución.
 
 Los valores de secretos no se guardan jamás: solo regla, archivo y línea.
@@ -127,6 +129,26 @@ def _result(key: str, status: str, detail: str, findings: list | None = None, st
             "duration_s": round(time.time() - started, 1) if started else None}
 
 
+def engine_user() -> list[str]:
+    """`--user` con el UID y GID de este proceso, y un HOME escribible para motores que guardan estado."""
+    if not hasattr(os, "getuid"):
+        return []
+    return ["--user", f"{os.getuid()}:{os.getgid()}", "-e", "HOME=/tmp"]
+
+
+def writable_cache(preferred: Path) -> Path:
+    """La caché del motor si este usuario puede escribirla; si no (p. ej. la crearon motores que corrían
+    como root en una versión anterior), una nueva junto a ella. La vieja se puede borrar a mano."""
+    preferred.mkdir(parents=True, exist_ok=True)
+    blocked = not os.access(preferred, os.W_OK | os.X_OK) or any(
+        not os.access(entry, os.W_OK) for entry in list(preferred.iterdir())[:50])
+    if not blocked:
+        return preferred
+    fallback = preferred.with_name(f"{preferred.name}-{os.getuid() if hasattr(os, 'getuid') else 'user'}")
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback
+
+
 def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool = False,
          mounts: list[str] | None = None, timeout: int = 900, env: dict[str, str] | None = None,
          secret_env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
@@ -136,7 +158,7 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
     environment += [part for name in (secret_env or {}) for part in ("-e", name)]
     source = ["-v", f"{host_path(snapshot)}:/src:ro"] if snapshot is not None else []
     command = [shutil.which("docker"), "run", "--rm", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-               "--pids-limit", "512", "--memory", "3g", "--cpus", "2",
+               *engine_user(), "--pids-limit", "512", "--memory", "3g", "--cpus", "2",
                "--network", "bridge" if network else "none",
                *source, *environment, *(mounts or []), IMAGES[key]["image"], *arguments]
     process_env = {**os.environ, **(secret_env or {})} if secret_env else None
@@ -375,13 +397,13 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
     started = time.time()
     if not docker_available():
         return _result("trivy", "not_tested", "Docker no disponible: dependencias, IaC y secretos con Trivy no se ejecutaron.")
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir = writable_cache(cache_dir)
     try:
         # Con las dependencias de desarrollo (marcadas como tales) y la lista de paquetes para saber cuáles son.
         completed = _run("trivy", ["fs", "--scanners", "vuln,misconfig,secret", "--include-dev-deps", "--list-all-pkgs",
-                                   "--format", "json", "--quiet",
+                                   "--cache-dir", "/cache", "--format", "json", "--quiet",
                                    "--timeout", "14m", "/src"], snapshot, network=True,
-                         mounts=["-v", f"{host_path(cache_dir)}:/root/.cache/trivy"])
+                         mounts=["-v", f"{host_path(cache_dir)}:/cache"])
         if completed.returncode != 0 and not completed.stdout.strip():
             return _result("trivy", "inconclusive", "Trivy terminó con error antes de producir resultados"
                            + (" (sin acceso a su base de vulnerabilidades)." if "download" in completed.stderr.lower() else "."), started=started)
