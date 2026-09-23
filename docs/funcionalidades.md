@@ -108,6 +108,8 @@ Si Docker no está disponible, el paso lo declara como `not_tested` con el motiv
 
 ## Hallazgos de dependencias
 
+Se revisan también las **dependencias de desarrollo** (`devDependencies`, grupos de desarrollo), marcadas como tales: no llegan a producción, pero se ejecutan en los equipos y en la CI, que es donde golpean los ataques de cadena de suministro. Bajan un nivel de prioridad salvo que estén en CISA KEV. Para el código basta con Trivy: medido en repositorios reales, Grype encuentra lo mismo una vez incluidas las de desarrollo (Grype sí se usa en imágenes de contenedor, donde aporta).
+
 Cada aviso de dependencia llega listo para decidir, no como un identificador suelto. Del detalle de OSV se toman resumen, alias CVE/GHSA, CWE y el vector CVSS, cuyo **score se calcula** con la fórmula 3.1 en lugar de copiarse. La **versión corregida** se elige del rango que contiene la versión instalada: quien usa `minimatch 9.0.5` oye "actualiza a 9.0.6", no "a 10.2.3". Se cruza con dos feeds públicos descargados en bloque y guardados a diario en `data/feeds/` —el catálogo **CISA KEV** de explotación activa y las probabilidades **EPSS**—, de modo que nadie recibe consultas CVE por CVE que revelen qué dependencias tienen los clientes.
 
 Con eso, cada hallazgo trae una **prioridad con sus factores visibles** (`act` si está en KEV o combina CVSS ≥ 9 con EPSS alto; `attend`; `track`), una remediación concreta y una **huella estable** independiente de la ruta del lockfile, que es lo que evitará duplicar tickets entre ejecuciones. El panel agrupa los avisos por paquete y dice qué versión los cierra todos; `GET /api/runs/{id}/tickets.json` exporta un ticket por hallazgo con esa forma, pensado para el conector de Jira.

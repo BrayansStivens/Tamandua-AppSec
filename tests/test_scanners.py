@@ -124,3 +124,28 @@ class RunnerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DevDependencyTests(unittest.TestCase):
+    def test_dev_dependencies_are_included_marked_and_deprioritized(self):
+        from appsec_agent.scanners import parse_trivy
+        vector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+        def vuln(name, pkg_id):
+            return {"VulnerabilityID": f"CVE-2026-{len(name)}000", "PkgID": pkg_id, "PkgName": name, "InstalledVersion": "1.0.0",
+                    "FixedVersion": "1.0.1", "Severity": "CRITICAL", "CVSS": {"nvd": {"V3Vector": vector}}, "Title": name}
+        payload = {"Results": [{"Target": "pnpm-lock.yaml", "Type": "pnpm", "Class": "lang-pkgs",
+                                "Packages": [{"ID": "postcss@1.0.0", "Name": "postcss", "Dev": True, "Relationship": "indirect"},
+                                             {"ID": "express@1.0.0", "Name": "express", "Relationship": "direct"}],
+                                "Vulnerabilities": [vuln("postcss", "postcss@1.0.0"), vuln("express", "express@1.0.0")]}]}
+        by_name = {item["package"]["name"]: item for item in parse_trivy(payload, {})}
+        self.assertTrue(by_name["postcss"]["package"]["dev"])
+        # Crítica sin KEV ni EPSS alto: «atender» en producción, un nivel menos por ser de desarrollo.
+        self.assertEqual((by_name["express"]["priority"]["action"], by_name["postcss"]["priority"]["action"]), ("attend", "track"))
+        self.assertIn("desarrollo", " ".join(by_name["postcss"]["priority"]["factors"]))
+        self.assertFalse(by_name["express"]["package"]["dev"])
+        self.assertTrue(by_name["express"]["package"]["direct"])
+        # Con EPSS alto, «actuar ya» baja a «atender»; en CISA KEV no se rebaja aunque sea de desarrollo.
+        epss = {"epss": {"CVE-2026-7000": (0.5, 0.99)}}
+        self.assertEqual({item["package"]["name"]: item for item in parse_trivy(payload, epss)}["postcss"]["priority"]["action"], "attend")
+        kev = {"kev": {"CVE-2026-7000": {"date_added": "2026-09-01"}}}
+        self.assertEqual({item["package"]["name"]: item for item in parse_trivy(payload, kev)}["postcss"]["priority"]["action"], "act")

@@ -10,7 +10,7 @@ import { JiraExportDialog, useJiraStatus, type TicketLink } from '@/components/j
 import { SUPPRESSED, TriageActions, TriageBadge, TriageDialog, TriageHistory, triageLabel, type TriageState, type TriageStatus } from '@/components/triage'
 
 export type Priority = { action: 'act' | 'attend' | 'track'; factors: string[] }
-export type Package = { ecosystem: string; name: string; version: string; fixed_version: string | null; introduced: string | null }
+export type Package = { ecosystem: string; name: string; version: string; fixed_version: string | null; introduced: string | null; dev?: boolean; direct?: boolean | null }
 export type Advisory = { id: string; aliases: string[]; summary: string; details: string; cvss_vector: string | null; cvss_score: number | null; published: string | null; modified: string | null; references: string[] }
 export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle }
 export type Lifecycle = { status: 'open' | 'fixed'; origin?: { kind: 'scan' | 'pr'; pr?: number; branch?: string; merged?: boolean }; first_seen?: string; last_seen?: string; fixed?: { at: string; how: string; auto: boolean } | null; reopened_at?: string | null }
@@ -53,7 +53,7 @@ function groupFindings(findings: RepositoryFinding[]): Group[] {
     const epss = items.reduce<number | null>((best, item) => item.epss && (best === null || item.epss.score > best) ? item.epss.score : best, null)
     return { key, findings: items, scanner: items[0].scanner, severity: worst(items), action: urgent(items), fix, epss, kev: items.some(item => item.kev),
       label: pkg ? `${pkg.name} ${pkg.version}` : items[0].title,
-      meta: pkg ? `${items.length} ${items.length === 1 ? 'aviso' : 'avisos'} · ${pkg.ecosystem}${fix ? ` · actualizar a ${fix}` : ' · sin corrección publicada'}` : `${items[0].path}:${items[0].line}` }
+      meta: pkg ? `${items.length} ${items.length === 1 ? 'aviso' : 'avisos'} · ${pkg.ecosystem}${pkg.dev ? ' · de desarrollo' : pkg.direct === false ? ' · transitiva' : ''}${fix ? ` · actualizar a ${fix}` : ' · sin corrección publicada'}` : `${items[0].path}:${items[0].line}` }
   }).sort((left, right) => (ACTION_ORDER[left.action] - ACTION_ORDER[right.action]) || (SEVERITY_ORDER[left.severity] - SEVERITY_ORDER[right.severity]) || left.label.localeCompare(right.label))
 }
 
@@ -171,6 +171,7 @@ function FindingDetail({ finding, canAccept, onPick }: { finding: RepositoryFind
   return <div className="rounded-xl border border-app-line bg-panel p-4">
     <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-medium">{advisory?.summary || finding.title}</p><p className="mt-1 flex flex-wrap gap-x-2 font-mono text-xs text-app-subtle"><span className="text-app-secondary">{finding.rule_id}</span>{finding.cve.filter(id => id !== finding.rule_id).map(id => <a key={id} href={`https://www.cve.org/CVERecord?id=${id}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">{id}</a>)}{finding.ghsa.filter(id => id !== finding.rule_id).map(id => <a key={id} href={`https://github.com/advisories/${id}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">{id}</a>)}{finding.cwe.map(id => <a key={id} href={`https://cwe.mitre.org/data/definitions/${id}.html`} target="_blank" rel="noreferrer" className="hover:underline">CWE-{id}</a>)}</p></div><Badge variant="outline" className={severityClass(finding.severity)}>{severityLabel[finding.severity]}{advisory?.cvss_score !== null && advisory?.cvss_score !== undefined ? ` · ${advisory.cvss_score}` : ''}</Badge></div>
     <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+      {pkg?.dev && <Fact label="Tipo"><span className="rounded border border-app-line px-1.5 py-0.5 text-xs">Dependencia de desarrollo</span> <span className="text-xs text-app-subtle">no llega a producción, pero se ejecuta en tu equipo y en la CI</span></Fact>}
       {pkg && <Fact label="Corrección">{pkg.fixed_version ? <><span className="font-mono">{pkg.version}</span> → <span className="font-mono font-medium text-brand">{pkg.fixed_version}</span></> : 'Sin versión corregida publicada'}</Fact>}
       {!pkg && <Fact label="Ubicación"><span className="font-mono text-xs">{finding.path}:{finding.line}</span></Fact>}
       {finding.epss && <Fact label="EPSS · probabilidad de explotación en 30 días">{(finding.epss.score * 100).toFixed(2)}% <span className="text-app-subtle">(percentil {(finding.epss.percentile * 100).toFixed(0)})</span></Fact>}

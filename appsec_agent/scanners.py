@@ -233,7 +233,7 @@ def _pick_fixed(fixed: str | None, installed: str) -> str | None:
     return min(later, key=lambda item: (len(item.split(".")), item)) if later else (candidates[0] if candidates else None)
 
 
-def _trivy_vulnerability(entry: dict, target: str, ecosystem: str, feeds: dict) -> dict:
+def _trivy_vulnerability(entry: dict, target: str, ecosystem: str, feeds: dict, packages: dict | None = None) -> dict:
     identifier = str(entry.get("VulnerabilityID", ""))
     name, installed = str(entry.get("PkgName", "")), str(entry.get("InstalledVersion", ""))
     fixed = _pick_fixed(entry.get("FixedVersion"), installed)
@@ -255,12 +255,24 @@ def _trivy_vulnerability(entry: dict, target: str, ecosystem: str, feeds: dict) 
     references = [url for url in entry.get("References", []) or [] if isinstance(url, str) and url.startswith("https://")][:8]
     remediation = (f"Actualiza {name} de {installed} a {fixed} o superior en {target} y regenera el lockfile."
                    if fixed else f"No hay versión corregida publicada para {name}. Evalúa alcanzabilidad, mitiga o sustituye la dependencia.")
+    meta = (packages or {}).get(entry.get("PkgID")) or {}
+    dev = bool(meta.get("Dev"))
+    if dev:
+        # De desarrollo: no llega a producción, pero corre en los equipos y en la CI (cadena de suministro).
+        priority["factors"].append("Dependencia de desarrollo: no llega a producción, pero se ejecuta en tu equipo y en la CI")
+        if not kev and priority["action"] == "act":
+            priority["action"] = "attend"
+        elif not kev:
+            priority["action"] = "track"
+        remediation += " Es una dependencia de desarrollo: el riesgo está en los equipos del equipo y en la CI, no en producción."
+    relationship = meta.get("Relationship")
     digest = sca_fingerprint("sca", identifier, ecosystem, name, installed)
     return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "tool": "trivy", "rule_id": identifier,
             "title": f"{name} {installed}: {summary}"[:200], "path": target, "line": 1, "severity": severity,
             "confidence": 8 if score is not None else 6, "verdict": "candidate", "cwe": cwe, "owasp": ["A03:2025"],
             "cve": cves, "ghsa": ghsas,
-            "package": {"ecosystem": ecosystem, "name": name, "version": installed, "fixed_version": fixed, "introduced": None},
+            "package": {"ecosystem": ecosystem, "name": name, "version": installed, "fixed_version": fixed, "introduced": None,
+                        "dev": dev, "direct": relationship == "direct" if relationship else None},
             "advisory": {"id": identifier, "aliases": cves + ghsas, "summary": summary,
                          "details": str(entry.get("Description") or "")[:2000], "cvss_vector": vector,
                          "cvss_score": score, "published": entry.get("PublishedDate"),
@@ -298,8 +310,9 @@ def parse_trivy(payload: dict, feeds: dict) -> list[dict]:
     for result in payload.get("Results", []) or []:
         target = _relative(str(result.get("Target", "")))
         ecosystem = str(result.get("Type") or "").lower() or "unknown"
+        packages = {item.get("ID"): item for item in result.get("Packages") or [] if item.get("ID")}
         for entry in result.get("Vulnerabilities") or []:
-            findings.append(_trivy_vulnerability(entry, target, ecosystem, feeds))
+            findings.append(_trivy_vulnerability(entry, target, ecosystem, feeds, packages))
         for entry in result.get("Misconfigurations") or []:
             if str(entry.get("Status", "FAIL")).upper() == "FAIL":
                 findings.append(_trivy_misconfiguration(entry, target))
@@ -319,7 +332,9 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
         return _result("trivy", "not_tested", "Docker no disponible: dependencias, IaC y secretos con Trivy no se ejecutaron.")
     cache_dir.mkdir(parents=True, exist_ok=True)
     try:
-        completed = _run("trivy", ["fs", "--scanners", "vuln,misconfig,secret", "--format", "json", "--quiet",
+        # Con las dependencias de desarrollo (marcadas como tales) y la lista de paquetes para saber cuáles son.
+        completed = _run("trivy", ["fs", "--scanners", "vuln,misconfig,secret", "--include-dev-deps", "--list-all-pkgs",
+                                   "--format", "json", "--quiet",
                                    "--timeout", "14m", "/src"], snapshot, network=True,
                          mounts=["-v", f"{host_path(cache_dir)}:/root/.cache/trivy"])
         if completed.returncode != 0 and not completed.stdout.strip():
@@ -337,8 +352,10 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
     targets = [result.get("Target", "") for result in payload.get("Results", []) or []]
     manifests = [target for result, target in zip(payload.get("Results", []) or [], targets) if result.get("Class") == "lang-pkgs"]
     configs = [target for result, target in zip(payload.get("Results", []) or [], targets) if result.get("Class") == "config"]
+    dev = sum(1 for finding in findings if (finding.get("package") or {}).get("dev"))
     detail = (f"{len(manifests)} manifiestos de dependencias y {len(configs)} archivos de infraestructura examinados: "
-              f"{kinds['sca']} avisos de dependencias, {kinds['iac']} fallos de configuración, {kinds['secrets']} secretos.")
+              f"{kinds['sca']} avisos de dependencias" + (f" ({dev} en dependencias de desarrollo, con menos prioridad)" if dev else "")
+              + f", {kinds['iac']} fallos de configuración, {kinds['secrets']} secretos.")
     if not feeds.get("kev") or not feeds.get("epss"):
         detail += " KEV/EPSS no disponibles; la prioridad usa solo CVSS."
     return _result("trivy", "completed", detail, findings, started)
