@@ -447,18 +447,23 @@ def parse_zizmor(payload: list) -> list[dict]:
     return findings
 
 
-def has_github_actions(snapshot: Path) -> bool:
+def github_actions_files(snapshot: Path) -> list[Path]:
+    """Workflows y acciones compuestas que zizmor audita."""
     workflows = snapshot / ".github" / "workflows"
-    if workflows.is_dir() and any(path.suffix in (".yml", ".yaml") for path in workflows.iterdir()):
-        return True
-    return any(path.name in ("action.yml", "action.yaml") for path in snapshot.rglob("action.y*ml"))
+    found = sorted(path for path in workflows.iterdir() if path.suffix in (".yml", ".yaml")) if workflows.is_dir() else []
+    return found + sorted(path for path in snapshot.rglob("action.y*ml") if path.name in ("action.yml", "action.yaml"))
+
+
+def has_github_actions(snapshot: Path) -> bool:
+    return bool(github_actions_files(snapshot))
 
 
 def run_zizmor(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():
         return _result("zizmor", "not_tested", "Docker no disponible: los workflows de GitHub Actions no se auditaron con zizmor.")
-    if not has_github_actions(snapshot):
+    audited = github_actions_files(snapshot)
+    if not audited:
         return _result("zizmor", "completed", "El repositorio no tiene workflows ni acciones de GitHub que auditar.", started=started)
     try:
         completed = _run("zizmor", ["--offline", "--no-exit-codes", "--no-progress", "--format", "json", "/src"], snapshot, timeout=300)
@@ -470,8 +475,10 @@ def run_zizmor(snapshot: Path) -> dict:
     if completed.returncode != 0 and not payload:
         return _result("zizmor", "inconclusive", "zizmor terminó con error antes de producir resultados.", started=started)
     findings = parse_zizmor(payload)
-    files = len({item["path"] for item in findings})
-    return _result("zizmor", "completed", f"{len(findings)} problemas en {files} workflows o acciones de GitHub, sin conexión.", findings, started)
+    affected = len({item["path"] for item in findings})
+    detail = (f"{len(audited)} workflows o acciones de GitHub auditados sin conexión: "
+              + (f"{len(findings)} problemas en {affected} de ellos." if findings else "sin problemas."))
+    return _result("zizmor", "completed", detail, findings, started)
 
 
 # --- unión -------------------------------------------------------------------------------------
