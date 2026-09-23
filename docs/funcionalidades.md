@@ -109,16 +109,13 @@ python3 -m appsec_agent scan-repository --source-id local:appsec-agent --allow-o
 
 Los informes JSON, Markdown, SARIF, SOC 2 Tipo II e ISO 27001 se descargan desde cada ejecución. Los perfiles de cumplimiento ordenan evidencia técnica; no constituyen auditoría, certificación ni atestación. Los enlaces CWE/CVE/GHSA apuntan a los registros públicos correspondientes cuando hay identificadores. DAST sobre objetivos reales sigue pendiente.
 
-## Proveedores de IA y laboratorio
+## Proveedores de IA
 
-`OPENAI_API_KEY` y `ANTHROPIC_API_KEY` permiten comprobar autenticación con OpenAI y Claude desde **Integraciones** o con `ai-check`. Se consulta el catálogo de modelos oficial sin enviar código ni hallazgos. La IA aún no participa en la revisión ni genera hipótesis.
+Cada usuario puede guardar su propia clave de OpenAI o Anthropic en **Integraciones**; se comprueba contra el catálogo de modelos del proveedor sin enviar código ni hallazgos. Hoy la IA **no participa** en el análisis: cuando lo haga, será opcional y con consentimiento en cada ejecución.
 
 ```bash
-python3 -m appsec_agent providers
-python3 -m appsec_agent ai-check --provider openai
-python3 -m appsec_agent ai-check --provider anthropic
-python3 -m appsec_agent scan-fixture --variant both
+make cli ARGS="providers"
+make cli ARGS="ai-check --provider openai"
 ```
 
-`scan-fixture` y la consola acotada del panel prueban solo el fixture propio. La consola real instalable es `python3 -m appsec_agent`; el campo del panel es una interfaz guiada, no un shell arbitrario. La CLI devuelve `0` sin candidatos observados, `2` con candidatos/hallazgos, `3` si quedó incompleta y `1` para una entrada inválida.
-
+La CLI devuelve `0` sin hallazgos, `2` con hallazgos, `3` si el análisis quedó incompleto y `1` ante una entrada inválida.

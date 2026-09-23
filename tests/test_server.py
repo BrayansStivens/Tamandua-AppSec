@@ -72,24 +72,21 @@ class ServerTests(unittest.TestCase):
         return handler.wfile.getvalue()
 
     def test_rejects_cross_origin_and_arbitrary_targets(self):
-        body = json.dumps({"variant": "fixed"})
-        status, _ = self.request("POST", "/api/lab/scans", body, {"Origin": "http://evil.test", "X-AppSec-Agent-Action": "scan-lab"})
+        body = json.dumps({"source_id": "local:x", "allow_osv_upload": False})
+        status, _ = self.request("POST", "/api/repositories/scans", body, {"Origin": "http://evil.test", "X-AppSec-Agent-Action": "scan-repository"})
         self.assertEqual(status, 403)
-        status, _ = self.request("POST", "/api/lab/scans", json.dumps({"variant": "external", "url": "https://example.com"}),
-                                 {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-lab"})
+        status, _ = self.request("POST", "/api/images/scans", json.dumps({"reference": "https://example.com/x"}),
+                                 {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-image"})
         self.assertEqual(status, 400)
         status, _ = self.request("GET", "/assets/../store.py")
         self.assertEqual(status, 404)
         self.assertEqual(list_runs(self.data_dir), [])
 
-    def test_runs_only_the_fixed_lab_variant(self):
-        status, payload = self.request("POST", "/api/lab/scans", json.dumps({"variant": "fixed"}),
-                                       {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-lab"})
-        self.assertEqual(status, 200)
-        result = json.loads(payload)
-        self.assertEqual(result["runs"][0]["variant"], "fixed")
-        self.assertEqual(result["runs"][0]["summary"]["confirmed"], 0)
-        self.assertEqual(len(list_runs(self.data_dir)), 1)
+    def test_lab_is_no_longer_reachable_from_the_api(self):
+        status, _ = self.request("POST", "/api/lab/scans", json.dumps({"variant": "fixed"}),
+                                 {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-lab"})
+        self.assertEqual(status, 404)
+        self.assertEqual(list_runs(self.data_dir), [])
 
     def test_user_supplies_own_ai_key_and_it_never_returns_to_the_browser(self):
         secret = "sk-user-owned-key-000111222333"
@@ -146,10 +143,11 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(list_runs(self.data_dir), [])
 
     def test_soc2_export_is_explicitly_non_certifying(self):
-        status, payload = self.request("POST", "/api/lab/scans", json.dumps({"variant": "fixed"}),
-                                       {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-lab"})
-        self.assertEqual(status, 200)
-        run_id = json.loads(payload)["runs"][0]["id"]
+        # El laboratorio ya no tiene ruta en la API: la ejecución se crea como lo hace la CLI (scan-fixture).
+        from appsec_agent.cli import DEFAULT_FIXTURE
+        from appsec_agent.engine import scan_fixture
+        from appsec_agent.store import save_scan
+        run_id = save_scan(self.data_dir, scan_fixture(DEFAULT_FIXTURE, "fixed"))["id"]
         status, report = self.request("GET", f"/api/runs/{run_id}/report-soc2.md")
         self.assertEqual(status, 200)
         self.assertIn(b"SOC 2 Tipo II", report)

@@ -13,8 +13,6 @@ from .. import findings_registry, jira, triage
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
 from ..dashboard import compute as compute_dashboard
-from ..engine import scan_fixture
-from ..fixture import FixtureError
 from ..integrations import github_installation
 from ..repository_sources import available_sources
 from ..scanners import docker_available
@@ -22,11 +20,10 @@ from ..scan_plan import plan as scan_plan
 from ..github_app import GitHubAppError
 from ..repository_sources import SourceError
 from ..store import _run_dir, list_runs, load_run, page_runs, render_profile_report, render_repository_report
-from ..store import render_repository_sarif, render_tickets, save_scan
+from ..store import render_repository_sarif, render_tickets
 from .core import VERSION, Request, route
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
-FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "tenant-api-lab"
 PROFILE_REPORTS = ("report-soc2.md", "report-iso27001.md", "report-custom.md")
 
 
@@ -282,20 +279,3 @@ def registry_save(request: Request):
     except ImageError as exc:
         return request.json(400, {"error": str(exc)})
 
-
-@route("POST", "/api/lab/scans", action="scan-lab")
-def lab_scan(request: Request):
-    payload, state = request.payload, request.state
-    if not isinstance(payload, dict) or set(payload) != {"variant"} or payload["variant"] not in ("both", "vulnerable", "fixed"):
-        return request.json(400, {"error": "Variante inválida"})
-    if not state.scan_lock.acquire(blocking=False):
-        return request.json(409, {"error": "Ya hay una prueba en curso"})
-    try:
-        variants = ("vulnerable", "fixed") if payload["variant"] == "both" else (payload["variant"],)
-        records = [save_scan(request.data_dir, scan_fixture(FIXTURE_DIR, variant)) for variant in variants]
-        return request.json(200, {"runs": [{"id": record["id"], "variant": record["variant"], "status": record["status"],
-                                            "summary": record["summary"]} for record in records]})
-    except (FixtureError, OSError, ValueError):
-        return request.json(500, {"error": "No se pudo ejecutar el laboratorio aprobado"})
-    finally:
-        state.scan_lock.release()

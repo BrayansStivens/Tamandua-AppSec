@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BookOpen, ChevronRight, Clock3, GitPullRequest, LayoutDashboard, Network,
-  LogOut, Menu, Monitor, Moon, Play, PlugZap, Radar, SearchCheck, Shield, ShieldAlert, Sun, Terminal, Globe2, Layers3, UserRound, UsersRound,
+  ChevronRight, Clock3, GitPullRequest, LayoutDashboard, Network,
+  LogOut, Menu, Monitor, Moon, Play, PlugZap, Radar, SearchCheck, Shield, ShieldAlert, Sun, Globe2, Layers3, UserRound, UsersRound,
   Bug,
 } from 'lucide-react'
 import { BrandMark } from '@/components/brand-mark'
@@ -19,21 +19,18 @@ import { Dashboard } from '@/views/Dashboard'
 import { Findings } from '@/views/Findings'
 import { CveTracker } from '@/views/CveTracker'
 import { Users } from '@/views/Users'
-import { Console } from '@/views/Console'
 import { CoverageView } from '@/views/Coverage'
 import { Integrations } from '@/views/Integrations'
-import { LabFindings } from '@/views/LabFindings'
 import { PullRequests } from '@/views/PullRequests'
-import { Roadmap } from '@/views/Roadmap'
 import { ThreatModels } from '@/views/ThreatModels'
-import type { Finding, RunDetail, RunRow } from '@/lib/runs'
+import type { RunDetail, RunRow } from '@/lib/runs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-type View = 'overview' | 'pentests' | 'new' | 'findings' | 'coverage' | 'repositories' | 'domains' | 'console' | 'integrations' | 'roadmap' | 'account' | 'users' | 'pulls' | 'threats' | 'cves'
+type View = 'overview' | 'pentests' | 'new' | 'findings' | 'coverage' | 'repositories' | 'domains' | 'integrations' | 'account' | 'users' | 'pulls' | 'threats' | 'cves'
 type Theme = 'system' | 'light' | 'dark'
 
 const navigation: { id: View; label: string; icon: typeof Shield }[] = [
@@ -46,10 +43,8 @@ const navigation: { id: View; label: string; icon: typeof Shield }[] = [
   { id: 'pulls', label: 'Pull requests', icon: GitPullRequest },
   { id: 'cves', label: 'CVE tracker', icon: Bug },
   { id: 'domains', label: 'Dominios', icon: Globe2 },
-  { id: 'console', label: 'Consola', icon: Terminal },
   { id: 'integrations', label: 'Integraciones', icon: PlugZap },
   { id: 'users', label: 'Usuarios', icon: UsersRound },
-  { id: 'roadmap', label: 'Próximamente', icon: BookOpen },
 ]
 const isoDate = (date: string) => new Date(date).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -111,20 +106,9 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     return data
   }, [])
   useEffect(() => {
-    refresh().then(async data => {
-      const initial = data.find(row => row.type === 'repository_scan')
-        ?? data.find(row => row.type === 'lab_scan' && row.variant === 'vulnerable')
-        ?? data.find(row => row.type === 'lab_scan')
-      if (!initial) return
-      setDetail(await api.get<RunDetail>(`/api/runs/${encodeURIComponent(initial.id)}`))
-    }).catch(caught => setError(caught instanceof Error ? caught.message : String(caught)))
+    refresh().catch(caught => setError(caught instanceof Error ? caught.message : String(caught)))
   }, [refresh])
-  const vulnerable = rows.find(row => row.type === 'lab_scan' && row.variant === 'vulnerable')
-  const latestLab = rows.find(row => row.type === 'lab_scan')
-  const latest = rows.find(row => row.type === 'repository_scan') ?? latestLab
-  const activeRow = rows.find(row => row.id === selectedId) ?? latest ?? vulnerable
-  const findings = detail && detail.id === activeRow?.id ? detail.findings ?? [] : []
-  const labFindings = activeRow?.type === 'lab_scan' ? findings as Finding[] : []
+  const latest = rows.find(row => row.type === 'repository_scan' || row.type === 'image_scan')
   const currentTitle = view === 'new' ? 'Nuevo pentest' : view === 'account' ? 'Cuenta' : navigation.find(item => item.id === view)?.label ?? 'Resumen'
 
   const openRun = useCallback(async (id: string, nextView: View = 'findings') => {
@@ -146,7 +130,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
   // El asistente vive dentro de Pentests: la sección sigue marcada mientras se crea una ejecución.
   const activeNav: View = view === 'new' ? 'pentests' : view
   // Usuarios es solo para administradores; el servidor lo impone igualmente.
-  const nav = <div className="space-y-1">{navigation.filter(item => item.id !== 'users' || user.role === 'admin').map(item => <button key={item.id} onClick={() => selectView(item.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${activeNav === item.id ? 'bg-accent font-medium text-accent-foreground' : 'text-app-muted hover:bg-app-soft hover:text-app-fg'}`}><item.icon className="size-4" />{item.label}{item.id === 'console' && <span className="ml-auto size-1.5 rounded-full bg-brand" />}</button>)}</div>
+  const nav = <div className="space-y-1">{navigation.filter(item => item.id !== 'users' || user.role === 'admin').map(item => <button key={item.id} onClick={() => selectView(item.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${activeNav === item.id ? 'bg-accent font-medium text-accent-foreground' : 'text-app-muted hover:bg-app-soft hover:text-app-fg'}`}><item.icon className="size-4" />{item.label}</button>)}</div>
 
   const userCard = <div className="space-y-3 rounded-xl border border-app-line bg-app-soft p-3">
     <button onClick={() => selectView('account')} className={`flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-app-soft ${view === 'account' ? 'text-brand' : ''}`}>
@@ -166,21 +150,18 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     if (view === 'threats') return <ThreatModels user={user} onOpenRun={id => openRun(id, 'findings')} />
     if (view === 'cves') return <CveTracker onNew={() => selectView('new')} />
     if (view === 'pulls') return <PullRequests user={user} onOpenRun={id => openRun(id, 'findings')} />
-    // Los repositorios se ven agrupados; el laboratorio sintético conserva su propia vista.
-    if (view === 'findings' && activeRow?.type !== 'lab_scan') return <Findings key={selectedId ?? 'current'} user={user} requestedRun={selectedId} onNew={() => selectView('new')} />
+    if (view === 'findings') return <Findings key={selectedId ?? 'current'} user={user} requestedRun={selectedId} onNew={() => selectView('new')} />
     if (view === 'coverage') return <CoverageView />
     if (view === 'account') return <Account user={user} onChanged={session.reload} />
     if (view === 'users' && user.role === 'admin') return <Users me={user} />
     if (view === 'integrations') return <Integrations user={user} />
-    if (view === 'findings' && activeRow?.type === 'lab_scan') return <LabFindings activeRow={activeRow} findings={labFindings} onSelect={id => openRun(id, 'findings')} />
-    if (view === 'console') return <Console refresh={refresh} />
-    return <Roadmap />
+    return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
   }
 
   return <div className="min-h-screen bg-app text-app-fg"><TopProgress /><div className="flex min-h-screen">
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-app-line bg-inset px-4 py-6 lg:flex"><div className="mb-9 flex items-center gap-3 px-2"><BrandMark size={40} /><div><div className="text-sm font-semibold tracking-wide">APPSEC AGENT</div><div className="text-xs text-app-subtle">Workspace local</div></div></div>{nav}<div className="mt-auto">{userCard}</div></aside>
     <div className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-app-line bg-app px-4 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetTrigger render={<Button aria-label="Abrir navegación" variant="ghost" size="icon" className="lg:hidden" />}><Menu /></SheetTrigger><SheetContent side="left" className="w-72 border-app-line bg-inset"><SheetHeader><SheetTitle className="text-left">AppSec Agent</SheetTitle></SheetHeader><div className="space-y-6 px-3">{nav}{userCard}</div></SheetContent></Sheet><span className="hidden text-sm text-app-muted sm:inline">Workspace</span><ChevronRight className="hidden size-3 text-app-faint sm:block" /><span className="text-sm font-medium">{currentTitle}</span></div><div className="flex items-center gap-3"><Select value={theme} onValueChange={value => setTheme(value as Theme)}><SelectTrigger aria-label="Apariencia" size="sm" className="min-w-28 border-app-line bg-app-soft text-app-secondary sm:min-w-32">{theme === 'dark' ? <Moon className="size-3.5" /> : theme === 'light' ? <Sun className="size-3.5" /> : <Monitor className="size-3.5" />}<span className="min-w-0 flex-1 text-left">{theme === 'system' ? 'Sistema' : theme === 'light' ? 'Claro' : 'Oscuro'}</span></SelectTrigger><SelectContent align="end" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="system">Sistema</SelectItem><SelectItem value="light">Claro</SelectItem><SelectItem value="dark">Oscuro</SelectItem></SelectContent></Select><Badge variant="outline" className="hidden border-app-line text-app-muted sm:inline-flex">Local · v0.9</Badge><Button aria-label="Nuevo pentest" onClick={() => selectView('new')} className="bg-primary text-primary-foreground hover:bg-primary/90"><Play /><span className="hidden sm:inline">Nuevo pentest</span></Button></div></header>
-    <main className="mx-auto max-w-[1520px] space-y-7 px-4 py-7 sm:px-8 sm:py-9"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-brand"><span className="size-1.5 rounded-full bg-brand" />Security workspace / 01</div><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{currentTitle}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-app-muted">{view === 'overview' ? 'Descubre, reproduce y explica cada riesgo con evidencia trazable.' : view === 'pentests' ? 'Historial de ejecuciones de este workspace, con su tipo, estado y resultados.' : view === 'new' ? 'Define el objetivo, declara el alcance y revisa qué se ejecuta antes de lanzar.' : view === 'repositories' ? 'Conecta tus repositorios y elige el código que quieres analizar.' : view === 'domains' ? 'Registra dominios y comprueba su propiedad antes de las pruebas web.' : view === 'integrations' ? 'Administra los proveedores de código y consulta el estado de la IA.' : view === 'console' ? 'Lanza pruebas acotadas y sigue sus resultados desde la consola.' : view === 'roadmap' ? 'Un mes para convertir el laboratorio en un piloto SaaS medible.' : view === 'account' ? 'Tu acceso: contraseña y segundo factor.' : view === 'users' ? 'Invita a tu equipo, asigna roles y retira accesos.' : view === 'pulls' ? 'Cada PR se revisa por lo que introduce, no por lo que ya había.' : view === 'cves' ? 'Todas las vulnerabilidades publicadas en NVD, con explotación activa (KEV) y probabilidad de explotación (EPSS), buscables en local.' : view === 'threats' ? 'Modela el sistema y contrasta cada amenaza STRIDE con lo que encuentran los escaneos.' : 'Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles.'}</p></div>{latest && <div className="flex items-center gap-2 text-xs text-app-subtle"><Clock3 className="size-3.5" />Última ejecución {isoDate(latest.created_at)}</div>}</div>
+    <main className="mx-auto max-w-[1520px] space-y-7 px-4 py-7 sm:px-8 sm:py-9"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-brand"><span className="size-1.5 rounded-full bg-brand" />Security workspace / 01</div><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{currentTitle}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-app-muted">{view === 'overview' ? 'Descubre, reproduce y explica cada riesgo con evidencia trazable.' : view === 'pentests' ? 'Historial de ejecuciones de este workspace, con su tipo, estado y resultados.' : view === 'new' ? 'Define el objetivo, declara el alcance y revisa qué se ejecuta antes de lanzar.' : view === 'repositories' ? 'Conecta tus repositorios y elige el código que quieres analizar.' : view === 'domains' ? 'Registra dominios y comprueba su propiedad antes de las pruebas web.' : view === 'integrations' ? 'Administra los proveedores de código y consulta el estado de la IA.' : view === 'account' ? 'Tu acceso: contraseña y segundo factor.' : view === 'users' ? 'Invita a tu equipo, asigna roles y retira accesos.' : view === 'pulls' ? 'Cada PR se revisa por lo que introduce, no por lo que ya había.' : view === 'cves' ? 'Todas las vulnerabilidades publicadas en NVD, con explotación activa (KEV) y probabilidad de explotación (EPSS), buscables en local.' : view === 'threats' ? 'Modela el sistema y contrasta cada amenaza STRIDE con lo que encuentran los escaneos.' : 'Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles.'}</p></div>{latest && <div className="flex items-center gap-2 text-xs text-app-subtle"><Clock3 className="size-3.5" />Última ejecución {isoDate(latest.created_at)}</div>}</div>
       {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
       <div className="lg:hidden"><Tabs value={activeNav} onValueChange={value => selectView(value as View)}><TabsList className="w-full overflow-x-auto bg-app-soft">{navigation.slice(0, 4).map(item => <TabsTrigger key={item.id} value={item.id} className="min-w-fit px-3">{item.label}</TabsTrigger>)}</TabsList></Tabs></div>
       {renderMain()}

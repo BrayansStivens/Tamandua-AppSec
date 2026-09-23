@@ -48,7 +48,6 @@ class State:
     log: object
     jobs: ScanJobs
     auth: Authenticator
-    scan_lock: threading.BoundedSemaphore = field(default_factory=lambda: threading.BoundedSemaphore(1))
     domain_lock: threading.Lock = field(default_factory=threading.Lock)
     code_lock: threading.Lock = field(default_factory=threading.Lock)
     code_tokens: dict = field(default_factory=dict)

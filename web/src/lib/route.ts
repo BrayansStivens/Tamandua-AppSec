@@ -2,8 +2,8 @@
 // El fragmento #link=… de las invitaciones no empieza por «/» y no se toca aquí.
 const SLUGS: Record<string, string> = {
   overview: 'resumen', pentests: 'pentests', new: 'nuevo', findings: 'hallazgos', coverage: 'cobertura', threats: 'amenazas',
-  repositories: 'repositorios', pulls: 'pull-requests', domains: 'dominios', console: 'consola', integrations: 'integraciones',
-  users: 'usuarios', account: 'cuenta', roadmap: 'proximamente', cves: 'cve-tracker',
+  repositories: 'repositorios', pulls: 'pull-requests', domains: 'dominios', integrations: 'integraciones',
+  users: 'usuarios', account: 'cuenta', cves: 'cve-tracker',
 }
 const VIEWS = Object.fromEntries(Object.entries(SLUGS).map(([view, slug]) => [slug, view]))
 export const ROUTE_EVENT = 'appsec:route'

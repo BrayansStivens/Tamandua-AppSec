@@ -178,7 +178,7 @@ class GateTests(HttpCase):
             self.assertEqual(self.call("GET", path)[0], 401, path)
         status, body, _ = self.call("GET", "/api/health")
         self.assertEqual(set(body), {"status", "version"})  # sin sesión no se cuenta el estado interno
-        self.assertEqual(self.post("/api/lab/scans", "scan-lab", {"variant": "fixed"})[0], 401)
+        self.assertEqual(self.post("/api/repositories/scans", "scan-repository", {"source_id": "x", "allow_osv_upload": False})[0], 401)
 
     def test_login_cookie_attributes_and_member_limits(self):
         Users(self.data_dir).create("analista", PASSWORD)
@@ -254,7 +254,7 @@ class PolicyAndUsersTests(HttpCase):
             self.assertTrue(session["totp_required"])
             status, body, _ = self.call("GET", "/api/runs", headers={"Cookie": cookie})
             self.assertEqual((status, body["code"]), (403, "totp_required"))
-            self.assertEqual(self.post("/api/lab/scans", "scan-lab", {"variant": "fixed"}, cookie)[0], 403)
+            self.assertEqual(self.post("/api/repositories/scans", "scan-repository", {"source_id": "x", "allow_osv_upload": False}, cookie)[0], 403)
             status, _, cookies = self.enrol(cookie)
             self.assertEqual(status, 200)
             # Confirmar reemite la sesión con segundo factor; la anterior, sin él, deja de valer.
