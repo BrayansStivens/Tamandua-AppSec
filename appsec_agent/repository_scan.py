@@ -190,6 +190,11 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         report("info", f"zizmor {IMAGES['zizmor']['version']}: seguridad de GitHub Actions…")
         zizmor = run_zizmor(root)
         tools = [sast, secrets_gitleaks, trivy, checkov, zizmor]
+        # Un motor que no corrió no es «cero hallazgos»: se dice en claro y la ejecución queda incompleta.
+        failed = [tool["name"] for tool in (sast, secrets_gitleaks, trivy) if tool["status"] == "inconclusive"]
+        if failed:
+            report("warn", f"No se pudieron ejecutar: {', '.join(failed)}. El resultado no equivale a «sin hallazgos»; "
+                           "revisa en el servidor que las imágenes estén construidas (docker compose build).")
         findings.extend(sast["findings"])
         trivy_secrets = [item for item in trivy["findings"] if item["scanner"] == "secrets"]
         findings.extend(merge_secrets(secrets_gitleaks["findings"], trivy_secrets))
@@ -316,7 +321,8 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                   for action in ("act", "attend", "track")}
     truncated = bool(snapshot.get("truncated"))
     return {"type": "repository_scan",
-            "status": "incomplete" if sca_status == "inconclusive" or truncated else "completed",
+            "status": "incomplete" if sca_status == "inconclusive" or truncated or any(
+                tool["tool"] in ("opengrep", "gitleaks", "trivy") and tool["status"] == "inconclusive" for tool in tools) else "completed",
             "source": source, "fixture": source["name"], "variant": "code", "context": declared,
             "steps": steps, "findings": findings,
             "owasp_coverage": coverage, "inventory": collect_inventory(root), "unused_dependencies": unused_dependencies(root),

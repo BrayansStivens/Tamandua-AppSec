@@ -151,7 +151,7 @@ class ScanJobs:
         work.mkdir(parents=True, exist_ok=True)
         try:
             with TemporaryDirectory(prefix="snapshot-", dir=work) as temporary:
-                root, source = snapshot_source(job["source_id"], Path(temporary), job["tokens"], job["installation_id"])
+                root, source = snapshot_source(job["source_id"], Path(temporary), job["tokens"], job["installation_id"], progress=progress)
                 snapshot = source.get("snapshot") or {}
                 progress("ok", f"Snapshot listo: {source.get('files', 0)} archivos analizables"
                                + (f", {snapshot.get('skipped_not_analyzable', 0)} descartados por no ser código" if snapshot.get("skipped_not_analyzable") else "") + ".")
@@ -236,7 +236,7 @@ class ScanJobs:
             work = self.data_dir / "work"
             work.mkdir(parents=True, exist_ok=True)
             with TemporaryDirectory(prefix="pr-", dir=work) as temporary:
-                root, source = snapshot_source(source_id, Path(temporary), None, installation, ref=pull["head_sha"])
+                root, source = snapshot_source(source_id, Path(temporary), None, installation, ref=pull["head_sha"], progress=progress)
                 scan = scan_repository(root, source, allow_osv_upload=False, data_dir=self.data_dir, progress=progress)
             # Las rutas excluidas las decide el servidor, no el PR: se quitan antes de decidir si bloquea.
             from .exclusions import apply_to_record

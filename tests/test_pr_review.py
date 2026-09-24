@@ -127,7 +127,7 @@ class JobTests(unittest.TestCase):
             scan = scan_repository(main, {"id": "github:org/api", "name": "org/api", "provider": "github", "files": 1})
             save_repository_scan(self.data_dir, scan)
 
-        def snapshot(source_id, destination, tokens, installation, ref=None):
+        def snapshot(source_id, destination, tokens, installation, ref=None, progress=None):
             self.assertEqual(ref, SHA)
             shutil.copytree(self.repo, destination, dirs_exist_ok=True)
             return destination, {"id": source_id, "name": "org/api", "provider": "github", "files": 1, "sha256": "x"}
@@ -206,7 +206,7 @@ class SecretInDocsTests(unittest.TestCase):
 
     def _review_only(self, permissions):
         # Mismo camino que run_review, sin línea base y con el parche que fije la prueba.
-        def snapshot(source_id, destination, tokens, installation, ref=None):
+        def snapshot(source_id, destination, tokens, installation, ref=None, progress=None):
             import shutil
             shutil.copytree(self.repo, destination, dirs_exist_ok=True)
             return destination, {"id": source_id, "name": "org/api", "provider": "github", "files": 2, "sha256": "x"}

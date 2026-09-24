@@ -242,5 +242,70 @@ class RepositoryWorkflowTests(unittest.TestCase):
             self.assertEqual(run.call_args.args[0][0], "dig")
 
 
+class DownloadTests(unittest.TestCase):
+    """Una descarga lenta informa de lo recibido y tiene plazo total: no se queda «pegada» en silencio."""
+
+    class Slow:
+        def __init__(self, chunks, step):
+            self.chunks, self.step = list(chunks), step
+        def __enter__(self):
+            return self
+        def __exit__(self, *_):
+            return False
+        def read1(self, _size):
+            self.step()
+            return self.chunks.pop(0) if self.chunks else b""
+
+    def run_download(self, chunks, *, timeout="900"):
+        from appsec_agent import repository_sources
+        clock = [0.0]
+        response = self.Slow(chunks, lambda: clock.__setitem__(0, clock[0] + 11))
+        messages = []
+        opener = type("Opener", (), {"open": lambda self, *a, **k: response})()
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.dict("os.environ", {"APPSEC_AGENT_DOWNLOAD_TIMEOUT": timeout}), \
+                patch("appsec_agent.repository_sources.build_opener", return_value=opener), \
+                patch("appsec_agent.repository_sources.time.monotonic", side_effect=lambda: clock[0]):
+            written = repository_sources._download_archive("https://api.github.com/x", "t", "github", Path(temporary) / "a.tar.gz",
+                                                           progress=lambda level, message: messages.append(message))
+        return written, messages
+
+    def test_progress_is_reported_while_downloading(self):
+        written, messages = self.run_download([b"x" * 1_048_576] * 3)
+        self.assertEqual(written, 3 * 1_048_576)
+        self.assertTrue(any("MB recibidos" in message for message in messages))
+        self.assertIn("Extrayendo", messages[-1])
+
+    def test_a_download_that_never_ends_fails_with_a_clear_message(self):
+        from appsec_agent.repository_sources import SourceError
+        with self.assertRaises(SourceError) as caught:
+            self.run_download([b"x"] * 1000, timeout="60")
+        self.assertIn("superó 1 min", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
+
+
+class EnginesDownTests(unittest.TestCase):
+    """Si los motores no corren (imágenes sin construir), la ejecución no puede presentarse como limpia."""
+
+    def test_scan_without_engines_is_incomplete_and_says_why(self):
+        from appsec_agent import repository_scan
+        from appsec_agent.scanners import _result
+        down = lambda key: _result(key, "inconclusive", "Imagen no construida")
+        messages = []
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(repository_scan, "docker_available", return_value=True), \
+                patch.object(repository_scan, "run_opengrep", side_effect=lambda *_: down("opengrep")), \
+                patch.object(repository_scan, "run_gitleaks", side_effect=lambda *_: down("gitleaks")), \
+                patch.object(repository_scan, "run_trivy", side_effect=lambda *_: down("trivy")), \
+                patch.object(repository_scan, "run_checkov", side_effect=lambda *_: down("checkov")), \
+                patch.object(repository_scan, "run_zizmor", side_effect=lambda *_: down("zizmor")), \
+                patch.object(repository_scan, "load_feeds", return_value={"kev": {}, "epss": {}}):
+            root = Path(temporary)
+            (root / "app.py").write_text("print('hola')\n", encoding="utf-8")
+            scan = repository_scan.scan_repository(root, {"id": "github:org/app", "name": "org/app", "provider": "github", "files": 1},
+                                                   data_dir=root, progress=lambda level, message: messages.append((level, message)))
+        self.assertEqual(scan["status"], "incomplete")
+        self.assertTrue(any(level == "warn" and "no equivale" in message for level, message in messages))

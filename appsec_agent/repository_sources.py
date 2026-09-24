@@ -7,6 +7,7 @@ import json
 import os
 import re
 import tarfile
+import time
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
@@ -102,9 +103,20 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
         raise SourceError("No se pudo consultar el proveedor de código") from exc
 
 
+def _download_timeout() -> int:
+    try:
+        return max(60, int(os.environ.get("APPSEC_AGENT_DOWNLOAD_TIMEOUT", "900")))
+    except ValueError:
+        return 900
+
+
 def _download_archive(url: str, token: str, provider: str, destination: Path,
-                      *, redirect_host: str | None = None) -> int:
-    """Baja el tarball a disco por trozos. Un repositorio de cientos de MB no cabe en memoria."""
+                      *, redirect_host: str | None = None, progress=None) -> int:
+    """Baja el tarball a disco por trozos. Un repositorio de cientos de MB no cabe en memoria.
+
+    El `timeout` del socket solo corta si no llega nada; una conexión que gotea podría
+    tardar horas sin decir nada. Por eso hay un plazo total y se informa de lo descargado."""
+    deadline = time.monotonic() + _download_timeout()
     headers = {"Accept": "application/vnd.github+json", "User-Agent": "AppSecAgent/0.4"}
     if provider == "github":
         headers["Authorization"] = f"Bearer {token}"
@@ -124,16 +136,25 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
                 raise SourceError("Redirección de archivo no permitida")
             # La URL temporal se consulta sin la credencial original.
             response = opener.open(Request(target, headers={"User-Agent": "AppSecAgent/0.4"}), timeout=180)
-        written = 0
+        written, reported = 0, time.monotonic()
         with response, open(destination, "wb") as handle:
             while True:
-                chunk = response.read(1_048_576)
+                chunk = response.read1(1_048_576)
                 if not chunk:
                     break
                 written += len(chunk)
                 if written > MAX_ARCHIVE:
                     raise SourceError("El archivo del repositorio supera 1 GB comprimido")
                 handle.write(chunk)
+                now = time.monotonic()
+                if now > deadline:
+                    raise SourceError(f"La descarga superó {_download_timeout() // 60} min "
+                                      f"({written // 1_048_576} MB recibidos); revisa la conexión con {provider.capitalize()}")
+                if progress and now - reported >= 10:
+                    progress("info", f"Descargando… {written / 1_048_576:.0f} MB recibidos")
+                    reported = now
+        if progress:
+            progress("info", f"Descarga completa ({written / 1_048_576:.1f} MB). Extrayendo archivos analizables…")
         return written
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
         raise SourceError("No se pudo descargar el repositorio") from exc
@@ -431,7 +452,7 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
 
 
 def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | None = None,
-                    installation_id: int | None = None, ref: str | None = None) -> tuple[Path, dict]:
+                    installation_id: int | None = None, ref: str | None = None, progress=None) -> tuple[Path, dict]:
     """Snapshot de solo lectura. `ref` fija un commit concreto (revisión de un PR); solo GitHub."""
     if ref is not None and (not re.fullmatch(r"[0-9a-f]{40}", ref) or not source_id.startswith("github:")):
         raise SourceError("Commit inválido")
@@ -488,11 +509,11 @@ def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | 
     if provider == "github":
         name = source_id.removeprefix("github:")
         url = f"https://api.github.com/repos/{name}/tarball" + (f"/{ref}" if ref else "")
-        _download_archive(url, token, provider, archive_path, redirect_host="codeload.github.com")
+        _download_archive(url, token, provider, archive_path, redirect_host="codeload.github.com", progress=progress)
     else:
         identifier = source_id.removeprefix("gitlab:")
         url = f"https://gitlab.com/api/v4/projects/{quote(identifier)}/repository/archive.tar.gz?include_lfs_blobs=false"
-        _download_archive(url, token, provider, archive_path)
+        _download_archive(url, token, provider, archive_path, progress=progress)
     try:
         stats = _extract_limited(archive_path, destination)
     finally:
