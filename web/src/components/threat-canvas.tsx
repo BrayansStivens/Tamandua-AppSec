@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   applyNodeChanges, Background, BackgroundVariant, BaseEdge, ConnectionMode, Controls, EdgeLabelRenderer, getBezierPath, Handle,
   MarkerType, NodeResizer, Panel, Position, ReactFlow, ReactFlowProvider, useReactFlow,
@@ -9,7 +9,7 @@ import { Globe2, LayoutGrid, Lock, Plus, Square, Trash2, Undo2 } from 'lucide-re
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { autoLayout, baseKind, fitBox, NODE_H, NODE_W, sizeOf } from '@/components/threat-layout'
+import { autoLayout, baseKind, curvePoint, fitBox, labelSpots, NODE_H, NODE_W, sizeOf, type Side } from '@/components/threat-layout'
 import { assetGroups, newId, PROCESSES, STORES, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/components/threat-model-types'
 
 // Editor visual del modelo: los componentes se arrastran, los flujos se crean uniendo sus puntos y las
@@ -21,7 +21,7 @@ const select = 'h-8 w-full rounded-lg border border-app-line bg-app-soft px-2 te
 
 type ComponentData = { component: Component; kindLabel: string; flagged: boolean }
 type BoundaryData = { name: string }
-type FlowData = { flow: Flow; flagged: boolean }
+type FlowData = { flow: Flow; flagged: boolean; labelAt?: number }
 type CanvasNode = Node<ComponentData, 'component'> | Node<BoundaryData, 'boundary'>
 
 const componentId = (id: string) => `c:${id}`
@@ -74,14 +74,30 @@ function membership(nodes: CanvasNode[]): Record<string, string[]> {
   return result
 }
 
+// Con Shift pulsado, redimensionar conserva la proporción (como en cualquier editor de diseño).
+const ShiftContext = createContext(false)
+function useShiftKey() {
+  const [down, setDown] = useState(false)
+  useEffect(() => {
+    const update = (event: KeyboardEvent) => setDown(event.shiftKey)
+    const reset = () => setDown(false)
+    window.addEventListener('keydown', update)
+    window.addEventListener('keyup', update)
+    window.addEventListener('blur', reset)
+    return () => { window.removeEventListener('keydown', update); window.removeEventListener('keyup', update); window.removeEventListener('blur', reset) }
+  }, [])
+  return down
+}
+
 function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'component'>>) {
+  const keepRatio = useContext(ShiftContext)
   const { component, kindLabel, flagged } = data
   const base = baseKind(component)
   const shape = PROCESSES.includes(base) ? 'rounded-full px-5' : STORES.includes(base) ? 'rounded-none border-x-0 border-y-2' : 'rounded-lg'
   const sensitive = component.data.some(item => SENSITIVE.includes(item))
   return <div title={component.name} className={`tm-node flex h-full min-h-[64px] w-full flex-col items-center justify-center border bg-panel px-3 py-2 text-center shadow-sm ${shape}
     ${flagged ? 'border-amber-500 ring-2 ring-amber-500/40' : 'border-app-line'} ${selected ? 'outline-2 outline-offset-2 outline-brand' : ''}`}>
-    <NodeResizer isVisible={selected} minWidth={140} minHeight={64} maxWidth={520} maxHeight={320} color="var(--brand)" />
+    <NodeResizer isVisible minWidth={140} minHeight={64} maxWidth={520} maxHeight={320} keepAspectRatio={keepRatio} color="var(--brand)" lineClassName="tm-resize-line" handleClassName="tm-resize-handle" />
     {(['t', 'r', 'b', 'l'] as const).map(side => <Handle key={side} id={side} type="source" position={{ t: Position.Top, r: Position.Right, b: Position.Bottom, l: Position.Left }[side]} className="tm-handle" />)}
     <span className="line-clamp-2 text-[13px] leading-4 font-semibold text-app-fg">{component.name}</span>
     <span className="mt-0.5 line-clamp-1 text-[11px] text-app-subtle">{component.technology || kindLabel}</span>
@@ -94,21 +110,27 @@ function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'compon
 }
 
 function BoundaryNode({ data, selected }: NodeProps<Node<BoundaryData, 'boundary'>>) {
+  const keepRatio = useContext(ShiftContext)
   return <div className={`tm-boundary relative h-full w-full rounded-2xl border-2 border-dashed ${selected ? 'border-brand/70' : 'border-app-faint/70'}`}>
-    <NodeResizer isVisible minWidth={220} minHeight={140} color="var(--brand)" lineClassName="tm-resize-line" handleClassName="tm-resize-handle" />
+    <NodeResizer isVisible minWidth={220} minHeight={140} keepAspectRatio={keepRatio} color="var(--brand)" lineClassName="tm-resize-line" handleClassName="tm-resize-handle" />
     <span className="tm-drag absolute top-2 left-3 cursor-move rounded-md bg-app px-1.5 py-0.5 text-xs font-semibold text-app-muted">{data.name}</span>
   </div>
 }
 
 function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected, markerEnd }: EdgeProps<Edge<FlowData, 'flow'>>) {
-  const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+  const [path, midX, midY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+  const at = data?.labelAt ?? 0.5
+  const spot = at === 0.5 ? { x: midX, y: midY } : curvePoint(sourceX, sourceY, sourcePosition as Side, targetX, targetY, targetPosition as Side, at)
+  const labelX = Math.round(spot.x), labelY = Math.round(spot.y)
   const flow = data?.flow
+  const label = flow ? `${flow.protocol.toUpperCase()}${flow.name ? ` · ${flow.name}` : ''}${flow.encrypted ? '' : ' · sin cifrar'}` : ''
   return <>
     <BaseEdge id={id} path={path} markerEnd={markerEnd} className={`tm-flow ${flow?.encrypted ? '' : 'tm-flow--plain'} ${data?.flagged ? 'tm-flow--flagged' : ''} ${selected ? 'tm-flow--selected' : ''}`} />
-    {flow && <EdgeLabelRenderer>
+    {flow && label && <EdgeLabelRenderer>
       <div className="tm-flow-label nodrag nopan" data-x={labelX} data-y={labelY} ref={element => { if (element) element.style.transform = `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}>
-        <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${selected ? 'border-brand/60 text-brand' : 'border-app-line text-app-muted'} bg-panel`}>
-          {flow.protocol.toUpperCase()}{flow.name ? ` · ${flow.name}` : ''}{flow.encrypted ? '' : ' · sin cifrar'}
+        {/* Acotada al hueco entre columnas para no tapar componentes; completa en el título y al seleccionarla. */}
+        <span title={label} className={`inline-block truncate rounded-md border px-1.5 py-0.5 align-middle text-[10px] font-medium ${selected ? 'max-w-[260px] border-brand/60 text-brand' : 'max-w-[132px] border-app-line text-app-muted'} bg-panel`}>
+          {label}
         </span>
       </div>
     </EdgeLabelRenderer>}
@@ -136,6 +158,7 @@ export function ThreatCanvas(props: Props) {
 
 function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
   const dark = useDarkMode()
+  const shift = useShiftKey()
   const flow = useReactFlow()
   const [nodes, setNodes] = useState<CanvasNode[]>(() => build(model, threats, catalog.kinds, []))
   const [selectedFlow, setSelectedFlow] = useState<string | null>(null)
@@ -187,13 +210,21 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
 
   const positions = useMemo(() => Object.fromEntries(nodes.filter(node => node.type === 'component').map(node => [plain(node.id), node.position])), [nodes])
   const hot = useMemo(() => new Set(threats.filter(row => row.status === 'evidenced').map(row => row.element)), [threats])
-  const edges = useMemo<Edge<FlowData, 'flow'>[]>(() => model.flows.flatMap(item => {
-    const a = positions[item.source], b = positions[item.target]
-    if (!a || !b) return []
-    const [sourceHandle, targetHandle] = sides(a, b)
-    return [{ id: flowId(item.id), type: 'flow', source: componentId(item.source), target: componentId(item.target), sourceHandle, targetHandle,
-              selected: selectedFlow === item.id, data: { flow: item, flagged: hot.has(item.id) }, markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 } }]
-  }), [model.flows, positions, selectedFlow, hot])
+  const rects = useMemo(() => Object.fromEntries(nodes.filter(node => node.type === 'component').map(node => [plain(node.id),
+    { ...node.position, width: node.measured?.width ?? node.width ?? NODE_W, height: node.measured?.height ?? node.height ?? NODE_H }])), [nodes])
+  const edges = useMemo<Edge<FlowData, 'flow'>[]>(() => {
+    const side: Record<string, Side> = { t: 'top', r: 'right', b: 'bottom', l: 'left' }
+    const drawn = model.flows.flatMap(item => {
+      const a = positions[item.source], b = positions[item.target]
+      if (!a || !b || !rects[item.source] || !rects[item.target]) return []
+      return [{ item, handles: sides(a, b) }]
+    })
+    const spots = labelSpots(drawn.map(({ item, handles }) => ({ id: item.id, source: rects[item.source], target: rects[item.target],
+      sourceSide: side[handles[0]], targetSide: side[handles[1]], text: `${item.protocol} · ${item.name ?? ''}${item.encrypted ? '' : ' · sin cifrar'}` })), Object.values(rects))
+    return drawn.map(({ item, handles: [sourceHandle, targetHandle] }) => ({ id: flowId(item.id), type: 'flow' as const, source: componentId(item.source), target: componentId(item.target),
+      sourceHandle, targetHandle, selected: selectedFlow === item.id, data: { flow: item, flagged: hot.has(item.id), labelAt: spots[item.id] },
+      markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 } }))
+  }, [model.flows, positions, rects, selectedFlow, hot])
 
   const onEdgesChange = useCallback((changes: EdgeChange[]) => {
     const picked = changes.find(change => change.type === 'select')
@@ -252,11 +283,14 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
   const selectedNode = nodes.find(node => node.selected)
   // Con la guía abierta el panel de edición baja bajo el lienzo: el diagrama necesita el ancho.
   return <div className={`grid gap-4 ${compact ? '' : 'xl:grid-cols-[minmax(0,1fr)_320px]'}`}>
-    <div className="tm-canvas h-[640px] overflow-hidden rounded-2xl border border-app-line bg-inset">
+    <ShiftContext.Provider value={shift}><div className="tm-canvas h-[640px] overflow-hidden rounded-2xl border border-app-line bg-inset">
       <ReactFlow<CanvasNode, Edge<FlowData, 'flow'>> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
         onDelete={({ nodes: removed, edges: gone }) => remove(removed.map(node => node.id), gone.map(edge => edge.id))}
-        connectionMode={ConnectionMode.Loose} deleteKeyCode={['Backspace', 'Delete']} colorMode={dark ? 'dark' : 'light'}
+        connectionMode={ConnectionMode.Loose} deleteKeyCode={['Backspace', 'Delete']}
+        // Shift es para mantener la proporción al redimensionar: como tecla de selección por recuadro el
+        // panel capturaría el puntero antes que el tirador. La selección múltiple sigue con Cmd/Ctrl.
+        selectionKeyCode={null} colorMode={dark ? 'dark' : 'light'}
         fitView fitViewOptions={{ padding: 0.15 }} minZoom={0.2} maxZoom={2} snapToGrid snapGrid={[8, 8]}>
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
         <Controls showInteractive={false} />
@@ -266,7 +300,7 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
           <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={tidy} title="Colocar en columnas por frontera"><LayoutGrid />Ordenar</Button>
         </Panel>
       </ReactFlow>
-    </div>
+    </div></ShiftContext.Provider>
     <Inspector model={model} setModel={setModel} catalog={catalog} node={selectedNode} flowId={selectedFlow}
       onRemove={() => remove(selectedNode ? [selectedNode.id] : [], selectedFlow ? [flowId(selectedFlow)] : [])} />
   </div>

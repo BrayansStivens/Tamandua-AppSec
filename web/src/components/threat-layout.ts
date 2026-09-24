@@ -6,8 +6,8 @@ import type { Box, Component, Model, Point } from '@/components/threat-model-typ
 
 export const NODE_W = 184
 export const NODE_H = 88          // hueco por componente: caben dos líneas de nombre y la tecnología
-const GAP_X = 120                 // entre columnas: sitio para la etiqueta del flujo
-const GAP_INNER = 72              // entre subcolumnas dentro de una frontera
+const GAP_X = 160                 // entre columnas: sitio para la etiqueta del flujo (máx. 132 px)
+const GAP_INNER = 150             // entre subcolumnas dentro de una frontera: también llevan etiqueta
 const GAP_Y = 44
 const PAD = 32
 const HEADER = 44                 // nombre de la frontera
@@ -124,4 +124,54 @@ export function fitBox(box: Box, members: { position: Point; width: number; heig
   const right = Math.max(box.x + box.width, ...members.map(item => item.position.x + item.width + PAD))
   const bottom = Math.max(box.y + box.height, ...members.map(item => item.position.y + item.height + PAD))
   return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
+// Etiquetas de los flujos: el punto medio de la curva cae encima de otro componente cuando el flujo salta
+// columnas. Se prueban varios puntos de la curva (del centro hacia los extremos) y gana el primero que no
+// pisa componentes ni etiquetas ya colocadas. Mismo trazado que getBezierPath de React Flow.
+export type Side = 'top' | 'right' | 'bottom' | 'left'
+type Rect = { x: number; y: number; width: number; height: number }
+export type LabelEdge = { id: string; source: Rect; target: Rect; sourceSide: Side; targetSide: Side; text: string }
+
+const LABEL_MAX = 132
+const LABEL_H = 20
+const SPOTS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.78, 0.22, 0.85, 0.15]
+
+const offset = (distance: number) => distance >= 0 ? 0.5 * distance : 0.25 * 25 * Math.sqrt(-distance)
+const control = (side: Side, x1: number, y1: number, x2: number, y2: number): [number, number] =>
+  side === 'left' ? [x1 - offset(x1 - x2), y1] : side === 'right' ? [x1 + offset(x2 - x1), y1]
+    : side === 'top' ? [x1, y1 - offset(y1 - y2)] : [x1, y1 + offset(y2 - y1)]
+
+export function curvePoint(sx: number, sy: number, sourceSide: Side, tx: number, ty: number, targetSide: Side, t: number) {
+  const [ax, ay] = control(sourceSide, sx, sy, tx, ty)
+  const [bx, by] = control(targetSide, tx, ty, sx, sy)
+  const u = 1 - t
+  return { x: u ** 3 * sx + 3 * u * u * t * ax + 3 * u * t * t * bx + t ** 3 * tx, y: u ** 3 * sy + 3 * u * u * t * ay + 3 * u * t * t * by + t ** 3 * ty }
+}
+
+const anchor = (rect: Rect, side: Side) => side === 'left' ? [rect.x, rect.y + rect.height / 2] : side === 'right' ? [rect.x + rect.width, rect.y + rect.height / 2]
+  : side === 'top' ? [rect.x + rect.width / 2, rect.y] : [rect.x + rect.width / 2, rect.y + rect.height]
+const overlap = (a: Rect, b: Rect) => Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y))
+
+export function labelSpots(edges: LabelEdge[], components: Rect[]): Record<string, number> {
+  const placed: Rect[] = []
+  const spots: Record<string, number> = {}
+  // Primero los flujos cortos: tienen menos sitio donde elegir.
+  const length = (edge: LabelEdge) => Math.hypot(edge.target.x - edge.source.x, edge.target.y - edge.source.y)
+  for (const edge of [...edges].sort((a, b) => length(a) - length(b))) {
+    const [sx, sy] = anchor(edge.source, edge.sourceSide), [tx, ty] = anchor(edge.target, edge.targetSide)
+    const width = Math.min(LABEL_MAX, edge.text.length * 6 + 14) + 8
+    let best = { t: 0.5, cost: Infinity, rect: null as Rect | null }
+    for (const t of SPOTS) {
+      const point = curvePoint(sx, sy, edge.sourceSide, tx, ty, edge.targetSide, t)
+      const rect = { x: point.x - width / 2, y: point.y - (LABEL_H + 6) / 2, width, height: LABEL_H + 6 }
+      // Pisar un componente pesa más que pisar otra etiqueta; alejarse del centro, apenas.
+      const cost = components.reduce((total, item) => total + overlap(rect, item) * 4, 0) + placed.reduce((total, item) => total + overlap(rect, item), 0) + Math.abs(t - 0.5)
+      if (cost < best.cost) best = { t, cost, rect }
+      if (cost < 1) break
+    }
+    spots[edge.id] = best.t
+    if (best.rect) placed.push(best.rect)
+  }
+  return spots
 }

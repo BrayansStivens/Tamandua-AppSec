@@ -982,7 +982,7 @@ def _layout(model: dict) -> dict:
 
 # Mismo algoritmo que el editor del panel (threat-layout.ts): capas por tipo empujadas por los flujos,
 # cada frontera como un bloque que contiene a sus componentes.
-LAYOUT_NODE_H, LAYOUT_GAP_X, LAYOUT_GAP_INNER, LAYOUT_GAP_Y, LAYOUT_PAD, LAYOUT_HEADER = 88, 120, 72, 44, 32, 44
+LAYOUT_NODE_H, LAYOUT_GAP_X, LAYOUT_GAP_INNER, LAYOUT_GAP_Y, LAYOUT_PAD, LAYOUT_HEADER = 88, 160, 150, 44, 32, 44
 LAYERS = {"actor": 0, "web_app": 1, "identity": 1, "api": 2, "service": 2, "function": 2, "cache": 3, "queue": 3,
           "database": 3, "storage": 3, "external": 4}
 

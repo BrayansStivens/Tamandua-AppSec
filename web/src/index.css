@@ -226,11 +226,14 @@ body { min-width: 320px; }
 .tm-canvas .tm-flow-label { position: absolute; pointer-events: all; cursor: pointer; }
 .tm-canvas .react-flow__edge-textbg { fill: var(--app-panel); }
 
-/* Fronteras redimensionables desde cualquier borde o esquina, sin seleccionarlas antes: el borde se
-   puede agarrar (10 px de zona útil) y los tiradores aparecen al pasar el ratón. */
-.tm-canvas .react-flow__node-boundary .tm-resize-line { border-color: transparent !important; }
-.tm-canvas .react-flow__node-boundary .tm-resize-line.left, .tm-canvas .react-flow__node-boundary .tm-resize-line.right { width: 10px; }
-.tm-canvas .react-flow__node-boundary .tm-resize-line.top, .tm-canvas .react-flow__node-boundary .tm-resize-line.bottom { height: 10px; }
-.tm-canvas .react-flow__node-boundary .tm-resize-handle { opacity: 0; width: 9px; height: 9px; border-radius: 2px; transition: opacity .15s; }
-.tm-canvas .react-flow__node-boundary:hover .tm-resize-handle, .tm-canvas .react-flow__node-boundary.selected .tm-resize-handle { opacity: 1; }
-
+/* Fronteras y componentes redimensionables desde cualquier borde o esquina, sin seleccionarlos antes: el borde
+   se agarra (10 px de zona útil) y los tiradores aparecen al pasar el ratón. Con Shift se conserva la proporción. */
+.tm-canvas .tm-resize-line { border-color: transparent !important; }
+.tm-canvas .tm-resize-line.left, .tm-canvas .tm-resize-line.right { width: 10px; }
+.tm-canvas .tm-resize-line.top, .tm-canvas .tm-resize-line.bottom { height: 10px; }
+.tm-canvas .tm-resize-handle { opacity: 0; width: 10px; height: 10px; border-radius: 2px; transition: opacity .15s; }
+.tm-canvas .react-flow__node:hover .tm-resize-handle, .tm-canvas .react-flow__node.selected .tm-resize-handle { opacity: 1; }
+/* En un componente, los bordes redimensionan y los puntos de conexión siguen encima para crear flujos. */
+.tm-canvas .react-flow__node-component .tm-handle { z-index: 2; }
+/* Las etiquetas de los flujos van por encima de los componentes: nunca quedan tapadas. */
+.tm-canvas .react-flow__edgelabel-renderer { z-index: 1001 !important; }

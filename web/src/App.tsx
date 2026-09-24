@@ -12,6 +12,7 @@ import { AnalysisList } from '@/components/analysis-list'
 import { AnalysisWizard } from '@/components/analysis-wizard'
 import { useToasts } from '@/components/run-progress'
 import { TopProgress } from '@/components/loading'
+import { UpdateNotice } from '@/components/update-notice'
 import type { SessionActions, SessionUser } from '@/components/auth/session'
 import { api } from '@/lib/api'
 import { readRoute, writeRoute } from '@/lib/route'
@@ -169,7 +170,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
       {renderMain()}
       <footer className="border-t border-app-line pt-5 text-xs text-app-faint">{BRAND.name} · software libre bajo <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">AGPL-3.0</a> · <a href={BRAND.repo} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">código fuente</a> · los resultados negativos no prueban ausencia de vulnerabilidades.</footer>
     </main></div>
-  </div>{toasts.view}</div>
+  </div>{toasts.view}<UpdateNotice /></div>
 }
 
 export default App
