@@ -61,23 +61,113 @@ CONFIDENCE = {"HIGH": 8, "MEDIUM": 6, "LOW": 4}
 _docker_state: dict[str, bool] = {}
 
 
+_own_mounts: dict[str, object] = {"at": None, "mounts": {}}
+
+
+def in_container() -> bool:
+    return Path("/.dockerenv").exists()
+
+
+def own_mounts() -> dict[str, str]:
+    """Montajes de este contenedor tal como los ve el demonio: {ruta interna: ruta en el host}.
+
+    Se pregunta a Docker en vez de fiarse de `${PWD}` en compose, que en PowerShell o cmd
+    (Windows) llega vacío. Así vale igual en macOS (Apple Silicon e Intel), Linux, Windows y WSL.
+    Fuera de un contenedor, o si Docker no responde, devuelve {} (y se reintenta al minuto)."""
+    at = _own_mounts["at"]
+    if at is not None and (_own_mounts["mounts"] or time.monotonic() - at < 60):
+        return dict(_own_mounts["mounts"])
+    mounts: dict[str, str] = {}
+    binary, identity = shutil.which("docker"), os.environ.get("HOSTNAME", "")
+    if binary and re.fullmatch(r"[0-9a-f]{12,64}", identity) and in_container():
+        try:
+            completed = subprocess.run([binary, "inspect", identity, "--format", "{{json .Mounts}}"],
+                                       capture_output=True, text=True, timeout=8)
+            rows = json.loads(completed.stdout or "[]") if completed.returncode == 0 else []
+        except (OSError, subprocess.TimeoutExpired, ValueError):
+            rows = []
+        for row in rows if isinstance(rows, list) else []:
+            if isinstance(row, dict) and row.get("Type") == "bind" and isinstance(row.get("Source"), str) \
+                    and isinstance(row.get("Destination"), str):
+                mounts[row["Destination"].rstrip("/")] = row["Source"]
+    _own_mounts.update(at=time.monotonic(), mounts=mounts)
+    return dict(mounts)
+
+
+def _host_pairs() -> list[tuple[str, str]]:
+    detected = own_mounts()
+    pairs = []
+    for inside, configured in ((os.environ.get("APPSEC_AGENT_DATA_DIR"), os.environ.get("APPSEC_AGENT_HOST_DATA_DIR")),
+                               (str(RULES_DIR), os.environ.get("APPSEC_AGENT_HOST_RULES_DIR"))):
+        if not inside:
+            continue
+        outside = detected.get(str(Path(inside)).rstrip("/")) or (configured if _usable(inside, configured) else None)
+        if outside:
+            pairs.append((inside, outside))
+    return pairs
+
+
+def _usable(inside: str, outside: str | None) -> bool:
+    # `${PWD}/data` con PWD vacío queda en `/data`: igual a la ruta interna, no apunta al host.
+    return bool(outside and outside.strip() and outside.rstrip("/") not in (inside.rstrip("/"), "/data", "/rules"))
+
+
 def host_path(path: Path) -> str:
     """Ruta tal como la ve el demonio de Docker.
 
     Cuando la app corre en un contenedor, los volúmenes que pide para los
-    contenedores hermanos se resuelven en el host, no dentro de la app. Con
-    APPSEC_AGENT_DATA_DIR (ruta interna) y APPSEC_AGENT_HOST_DATA_DIR (la misma
-    carpeta vista desde el host) se traduce el prefijo; igual con las reglas.
+    contenedores hermanos se resuelven en el host, no dentro de la app. La ruta del
+    host se detecta preguntando a Docker por los montajes de este contenedor; si no
+    se puede, se usan APPSEC_AGENT_HOST_DATA_DIR y APPSEC_AGENT_HOST_RULES_DIR.
     """
     resolved = path.resolve()
-    for inside, outside in ((os.environ.get("APPSEC_AGENT_DATA_DIR"), os.environ.get("APPSEC_AGENT_HOST_DATA_DIR")),
-                            (str(RULES_DIR), os.environ.get("APPSEC_AGENT_HOST_RULES_DIR"))):
-        if inside and outside:
-            try:
-                return str(Path(outside) / resolved.relative_to(Path(inside).resolve()))
-            except ValueError:
-                continue
+    for inside, outside in _host_pairs():
+        try:
+            return str(Path(outside) / resolved.relative_to(Path(inside).resolve()))
+        except ValueError:
+            continue
     return str(resolved)
+
+
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+_TOKENS = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,})")
+
+
+def cause(completed: subprocess.CompletedProcess | None) -> str:
+    """La última línea útil del stderr del motor o de Docker, para decir *por qué* falló.
+
+    Se recorta, se quitan colores y cualquier token, y la carpeta de datos del host se
+    abrevia: lo que se ve en el panel ayuda a diagnosticar sin exponer credenciales."""
+    if completed is None:
+        return ""
+    lines = [line.strip() for line in _ANSI.sub("", completed.stderr or "").splitlines() if line.strip()]
+    if not lines:
+        return ""
+    text = _TOKENS.sub("[token]", lines[-1])
+    host = os.environ.get("APPSEC_AGENT_HOST_DATA_DIR", "")
+    if len(host) > 1:
+        text = text.replace(host, "<datos>")
+    return " ".join(text.split())[:240]
+
+
+def with_cause(message: str, completed: subprocess.CompletedProcess | None) -> str:
+    reason = cause(completed)
+    return f"{message.rstrip('.')}: {reason}" if reason else message
+
+
+def host_mount_problem() -> str | None:
+    """Dentro del contenedor, los motores montan la carpeta de datos *del host*. Si no se pudo
+    averiguar (ni preguntando a Docker ni por el entorno), los motores fallarían sin explicación."""
+    inside = os.environ.get("APPSEC_AGENT_DATA_DIR")
+    if not inside or not in_container():
+        return None
+    if any(pair[0] == inside for pair in _host_pairs()):
+        return None
+    return ("No se pudo averiguar la ruta de ./data en el host, así que los motores no pueden leer el código. "
+            "Define APPSEC_AGENT_HOST_DATA_DIR en .env con la ruta absoluta de ./data y reinicia (make up).")
+
+
+_last_image_error: dict[str, str] = {}
 
 
 def docker_available() -> bool:
@@ -94,10 +184,12 @@ def docker_available() -> bool:
 def image_available(key: str) -> bool:
     binary = shutil.which("docker")
     try:
-        return bool(binary) and subprocess.run([binary, "image", "inspect", IMAGES[key]["image"]],
-                                               capture_output=True, timeout=15).returncode == 0
+        completed = subprocess.run([binary, "image", "inspect", IMAGES[key]["image"]], capture_output=True, text=True,
+                                   timeout=15) if binary else None
     except (OSError, subprocess.TimeoutExpired):
         return False
+    _last_image_error[key] = cause(completed)
+    return bool(completed) and completed.returncode == 0
 
 
 def engine_status() -> list[dict]:
@@ -260,7 +352,11 @@ def run_opengrep(snapshot: Path) -> dict:
     if not docker_available():
         return _result("opengrep", "not_tested", "Docker no disponible: el SAST multi-lenguaje no se ejecutó.")
     if not image_available("opengrep"):
-        return _result("opengrep", "not_tested", "Imagen de Opengrep no construida: ejecuta make build (o docker compose build).")
+        reason = _last_image_error.get("opengrep", "")
+        # «No such image» es que falta construirla; cualquier otra cosa es un problema con Docker.
+        if not reason or "no such image" in reason.lower():
+            return _result("opengrep", "not_tested", "Imagen de Opengrep no construida: ejecuta make build (o docker compose build).")
+        return _result("opengrep", "not_tested", f"Docker no pudo consultar la imagen de Opengrep: {reason}")
     languages = snapshot_languages(snapshot)
     compiled = minified_files(snapshot)
     excludes = [part for path in compiled for part in ("--exclude", path)]
@@ -405,8 +501,8 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
                                    "--timeout", "14m", "/src"], snapshot, network=True,
                          mounts=["-v", f"{host_path(cache_dir)}:/cache"])
         if completed.returncode != 0 and not completed.stdout.strip():
-            return _result("trivy", "inconclusive", "Trivy terminó con error antes de producir resultados"
-                           + (" (sin acceso a su base de vulnerabilidades)." if "download" in completed.stderr.lower() else "."), started=started)
+            return _result("trivy", "inconclusive", with_cause("Trivy terminó con error antes de producir resultados"
+                           + (" (sin acceso a su base de vulnerabilidades)" if "download" in completed.stderr.lower() else ""), completed), started=started)
         payload = json.loads(completed.stdout or "{}")
     except subprocess.TimeoutExpired:
         return _result("trivy", "inconclusive", "Trivy superó el tiempo máximo; dependencias e IaC no concluyeron.", started=started)
@@ -485,7 +581,7 @@ def run_gitleaks(snapshot: Path) -> dict:
         except (OSError, ValueError):
             return _result("gitleaks", "inconclusive", "Gitleaks no devolvió un reporte legible.", started=started)
     if completed.returncode not in (0, 1):
-        return _result("gitleaks", "inconclusive", "Gitleaks terminó con error.", started=started)
+        return _result("gitleaks", "inconclusive", with_cause("Gitleaks terminó con error", completed), started=started)
     findings = parse_gitleaks(payload)
     return _result("gitleaks", "completed", f"Reglas de Gitleaks sobre el snapshot: {len(findings)} secretos; valores redactados.", findings, started)
 

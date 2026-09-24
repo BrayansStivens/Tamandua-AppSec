@@ -30,7 +30,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from .scanners import _base, _relative, _result, _run, _stable, docker_available
+from .scanners import _base, _relative, _result, _run, _stable, docker_available, with_cause
 
 CHECKOV_FRAMEWORKS = ("terraform", "terraform_json", "cloudformation", "kubernetes", "helm", "kustomize", "dockerfile",
                       "arm", "bicep", "serverless", "openapi", "ansible", "github_actions", "gitlab_ci",
@@ -301,7 +301,7 @@ def run_checkov(snapshot: Path) -> dict:
     except (OSError, ValueError):
         return _result("checkov", "inconclusive", "Checkov no devolvió una salida legible.", started=started)
     if completed.returncode not in (0, 1) and not payload:
-        return _result("checkov", "inconclusive", "Checkov terminó con error antes de producir resultados.", started=started)
+        return _result("checkov", "inconclusive", with_cause("Checkov terminó con error antes de producir resultados", completed), started=started)
     findings = parse_checkov(payload)
     frameworks = sorted({item["framework"] for item in findings})
     detail = (f"{len(findings)} fallos de configuración en " + ", ".join(frameworks) + "."
@@ -473,7 +473,7 @@ def run_zizmor(snapshot: Path) -> dict:
     except (OSError, ValueError):
         return _result("zizmor", "inconclusive", "zizmor no devolvió una salida legible.", started=started)
     if completed.returncode != 0 and not payload:
-        return _result("zizmor", "inconclusive", "zizmor terminó con error antes de producir resultados.", started=started)
+        return _result("zizmor", "inconclusive", with_cause("zizmor terminó con error antes de producir resultados", completed), started=started)
     findings = parse_zizmor(payload)
     affected = len({item["path"] for item in findings})
     detail = (f"{len(audited)} workflows o acciones de GitHub auditados sin conexión: "

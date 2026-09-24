@@ -158,8 +158,12 @@ class ScanJobs:
                 scan = scan_repository(root, source, allow_osv_upload=job["allow_osv_upload"],
                                        context=job["context"], data_dir=self.data_dir, progress=progress)
             summary = scan["summary"]
-            progress("ok", f"Terminado: {summary['candidates']} hallazgos "
-                           f"({summary['severities'].get('critical', 0)} críticos, {summary['severities'].get('high', 0)} altos).")
+            counts = (f"{summary['candidates']} hallazgos ({summary['severities'].get('critical', 0)} críticos, "
+                      f"{summary['severities'].get('high', 0)} altos)")
+            if scan["status"] == "incomplete":
+                progress("warn", f"Terminado con cobertura incompleta: {counts}. Revisa arriba qué no se ejecutó.")
+            else:
+                progress("ok", f"Terminado: {counts}.")
             final = save_repository_scan(self.data_dir, {**scan, "progress": record["progress"],
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
@@ -189,8 +193,12 @@ class ScanJobs:
         try:
             scan = scan_image(job["image"], data_dir=self.data_dir, context=job["context"], progress=progress)
             summary = scan["summary"]
-            progress("ok", f"Terminado: {summary['candidates']} hallazgos "
-                           f"({summary['severities'].get('critical', 0)} críticos, {summary['severities'].get('high', 0)} altos).")
+            counts = (f"{summary['candidates']} hallazgos ({summary['severities'].get('critical', 0)} críticos, "
+                      f"{summary['severities'].get('high', 0)} altos)")
+            if scan["status"] == "incomplete":
+                progress("warn", f"Terminado con cobertura incompleta: {counts}. Revisa arriba qué no se ejecutó.")
+            else:
+                progress("ok", f"Terminado: {counts}.")
             final = save_repository_scan(self.data_dir, {**scan, "requested_by": record.get("requested_by"), "progress": record["progress"],
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])

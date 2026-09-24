@@ -309,3 +309,43 @@ class EnginesDownTests(unittest.TestCase):
                                                    data_dir=root, progress=lambda level, message: messages.append((level, message)))
         self.assertEqual(scan["status"], "incomplete")
         self.assertTrue(any(level == "warn" and "no equivale" in message for level, message in messages))
+
+
+class EngineCauseTests(unittest.TestCase):
+    def test_the_docker_error_is_shown_without_tokens_or_host_paths(self):
+        import subprocess
+        from appsec_agent.scanners import with_cause
+        failed = subprocess.CompletedProcess([], 125, "", "\x1b[31mdocker: Error response from daemon: invalid mount /c/Users/yo/tamandua/data/work/x "
+                                                             "token ghp_abcdefghijklmnopqrstuvwxyz123456\x1b[0m\n")
+        with patch.dict("os.environ", {"APPSEC_AGENT_HOST_DATA_DIR": "/c/Users/yo/tamandua/data"}):
+            text = with_cause("Gitleaks terminó con error.", failed)
+        self.assertTrue(text.startswith("Gitleaks terminó con error: docker: Error response from daemon: invalid mount <datos>/work/x"))
+        self.assertNotIn("ghp_", text)
+        self.assertEqual(with_cause("Sin causa.", subprocess.CompletedProcess([], 1, "", "")), "Sin causa.")
+
+    def test_the_host_path_is_asked_to_docker_on_any_platform(self):
+        import subprocess
+        from appsec_agent import scanners
+        mounts = json.dumps([{"Type": "bind", "Source": "/run/desktop/mnt/host/c/Users/yo/tamandua/data", "Destination": "/data"},
+                             {"Type": "bind", "Source": "/var/run/docker.sock", "Destination": "/var/run/docker.sock"}])
+        scanners._own_mounts.update(at=None, mounts={})
+        # En PowerShell `${PWD}` llega vacío y compose deja la ruta del host en `/data`.
+        with patch.dict("os.environ", {"APPSEC_AGENT_DATA_DIR": "/data", "APPSEC_AGENT_HOST_DATA_DIR": "/data", "HOSTNAME": "074eeb4e2cfd"}), \
+                patch.object(scanners, "in_container", return_value=True), \
+                patch.object(scanners.shutil, "which", return_value="/usr/bin/docker"), \
+                patch.object(scanners.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, mounts, "")), \
+                patch.object(Path, "resolve", lambda self, strict=False: self):
+            self.assertEqual(scanners.host_path(Path("/data/work/snap")), "/run/desktop/mnt/host/c/Users/yo/tamandua/data/work/snap")
+            self.assertIsNone(scanners.host_mount_problem())
+        scanners._own_mounts.update(at=None, mounts={})
+
+    def test_without_docker_answer_a_bad_env_path_is_explained(self):
+        from appsec_agent import scanners
+        scanners._own_mounts.update(at=None, mounts={})
+        with patch.dict("os.environ", {"APPSEC_AGENT_DATA_DIR": "/data", "APPSEC_AGENT_HOST_DATA_DIR": "/data", "HOSTNAME": "x"}), \
+                patch.object(scanners, "in_container", return_value=True):
+            self.assertIn("APPSEC_AGENT_HOST_DATA_DIR", scanners.host_mount_problem())
+        with patch.dict("os.environ", {"APPSEC_AGENT_DATA_DIR": "/data", "APPSEC_AGENT_HOST_DATA_DIR": "/home/yo/tamandua/data", "HOSTNAME": "x"}), \
+                patch.object(scanners, "in_container", return_value=True):
+            self.assertIsNone(scanners.host_mount_problem())
+        scanners._own_mounts.update(at=None, mounts={})

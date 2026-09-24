@@ -17,7 +17,7 @@ from .advisories import MAX_DETAILS, dependency_finding, fetch_advisory, load_fe
 from .coverage import owasp_coverage
 from .engine import WEB_TOP_10_2025
 from .config_scanners import merge_repository, run_checkov, run_zizmor
-from .scanners import IMAGES, docker_available, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from .scanners import IMAGES, docker_available, host_mount_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
 
 
 SECRET_RULES = (
@@ -176,6 +176,9 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     tools: list[dict] = []
     if engines:
         # Cada motor corre en su contenedor pinneado por digest; el paso guarda versión, imagen y duración.
+        mount_problem = host_mount_problem()
+        if mount_problem:
+            report("warn", mount_problem)
         report("info", "Opengrep 1.30.0: SAST multi-lenguaje con reglas propias…")
         sast = run_opengrep(root)
         report("ok" if sast["status"] != "inconclusive" else "warn", f"Opengrep: {sast['detail']}")
