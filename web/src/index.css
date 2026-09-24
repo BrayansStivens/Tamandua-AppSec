@@ -196,3 +196,33 @@ body { min-width: 320px; }
 @keyframes appsec-breathe { 0%, 100% { opacity: .45; transform: scale(.985) } 50% { opacity: .95; transform: scale(1) } }
 @keyframes appsec-progress { 0% { transform: translateX(-100%) } 100% { transform: translateX(300%) } }
 @media (prefers-reduced-motion: reduce) { [class*="animate-[appsec"] { animation: none !important } }
+
+/* Editor de diagramas de amenazas (React Flow): colores del tema, fronteras que no tapan lo de dentro. */
+.tm-canvas .react-flow {
+    --xy-background-color: transparent;
+    --xy-background-pattern-color: color-mix(in oklch, var(--app-faint) 45%, transparent);
+    --xy-edge-stroke: var(--app-muted);
+    --xy-edge-stroke-selected: var(--brand);
+    --xy-connectionline-stroke: var(--brand);
+    --xy-handle-background-color: var(--brand);
+    --xy-handle-border-color: var(--app-panel);
+    --xy-controls-button-background-color: var(--app-panel);
+    --xy-controls-button-background-color-hover: var(--app-soft);
+    --xy-controls-button-color: var(--app-fg);
+    --xy-controls-button-border-color: var(--app-line);
+    --xy-attribution-background-color: transparent;
+    --xy-selection-background-color: color-mix(in oklch, var(--brand) 10%, transparent);
+    --xy-selection-border: 1px dotted var(--brand);
+}
+.tm-canvas .react-flow__node-boundary { pointer-events: none !important; }
+.tm-canvas .react-flow__node-boundary .tm-drag,
+.tm-canvas .react-flow__node-boundary .react-flow__resize-control { pointer-events: all; }
+.tm-canvas .tm-handle { width: 9px; height: 9px; opacity: 0; transition: opacity .15s; }
+.tm-canvas .react-flow__node:hover .tm-handle, .tm-canvas .react-flow__node.selected .tm-handle, .tm-canvas .react-flow.connecting .tm-handle { opacity: 1; }
+.tm-canvas .tm-flow { stroke: var(--app-muted); stroke-width: 1.5; }
+.tm-canvas .tm-flow--plain { stroke-dasharray: 5 4; }
+.tm-canvas .tm-flow--flagged { stroke: var(--color-amber-500); stroke-width: 2; }
+.tm-canvas .tm-flow--selected { stroke: var(--brand); stroke-width: 2.25; }
+.tm-canvas .tm-flow-label { position: absolute; pointer-events: all; cursor: pointer; }
+.tm-canvas .react-flow__edge-textbg { fill: var(--app-panel); }
+

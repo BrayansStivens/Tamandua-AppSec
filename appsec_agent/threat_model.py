@@ -9,7 +9,8 @@ Sobre el modelo se aplican reglas STRIDE propias y visibles, como las reglas
 SAST: cada amenaza dice qué regla la genera, por qué aplica a ese elemento, qué
 la mitiga y con qué CWE se relaciona. Lo que la distingue de una lista genérica
 es la **evidencia**: si un repositorio enlazado tiene hallazgos abiertos con uno
-de esos CWE, la amenaza aparece como *evidenciada* y enlaza a ellos.
+de esos CWE —en la carpeta del componente, si se indicó—, la amenaza aparece *con indicios* y
+enlaza a ellos: una señal para revisar, no una confirmación.
 
 Exporta a OWASP Threat Dragon (JSON v2) y a un script de OWASP pytm, para quien
 quiera seguir en esas herramientas.
@@ -48,6 +49,8 @@ CLASSIFICATION_LABELS = {"public": "públicos", "internal": "internos", "confide
 PROTOCOLS = ("https", "http", "grpc", "websocket", "sql", "amqp", "redis", "smtp", "sftp", "other")
 DECISIONS = ("mitigated", "accepted", "not_applicable")
 ID = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+FOLDER = re.compile(r"[A-Za-z0-9_.\- /@+]{0,200}")
+CANVAS = 100_000  # coordenadas del lienzo: de sobra para cualquier diagrama
 LIMITS = {"components": 60, "flows": 150, "boundaries": 20}
 _lock = threading.Lock()
 
@@ -67,6 +70,38 @@ def _text(value, limit: int, field: str, *, required: bool = False) -> str:
     if any(ord(character) < 32 for character in cleaned):
         raise ModelError(f"{field} contiene caracteres de control")
     return cleaned
+
+
+def _folder(value, field: str) -> str:
+    """Carpeta del repositorio que es el código de un componente: relativa, sin «..», terminada en «/»."""
+    if value in (None, ""):
+        return ""
+    if not isinstance(value, str) or not FOLDER.fullmatch(value):
+        raise ModelError(f"{field}: usa una carpeta relativa del repositorio, p. ej. frontend/ o services/api/")
+    clean = value.strip().removeprefix("./").strip("/")
+    if any(part in ("", ".", "..") for part in clean.split("/")) and clean:
+        raise ModelError(f"{field}: sin «..» ni tramos vacíos")
+    return f"{clean}/" if clean else ""
+
+
+def _number(value, low: float, high: float):
+    return round(float(value), 1) if isinstance(value, (int, float)) and not isinstance(value, bool) and low <= value <= high else None
+
+
+def _position(raw) -> dict | None:
+    """Dónde está un componente en el lienzo del editor. Opcional: sin ella se reparte en columnas."""
+    if not isinstance(raw, dict):
+        return None
+    x, y = _number(raw.get("x"), -CANVAS, CANVAS), _number(raw.get("y"), -CANVAS, CANVAS)
+    return {"x": x, "y": y} if x is not None and y is not None else None
+
+
+def _box(raw) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    position = _position(raw)
+    width, height = _number(raw.get("width"), 80, 20_000), _number(raw.get("height"), 60, 20_000)
+    return {**position, "width": width, "height": height} if position and width and height else None
 
 
 # ------------------------------------------------------------ validación
@@ -96,7 +131,8 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
         components.append({"id": identifier, "name": _text(raw.get("name"), 80, "El nombre del componente", required=True),
                            "kind": raw["kind"], "description": _text(raw.get("description"), 400, "La descripción"),
                            "technology": _text(raw.get("technology"), 80, "La tecnología"),
-                           "asset": asset or None, "data": sorted(set(data)),
+                           "asset": asset or None, "path": _folder(raw.get("path"), f"La carpeta de {identifier}") if asset else "",
+                           "position": _position(raw.get("position")), "data": sorted(set(data)),
                            "internet_facing": bool(raw.get("internet_facing")),
                            "authenticates": bool(raw.get("authenticates")),
                            "encrypted_at_rest": bool(raw.get("encrypted_at_rest")),
@@ -135,7 +171,7 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
         placed.update(members)
         boundary_ids.add(identifier)
         boundaries.append({"id": identifier, "name": _text(raw.get("name"), 80, "El nombre de la frontera", required=True),
-                           "components": list(dict.fromkeys(members))})
+                           "components": list(dict.fromkeys(members)), "box": _box(raw.get("box"))})
     for key, items in (("components", components), ("flows", flows), ("boundaries", boundaries)):
         if len(items) > LIMITS[key]:
             raise ModelError(f"Máximo {LIMITS[key]} {key} por modelo")
@@ -286,29 +322,30 @@ def suggest(name: str, repositories: list[dict]) -> dict:
             if hit:
                 where = found_in.get(hit[0])
                 matched.append((kind, label, technology or hit[0],
-                                f"Detectado por «{', '.join(hit[:3])}» en {short}/{where}" if where else f"Detectado por «{', '.join(hit[:3])}» en {short}"))
+                                f"Detectado por «{', '.join(hit[:3])}» en {short}/{where}" if where else f"Detectado por «{', '.join(hit[:3])}» en {short}",
+                                where.rsplit("/", 1)[0] + "/" if where and "/" in where else ""))
         for image in inventory.get("services") or []:
             if image in SERVICE_IMAGES:
                 kind, label = SERVICE_IMAGES[image]
                 where = found_in.get(f"image:{image}")
-                matched.append((kind, label, label, f"Imagen «{image}» en {short}/{where}" if where else f"Imagen «{image}» en {short}"))
-        has_process = any(kind in PROCESSES for kind, _, _, _ in matched)
+                matched.append((kind, label, label, f"Imagen «{image}» en {short}/{where}" if where else f"Imagen «{image}» en {short}", ""))
+        has_process = any(item[0] in PROCESSES for item in matched)
         if not has_process:
             read = ", ".join(inventory.get("manifests") or []) or "ningún manifiesto"
             matched.append(("api", f"Servicio {short}", None,
-                            f"No se reconoció ningún framework en {short} (leído: {read[:200]}); revisa el tipo."))
+                            f"No se reconoció ningún framework en {short} (leído: {read[:200]}); revisa el tipo.", ""))
         # Un ORM es la forma de hablar con la base de datos, no otra base de datos: si hay motor concreto, se fusionan.
         orm = next((item for item in matched if item[1] == "Base de datos (ORM)"), None)
         engines = [item for item in matched if item[0] == "database" and item[1] != "Base de datos (ORM)"]
         if orm and engines:
             matched = [item for item in matched if item is not orm and item is not engines[0]]
-            kind, label, technology, provenance = engines[0]
-            matched.append((kind, label, f"{technology} vía {orm[2]}", f"{provenance}; acceso con {orm[3].split('«', 1)[-1].split('»', 1)[0]}"))
+            kind, label, technology, provenance, folder = engines[0]
+            matched.append((kind, label, f"{technology} vía {orm[2]}", f"{provenance}; acceso con {orm[3].split('«', 1)[-1].split('»', 1)[0]}", folder))
         # Next.js ya es la app web: no se duplica con «aplicación en el navegador».
-        if any(label == "Aplicación Next.js" for _, label, _, _ in matched):
+        if any(item[1] == "Aplicación Next.js" for item in matched):
             matched = [item for item in matched if item[1] != "Aplicación web en el navegador"]
         several = len(repositories) > 1
-        for kind, label, technology, provenance in matched:
+        for kind, label, technology, provenance, folder in matched:
             key = (kind, label if kind not in PROCESSES else f"{label}:{repository['id']}")
             if key in found:
                 # Otra pista del mismo componente: se suma a su procedencia en lugar de perderse.
@@ -323,6 +360,7 @@ def suggest(name: str, repositories: list[dict]) -> dict:
             component = {"id": _slug(shown, used), "name": shown, "kind": kind, "technology": technology or "",
                          "description": provenance[:400],
                          "origin": "suggested", "asset": repository["id"] if kind in PROCESSES else None,
+                         "path": folder if kind in PROCESSES else "",
                          "internet_facing": kind in ("web_app", "api") and kind != "service",
                          "authenticates": kind in PROCESSES,
                          "data": ["payment"] if technology and technology.lower() in PAYMENT else
@@ -500,6 +538,19 @@ def _severity(model: dict, rule: dict, component: dict | None, flow: dict | None
     return SEVERITY_ORDER[max(0, min(level, len(SEVERITY_ORDER) - 1))]
 
 
+def _scopes_near(model: dict, component: dict | None, flow: dict | None) -> set[tuple[str, str]]:
+    """(repositorio, carpeta) cuyo código implementa o toca el elemento; carpeta vacía = repositorio entero."""
+    components, _ = _index(model)
+    if component is not None and component["kind"] in PROCESSES:
+        return {(component["asset"], component.get("path") or "")} if component.get("asset") else set()
+    if flow is not None:
+        ends = [components[flow["source"]], components[flow["target"]]]
+    else:
+        ends = [component] + [components[f["source"] if f["target"] == component["id"] else f["target"]]
+                              for f in model.get("flows", []) if component["id"] in (f["source"], f["target"])]
+    return {(item["asset"], item.get("path") or "") for item in ends if item.get("asset")}
+
+
 def _assets_near(model: dict, component: dict | None, flow: dict | None) -> set[str]:
     """Repositorios cuyo código implementa o toca el elemento.
 
@@ -528,10 +579,14 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None)
         policy = rule.get("evidence") or {}
         # Por defecto evidencia el código propio; una vulnerabilidad de una dependencia se atribuye a TM-T02.
         scanners = policy.get("scanners", ("sast", "secrets", "iac"))
-        for asset in sorted(_assets_near(model, component, flow)):
+        scopes = sorted(_scopes_near(model, component, flow))
+        for asset, folder in scopes:
             for finding in (findings_by_asset or {}).get(asset, []):
                 scanner = finding.get("scanner")
                 if scanner not in scanners:
+                    continue
+                # Solo el código del componente: en un monorepo, el backend no evidencia amenazas del frontend.
+                if folder and not str(finding.get("path") or "").startswith(folder):
                     continue
                 if (policy.get("any_cwe") or scanner in policy.get("any_cwe_for", ())
                         or set(finding.get("cwe") or []) & set(rule["cwe"])):
@@ -550,7 +605,8 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None)
                      "title": rule["title"], "why": rule["why"], "mitigations": rule["mitigations"], "cwe": rule["cwe"],
                      "element": element, "element_type": "flow" if flow else "component", "element_name": label,
                      "severity": severity, "status": status, "decision": decision,
-                     "evidence": evidence[:20], "evidence_count": len(evidence)})
+                     "evidence": evidence[:20], "evidence_count": len(evidence),
+                     "evidence_scope": [{"asset": asset, "path": folder or None} for asset, folder in scopes]})
     order = {"evidenced": 0, "open": 1, "accepted": 2, "mitigated": 3, "not_applicable": 4}
     return sorted(rows, key=lambda row: (order[row["status"]], SEVERITY_ORDER.index(row["severity"]), row["stride"], row["element_name"]))
 
@@ -639,7 +695,22 @@ STRIDE_EN = {"S": "Spoofing", "T": "Tampering", "R": "Repudiation", "I": "Inform
 
 
 def _layout(model: dict) -> dict:
-    """Columnas por frontera en el orden declarado; lo que no está en ninguna, al final."""
+    """Lo dibujado en el editor si lo hay; si no, columnas por frontera en el orden declarado."""
+    stored = _stored_layout(model)
+    if stored:
+        return stored
+    return _column_layout(model)
+
+
+def _stored_layout(model: dict) -> dict | None:
+    components = model.get("components", [])
+    if not components or not all(item.get("position") for item in components):
+        return None
+    return {"nodes": {item["id"]: dict(item["position"]) for item in components},
+            "boundaries": {item["id"]: dict(item["box"]) for item in model.get("boundaries", []) if item.get("box")}}
+
+
+def _column_layout(model: dict) -> dict:
     columns = [boundary["components"] for boundary in model.get("boundaries", [])]
     placed = {member for column in columns for member in column}
     loose = [item["id"] for item in model.get("components", []) if item["id"] not in placed]
@@ -699,8 +770,8 @@ def to_markdown(model: dict, rows: list[dict]) -> str:
              f"Actualizado {model.get('updated_at', '')[:16].replace('T', ' ')} por {model.get('updated_by', '—')}.", "",
              "## Resumen", "",
              f"- {counts['total']} amenazas STRIDE sobre {len(components)} componentes y {len(model.get('flows', []))} flujos.",
-             f"- **{counts['by_status']['evidenced']} evidenciadas** por hallazgos abiertos de los escaneos; "
-             f"{counts['by_status']['open']} abiertas sin evidencia (revisar); {counts['by_status']['mitigated']} mitigadas; "
+             f"- **{counts['by_status']['evidenced']} con indicios** en hallazgos abiertos de los análisis (señal para revisar, no confirmación); "
+             f"{counts['by_status']['open']} abiertas sin indicios (revisar); {counts['by_status']['mitigated']} mitigadas; "
              f"{counts['by_status']['accepted']} aceptadas; {counts['by_status']['not_applicable']} no aplican.", "",
              "## Componentes", "", "| Componente | Tipo | Datos | Expuesto | Repositorio |", "|---|---|---|---|---|"]
     for item in model.get("components", []):

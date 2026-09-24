@@ -16,7 +16,7 @@ Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Con
 - **Revisión de pull requests**: solo cuenta lo que el PR introduce; publica un comentario y un estado de commit que puede bloquear el merge según el umbral que elijas.
 - **Ciclo de vida de hallazgos** por repositorio: remediación automática cuando un escaneo o un commit del PR ya no lo encuentra, triage con motivo e historial.
 - **CVE tracker**: copia local completa de NVD con buscador, filtros por severidad/año/KEV y «¿te afecta?».
-- **Modelado de amenazas** STRIDE propuesto a partir de tus repositorios, con las amenazas evidenciadas por hallazgos reales.
+- **Modelado de amenazas** STRIDE propuesto a partir de tus repositorios, con editor visual de diagramas y amenazas con indicios en hallazgos reales.
 - **Informes** JSON, Markdown y SARIF; exportación a **Jira** sin duplicados.
 - **Equipo**: invitaciones, roles y segundo factor (TOTP).
 

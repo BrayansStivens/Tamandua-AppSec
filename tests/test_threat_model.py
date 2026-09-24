@@ -81,6 +81,35 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(by[("TM-T01", "front")]["status"], "evidenced")
         self.assertEqual(by[("TM-T01", "api")]["status"], "open")   # la API no hereda los hallazgos del front
 
+    def test_in_a_monorepo_evidence_comes_only_from_the_component_folder(self):
+        current = tm.validate({**model(), "components": model()["components"] + [
+            {"id": "front", "name": "Front", "kind": "web_app", "internet_facing": True, "asset": REPO, "path": "./frontend"}],
+            "flows": model()["flows"] + [{"id": "f9", "source": "front", "target": "api", "protocol": "https", "data": ["pii"], "authenticated": True}]},
+            known_assets={REPO})
+        front = next(item for item in current["components"] if item["id"] == "front")
+        self.assertEqual(front["path"], "frontend/")
+        backend = {**_finding("e" * 64, cwe=(79,)), "scanner": "sast", "package": None, "path": "backend/app.py"}
+        ui = {**_finding("f" * 64, cwe=(79,)), "scanner": "sast", "package": None, "path": "frontend/src/app.ts"}
+        by = {(row["rule"], row["element"]): row for row in tm.threats(current, {REPO: [backend, ui]})}
+        self.assertEqual([item["fingerprint"] for item in by[("TM-T01", "front")]["evidence"]], ["f" * 64])
+        self.assertEqual(by[("TM-T01", "front")]["evidence_scope"], [{"asset": REPO, "path": "frontend/"}])
+        # La API no tiene carpeta: toma el repositorio entero y lo dice.
+        self.assertEqual(by[("TM-T01", "api")]["evidence_scope"], [{"asset": REPO, "path": None}])
+        self.assertEqual(by[("TM-T01", "api")]["evidence_count"], 2)
+
+    def test_folders_and_canvas_positions_are_validated(self):
+        for folder in ("../etc", "a/../b", "a;b"):
+            bad = [{**item, "path": folder} if item["id"] == "api" else item for item in model()["components"]]
+            with self.subTest(folder=folder), self.assertRaises(tm.ModelError):
+                model(components=bad)
+        placed = model(components=[{**item, "position": {"x": 10.26, "y": -4}} for item in model()["components"]],
+                       boundaries=[{**model()["boundaries"][0], "box": {"x": 0, "y": 0, "width": 300, "height": 200}}])
+        self.assertEqual(placed["components"][0]["position"], {"x": 10.3, "y": -4})
+        self.assertEqual(placed["boundaries"][0]["box"], {"x": 0, "y": 0, "width": 300, "height": 200})
+        odd = [{**item, "position": {"x": "1", "y": 2}} if item["id"] == "usuario" else item for item in model()["components"]]
+        self.assertIsNone(model(components=odd)["components"][0]["position"])
+        self.assertEqual(tm._layout(placed)["nodes"]["usuario"], {"x": 10.3, "y": -4})  # las exportaciones usan lo dibujado
+
     def test_several_repositories_name_their_processes(self):
         inventory = {"packages": {"pypi": ["fastapi"]}}
         draft = tm.suggest("S", [{"id": "github:o/a", "name": "o/a", "inventory": inventory, "findings": []},
