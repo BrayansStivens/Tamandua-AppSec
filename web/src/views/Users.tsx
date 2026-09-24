@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/types'
+import { SkeletonTable } from '@/components/loading'
 
 type Listing = { users: SessionUser[]; totp_policy: 'admins' | 'all' | 'none' }
 type LinkResult = { user: SessionUser; link: string; expires_in_hours: number }
@@ -39,7 +40,7 @@ export function Users({ me }: { me: SessionUser }) {
       <Button onClick={() => setInviting(true)} className="bg-primary text-primary-foreground hover:bg-primary/90"><UserPlus />Invitar</Button></CardHeader>
       <CardContent className="space-y-3">
         {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">{error}</div>}
-        {!listing ? <LoaderCircle className="size-5 animate-spin text-app-muted" /> : <div className="overflow-x-auto rounded-xl border border-app-line">
+        {!listing ? <SkeletonTable rows={4} columns={5} label="Cargando usuarios" /> : <div className="overflow-x-auto rounded-xl border border-app-line">
           <table className="w-full min-w-[760px] text-sm"><thead><tr className="border-b border-app-line text-left text-xs text-app-subtle"><th className="px-4 py-2.5 font-normal">Usuario</th><th className="px-4 py-2.5 font-normal">Rol</th><th className="px-4 py-2.5 font-normal">Segundo factor</th><th className="px-4 py-2.5 font-normal">Último acceso</th><th className="px-4 py-2.5 font-normal">Acciones</th></tr></thead>
             <tbody>{listing.users.map(user => { const self = user.id === me.id
               return <tr key={user.id} className={`border-b border-app-line last:border-b-0 ${user.disabled ? 'opacity-60' : ''}`}>

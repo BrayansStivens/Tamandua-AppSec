@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { SkeletonTable } from '@/components/loading'
 
 export type AnalysisRow = { id: string; type: string; status: string; created_at: string; variant?: string; fixture?: string; source?: { name: string }; summary: { candidates?: number; confirmed?: number; executed?: number; planned?: number; severities?: Record<string, number>; kev?: number } }
 
@@ -36,7 +37,8 @@ export function AnalysisList({ refreshKey, onOpen, onNew }: { refreshKey: number
       <Select value={type} onValueChange={value => setType(value ?? 'all')}><SelectTrigger aria-label="Filtrar por tipo" size="sm" className="min-w-44 border-app-line bg-app-soft text-app-secondary">{type === 'all' ? 'Todos los tipos' : typeLabel(type)}</SelectTrigger><SelectContent align="start" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="all">Todos los tipos</SelectItem><SelectItem value="repository_scan">Análisis de código</SelectItem><SelectItem value="image_scan">Imagen de contenedor</SelectItem><SelectItem value="pr_review">Revisión de PR</SelectItem></SelectContent></Select>
     </div>
     {page.error && <p role="alert" className="text-sm text-danger">{page.error}</p>}
-    {page.total === 0 && !page.loading
+    {page.total === 0 && page.loading ? <SkeletonTable rows={6} columns={5} label="Cargando análisis" />
+      : page.total === 0
       ? <div className="flex flex-col items-center gap-3 py-16 text-center"><Radar className="size-7 text-app-subtle" /><p className="font-medium">Aún no hay análisis</p><p className="max-w-sm text-sm text-app-muted">Aquí aparecerán tus análisis. Lanza el primero sobre un repositorio o una imagen de contenedor.</p><Button onClick={onNew} className="mt-1 bg-primary text-primary-foreground hover:bg-primary/90"><Plus /> Nuevo análisis</Button></div>
       : <div className="overflow-hidden rounded-xl border border-app-line">
         <div className="hidden grid-cols-[110px_minmax(0,1fr)_170px_120px_150px] gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid"><span>Estado</span><span>Análisis</span><span>Tipo</span><span>Hallazgos</span><span>Iniciado</span></div>

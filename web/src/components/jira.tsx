@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/types'
+import { SkeletonCard } from '@/components/loading'
 
 export type JiraStatus = { configured: false } | { configured: true; site: string; email: string; project: string; project_name?: string | null; issue_type: string; last4: string; saved_at?: string; saved_by?: string }
 export type TicketLink = { key: string; url: string; by?: string; linked_at?: string }
@@ -38,8 +39,8 @@ export function JiraCard({ canManage }: { canManage: boolean }) {
   }
   return <div className="rounded-xl border border-app-line bg-inset p-5">
     <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-brand/10 p-2 text-brand"><Ticket className="size-5" /></div><div><h3 className="font-semibold">Jira Cloud</h3><p className="text-xs text-app-subtle">{status?.configured ? `${status.site} · proyecto ${status.project}${status.project_name ? ` (${status.project_name})` : ''}` : 'Crea incidencias desde los hallazgos'}</p></div></div>
-      <Badge variant="outline" className={status?.configured ? 'border-brand/30 text-brand' : 'border-app-line text-app-muted'}>{status?.configured ? 'Conectado' : 'Sin configurar'}</Badge></div>
-    {status?.configured ? <div className="mt-5 space-y-3 text-sm text-app-muted">
+      {status && <Badge variant="outline" className={status.configured ? 'border-brand/30 text-brand' : 'border-app-line text-app-muted'}>{status.configured ? 'Conectado' : 'Sin configurar'}</Badge>}</div>
+    {!status ? <div className="mt-5"><SkeletonCard lines={2} label="Cargando la conexión con Jira" /></div> : status.configured ? <div className="mt-5 space-y-3 text-sm text-app-muted">
       <p>Cuenta {status.email} · token ····{status.last4} · tipo «{status.issue_type}»{status.saved_by ? ` · configurado por ${status.saved_by}` : ''}{status.saved_at ? ` el ${formatDate(status.saved_at)}` : ''}</p>
       <p className="text-xs leading-5 text-app-subtle">Cada incidencia lleva la etiqueta <code className="font-mono">appsec-&lt;huella&gt;</code>: volver a exportar el mismo hallazgo enlaza la existente en lugar de duplicarla.</p>
       {canManage && <Button variant="ghost" disabled={busy} onClick={() => void remove()}>Retirar conexión</Button>}

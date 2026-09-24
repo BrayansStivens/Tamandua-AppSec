@@ -36,6 +36,8 @@ export function CoverageView() {
   const [asset, setAsset] = useState<Asset | null>(null)
   const [detail, setDetail] = useState<(RunRow & { owasp_coverage?: OwaspCoverage[]; steps?: ScanStep[] }) | null>(null)
   const [loading, setLoading] = useState(false)
+  // Hasta que el selector resuelve el repositorio no hay nada que medir: nada de «Sin escaneo» provisional.
+  const [resolved, setResolved] = useState(false)
   const runId = asset?.latest_scan?.run_id
   useEffect(() => {
     if (!runId) { setDetail(null); return }
@@ -44,9 +46,11 @@ export function CoverageView() {
   }, [runId])
   const coverage = OWASP_TOP10.map(([id, title]) => detail?.owasp_coverage?.find(item => item.id === id) ?? { id, title, status: 'not_tested' as const, probe_ids: [], reason: 'Sin escaneo completo de este repositorio' })
   return <div className="space-y-5">
-    <div className="max-w-xl space-y-1"><span className="text-xs text-app-muted">Repositorio</span><AssetPicker value={asset} onChange={setAsset} /></div>
-    {asset && !runId ? <Card className="border-app-line bg-panel"><CardContent className="py-10 text-center text-sm text-app-muted">Este repositorio aún no tiene un escaneo completo terminado. La cobertura OWASP se mide sobre él: lanza uno desde «Nuevo análisis».</CardContent></Card>
-      : loading ? <Skeleton rows={6} />
+    <div className="max-w-xl space-y-1"><span className="text-xs text-app-muted">Repositorio</span><AssetPicker value={asset} onChange={value => { setAsset(value); setResolved(true) }} /></div>
+    {!resolved ? <Skeleton rows={6} label="Cargando cobertura" />
+      : !asset ? <Card className="border-app-line bg-panel"><CardContent className="py-10 text-center text-sm text-app-muted">Aún no hay repositorios analizados. La cobertura OWASP aparece tras el primer escaneo completo.</CardContent></Card>
+      : !runId ? <Card className="border-app-line bg-panel"><CardContent className="py-10 text-center text-sm text-app-muted">Este repositorio aún no tiene un escaneo completo terminado. La cobertura OWASP se mide sobre él: lanza uno desde «Nuevo análisis».</CardContent></Card>
+      : loading ? <Skeleton rows={6} label="Cargando cobertura" />
       : <Coverage run={detail} coverage={coverage} steps={detail?.steps ?? []} />}
   </div>
 }

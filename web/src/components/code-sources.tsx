@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { GitHubAppGuide, GitHubInstall, type GitHubStatus } from '@/components/github-setup'
 import { Pager } from '@/components/source-search'
-import { SkeletonList } from '@/components/loading'
+import { SkeletonCard, SkeletonList } from '@/components/loading'
 import { useSourcePage } from '@/lib/sources'
 import { ComingSoonCard } from '@/components/coming-soon'
 
@@ -59,6 +59,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
             {github && <Badge variant="outline" className={github.connected ? 'border-brand/40 text-brand' : 'border-app-line text-app-muted'}>{github.connected ? 'Conectado' : github.configured ? 'Sin conectar' : 'Sin configurar'}</Badge>}
           </div>
 
+          {!github && <div className="mt-4"><SkeletonCard lines={3} label="Cargando la conexión con GitHub" /></div>}
           {github?.connected && <div className="mt-4 space-y-3">
             <p className="text-sm font-medium">{installations.length} {installations.length === 1 ? 'cuenta conectada' : 'cuentas conectadas'}</p>
             <div className="grid gap-3 lg:grid-cols-2">{installations.map(installation => {

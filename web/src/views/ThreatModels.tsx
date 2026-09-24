@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Menu, MenuContent, MenuGroup, MenuItem, MenuTrigger } from '@/components/ui/menu'
-import { Skeleton } from '@/components/loading'
+import { Skeleton, SkeletonCard, SkeletonList, SkeletonTiles } from '@/components/loading'
 import { SourceSearch } from '@/components/source-search'
 import type { Source } from '@/lib/sources'
 import { api } from '@/lib/api'
@@ -116,7 +116,8 @@ function Editor({ id, catalog: base, user, onBack, onOpenRun }: { id: string; ca
     if (!window.confirm('¿Borrar este modelo de amenazas? No se puede deshacer.')) return
     try { await api.post('/api/threat-models/delete', 'delete-threat-model', { id }); onBack() } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) }
   }
-  if (!view || !draft) return error ? <div role="alert" className="text-sm text-danger">{error}</div> : <LoaderCircle className="size-5 animate-spin text-app-muted" />
+  if (!view || !draft) return error ? <div role="alert" className="text-sm text-danger">{error}</div>
+    : <div className="space-y-5"><SkeletonCard lines={2} label="Cargando el modelo" /><SkeletonTiles count={6} label="Cargando el resumen de amenazas" /><SkeletonList rows={5} label="Cargando amenazas" /></div>
   const summary = view.summary
   const methodology: Methodology = draft.methodology ?? 'stride'
   const tabs = methodology === 'custom' ? customTabs(draft.custom_modules ?? ['manual', 'elements']) : TABS[methodology]

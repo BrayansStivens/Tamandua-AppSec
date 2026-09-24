@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { SourceSearch } from '@/components/source-search'
 import { fetchSource, type Source, type SourcePage } from '@/lib/sources'
+import { SkeletonCard, SkeletonList } from '@/components/loading'
 
 type ScanPlan = { languages: { name: string; files: number; rules: number }[]; runs: string[]; skips: string[]; osv_needed: boolean; files: number | null; manifests: string[]; iac: string[]; pipelines?: string[] }
 type Kind = 'code' | 'web' | 'image'
@@ -31,7 +32,7 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
   const [step, setStep] = useState(0)
   const [chosenSource, setChosenSource] = useState<Source | null>(null)
   const source = chosenSource?.id ?? null
-  const [domains, setDomains] = useState<Domain[]>([])
+  const [domains, setDomains] = useState<Domain[] | null>(null)
   const [targets, setTargets] = useState<string[]>([])
   const [context, setContext] = useState('')
   const [allowOsv, setAllowOsv] = useState(false)
@@ -42,7 +43,7 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [reference, setReference] = useState('')
-  const [registries, setRegistries] = useState<Registry[]>([])
+  const [registries, setRegistries] = useState<Registry[] | null>(null)
 
   // Un enlace directo trae el id: se pide ese repositorio, no el catálogo.
   useEffect(() => { if (initialSourceId) fetchSource(initialSourceId).then(setChosenSource).catch(caught => setError(caught instanceof Error ? caught.message : String(caught))) }, [initialSourceId])
@@ -57,9 +58,9 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
   useEffect(() => { api.get<{ registries: Registry[] }>('/api/registries').then(data => setRegistries(data.registries)).catch(() => {}) }, [])
 
   const steps = kind ? STEPS[kind] : []
-  const chosenTargets = domains.filter(item => targets.includes(item.id))
+  const chosenTargets = (domains ?? []).filter(item => targets.includes(item.id))
   const imageRegistry = registryOf(reference)
-  const imageCredentials = registries.find(item => item.registry === imageRegistry) ?? null
+  const imageCredentials = registries?.find(item => item.registry === imageRegistry) ?? null
   const ready = kind === 'code' ? !!source : kind === 'image' ? !!imageRegistry : targets.length > 0
 
   const launch = async () => {
@@ -105,7 +106,7 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
             <Input id="image-reference" autoFocus value={reference} onChange={event => setReference(event.target.value)} maxLength={300} spellCheck={false} autoComplete="off" placeholder="p. ej. nginx:1.21 o ghcr.io/tu-org/tu-imagen:1.0" className="border-app-line bg-app-soft font-mono text-sm" />
             {reference.trim() && !imageRegistry && <p className="text-xs text-danger">No parece una referencia válida: registro/repositorio:etiqueta, en minúsculas.</p>}
             {!reference.trim() && <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs text-app-subtle"><span>Prueba con una pública:</span>{[['nginx:1.21', 'antigua, muchos avisos'], ['nginx:1.27-alpine', 'reciente, pocos'], ['vulnerables/web-dvwa', 'vulnerable a propósito']].map(([value, hint]) => <button key={value} type="button" onClick={() => setReference(value)} title={hint} className="rounded-md border border-app-line bg-app-soft px-2 py-0.5 font-mono text-[11px] text-app-secondary hover:border-app-faint">{value}</button>)}</div>}</div>
-          {imageRegistry && <div className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${imageCredentials ? 'border-brand/30 bg-brand/[0.06]' : 'border-app-line bg-inset'}`}><KeyRound className="mt-0.5 size-4 shrink-0 text-app-muted" /><span>{imageCredentials
+          {imageRegistry && registries && <div className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${imageCredentials ? 'border-brand/30 bg-brand/[0.06]' : 'border-app-line bg-inset'}`}><KeyRound className="mt-0.5 size-4 shrink-0 text-app-muted" /><span>{imageCredentials
               ? <>Se usarán las credenciales guardadas para <strong className="font-medium">{imageRegistry}</strong> (usuario {imageCredentials.username}, token ····{imageCredentials.last4}).</>
               : <>Sin credenciales para <strong className="font-medium">{imageRegistry}</strong>: sirve para imágenes públicas. Si es privada, un administrador puede guardar un token de solo lectura en <button type="button" onClick={onManageConnections} className="underline underline-offset-2">Integraciones → Registros de contenedores</button>.</>}</span></div>}
           <p className="text-xs text-app-subtle">Consejo: analiza una etiqueta inmutable (versión o <span className="font-mono">@sha256:</span>) en lugar de <span className="font-mono">latest</span>, para saber exactamente qué revisaste.</p>
@@ -130,7 +131,7 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
             <Row label="Objetivo" value={kind === 'code' ? chosenSource?.name ?? 'sin seleccionar' : kind === 'image' ? reference.trim() || 'sin seleccionar' : chosenTargets.map(item => item.host).join(', ') || 'sin seleccionar'} />
             <Row label="Contexto" value={context.trim() || 'sin contexto declarado'} />
             {kind === 'code' && <>
-              {!plan ? <div className="flex items-center gap-2 rounded-xl border border-app-line bg-inset p-4 text-sm text-app-muted">{planError ? <><TriangleAlert className="size-4 text-warning" />{planError}</> : <><LoaderCircle className="size-4 animate-spin" />Leyendo el repositorio para calcular qué se analiza…</>}</div> : <>
+              {!plan ? <div className="flex items-center gap-2 rounded-xl border border-app-line bg-inset p-4 text-sm text-app-muted">{planError ? <><TriangleAlert className="size-4 text-warning" />{planError}</> : <div className="w-full"><SkeletonCard lines={4} label="Leyendo el repositorio para calcular qué se analiza" /></div>}</div> : <>
               {plan.languages.length > 0 && <div className="space-y-2 rounded-xl border border-app-line bg-inset p-4"><p className="text-xs font-medium tracking-widest text-app-subtle uppercase">Lenguajes del repositorio{plan.files !== null ? ` · ${plan.files} ficheros` : ''}</p><div className="flex flex-wrap gap-2">{plan.languages.map(item => <span key={item.name} className={`rounded-lg border px-2 py-1 text-xs ${item.rules ? 'border-brand/30 text-brand' : 'border-warning-line text-warning'}`}>{item.name} · {item.files} · {item.rules ? `${item.rules} reglas` : 'sin reglas SAST'}</span>)}</div></div>}
               <div className="space-y-2 rounded-xl border border-app-line bg-inset p-4"><p className="text-xs font-medium tracking-widest text-app-subtle uppercase">Se ejecuta</p>{[...plan.runs, ...(plan.osv_needed && allowOsv ? ['Dependencias: consulta a api.osv.dev autorizada'] : [])].map(item => <p key={item} className="flex gap-2 text-sm text-app-secondary"><Check className="mt-0.5 size-4 shrink-0 text-brand" />{item}</p>)}</div>
               <div className="space-y-2 rounded-xl border border-app-line bg-inset p-4"><p className="text-xs font-medium tracking-widest text-app-subtle uppercase">No se ejecuta</p>{plan.skips.map(item => <p key={item} className="flex gap-2 text-sm text-app-muted"><X className="mt-0.5 size-4 shrink-0 text-app-subtle" />{item}</p>)}</div>
@@ -163,7 +164,7 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
     </div>
 
     <SourceDialog open={pickSource} onOpenChange={setPickSource} selected={source} onSelect={item => { setChosenSource(item); setPickSource(false) }} onManageConnections={onManageConnections} />
-    <TargetsDialog open={pickTargets} onOpenChange={setPickTargets} domains={domains} selected={targets} onConfirm={ids => { setTargets(ids); setPickTargets(false) }} onRegistered={domain => setDomains(previous => [...previous.filter(item => item.id !== domain.id), domain])} />
+    <TargetsDialog open={pickTargets} onOpenChange={setPickTargets} domains={domains} selected={targets} onConfirm={ids => { setTargets(ids); setPickTargets(false) }} onRegistered={domain => setDomains(previous => [...(previous ?? []).filter(item => item.id !== domain.id), domain])} />
   </div>
 }
 
@@ -182,13 +183,13 @@ function SourceDialog({ open, onOpenChange, selected, onSelect, onManageConnecti
   </DialogContent></Dialog>
 }
 
-function TargetsDialog({ open, onOpenChange, domains, selected, onConfirm, onRegistered }: { open: boolean; onOpenChange: (open: boolean) => void; domains: Domain[]; selected: string[]; onConfirm: (ids: string[]) => void; onRegistered: (domain: Domain) => void }) {
+function TargetsDialog({ open, onOpenChange, domains, selected, onConfirm, onRegistered }: { open: boolean; onOpenChange: (open: boolean) => void; domains: Domain[] | null; selected: string[]; onConfirm: (ids: string[]) => void; onRegistered: (domain: Domain) => void }) {
   const [filter, setFilter] = useState('')
   const [draft, setDraft] = useState<string[]>(selected)
   const [adding, setAdding] = useState(false)
   const [pending, setPending] = useState<Domain | null>(null)
   useEffect(() => { if (open) setDraft(selected) }, [open, selected])
-  const visible = domains.filter(item => item.host.includes(filter.trim().toLowerCase()))
+  const visible = (domains ?? []).filter(item => item.host.includes(filter.trim().toLowerCase()))
   const toggle = (id: string) => setDraft(previous => previous.includes(id) ? previous.filter(item => item !== id) : previous.length < TARGET_LIMIT ? [...previous, id] : previous)
   return <>
     <Dialog open={open && !adding && !pending} onOpenChange={onOpenChange}><DialogContent className="max-w-xl">
@@ -197,7 +198,7 @@ function TargetsDialog({ open, onOpenChange, domains, selected, onConfirm, onReg
       <div className="max-h-64 space-y-2 overflow-y-auto rounded-xl border border-app-line p-2">
         {visible.map(domain => { const checked = draft.includes(domain.id)
           return <label key={domain.id} className={`flex cursor-pointer items-center gap-3 rounded-lg p-3 transition ${checked ? 'bg-brand/10' : 'hover:bg-app-soft'}`}><input type="checkbox" checked={checked} onChange={() => toggle(domain.id)} disabled={!checked && draft.length >= TARGET_LIMIT} className="accent-brand" /><Globe2 className="size-4 shrink-0 text-app-muted" /><span className="min-w-0 flex-1"><span className="block truncate text-sm">{domain.host}</span><span className="text-xs text-app-subtle">{kindLabel[domain.kind ?? 'web']}</span></span><span className={`shrink-0 text-xs ${domain.verified ? 'text-brand' : 'text-warning'}`}>{domain.verified ? 'Verificado' : 'Sin verificar'}</span></label> })}
-        {!visible.length && <p className="py-6 text-center text-sm text-app-muted">No hay dominios registrados que coincidan.</p>}
+        {!domains ? <SkeletonList rows={3} dense label="Cargando dominios" /> : !visible.length && <p className="py-6 text-center text-sm text-app-muted">No hay dominios registrados que coincidan.</p>}
       </div>
       {/* El diálogo nuevo se abre en el tick siguiente: si se abriera en este clic, el
           detector de pulsación externa de base-ui vería ese mismo clic y lo cerraría. */}

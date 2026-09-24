@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { Skeleton } from '@/components/loading'
+import { Bone, Skeleton } from '@/components/loading'
 import { SeverityPill, type CveOverview } from '@/views/CveTracker'
 import { api } from '@/lib/api'
 import { formatDate, statusLabel, type Dashboard as DashboardData } from '@/lib/types'
@@ -89,7 +89,7 @@ function CyberNews({ news, onTracker }: { news: DashboardData['cve_news']; onTra
           <div><div className="text-5xl font-semibold tracking-tight tabular-nums">{count(news.published_7d)}</div><div className="mt-1 text-sm text-app-muted">últimos 7 días</div></div>
           <div><div className="text-5xl font-semibold tracking-tight tabular-nums">{count(news.published_30d)}</div><div className="mt-1 text-sm text-app-muted">últimos 30 días</div></div>
         </div>
-        <div className="mt-6">{cells.length ? <Suspense fallback={<div style={{ height: 330 }} />}><SeveritySkyline cells={cells} height={330} /></Suspense>
+        <div className="mt-6">{!overview ? <div role="status" aria-label="Cargando el skyline de severidad"><Bone className="h-[330px] rounded-xl" /></div> : cells.length ? <Suspense fallback={<Bone className="h-[330px] rounded-xl" />}><SeveritySkyline cells={cells} height={330} /></Suspense>
           : <div className="grid h-[330px] place-items-center rounded-xl border border-dashed border-app-line text-center text-xs text-app-subtle"><span>El skyline de severidad aparece en cuanto la base local<br />tenga los CVE de los últimos 30 días.</span></div>}</div>
       </CardContent>
     </Card>

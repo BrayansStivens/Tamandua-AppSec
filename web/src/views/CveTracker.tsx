@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Skeleton } from '@/components/loading'
+import { Bone, Skeleton, SkeletonList } from '@/components/loading'
 import { api, query } from '@/lib/api'
 import { readRoute, writeRoute } from '@/lib/route'
 
@@ -141,15 +141,15 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
     <aside className="space-y-4">
       <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">¿Te afecta?</CardTitle><CardDescription className="text-xs leading-5">Analiza tus repositorios: cruzamos las dependencias con estos CVE, con KEV y EPSS, y te decimos cuáles tienes de verdad.</CardDescription></CardHeader>
         <CardContent><Button onClick={onNew} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">Nuevo análisis <ArrowRight /></Button></CardContent></Card>
-      <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">Por año</CardTitle><CardDescription className="text-xs">{overview ? `${overview.count.toLocaleString('es-CO')} CVE en la copia local` : 'Cargando…'}</CardDescription></CardHeader>
+      <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">Por año</CardTitle><CardDescription className="text-xs">{overview ? `${overview.count.toLocaleString('es-CO')} CVE en la copia local` : <Bone className="h-3 w-32" />}</CardDescription></CardHeader>
         <CardContent>{overview?.years.length ? <div className="grid grid-cols-3 gap-1.5">{overview.years.map(item => <button key={item.year} type="button" onClick={() => apply({ year: filters.year === String(item.year) ? '' : String(item.year) })} title={`${item.count.toLocaleString('es-CO')} CVE`}
           className={`rounded-md border px-2 py-1.5 text-center font-mono text-xs transition ${filters.year === String(item.year) ? 'border-primary bg-primary text-primary-foreground' : 'border-app-line bg-app-soft hover:border-app-faint'}`}>{item.year}</button>)}</div>
-          : <p className="text-xs text-app-subtle">Aparecen según se cargan.</p>}</CardContent></Card>
+          : <div role="status" aria-label="Cargando años" className="grid grid-cols-3 gap-1.5">{Array.from({ length: 9 }, (_, index) => <Bone key={index} className="h-7" />)}</div>}</CardContent></Card>
       <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Flame className="size-4 text-danger" />Explotación activa</CardTitle><CardDescription className="text-xs">Últimas altas en CISA KEV{overview?.kev_total ? ` · ${overview.kev_total.toLocaleString('es-CO')} en el catálogo` : ''}</CardDescription></CardHeader>
         <CardContent className="space-y-0.5">{overview?.latest_kev.length ? overview.latest_kev.map(item => <button key={item.id} type="button" onClick={() => show(item.id)} className="flex w-full items-start justify-between gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-app-soft">
           <span className="min-w-0"><span className="block font-mono text-xs font-medium">{item.id}</span><span className="block truncate text-[11px] text-app-muted" title={item.name ?? ''}>{item.name}</span></span>
           <span className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-app-subtle">{item.date_added}{item.ransomware && <span className="text-danger">ransomware</span>}</span></button>)
-          : <p className="text-xs text-app-subtle">Sin catálogo KEV descargado todavía.</p>}
+          : !overview ? <SkeletonList rows={5} dense label="Cargando altas en KEV" /> : <p className="text-xs text-app-subtle">Sin catálogo KEV descargado todavía.</p>}
           <button type="button" onClick={() => apply({ kev: true, sort: 'published' })} className="mt-2 flex items-center gap-1 px-1.5 text-xs text-app-muted hover:text-app-fg">Ver todos los KEV <ArrowRight className="size-3" /></button></CardContent></Card>
     </aside>
     <CveSheet id={open} onClose={() => show(null)} />
@@ -182,7 +182,7 @@ function CveSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
   return <Sheet open={!!id} onOpenChange={next => { if (!next) onClose() }}>
     <SheetContent side="right" className="w-full overflow-y-auto border-app-line sm:max-w-xl">
       <SheetHeader className="border-b border-app-line pb-4"><SheetTitle className="font-mono text-lg">{id}</SheetTitle>
-        <SheetDescription>{item ? `Publicado ${day(item.published)}${item.modified ? ` · modificado ${day(item.modified)}` : ''}` : 'Cargando…'}</SheetDescription></SheetHeader>
+        <SheetDescription>{item ? `Publicado ${day(item.published)}${item.modified ? ` · modificado ${day(item.modified)}` : ''}` : <Bone className="h-3 w-48" />}</SheetDescription></SheetHeader>
       <div className="space-y-5 px-4 pb-6">
         {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">{error}</div>}
         {!item && !error && <Skeleton rows={4} />}

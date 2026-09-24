@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { ApiError, TOTP_REQUIRED_EVENT, UNAUTHORIZED_EVENT, api } from '@/lib/api'
 import { Account } from '@/views/Account'
-import { Splash } from '@/components/loading'
+import { SkeletonCard, Splash } from '@/components/loading'
 
 export type SessionUser = { id: string; username: string; display_name: string; role: 'admin' | 'member'; totp_enabled: boolean; last_login_at: string | null; disabled?: boolean; created_at?: string; has_password?: boolean; pending_link?: 'invite' | 'reset' | null }
 
@@ -96,7 +96,7 @@ function LinkView({ token, onDone, onCancel }: { token: string; onDone: () => vo
       {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
       <Button type="submit" disabled={busy} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <KeyRound />}Guardar y entrar</Button>
     </form> : error ? <div className="space-y-3"><div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div><Button variant="outline" className="w-full border-app-line bg-app-soft" onClick={onCancel}>Ir al inicio de sesión</Button></div>
-      : <LoaderCircle className="size-5 animate-spin text-app-muted" />}</CardContent></Card></Shell>
+      : <SkeletonCard lines={3} label="Comprobando el enlace" />}</CardContent></Card></Shell>
 }
 
 function LoginView({ setupRequired, notice, onDone }: { setupRequired: boolean; notice: string; onDone: () => void }) {
