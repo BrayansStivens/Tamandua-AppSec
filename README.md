@@ -32,7 +32,7 @@ cd appsec-agent
 make up
 ```
 
-`make up` crea tu `.env`, construye las imágenes, arranca y te muestra la URL y el **código de configuración**. `make help` lista el resto (logs, copias de seguridad, actualizar…); están todos en [docs/contenedores.md](docs/contenedores.md).
+`make up` crea tu `.env`, construye las imágenes, descarga los motores que falten, arranca y te muestra la URL y el **código de configuración**. `make help` lista el resto (logs, copias de seguridad, actualizar…); están todos en [docs/contenedores.md](docs/contenedores.md).
 
 Abre <http://127.0.0.1:8766> y:
 

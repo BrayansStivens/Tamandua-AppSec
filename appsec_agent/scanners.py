@@ -221,16 +221,20 @@ def engine_status() -> list[dict]:
              "ready": image_available(key), "built_locally": "@sha256:" not in meta["image"]} for key, meta in IMAGES.items()]
 
 
-def pull_engines() -> list[dict]:
-    """Descarga por digest las imágenes publicadas que falten; la de Opengrep se construye con `make build`."""
+def pull_engines(report=None) -> list[dict]:
+    """Descarga por digest las imágenes publicadas que falten; la de Opengrep se construye con `make build`.
+
+    `make engines` descarga desde el host (con progreso); esto queda para quien no use make."""
     binary = shutil.which("docker")
     results = []
     for row in engine_status():
+        if report and not (row["ready"] or row["built_locally"] or not binary):
+            report(f"Descargando {row['name']} {row['version']}… (puede tardar varios minutos)")
         if row["ready"] or row["built_locally"] or not binary:
             results.append({**row, "action": "ninguna" if row["ready"] else "construir con make build" if row["built_locally"] else "docker no disponible"})
             continue
         try:
-            completed = subprocess.run([binary, "pull", "--quiet", row["image"]], capture_output=True, text=True, timeout=900)
+            completed = subprocess.run([binary, "pull", "--quiet", row["image"]], capture_output=True, text=True, timeout=3600)
         except (OSError, subprocess.TimeoutExpired):
             completed = None
         done = bool(completed) and completed.returncode == 0

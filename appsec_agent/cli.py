@@ -124,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
             from .scanners import engine_status, pull_engines, socket_problem
             if socket_problem():
                 print(socket_problem())
-            rows = pull_engines() if args.pull else engine_status()
+            rows = pull_engines(report=lambda message: print(message, flush=True)) if args.pull else engine_status()
             for row in rows:
                 print(f"{'listo' if row['ready'] else 'falta':6} {row['name']} {row['version']}  {row['image']}"
                       + (f"  ({row['action']})" if row.get("action") else ""))

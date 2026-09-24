@@ -22,6 +22,10 @@ ifeq ($(strip $(DOCKER_SOCKET_GID)),0)
 DOCKER_SOCKET_GID :=
 endif
 export DOCKER_SOCKET_GID
+# Imágenes publicadas de los motores, fijadas por digest, leídas del código (sin Python ni la imagen de la app).
+# `make engines` las descarga desde el host: se ve el progreso, no hay límite de tiempo y no depende
+# de los permisos del socket dentro del contenedor.
+ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' appsec_agent/scanners.py
 
 .DEFAULT_GOAL := help
 .PHONY: help doctor setup build up down restart status logs ps setup-code engines update backup shell cli \
@@ -43,11 +47,12 @@ setup: ## Crea .env con tu UID/GID y las carpetas data/ y config/
 build: setup ## Construye las imágenes (app y motor Opengrep verificado)
 	$(COMPOSE) build
 
-up: setup ## Construye si hace falta, arranca y muestra la URL y el código de configuración
+up: setup ## Construye si hace falta, descarga los motores que falten, arranca y muestra la URL
 	$(COMPOSE) up --build -d
 	@printf 'Esperando a que el panel responda'
 	@i=0; until [ "$$(docker inspect -f '{{.State.Health.Status}}' appsec-agent 2>/dev/null)" = healthy ]; do \
 	  i=$$((i + 1)); if [ $$i -gt 60 ]; then echo; echo 'No arrancó en 2 minutos: make logs'; exit 1; fi; printf '.'; sleep 2; done; echo
+	@$(MAKE) --no-print-directory engines || echo 'Aviso: faltan motores; el panel funciona y se reintentan con make engines.'
 	@echo "Panel: $(URL)"
 	@$(MAKE) --no-print-directory setup-code
 
@@ -73,8 +78,16 @@ setup-code: ## Muestra el código para crear el primer administrador
 	  echo "Código de configuración: $$code  (créalo en $(URL))"; \
 	else echo "Ya hay un administrador creado: entra con tu usuario."; fi
 
-engines: ## Descarga por adelantado las imágenes de Trivy, Gitleaks, Grype, Checkov y zizmor
-	$(COMPOSE) run --rm --no-deps appsec python -m appsec_agent engines --pull
+engines: ## Descarga las imágenes de los motores que falten (Trivy, Gitleaks, Grype, Checkov, zizmor), con progreso
+	@images=$$($(ENGINE_IMAGES)); \
+	missing=0; for image in $$images; do docker image inspect "$$image" >/dev/null 2>&1 || missing=$$((missing + 1)); done; \
+	if [ $$missing -eq 0 ]; then echo 'Motores: todas las imágenes están listas.'; exit 0; fi; \
+	echo "Motores: faltan $$missing imágenes; la primera vez puede tardar según tu conexión."; \
+	for image in $$images; do \
+	  docker image inspect "$$image" >/dev/null 2>&1 && continue; \
+	  echo "→ $${image%%@*}"; \
+	  docker pull "$$image" || { echo "Falló la descarga de $${image%%@*}: revisa la conexión y repite make engines."; exit 1; }; \
+	done; echo 'Motores: listos.'
 
 update: ## Actualiza el código (git pull) y reconstruye
 	git pull --ff-only

@@ -28,7 +28,10 @@ make up
 1. crea `.env` desde `.env.example` con tu UID/GID (si no existe) y las carpetas `data/` y `config/`;
 2. construye las imágenes si han cambiado;
 3. arranca y espera a que el panel responda;
-4. muestra la URL y, si aún no hay administrador, el **código de configuración**.
+4. descarga las imágenes de los motores que falten, con progreso (la primera vez puede tardar según tu conexión; después no descarga nada);
+5. muestra la URL y, si aún no hay administrador, el **código de configuración**.
+
+Funciona igual en macOS (Apple Silicon e Intel), Linux y Windows con WSL o Git Bash. En Linux y en WSL con Docker nativo, el socket de Docker es del grupo `docker`: `make` detecta su número y se lo da al contenedor (`DOCKER_SOCKET_GID`). Si arrancas con `docker compose` directamente en esas máquinas, pon ese valor en `.env` (`stat -Lc %g /var/run/docker.sock`).
 
 ## Referencia de comandos
 
@@ -38,13 +41,13 @@ make up
 | `make doctor` | Comprueba Docker, Compose, arquitectura, disco, puerto, permisos de `data/` y `config/`, y motores. |
 | `make setup` | Solo crea `.env` y las carpetas; no toca un `.env` existente. |
 | `make build` | Construye las imágenes de la app y de Opengrep. |
-| `make up` | Construye si hace falta, arranca y muestra URL y código. |
+| `make up` | Construye si hace falta, arranca, descarga los motores que falten y muestra URL y código. |
 | `make down` | Para y elimina los contenedores. `data/` y `config/` se conservan. |
 | `make restart` | Reinicia la app. Los análisis en curso se marcan como fallidos. |
 | `make status` | Estado de los contenedores y de las imágenes de los motores. |
 | `make logs` | Sigue los logs de la app. |
 | `make setup-code` | Vuelve a mostrar el código de configuración. |
-| `make engines` | Descarga por adelantado Trivy, Gitleaks, Grype, Checkov y zizmor (si no, se bajan en el primer análisis). |
+| `make engines` | Descarga desde el host, con progreso, las imágenes de Trivy, Gitleaks, Grype, Checkov y zizmor que falten. `make up` ya lo hace; úsalo para reintentar si falló la conexión. |
 | `make update` | `git pull` y vuelve a levantar con la versión nueva. |
 | `make backup` | Copia `data/` y `config/` en `backups/<fecha>/`. Se niega si hay análisis en curso (salvo `FORCE=1`). |
 | `make shell` | Terminal dentro del contenedor. |

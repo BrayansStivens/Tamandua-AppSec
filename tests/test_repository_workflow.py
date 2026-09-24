@@ -380,3 +380,15 @@ class DockerAccessTests(unittest.TestCase):
                 patch.object(scanners, "socket_problem", return_value=None):
             self.assertFalse(scanners.docker_available())
             self.assertIn("permission denied", scanners.docker_problem())
+
+
+class MakefileEnginesTests(unittest.TestCase):
+    def test_make_engines_sees_every_published_image(self):
+        """`make engines` lee las imágenes con sed; si cambia su formato en scanners.py, esto avisa."""
+        import re
+        import subprocess
+        from appsec_agent.scanners import IMAGES
+        root = Path(__file__).resolve().parents[1]
+        command = re.search(r"^ENGINE_IMAGES := (.+)$", (root / "Makefile").read_text(encoding="utf-8"), re.M).group(1)
+        listed = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True, check=True).stdout.split()
+        self.assertEqual(listed, [meta["image"] for meta in IMAGES.values() if "@sha256:" in meta["image"]])
