@@ -28,7 +28,7 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import triage
+from . import threat_methods, triage
 
 
 class ModelError(ValueError):
@@ -175,7 +175,12 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
     for key, items in (("components", components), ("flows", flows), ("boundaries", boundaries)):
         if len(items) > LIMITS[key]:
             raise ModelError(f"Máximo {LIMITS[key]} {key} por modelo")
-    return {**model, "components": components, "flows": flows, "boundaries": boundaries}
+    try:
+        # Lo propio del enfoque elegido: amenazas escritas a mano, árboles, técnicas ATT&CK, etapas PASTA.
+        extras = threat_methods.validate(payload, elements=ids | flow_ids)
+    except threat_methods.MethodError as exc:
+        raise ModelError(str(exc)) from exc
+    return {**model, "components": components, "flows": flows, "boundaries": boundaries, **extras}
 
 
 # ------------------------------------------------------------ almacén
@@ -216,7 +221,8 @@ def list_models(data_dir: Path) -> list[dict]:
         except (OSError, ValueError):
             continue
         rows.append({key: model.get(key) for key in ("id", "name", "description", "updated_at", "updated_by", "created_at")}
-                    | {"components": len(model.get("components", [])), "flows": len(model.get("flows", []))})
+                    | {"components": len(model.get("components", [])), "flows": len(model.get("flows", [])),
+                       "methodology": model.get("methodology") or "stride"})
     return sorted(rows, key=lambda row: row.get("updated_at") or "", reverse=True)
 
 
@@ -475,14 +481,14 @@ def _index(model: dict) -> tuple[dict, dict]:
     return components, boundary_of
 
 
-def _targets(model: dict) -> list[tuple[dict, dict | None, dict | None]]:
+def _targets(model: dict, rules: list[dict] | None = None) -> list[tuple[dict, dict | None, dict | None]]:
     """(regla, componente, flujo) para cada regla que aplica. Las condiciones están aquí, a la vista."""
     components, boundary_of = _index(model)
     flows = model.get("flows", [])
     inbound = {cid: [flow for flow in flows if flow["target"] == cid] for cid in components}
     outbound = {cid: [flow for flow in flows if flow["source"] == cid] for cid in components}
     result = []
-    for rule in RULES:
+    for rule in RULES if rules is None else rules:
         applies = rule["applies"]
         if applies.startswith("flow_"):
             for flow in flows:
@@ -490,7 +496,8 @@ def _targets(model: dict) -> list[tuple[dict, dict | None, dict | None]]:
                 sensitive = any(CLASSIFICATIONS[item] >= 3 for item in flow["data"])
                 target = components[flow["target"]]
                 if ((applies == "flow_unencrypted_boundary" and crosses and not flow["encrypted"] and set(flow["data"]) - {"public"})
-                        or (applies == "flow_to_external_sensitive" and target["kind"] == "external" and sensitive)):
+                        or (applies == "flow_to_external_sensitive" and target["kind"] == "external" and sensitive)
+                        or (applies == "flow_personal_to_external" and target["kind"] == "external" and "pii" in flow["data"])):
                     result.append((rule, None, flow))
             continue
         for component in components.values():
@@ -498,6 +505,8 @@ def _targets(model: dict) -> list[tuple[dict, dict | None, dict | None]]:
             process = kind in PROCESSES
             sensitive = any(CLASSIFICATIONS[item] >= 3 for item in component["data"]) or any(
                 CLASSIFICATIONS[item] >= 3 for flow in inbound[component["id"]] + outbound[component["id"]] for item in flow["data"])
+            # Datos personales (LINDDUN): los guarda o le llegan o salen por algún flujo.
+            personal = "pii" in component["data"] or any("pii" in flow["data"] for flow in inbound[component["id"]] + outbound[component["id"]])
             match = {
                 "process": process,
                 "web_app": kind == "web_app",
@@ -513,6 +522,10 @@ def _targets(model: dict) -> list[tuple[dict, dict | None, dict | None]]:
                 "store_written_unauthenticated": kind in STORES and any(not flow["authenticated"] for flow in inbound[component["id"]]),
                 "store_sensitive_unencrypted": kind in STORES and not component["encrypted_at_rest"] and any(CLASSIFICATIONS[item] >= 3 for item in component["data"]),
                 "store_credentials": kind in STORES and "credentials" in component["data"],
+                "store_personal": kind in STORES and "pii" in component["data"],
+                "store_personal_unencrypted": kind in STORES and "pii" in component["data"] and not component["encrypted_at_rest"],
+                "process_personal": process and personal,
+                "process_personal_facing_actor": process and personal and any(components[flow["source"]]["kind"] == "actor" for flow in inbound[component["id"]]),
             }.get(applies, False)
             if match:
                 result.append((rule, component, None))
@@ -572,7 +585,11 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None)
     """Amenazas del modelo con su severidad, evidencia de los escaneos y decisión del equipo."""
     decisions = model.get("decisions", {})
     rows = []
-    for rule, component, flow in _targets(model):
+    method = model.get("methodology") or "stride"
+    family = threat_methods.RULE_BASED.get(method)
+    rules = RULES if family == "stride" else threat_methods.LINDDUN_RULES if family == "linddun" else []
+    categories = STRIDE if family == "stride" else threat_methods.LINDDUN
+    for rule, component, flow in _targets(model, rules):
         element = flow["id"] if flow else component["id"]
         threat_id = hashlib.sha256(f"{rule['id']}|{element}".encode()).hexdigest()[:16]
         evidence = []
@@ -601,14 +618,39 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None)
             severity = SEVERITY_ORDER[min(SEVERITY_ORDER.index(severity), worst)]
         components, _ = _index(model)
         label = (f"{components[flow['source']]['name']} → {components[flow['target']]['name']}" if flow else component["name"])
-        rows.append({"id": threat_id, "rule": rule["id"], "stride": rule["stride"], "category": STRIDE[rule["stride"]],
+        rows.append({"id": threat_id, "rule": rule["id"], "stride": rule["stride"], "category": categories[rule["stride"]], "framework": family,
                      "title": rule["title"], "why": rule["why"], "mitigations": rule["mitigations"], "cwe": rule["cwe"],
                      "element": element, "element_type": "flow" if flow else "component", "element_name": label,
                      "severity": severity, "status": status, "decision": decision,
                      "evidence": evidence[:20], "evidence_count": len(evidence),
                      "evidence_scope": [{"asset": asset, "path": folder or None} for asset, folder in scopes]})
+    rows += _manual_rows(model, decisions)
     order = {"evidenced": 0, "open": 1, "accepted": 2, "mitigated": 3, "not_applicable": 4}
     return sorted(rows, key=lambda row: (order[row["status"]], SEVERITY_ORDER.index(row["severity"]), row["stride"], row["element_name"]))
+
+
+def _manual_rows(model: dict, decisions: dict) -> list[dict]:
+    """Amenazas escritas por el equipo: mismo ciclo de decisiones que las de las reglas."""
+    components, _ = _index(model)
+    flows = {flow["id"]: flow for flow in model.get("flows", [])}
+    # Un código de la categoría del enfoque («S», «Dd») se muestra con su nombre; lo demás, tal cual.
+    names = threat_methods.LINDDUN if model.get("methodology") == "linddun" else STRIDE
+    rows = []
+    for item in model.get("manual_threats", []):
+        threat_id = hashlib.sha256(f"manual|{item['id']}".encode()).hexdigest()[:16]
+        element = item.get("element") or ""
+        flow = flows.get(element)
+        name = (f"{components[flow['source']]['name']} → {components[flow['target']]['name']}" if flow
+                else components[element]["name"] if element in components else "Todo el sistema")
+        decision = decisions.get(threat_id)
+        rows.append({"id": threat_id, "rule": "PROPIA", "stride": item.get("category") or "", "category": names.get(item.get("category") or "", item.get("category") or "Sin categoría"),
+                     "framework": "manual", "manual_id": item["id"], "title": item["title"], "why": item.get("scenario") or "",
+                     "mitigations": [item["mitigation"]] if item.get("mitigation") else [], "cwe": [],
+                     "element": element, "element_type": "flow" if flow else "component" if element in components else "system",
+                     "element_name": name, "severity": item["severity"], "status": decision["status"] if decision else "open",
+                     "decision": decision, "evidence": [], "evidence_count": 0, "evidence_scope": [],
+                     "likelihood": item.get("likelihood"), "impact": item.get("impact"), "owner": item.get("owner") or ""})
+    return rows
 
 
 def evidence_index(data_dir: Path, assets: set[str]) -> dict[str, list[dict]]:
@@ -636,7 +678,7 @@ def summary(rows: list[dict]) -> dict:
     return {"total": len(rows),
             "by_status": {status: sum(1 for row in rows if row["status"] == status)
                           for status in ("evidenced", "open", "accepted", "mitigated", "not_applicable")},
-            "by_stride": {letter: sum(1 for row in rows if row["stride"] == letter) for letter in STRIDE},
+            "by_stride": {code: sum(1 for row in rows if row["stride"] == code) for code in dict.fromkeys(row["stride"] for row in rows)},
             "by_severity": {level: sum(1 for row in rows if row["severity"] == level and row["status"] in ("evidenced", "open"))
                             for level in SEVERITY_ORDER}}
 
@@ -651,7 +693,7 @@ def to_threat_dragon(model: dict, rows: list[dict]) -> dict:
     by_element: dict[str, list[dict]] = {}
     for number, row in enumerate(rows, 1):
         by_element.setdefault(row["element"], []).append({
-            "id": row["id"], "number": number, "title": row["title"], "type": STRIDE_EN[row["stride"]],
+            "id": row["id"], "number": number, "title": row["title"], "type": STRIDE_EN.get(row["stride"], row["category"]),
             "status": status[row["status"]], "severity": {"critical": "High", "high": "High", "medium": "Medium", "low": "Low"}[row["severity"]],
             "description": row["why"] + (f" Evidencia: {row['evidence_count']} hallazgos abiertos." if row["evidence_count"] else ""),
             "mitigation": "; ".join(row["mitigations"]), "modelType": "STRIDE", "score": ""})
@@ -766,10 +808,13 @@ def to_pytm(model: dict) -> str:
 def to_markdown(model: dict, rows: list[dict]) -> str:
     components, _ = _index(model)
     counts = summary(rows)
+    method = model.get("methodology") or "stride"
+    method_label = threat_methods.METHODOLOGIES.get(method, method)
     lines = [f"# Modelo de amenazas · {model['name']}", "", model.get("description") or "", "",
-             f"Actualizado {model.get('updated_at', '')[:16].replace('T', ' ')} por {model.get('updated_by', '—')}.", "",
+             f"Enfoque: **{method_label}** · actualizado {model.get('updated_at', '')[:16].replace('T', ' ')} por {model.get('updated_by', '—')}.", "",
              "## Resumen", "",
-             f"- {counts['total']} amenazas STRIDE sobre {len(components)} componentes y {len(model.get('flows', []))} flujos.",
+             f"- {counts['total']} amenazas sobre {len(components)} componentes y {len(model.get('flows', []))} flujos"
+             f" ({sum(1 for row in rows if row.get('framework') == 'manual')} escritas por el equipo).",
              f"- **{counts['by_status']['evidenced']} con indicios** en hallazgos abiertos de los análisis (señal para revisar, no confirmación); "
              f"{counts['by_status']['open']} abiertas sin indicios (revisar); {counts['by_status']['mitigated']} mitigadas; "
              f"{counts['by_status']['accepted']} aceptadas; {counts['by_status']['not_applicable']} no aplican.", "",
@@ -778,15 +823,58 @@ def to_markdown(model: dict, rows: list[dict]) -> str:
         lines.append(f"| {item['name']} | {KINDS[item['kind']]} | {', '.join(CLASSIFICATION_LABELS[d] for d in item['data']) or '—'} | "
                      f"{'sí' if item['internet_facing'] else 'no'} | {item.get('asset') or '—'} |")
     lines += ["", "## Amenazas", ""]
-    labels = {"evidenced": "EVIDENCIADA", "open": "abierta", "mitigated": "mitigada", "accepted": "aceptada", "not_applicable": "no aplica"}
+    labels = {"evidenced": "CON INDICIOS", "open": "abierta", "mitigated": "mitigada", "accepted": "aceptada", "not_applicable": "no aplica"}
+    families = {"stride": "STRIDE", "linddun": "LINDDUN", "manual": "Propia"}
+    levels = {"low": "baja", "medium": "media", "high": "alta"}
     for row in rows:
         lines += [f"### [{row['severity'].upper()}] {row['title']} · {row['element_name']}", "",
-                  f"STRIDE: {row['category']} · regla `{row['rule']}` · estado: **{labels[row['status']]}**"
+                  f"{families.get(row.get('framework'), 'Categoría')}: {row['category']} · regla `{row['rule']}` · estado: **{labels[row['status']]}**"
                   + (f" ({row['decision']['by']}: {row['decision']['reason']})" if row.get("decision") else ""), "",
-                  row["why"], "", "Mitigaciones: " + "; ".join(row["mitigations"]),
-                  "CWE: " + ", ".join(f"CWE-{item}" for item in row["cwe"])]
+                  row["why"], "", "Mitigaciones: " + ("; ".join(row["mitigations"]) or "—"),
+                  "CWE: " + (", ".join(f"CWE-{item}" for item in row["cwe"]) or "—")]
+        if row.get("framework") == "manual" and (row.get("likelihood") or row.get("impact") or row.get("owner")):
+            lines.append(f"Posibilidad: {levels.get(row.get('likelihood'), '—')} · impacto: {levels.get(row.get('impact'), '—')} · responsable: {row.get('owner') or '—'}")
         for item in row["evidence"][:5]:
             lines.append(f"- Evidencia: {item['title']} ({item['severity']}) en `{item['location']}` · {item['asset']}")
         lines.append("")
-    lines += ["> Las amenazas salen de reglas sobre el modelo declarado: si el modelo no refleja el sistema, tampoco lo harán las amenazas.", ""]
+    flows = {flow["id"]: flow for flow in model.get("flows", [])}
+
+    def element_name(element: str) -> str:
+        if element in components:
+            return components[element]["name"]
+        if element in flows:
+            return f"{components[flows[element]['source']]['name']} → {components[flows[element]['target']]['name']}"
+        return "todo el sistema"
+    notes = model.get("pasta") or {}
+    if notes:
+        lines += ["## PASTA", ""]
+        for key, title in threat_methods.PASTA_STAGES:
+            if notes.get(key):
+                lines += [f"### {title}", "", notes[key], ""]
+    for tree in model.get("attack_trees") or []:
+        lines += [f"## Árbol de ataque · {tree['goal']}", ""]
+        children: dict = {}
+        for node in tree["nodes"]:
+            children.setdefault(node["parent"], []).append(node)
+
+        def walk(parent, depth):
+            for node in children.get(parent, []):
+                extra = [f"dificultad {levels[node['difficulty']]}" if node.get("difficulty") else "",
+                         f"sobre {element_name(node['element'])}" if node.get("element") else "", "mitigado" if node.get("mitigated") else ""]
+                gate = " (se necesitan todos)" if node["gate"] == "and" and children.get(node["id"]) else ""
+                lines.append(f"{'  ' * depth}- {node['text']}{gate}" + (f" · {', '.join(item for item in extra if item)}" if any(extra) else ""))
+                walk(node["id"], depth + 1)
+        walk(None, 0)
+        lines.append("")
+    mappings = model.get("attack_mappings") or []
+    if mappings:
+        status = {"relevant": "relevante", "mitigated": "mitigada", "not_applicable": "no aplica"}
+        lines += ["## MITRE ATT&CK", "", "| Técnica | Táctica | Elemento | Estado | Nota |", "|---|---|---|---|---|"]
+        for item in mappings:
+            name, spanish, tactics = threat_methods.TECHNIQUES[item["technique"]]
+            lines.append(f"| {item['technique']} {name} | {', '.join(threat_methods.TACTICS[tactic] for tactic in tactics)} | "
+                         f"{element_name(item['element'])} | {status[item['status']]} | {(item.get('note') or '').replace(chr(10), ' ').replace('|', chr(92) + '|')} |")
+        lines += ["", "MITRE ATT&CK® es una marca de The MITRE Corporation: https://attack.mitre.org", ""]
+    lines += ["> Las amenazas salen de reglas sobre el modelo declarado y de lo que escribe el equipo: si el modelo no refleja el sistema, "
+              "tampoco lo harán las amenazas. Los indicios de los análisis son señales para revisar, no confirmaciones.", ""]
     return "\n".join(lines)

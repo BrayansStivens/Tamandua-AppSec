@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import { ArrowDownToLine, ArrowLeft, ChevronRight, LoaderCircle, Network, Plus, Save, ShieldAlert, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, ArrowLeft, BookOpen, ChevronRight, Pencil, LoaderCircle, Network, Plus, Save, ShieldAlert, Sparkles, Trash2 } from 'lucide-react'
 import type { SessionUser } from '@/components/auth/session'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,9 +11,10 @@ import { api } from '@/lib/api'
 import { readRoute, setRouteParam } from '@/lib/route'
 import { formatDate } from '@/lib/types'
 import { ThreatCanvas } from '@/components/threat-canvas'
-import { newId, type Catalog, type Component, type Flow, type Kind, type Model, type Threat, type View, type Asset } from '@/components/threat-model-types'
+import { categoryHelp, GUIDES, type Methodology } from '@/components/threat-guides'
+import { AttackMappings, AttackTrees, GuidePanel, ManualThreatDialog, MethodDialog, MethodPicker, PastaStages } from '@/components/threat-methods'
+import { newId, type Catalog, type Component, type Flow, type Kind, type Model, type Threat, type View, type Asset, type ManualThreat } from '@/components/threat-model-types'
 
-const STRIDE: Record<string, string> = { S: 'Suplantación', T: 'Manipulación', R: 'Repudio', I: 'Divulgación', D: 'Denegación', E: 'Elevación' }
 const statusLabel = { evidenced: 'Con indicios', open: 'Abierta', mitigated: 'Mitigada', accepted: 'Aceptada', not_applicable: 'No aplica' }
 const statusClass = { evidenced: 'border-amber-500/50 bg-amber-500/15 text-amber-900 dark:text-amber-200', open: 'border-app-line text-app-secondary', mitigated: 'border-brand/30 text-brand', accepted: 'border-violet-500/30 text-violet-800 dark:text-violet-300', not_applicable: 'border-app-line text-app-subtle' }
 const severityClass: Record<string, string> = { critical: 'border-transparent bg-rose-600 text-white', high: 'border-orange-500/30 bg-orange-500/15 text-orange-800 dark:text-orange-300', medium: 'border-amber-500/30 bg-amber-400/15 text-amber-800 dark:text-amber-300', low: 'border-sky-500/30 bg-sky-400/15 text-sky-800 dark:text-sky-300' }
@@ -33,13 +34,14 @@ export function ThreatModels({ user, onOpenRun }: { user: SessionUser; onOpenRun
   return <div className="space-y-5">
     <Card className="border-app-line bg-panel"><CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3"><div><CardTitle>Modelos de amenazas</CardTitle><CardDescription className="mt-1 max-w-3xl leading-6">Dibuja el sistema —componentes, flujos de datos y fronteras de confianza— y analízalo con el enfoque que prefieras. Si el código de un componente tiene hallazgos abiertos relacionados, la amenaza aparece <strong>con indicios</strong>: una señal para revisar, no una confirmación.</CardDescription></div><Button onClick={() => setCreating(true)} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus />Nuevo modelo</Button></CardHeader>
       <CardContent>{catalog.models.length === 0 ? <div className="flex flex-col items-center gap-2 py-12 text-center"><Network className="size-7 text-app-subtle" /><p className="font-medium">Aún no hay modelos</p><p className="max-w-md text-sm text-app-muted">Empieza con una propuesta hecha a partir de lo que ya escaneaste: se detectan frameworks, bases de datos y servicios externos, y tú la corriges.</p></div>
-        : <div className="divide-y divide-app-line rounded-xl border border-app-line">{catalog.models.map(item => <button key={item.id} onClick={() => setOpenId(item.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-app-soft"><Network className="size-4 text-app-subtle" /><span className="min-w-0 flex-1"><span className="block text-sm font-medium">{item.name}</span><span className="block truncate text-xs text-app-subtle">{item.components} componentes · {item.flows} flujos{item.updated_at ? ` · actualizado ${formatDate(item.updated_at)} por ${item.updated_by}` : ''}</span></span><ChevronRight className="size-4 text-app-subtle" /></button>)}</div>}</CardContent></Card>
+        : <div className="divide-y divide-app-line rounded-xl border border-app-line">{catalog.models.map(item => <button key={item.id} onClick={() => setOpenId(item.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-app-soft"><Network className="size-4 text-app-subtle" /><span className="min-w-0 flex-1"><span className="block text-sm font-medium">{item.name}<span className="ml-2 rounded border border-app-line px-1.5 py-0.5 align-middle text-[10px] font-normal text-app-subtle">{GUIDES[(item.methodology ?? 'stride') as Methodology]?.name ?? item.methodology}</span></span><span className="block truncate text-xs text-app-subtle">{item.components} componentes · {item.flows} flujos{item.updated_at ? ` · actualizado ${formatDate(item.updated_at)} por ${item.updated_by}` : ''}</span></span><ChevronRight className="size-4 text-app-subtle" /></button>)}</div>}</CardContent></Card>
     <CreateDialog open={creating} assets={catalog.assets} onClose={() => setCreating(false)} onCreated={id => { setCreating(false); setOpenId(id) }} />
   </div>
 }
 
 function CreateDialog({ open, assets, onClose, onCreated }: { open: boolean; assets: Asset[]; onClose: () => void; onCreated: (id: string) => void }) {
   const [name, setName] = useState('')
+  const [methodology, setMethodology] = useState<Methodology>('stride')
   const [chosen, setChosen] = useState<string[]>([])
   const [filter, setFilter] = useState('')
   const [busy, setBusy] = useState(false)
@@ -52,14 +54,15 @@ function CreateDialog({ open, assets, onClose, onCreated }: { open: boolean; ass
       // Sin nombre, el sistema se llama como sus repositorios: el nombre no debe bloquear la propuesta.
       const fallback = assets.filter(item => chosen.includes(item.id)).map(item => item.name.split('/').pop()).join(' + ').slice(0, 80)
       const finalName = name.trim() || fallback || 'Nuevo sistema'
-      const body = chosen.length ? { name: finalName, suggest: chosen } : { model: { name: finalName, components: [], flows: [], boundaries: [] } }
+      const body = chosen.length ? { name: finalName, suggest: chosen, methodology } : { model: { name: finalName, methodology, components: [], flows: [], boundaries: [] } }
       onCreated((await api.post<View>('/api/threat-models', 'save-threat-model', body)).model.id)
       setName(''); setChosen([])
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
-  return <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-w-lg">
+  return <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
     <DialogHeader><DialogTitle>Nuevo modelo de amenazas</DialogTitle><DialogDescription>Elige los repositorios que forman el sistema. Se leen en el momento sus manifiestos (package.json, pyproject, go.mod, Cargo.toml, compose) y se propone cada componente citando de qué dependencia sale. O déjalo vacío para empezar en blanco.</DialogDescription></DialogHeader>
     <form className="space-y-4" onSubmit={submit}>
+      <div className="space-y-1.5"><span className="text-xs text-app-muted">Enfoque</span><MethodPicker value={methodology} onChange={setMethodology} /><p className="text-[11px] leading-4 text-app-subtle">Se puede cambiar después sin perder el diagrama.</p></div>
       <div className="space-y-1.5"><label htmlFor="tm-name" className="text-xs text-app-muted">Nombre del sistema (opcional)</label><Input id="tm-name" autoFocus maxLength={80} value={name} onChange={event => setName(event.target.value)} placeholder="Si lo dejas vacío, se usan los nombres de los repositorios" className="border-app-line bg-app-soft" /></div>
       <div className="space-y-1.5"><div className="flex items-center justify-between gap-2"><span className="text-xs text-app-muted">Repositorios{chosen.length ? ` · ${chosen.length} elegidos` : ''}</span><Input aria-label="Buscar repositorio" value={filter} onChange={event => setFilter(event.target.value)} placeholder="Buscar…" className="h-7 w-40 border-app-line bg-app-soft text-xs" /></div>
         {repositories.length ? <div className="max-h-64 space-y-0.5 overflow-y-auto rounded-lg border border-app-line p-2">{repositories.map(item => <label key={item.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-app-soft"><input type="checkbox" className="size-4 accent-brand" checked={chosen.includes(item.id)} onChange={event => setChosen(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} /><span className="min-w-0 flex-1 truncate">{item.name}</span>{item.last_run ? <span className="shrink-0 text-[10px] text-brand">escaneado</span> : <span className="shrink-0 text-[10px] text-app-subtle">sin escanear</span>}</label>)}</div> : <p className="text-xs text-app-subtle">{filter ? 'Ningún repositorio coincide.' : 'Conecta GitHub en Integraciones para elegir repositorios.'}</p>}
@@ -73,7 +76,11 @@ function CreateDialog({ open, assets, onClose, onCreated }: { open: boolean; ass
 function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog: Catalog; user: SessionUser; onBack: () => void; onOpenRun: (id: string) => void }) {
   const [view, setView] = useState<View | null>(null)
   const [draft, setDraft] = useState<Model | null>(null)
-  const [tab, setTab] = useState<'threats' | 'diagram' | 'elements'>('threats')
+  const [tab, setTab] = useState<string>('')
+  const [picking, setPicking] = useState(false)
+  // La guía se abre a demanda y se recuerda: quien ya sabe modelar no la ve si no la pide.
+  const [guide, setGuide] = useState(() => { try { return localStorage.getItem('tm-guide') === 'open' } catch { return false } })
+  const toggleGuide = (next: boolean) => { setGuide(next); try { localStorage.setItem('tm-guide', next ? 'open' : 'closed') } catch { /* sin almacenamiento */ } }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const load = useCallback(async () => { const data = await api.get<View>(`/api/threat-models/${id}`); setView(data); setDraft(data.model) }, [id])
@@ -82,7 +89,7 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
   const save = async () => {
     if (!draft) return
     setBusy(true); setError('')
-    try { const data = await api.post<View>('/api/threat-models', 'save-threat-model', { id, model: { name: draft.name, description: draft.description, components: draft.components, flows: draft.flows, boundaries: draft.boundaries } }); setView(data); setDraft(data.model) }
+    try { const data = await api.post<View>('/api/threat-models', 'save-threat-model', { id, model: payloadOf(draft) }); setView(data); setDraft(data.model) }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
   const remove = async () => {
@@ -91,22 +98,64 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
   }
   if (!view || !draft) return error ? <div role="alert" className="text-sm text-rose-700">{error}</div> : <LoaderCircle className="size-5 animate-spin text-app-muted" />
   const summary = view.summary
+  const methodology: Methodology = draft.methodology ?? 'stride'
+  const tabs = TABS[methodology]
+  const current = tabs.some(([key]) => key === tab) ? tab : tabs[0][0]
+  // Amenazas propias: se guardan al momento junto con el resto del modelo.
+  const saveModel = async (next: Model) => {
+    setBusy(true); setError('')
+    try { const data = await api.post<View>('/api/threat-models', 'save-threat-model', { id, model: payloadOf(next) }); setView(data); setDraft(data.model); return true }
+    catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); return false } finally { setBusy(false) }
+  }
   return <div className="space-y-5">
     <div className="flex flex-col gap-4 rounded-2xl border border-app-line bg-panel p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><button onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-xs text-app-subtle hover:text-app-fg"><ArrowLeft className="size-3" />Modelos</button><h2 className="text-xl font-semibold">{view.model.name}</h2><p className="mt-1 text-xs text-app-subtle">{view.model.components.length} componentes · {view.model.flows.length} flujos · {view.model.boundaries.length} fronteras{view.model.updated_at ? ` · ${formatDate(view.model.updated_at)} por ${view.model.updated_by}` : ''}</p></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><button onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-xs text-app-subtle hover:text-app-fg"><ArrowLeft className="size-3" />Modelos</button><h2 className="text-xl font-semibold">{view.model.name}</h2><div className="mt-1.5 flex flex-wrap items-center gap-2"><button onClick={() => setPicking(true)} className="inline-flex items-center gap-1 rounded-lg border border-brand/30 bg-brand/[0.07] px-2 py-0.5 text-xs font-medium text-brand hover:bg-brand/10" title="Cambiar el enfoque">{GUIDES[methodology].name}<Pencil className="size-3" /></button><button onClick={() => toggleGuide(!guide)} aria-pressed={guide} className="inline-flex items-center gap-1 rounded-lg border border-app-line px-2 py-0.5 text-xs text-app-muted hover:text-app-fg"><BookOpen className="size-3" />{guide ? 'Ocultar guía' : 'Guía'}</button></div><p className="mt-1 text-xs text-app-subtle">{view.model.components.length} componentes · {view.model.flows.length} flujos · {view.model.boundaries.length} fronteras{view.model.updated_at ? ` · ${formatDate(view.model.updated_at)} por ${view.model.updated_by}` : ''}</p></div>
         <div className="flex flex-wrap gap-2">{[['Threat Dragon', 'threat-dragon.json'], ['pytm', 'tm.py'], ['Informe', 'report.md']].map(([label, file]) => <a key={file} href={`/api/threat-models/${id}/${file}`} download={`${view.model.name}-${file}`}><Button size="sm" variant="outline" className="border-app-line bg-app-soft"><ArrowDownToLine />{label}</Button></a>)}{user.role === 'admin' && <Button size="sm" variant="ghost" onClick={() => void remove()} aria-label="Borrar modelo"><Trash2 /></Button>}</div></div>
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{(['evidenced', 'open', 'mitigated', 'accepted', 'not_applicable'] as const).map(status => <div key={status} className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.by_status[status] ?? 0}</div><div className="text-xs text-app-muted">{statusLabel[status]}</div></div>)}<div className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.total}</div><div className="text-xs text-app-muted">Total STRIDE</div></div></div>
+      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{(['evidenced', 'open', 'mitigated', 'accepted', 'not_applicable'] as const).map(status => <div key={status} className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.by_status[status] ?? 0}</div><div className="text-xs text-app-muted">{statusLabel[status]}</div></div>)}<div className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.total}</div><div className="text-xs text-app-muted">Total</div></div></div>
     </div>
     {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
-    <div className="flex flex-wrap items-center gap-2">{([['threats', 'Amenazas'], ['diagram', 'Diagrama'], ['elements', 'Tabla']] as const).map(([key, label]) => <Button key={key} size="sm" variant={tab === key ? 'default' : 'outline'} className={tab === key ? '' : 'border-app-line bg-app-soft'} onClick={() => setTab(key)}>{label}</Button>)}
+    <div className="flex flex-wrap items-center gap-2">{tabs.map(([key, label]) => <Button key={key} size="sm" variant={current === key ? 'default' : 'outline'} className={current === key ? '' : 'border-app-line bg-app-soft'} onClick={() => setTab(key)}>{label}</Button>)}
       {dirty && <span className="ml-auto flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">Cambios sin guardar<Button size="sm" onClick={() => void save()} disabled={busy} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <Save />}Guardar y recalcular</Button></span>}</div>
-    {tab === 'threats' && <Threats view={view} onChanged={setView} onOpenRun={onOpenRun} />}
-    {tab === 'diagram' && <ThreatCanvas model={draft} setModel={setDraft} threats={view.threats} catalog={catalog} />}
-    {tab === 'elements' && <Elements draft={draft} setDraft={setDraft} catalog={catalog} />}
+    <div className={guide ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]' : ''}><div className="min-w-0 space-y-5">
+      {current === 'threats' && <Threats view={view} draft={draft} methodology={methodology} busy={busy} onChanged={setView} onOpenRun={onOpenRun} onSaveModel={saveModel} />}
+      {current === 'diagram' && <ThreatCanvas model={draft} setModel={setDraft} threats={view.threats} catalog={catalog} />}
+      {current === 'elements' && <Elements draft={draft} setDraft={setDraft} catalog={catalog} />}
+      {current === 'stages' && <PastaStages model={draft} setModel={setDraft} threats={view.threats} catalog={catalog} onGo={setTab} />}
+      {current === 'trees' && <AttackTrees model={draft} setModel={setDraft} />}
+      {current === 'attack' && <AttackMappings model={draft} setModel={setDraft} catalog={catalog} />}
+    </div>{guide && <GuidePanel methodology={methodology} onClose={() => toggleGuide(false)} />}</div>
+    {picking && <MethodDialog current={methodology} onClose={() => setPicking(false)} onPick={next => { setPicking(false); setDraft({ ...draft, methodology: next }); setTab('') }} />}
   </div>
 }
 
-function Threats({ view, onChanged, onOpenRun }: { view: View; onChanged: (view: View) => void; onOpenRun: (id: string) => void }) {
+const TABS: Record<Methodology, [string, string][]> = {
+  stride: [['threats', 'Amenazas'], ['diagram', 'Diagrama'], ['elements', 'Tabla']],
+  linddun: [['threats', 'Amenazas de privacidad'], ['diagram', 'Diagrama'], ['elements', 'Tabla']],
+  pasta: [['stages', 'Etapas'], ['diagram', 'Diagrama'], ['threats', 'Amenazas'], ['trees', 'Árboles de ataque'], ['elements', 'Tabla']],
+  attack_trees: [['trees', 'Árboles de ataque'], ['diagram', 'Diagrama'], ['threats', 'Amenazas']],
+  attack: [['attack', 'Técnicas ATT&CK'], ['diagram', 'Diagrama'], ['threats', 'Amenazas']],
+  custom: [['threats', 'Amenazas'], ['diagram', 'Diagrama'], ['elements', 'Tabla']],
+}
+
+function payloadOf(model: Model) {
+  return { name: model.name, description: model.description, methodology: model.methodology ?? 'stride', components: model.components, flows: model.flows,
+           boundaries: model.boundaries, manual_threats: model.manual_threats ?? [], attack_trees: model.attack_trees ?? [],
+           attack_mappings: model.attack_mappings ?? [], pasta: Object.fromEntries(Object.entries(model.pasta ?? {}).filter(([, text]) => text.trim())) }
+}
+
+function Threats({ view, draft, methodology, busy, onChanged, onOpenRun, onSaveModel }: { view: View; draft: Model; methodology: Methodology; busy: boolean; onChanged: (view: View) => void; onOpenRun: (id: string) => void; onSaveModel: (model: Model) => Promise<boolean> }) {
+  const [editing, setEditing] = useState<ManualThreat | 'new' | null>(null)
+  const codes = [...new Set(view.threats.map(row => row.stride).filter(Boolean))]
+  const nameOf = (code: string) => view.threats.find(row => row.stride === code)?.category ?? code
+  const saveManual = async (threat: ManualThreat) => {
+    const list = draft.manual_threats ?? []
+    const next = list.some(item => item.id === threat.id) ? list.map(item => item.id === threat.id ? threat : item) : [...list, threat]
+    if (await onSaveModel({ ...draft, manual_threats: next })) setEditing(null)
+  }
+  const removeManual = async (manualId: string) => {
+    if (!window.confirm('¿Quitar esta amenaza?')) return
+    await onSaveModel({ ...draft, manual_threats: (draft.manual_threats ?? []).filter(item => item.id !== manualId) })
+  }
   const [stride, setStride] = useState('all')
   const [status, setStatus] = useState('pending')
   const [deciding, setDeciding] = useState<{ threat: Threat; status: 'mitigated' | 'accepted' | 'not_applicable' } | null>(null)
@@ -115,7 +164,8 @@ function Threats({ view, onChanged, onOpenRun }: { view: View; onChanged: (view:
   const reopen = async (threat: Threat) => onChanged(await api.post<View>('/api/threat-models/decide', 'threat-decision', { id: view.model.id, threat: threat.id, status: 'open' }))
   return <Card className="border-app-line bg-panel"><CardContent className="space-y-4 p-5">
     <div className="flex flex-wrap gap-2">
-      {['all', ...Object.keys(STRIDE)].map(letter => <button key={letter} onClick={() => setStride(letter)} className={`rounded-lg border px-2.5 py-1 text-xs ${stride === letter ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{letter === 'all' ? 'Todo STRIDE' : `${letter} · ${STRIDE[letter]} (${view.summary.by_stride[letter] ?? 0})`}</button>)}
+      {['all', ...codes].map(letter => <button key={letter} onClick={() => setStride(letter)} title={letter === 'all' ? undefined : categoryHelp(methodology, letter)} className={`rounded-lg border px-2.5 py-1 text-xs ${stride === letter ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{letter === 'all' ? 'Todas' : `${letter.length <= 2 ? `${letter} · ` : ''}${nameOf(letter)} (${view.summary.by_stride[letter] ?? 0})`}</button>)}
+      <Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => setEditing('new')}><Plus />Amenaza</Button>
       <select aria-label="Estado" value={status} onChange={event => setStatus(event.target.value)} className={`${select} ml-auto`}><option value="pending">Pendientes</option><option value="all">Todos los estados</option>{Object.entries(statusLabel).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
     </div>
     {rows.length === 0 ? <p className="py-8 text-center text-sm text-app-subtle">{view.threats.length ? 'Nada con estos filtros.' : 'Añade componentes y flujos para que aparezcan amenazas.'}</p>
@@ -132,11 +182,14 @@ function Threats({ view, onChanged, onOpenRun }: { view: View; onChanged: (view:
             <div><span className="text-xs font-medium text-app-muted">Mitigaciones</span><ul className="mt-1 list-disc space-y-0.5 pl-5 text-app-secondary">{row.mitigations.map(item => <li key={item}>{item}</li>)}</ul></div>
             <p className="font-mono text-xs text-app-subtle">{row.rule} · {row.cwe.map(item => `CWE-${item}`).join(', ')}</p>
             {row.evidence.length > 0 && <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3"><span className="text-xs font-medium text-amber-900 dark:text-amber-200"><ShieldAlert className="mr-1 inline size-3.5" />Indicios en los análisis ({row.evidence_count})</span><span className="mt-0.5 block text-[11px] text-app-subtle">Hallazgos abiertos relacionados con esta amenaza{row.evidence_scope?.some(scope => !scope.path) ? ' en el repositorio entero: indica la carpeta del componente en el diagrama para afinar' : ` en ${row.evidence_scope?.map(scope => scope.path).join(', ')}`}. Son una señal para revisar, no una confirmación.</span><ul className="mt-2 space-y-1 text-xs">{row.evidence.slice(0, 8).map(item => <li key={item.fingerprint} className="flex flex-wrap items-center gap-2"><Badge variant="outline" className={`text-[10px] ${severityClass[item.severity] ?? ''}`}>{severityLabel[item.severity] ?? item.severity}</Badge><span className="text-app-secondary">{item.title}</span><span className="font-mono text-app-subtle">{item.location}</span><button onClick={() => onOpenRun(item.run_id)} className="text-brand hover:underline">Ver hallazgos</button></li>)}</ul></div>}
+            {row.framework === 'manual' && (row.likelihood || row.impact || row.owner) && <p className="text-xs text-app-muted">Posibilidad: {row.likelihood ? ({ low: 'baja', medium: 'media', high: 'alta' } as const)[row.likelihood] : '—'} · impacto: {row.impact ? ({ low: 'bajo', medium: 'medio', high: 'alto' } as const)[row.impact] : '—'} · responsable: {row.owner || '—'}</p>}
+            {row.framework === 'manual' && <div className="flex gap-1.5"><Button size="xs" variant="outline" className="border-app-line bg-app-soft" onClick={() => setEditing((draft.manual_threats ?? []).find(item => item.id === row.manual_id) ?? null)}><Pencil />Editar</Button><Button size="xs" variant="ghost" onClick={() => void removeManual(row.manual_id ?? '')}><Trash2 />Quitar</Button></div>}
             {row.decision && <p className="text-xs text-app-muted"><strong>{statusLabel[row.status]}</strong> por {row.decision.by} el {formatDate(row.decision.at)}: {row.decision.reason}</p>}
             <div className="flex flex-wrap gap-1.5">{row.decision ? <Button size="xs" variant="outline" className="border-app-line bg-app-soft" onClick={() => void reopen(row)}>Reabrir</Button>
               : (['mitigated', 'accepted', 'not_applicable'] as const).map(next => <Button key={next} size="xs" variant="outline" className="border-app-line bg-app-soft" onClick={() => setDeciding({ threat: row, status: next })}>{statusLabel[next]}</Button>)}</div>
           </div>}
         </div> })}</div>}
+    {editing && <ManualThreatDialog model={draft} initial={editing === 'new' ? undefined : editing} methodology={methodology} busy={busy} onClose={() => setEditing(null)} onSave={threat => void saveManual(threat)} />}
     {deciding && <DecisionDialog modelId={view.model.id} threat={deciding.threat} status={deciding.status} onClose={() => setDeciding(null)} onDone={next => { setDeciding(null); onChanged(next) }} />}
   </CardContent></Card>
 }

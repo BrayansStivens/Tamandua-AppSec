@@ -48,7 +48,8 @@ def _view(request: Request, model: dict) -> dict:
 @route("GET", "/api/threat-models")
 def models(request: Request):
     return request.json(200, {"models": tm.list_models(request.data_dir), "assets": list(_assets(request).values()),
-                              "kinds": tm.KINDS, "protocols": tm.PROTOCOLS, "classifications": tm.CLASSIFICATION_LABELS})
+                              "kinds": tm.KINDS, "protocols": tm.PROTOCOLS, "classifications": tm.CLASSIFICATION_LABELS,
+                              "methods": tm.threat_methods.catalog()})
 
 
 @route("GET", "/api/threat-models/", prefix=True)
@@ -70,10 +71,10 @@ def model_detail(request: Request):
     return request.json(404, {"error": "Ruta no encontrada"})
 
 
-@route("POST", "/api/threat-models", action="save-threat-model", body=200_000)
+@route("POST", "/api/threat-models", action="save-threat-model", body=600_000)
 def save_model(request: Request):
     payload = request.payload
-    if not isinstance(payload, dict) or not set(payload) <= {"id", "model", "suggest", "name"}:
+    if not isinstance(payload, dict) or not set(payload) <= {"id", "model", "suggest", "name", "methodology"}:
         return request.json(400, {"error": "Solicitud inválida"})
     assets = _assets(request)
     try:
@@ -95,6 +96,7 @@ def save_model(request: Request):
                 repositories.append({"id": item, "name": assets[item]["name"],
                                      "inventory": inventory or record.get("inventory"), "findings": record.get("findings", [])})
             draft = tm.suggest(tm._text(payload.get("name"), 80, "El nombre", required=True), repositories)
+            draft["methodology"] = payload.get("methodology") or "stride"
             model = tm.validate(draft, known_assets=set(assets))
             return request.json(200, _view(request, tm.save(request.data_dir, model, by=request.user["username"])))
         model = tm.validate(payload.get("model"), known_assets=set(assets))

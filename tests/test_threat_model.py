@@ -110,6 +110,52 @@ class ModelTests(unittest.TestCase):
         self.assertIsNone(model(components=odd)["components"][0]["position"])
         self.assertEqual(tm._layout(placed)["nodes"]["usuario"], {"x": 10.3, "y": -4})  # las exportaciones usan lo dibujado
 
+    def test_linddun_looks_at_privacy_not_security(self):
+        rows = tm.threats(model(methodology="linddun"))
+        fired = {(row["rule"], row["element"]) for row in rows}
+        self.assertIn(("PV-Dd02", "db"), fired)          # datos personales sin cifrar en reposo
+        self.assertIn(("PV-L01", "db"), fired)
+        self.assertIn(("PV-U01", "api"), fired)          # recoge datos personales del usuario
+        self.assertFalse([row for row in rows if row["rule"].startswith("TM-")])
+        self.assertEqual({row["framework"] for row in rows}, {"linddun"})
+        self.assertIn("Divulgación de datos", {row["category"] for row in rows})
+
+    def test_team_written_threats_live_in_every_methodology(self):
+        manual = [{"id": "robo-sesion", "title": "Robo de sesión desde un Wi-Fi público", "category": "Sesión", "element": "f1",
+                   "severity": "high", "scenario": "Un atacante en la misma red...", "likelihood": "medium", "impact": "high", "owner": "ana"}]
+        for method in ("stride", "custom", "attack_trees"):
+            rows = tm.threats(model(methodology=method, manual_threats=manual))
+            own = [row for row in rows if row["framework"] == "manual"]
+            self.assertEqual((len(own), own[0]["element_name"], own[0]["owner"]), (1, "Usuario → API", "ana"), method)
+        self.assertEqual({row["framework"] for row in tm.threats(model(methodology="custom", manual_threats=manual))}, {"manual"})
+        with self.assertRaises(tm.ModelError):
+            model(manual_threats=[{**manual[0], "element": "no-existe"}])
+        with self.assertRaises(tm.ModelError):
+            model(methodology="inventado")
+
+    def test_attack_trees_and_attack_mappings_are_validated_and_reported(self):
+        tree = {"id": "cuenta", "goal": "Entrar en la cuenta de otro usuario", "nodes": [
+            {"id": "a", "parent": None, "text": "Robar la contraseña", "gate": "or"},
+            {"id": "b", "parent": "a", "text": "Phishing", "difficulty": "low"},
+            {"id": "c", "parent": None, "text": "Saltarse el segundo factor", "gate": "and", "element": "api", "mitigated": True}]}
+        mappings = [{"technique": "T1110", "element": "api", "status": "relevant", "note": "Sin límite de intentos"},
+                    {"technique": "T1110", "element": "api"}]  # duplicado: se ignora
+        current = model(methodology="attack", attack_trees=[tree], attack_mappings=mappings,
+                        pasta={"objectives": "Que nadie pague por otro"})
+        self.assertEqual(len(current["attack_mappings"]), 1)
+        report = tm.to_markdown({**current, "updated_at": "", "updated_by": "x"}, tm.threats(current))
+        for text in ("Enfoque: **MITRE ATT&CK**", "T1110 Brute Force", "Acceso a credenciales", "attack.mitre.org",
+                     "Entrar en la cuenta de otro usuario", "  - Phishing", "mitigado", "Que nadie pague por otro"):
+            self.assertIn(text, report)
+        for bad in ({**tree, "nodes": [{"id": "a", "parent": "b", "text": "x"}, {"id": "b", "parent": "a", "text": "y"}]},
+                    {**tree, "nodes": [{"id": "a", "parent": "zz", "text": "x"}]}):
+            with self.assertRaises(tm.ModelError):
+                model(attack_trees=[bad])
+        with self.assertRaises(tm.ModelError):
+            model(attack_mappings=[{"technique": "T9999"}])
+        with self.assertRaises(tm.ModelError):
+            model(pasta={"inventada": "x"})
+
     def test_several_repositories_name_their_processes(self):
         inventory = {"packages": {"pypi": ["fastapi"]}}
         draft = tm.suggest("S", [{"id": "github:o/a", "name": "o/a", "inventory": inventory, "findings": []},
