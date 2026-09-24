@@ -3,6 +3,9 @@
 - Trivy: dependencias de cualquier ecosistema, configuración de infraestructura
   (Dockerfile, Kubernetes, Terraform) y secretos. Necesita red solo para bajar su
   base de vulnerabilidades, que se cachea; no envía nada del repositorio.
+- OSV-Scanner: dependencias con la base OSV (que incluye la GitHub Advisory Database de
+  Dependabot) y más formatos de manifiesto (.NET, Gradle, uv…). Baja las bases de avisos
+  y compara en local; lo que coincide con Trivy se une en un solo hallazgo.
 - Gitleaks: secretos con alta precisión. Sin red.
 - Opengrep: SAST multi-lenguaje con nuestras propias reglas (`rules/`). Sin red.
 - Checkov y zizmor: infraestructura como código y pipelines de CI/CD (`config_scanners`). Sin red.
@@ -35,6 +38,9 @@ RULES_DIR = Path(__file__).resolve().parents[1] / "rules"
 IMAGES = {
     "trivy": {"name": "Trivy", "version": "0.74.0",
               "image": "aquasec/trivy@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969"},
+    # Dependencias con la base OSV (incluye la GitHub Advisory Database de Dependabot) y más formatos de manifiesto.
+    "osv-scanner": {"name": "OSV-Scanner", "version": "2.6.0",
+                    "image": "ghcr.io/google/osv-scanner@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa"},
     "gitleaks": {"name": "Gitleaks", "version": "8.30.1",
                  "image": "ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"},
     "opengrep": {"name": "Opengrep", "version": "1.30.0", "image": "appsec-agent/opengrep:1.30.0"},
@@ -550,6 +556,75 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
     if not feeds.get("kev") or not feeds.get("epss"):
         detail += " KEV/EPSS no disponibles; la prioridad usa solo CVSS."
     return _result("trivy", "completed", detail, findings, started)
+
+
+# --- OSV-Scanner ---------------------------------------------------------------------
+
+def parse_osv_scanner(payload: dict, feeds: dict) -> list[dict]:
+    """Un hallazgo por aviso y paquete. OSV agrupa en `groups` los identificadores del mismo aviso
+    (GHSA, PYSEC, CVE…); de cada grupo se toma uno como principal y el resto quedan como alias."""
+    from .advisories import dependency_finding
+    from .dependency_merge import stable_fingerprint
+    findings, seen = [], set()
+    for result in payload.get("results") or []:
+        path = _relative(str((result.get("source") or {}).get("path") or ""))
+        for entry in result.get("packages") or []:
+            package = entry.get("package") or {}
+            name, version, ecosystem = str(package.get("name") or ""), str(package.get("version") or ""), str(package.get("ecosystem") or "")
+            if not name or not version:
+                continue
+            vulnerabilities = {item.get("id"): item for item in entry.get("vulnerabilities") or [] if isinstance(item, dict) and item.get("id")}
+            groups = entry.get("groups") or [{"ids": [identifier]} for identifier in vulnerabilities]
+            for group in groups:
+                ids = [item for item in group.get("ids") or [] if item in vulnerabilities]
+                if not ids:
+                    continue
+                main = next((item for item in ids if item.startswith("GHSA-")), ids[0])
+                aliases = set(group.get("aliases") or []) | set(ids)
+                for item in ids:
+                    aliases |= set(vulnerabilities[item].get("aliases") or [])
+                advisory = {**vulnerabilities[main], "aliases": sorted(aliases - {main})}
+                finding = dependency_finding({"ecosystem": ecosystem, "name": name, "version": version, "path": path}, advisory, feeds)
+                digest = stable_fingerprint(main, aliases, ecosystem, name, version)
+                if digest in seen:
+                    continue
+                seen.add(digest)
+                finding.update(fingerprint=digest, finding_id=digest[:16], tool="osv-scanner")
+                findings.append(finding)
+    return findings
+
+
+def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bool = False) -> dict:
+    """OSV-Scanner con las bases de avisos descargadas en local: la lista de dependencias no sale de aquí.
+
+    Solo con `resolve` (el usuario autorizó consultas externas) resuelve dependencias transitivas de
+    manifiestos sin lockfile, lo que consulta deps.dev. El análisis de llamadas queda apagado: en Rust
+    ejecutaría scripts de compilación del repositorio."""
+    started = time.time()
+    if not docker_available():
+        return _result("osv-scanner", "not_tested", "Docker no disponible: dependencias con OSV-Scanner no se ejecutaron.")
+    cache_dir = writable_cache(cache_dir)
+    arguments = ["scan", "source", "-r", "--format", "json", "--offline-vulnerabilities", "--download-offline-databases",
+                 "--allow-no-lockfiles", "--no-call-analysis=go", "--no-call-analysis=rust", *([] if resolve else ["--no-resolve"]), "/src"]
+    try:
+        completed = _run("osv-scanner", arguments, snapshot, network=True, timeout=1800,
+                         env={"OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY": "/cache"}, mounts=["-v", f"{host_path(cache_dir)}:/cache"])
+        # 0: sin avisos · 1: con avisos. Cualquier otro código es un error del motor.
+        if completed.returncode not in (0, 1) or not completed.stdout.strip():
+            if completed.returncode == 0:
+                return _result("osv-scanner", "completed", "No hay manifiestos de dependencias que OSV-Scanner reconozca.", started=started)
+            return _result("osv-scanner", "inconclusive", with_cause("OSV-Scanner terminó con error antes de producir resultados", completed), started=started)
+        payload = json.loads(completed.stdout)
+    except subprocess.TimeoutExpired:
+        return _result("osv-scanner", "inconclusive", "OSV-Scanner superó el tiempo máximo (la primera vez descarga las bases de avisos).", started=started)
+    except (OSError, ValueError):
+        return _result("osv-scanner", "inconclusive", "OSV-Scanner no devolvió una salida legible.", started=started)
+    findings = parse_osv_scanner(payload, feeds)
+    manifests = {str((result.get("source") or {}).get("path") or "") for result in payload.get("results") or []}
+    packages = sum(len(result.get("packages") or []) for result in payload.get("results") or [])
+    detail = (f"{len(manifests)} manifiestos con {packages} paquetes vulnerables: {len(findings)} avisos, "
+              f"comparados en local con la base OSV" + ("" if resolve else " (sin resolver transitivas: no se envía la lista de dependencias)") + ".")
+    return _result("osv-scanner", "completed", detail, findings, started)
 
 
 # --- Gitleaks -------------------------------------------------------------------------

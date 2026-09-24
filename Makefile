@@ -78,7 +78,7 @@ setup-code: ## Muestra el código para crear el primer administrador
 	  echo "Código de configuración: $$code  (créalo en $(URL))"; \
 	else echo "Ya hay un administrador creado: entra con tu usuario."; fi
 
-engines: ## Descarga las imágenes de los motores que falten (Trivy, Gitleaks, Grype, Checkov, zizmor), con progreso
+engines: ## Descarga las imágenes de los motores que falten (Trivy, OSV-Scanner, Gitleaks, Grype, Checkov, zizmor), con progreso
 	@images=$$($(ENGINE_IMAGES)); \
 	missing=0; for image in $$images; do docker image inspect "$$image" >/dev/null 2>&1 || missing=$$((missing + 1)); done; \
 	if [ $$missing -eq 0 ]; then echo 'Motores: todas las imágenes están listas.'; exit 0; fi; \

@@ -24,7 +24,7 @@ const ACTION_ORDER: Record<string, number> = { act: 0, attend: 1, track: 2 }
 const severityLabel: Record<string, string> = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja', info: 'Info' }
 const actionLabel: Record<string, string> = { act: 'Actuar ya', attend: 'Atender', track: 'Seguimiento' }
 const scannerLabel: Record<string, string> = { sca: 'Dependencia', sast: 'Código', secrets: 'Secreto', iac: 'Infraestructura', cicd: 'CI/CD' }
-const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', checkov: 'Checkov', zizmor: 'zizmor', 'appsec-agent': 'Reglas propias' }
+const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', 'osv-scanner': 'OSV-Scanner', checkov: 'Checkov', zizmor: 'zizmor', 'appsec-agent': 'Reglas propias' }
 // Motor y, si otro lo confirmó, también ese: «Trivy + Grype».
 const toolsOf = (finding: { tool?: string; also_detected_by?: string[] }) => [finding.tool, ...(finding.also_detected_by ?? [])].filter(Boolean).map(tool => toolLabel[tool as string] ?? tool).join(' + ')
 const stepLabel = (status: string) => ({ completed: 'Completado', partial: 'Parcial', not_tested: 'No probado', inconclusive: 'Inconcluso', pending: 'Pendiente' }[status] ?? status)

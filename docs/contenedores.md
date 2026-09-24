@@ -47,7 +47,7 @@ Funciona igual en macOS (Apple Silicon e Intel), Linux y Windows con WSL o Git B
 | `make status` | Estado de los contenedores y de las imágenes de los motores. |
 | `make logs` | Sigue los logs de la app. |
 | `make setup-code` | Vuelve a mostrar el código de configuración. |
-| `make engines` | Descarga desde el host, con progreso, las imágenes de Trivy, Gitleaks, Grype, Checkov y zizmor que falten. `make up` ya lo hace; úsalo para reintentar si falló la conexión. |
+| `make engines` | Descarga desde el host, con progreso, las imágenes de Trivy, OSV-Scanner, Gitleaks, Grype, Checkov y zizmor que falten. `make up` ya lo hace; úsalo para reintentar si falló la conexión. |
 | `make update` | `git pull` y vuelve a levantar con la versión nueva. |
 | `make backup` | Copia `data/` y `config/` en `backups/<fecha>/`. Se niega si hay análisis en curso (salvo `FORCE=1`). |
 | `make shell` | Terminal dentro del contenedor. |

@@ -1,0 +1,1457 @@
+{
+ "results": [
+  {
+   "source": {
+    "path": "/src/api/Api.csproj",
+    "type": "lockfile"
+   },
+   "packages": [
+    {
+     "package": {
+      "name": "Newtonsoft.Json",
+      "version": "12.0.1",
+      "ecosystem": "NuGet"
+     },
+     "groups": [
+      {
+       "ids": [
+        "GHSA-5crp-9r3c-p9vr"
+       ],
+       "aliases": [
+        "CVE-2024-21907",
+        "GHSA-5crp-9r3c-p9vr"
+       ],
+       "max_severity": "7.5"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "NuGet",
+          "name": "Newtonsoft.Json",
+          "purl": "pkg:nuget/Newtonsoft.Json"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "13.0.1"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-21907"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-755"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2022-06-22T15:08:47Z",
+        "nvd_published_at": null,
+        "severity": "HIGH"
+       },
+       "details": "Newtonsoft.Json prior to version 13.0.1 is vulnerable to Insecure Defaults due to improper handling of expressions with high nesting level that lead to StackOverFlow exception or high CPU and RAM usag",
+       "id": "GHSA-5crp-9r3c-p9vr",
+       "modified": "2026-07-08T06:53:11.583483075Z",
+       "published": "2022-06-22T15:08:47Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/JamesNK/Newtonsoft.Json/issues/2457"
+        },
+        {
+         "type": "WEB",
+         "url": "https://github.com/JamesNK/Newtonsoft.Json/pull/2462"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Improper Handling of Exceptional Conditions in Newtonsoft.Json"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "source": {
+    "path": "/src/py/requirements.txt",
+    "type": "lockfile"
+   },
+   "packages": [
+    {
+     "package": {
+      "name": "requests",
+      "version": "2.25.0",
+      "ecosystem": "PyPI"
+     },
+     "groups": [
+      {
+       "ids": [
+        "PYSEC-2023-74",
+        "GHSA-j8r2-6x86-q33q"
+       ],
+       "aliases": [
+        "CVE-2023-32681",
+        "GHSA-j8r2-6x86-q33q",
+        "PYSEC-2023-74"
+       ],
+       "max_severity": "6.1"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-1872",
+        "GHSA-9hjg-9r4m-mvj7"
+       ],
+       "aliases": [
+        "CVE-2024-47081",
+        "GHSA-9hjg-9r4m-mvj7",
+        "PYSEC-2026-1872"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-1873",
+        "GHSA-9wx4-h78v-vm56"
+       ],
+       "aliases": [
+        "CVE-2024-35195",
+        "GHSA-9wx4-h78v-vm56",
+        "PYSEC-2026-1873"
+       ],
+       "max_severity": "5.6"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-2275",
+        "GHSA-gc5v-m9x4-r6x2"
+       ],
+       "aliases": [
+        "CVE-2026-25645",
+        "GHSA-gc5v-m9x4-r6x2",
+        "PYSEC-2026-2275"
+       ],
+       "max_severity": "5.5"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "74ea7cf7a6a27a4eeb2ae24e162bcc942a6706d5"
+            }
+           ],
+           "repo": "https://github.com/psf/requests",
+           "type": "GIT"
+          },
+          {
+           "events": [
+            {
+             "introduced": "2.3.0"
+            },
+            {
+             "fixed": "2.31.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2023-32681",
+        "GHSA-j8r2-6x86-q33q"
+       ],
+       "details": "Requests is a HTTP library. Since Requests 2.3.0, Requests has been leaking Proxy-Authorization headers to destination servers when redirected to an HTTPS endpoint. This is a product of how we use `re",
+       "id": "PYSEC-2023-74",
+       "modified": "2023-11-08T04:12:35.436175Z",
+       "published": "2023-05-26T18:15:00Z",
+       "references": [
+        {
+         "type": "ADVISORY",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q"
+        },
+        {
+         "type": "WEB",
+         "url": "https://github.com/psf/requests/releases/tag/v2.31.0"
+        }
+       ],
+       "schema_version": "1.7.3"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "2.32.4"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-47081",
+        "GHSA-9hjg-9r4m-mvj7"
+       ],
+       "details": "### Impact\n\nDue to a URL parsing issue, Requests releases prior to 2.32.4 may leak .netrc credentials to third parties for specific maliciously-crafted URLs.\n\n### Workarounds\nFor older versions of Req",
+       "id": "PYSEC-2026-1872",
+       "modified": "2026-07-07T17:47:00.332079836Z",
+       "published": "2026-07-07T16:02:54.151964Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-9hjg-9r4m-mvj7"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-47081"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Requests vulnerable to .netrc credentials leak via malicious URLs"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "2.32.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-35195",
+        "GHSA-9wx4-h78v-vm56"
+       ],
+       "details": "When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even i",
+       "id": "PYSEC-2026-1873",
+       "modified": "2026-07-07T17:46:36.762141019Z",
+       "published": "2026-07-07T11:45:42.890131Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-35195"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Requests `Session` object does not verify requests after making first request with verify=False"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "2.33.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-25645",
+        "GHSA-gc5v-m9x4-r6x2"
+       ],
+       "details": "Requests is a HTTP library. Prior to version 2.33.0, the `requests.utils.extract_zipped_paths()` utility function uses a predictable filename when extracting files from zip archives into the system te",
+       "id": "PYSEC-2026-2275",
+       "modified": "2026-07-13T07:15:43.964902190Z",
+       "published": "2026-03-25T17:16:52.970Z",
+       "references": [
+        {
+         "type": "ADVISORY",
+         "url": "https://github.com/psf/requests/releases/tag/v2.33.0"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-gc5v-m9x4-r6x2"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N",
+         "type": "CVSS_V3"
+        }
+       ]
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "2.32.4"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-47081",
+        "PYSEC-2026-1872"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-522"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2025-06-09T19:06:08Z",
+        "nvd_published_at": "2025-06-09T18:15:24Z",
+        "severity": "MODERATE"
+       },
+       "details": "### Impact\n\nDue to a URL parsing issue, Requests releases prior to 2.32.4 may leak .netrc credentials to third parties for specific maliciously-crafted URLs.\n\n### Workarounds\nFor older versions of Req",
+       "id": "GHSA-9hjg-9r4m-mvj7",
+       "modified": "2026-09-10T03:50:25.139398550Z",
+       "published": "2025-06-09T19:06:08Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-9hjg-9r4m-mvj7"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-47081"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Requests vulnerable to .netrc credentials leak via malicious URLs"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "2.32.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-35195",
+        "PYSEC-2026-1873"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-670"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2024-05-20T20:15:00Z",
+        "nvd_published_at": "2024-05-20T21:15:09Z",
+        "severity": "MODERATE"
+       },
+       "details": "When using a `requests.Session`, if the first request to a given origin is made with `verify=False`, TLS certificate verification may remain disabled for all subsequent requests to that origin, even i",
+       "id": "GHSA-9wx4-h78v-vm56",
+       "modified": "2026-09-10T03:50:13.740879755Z",
+       "published": "2024-05-20T20:15:00Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-9wx4-h78v-vm56"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-35195"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Requests `Session` object does not verify requests after making first request with verify=False"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "2.33.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-25645",
+        "PYSEC-2026-2275"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-377"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-03-25T16:56:28Z",
+        "nvd_published_at": "2026-03-25T17:16:52Z",
+        "severity": "MODERATE"
+       },
+       "details": "### Impact\nThe `requests.utils.extract_zipped_paths()` utility function uses a predictable filename when extracting files from zip archives into the system temporary directory. If the target file alre",
+       "id": "GHSA-gc5v-m9x4-r6x2",
+       "modified": "2026-09-10T03:50:39.207922076Z",
+       "published": "2026-03-25T16:56:28Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-gc5v-m9x4-r6x2"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-25645"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:L/AC:H/PR:L/UI:R/S:U/C:N/I:H/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Requests has Insecure Temp File Reuse in its extract_zipped_paths() utility function"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "requests",
+          "purl": "pkg:pypi/requests"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "2.3.0"
+            },
+            {
+             "fixed": "2.31.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2023-32681",
+        "PYSEC-2023-74"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-200"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2023-05-22T20:36:32Z",
+        "nvd_published_at": "2023-05-26T18:15:14Z",
+        "severity": "MODERATE"
+       },
+       "details": "### Impact\n\nSince Requests v2.3.0, Requests has been vulnerable to potentially leaking `Proxy-Authorization` headers to destination servers, specifically during redirects to an HTTPS origin. This is a",
+       "id": "GHSA-j8r2-6x86-q33q",
+       "modified": "2026-09-10T03:50:01.756149727Z",
+       "published": "2023-05-22T20:36:32Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/psf/requests/security/advisories/GHSA-j8r2-6x86-q33q"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-32681"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:N/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Unintended leak of Proxy-Authorization header in requests"
+      }
+     ]
+    },
+    {
+     "package": {
+      "name": "starlette",
+      "version": "0.27.0",
+      "ecosystem": "PyPI"
+     },
+     "groups": [
+      {
+       "ids": [
+        "PYSEC-2026-161",
+        "GHSA-86qp-5c8j-p5mr"
+       ],
+       "aliases": [
+        "CVE-2026-48710",
+        "GHSA-86qp-5c8j-p5mr",
+        "PYSEC-2026-161",
+        "X41-2026-002"
+       ],
+       "max_severity": "6.5"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-1941",
+        "GHSA-2c2j-9gv5-cj73"
+       ],
+       "aliases": [
+        "CVE-2025-54121",
+        "GHSA-2c2j-9gv5-cj73",
+        "PYSEC-2026-1941"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-1943",
+        "GHSA-f96h-pmfr-66vw"
+       ],
+       "aliases": [
+        "CVE-2024-47874",
+        "GHSA-f96h-pmfr-66vw",
+        "PYSEC-2026-1943"
+       ],
+       "max_severity": "8.7"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-2280",
+        "GHSA-x746-7m8f-x49c"
+       ],
+       "aliases": [
+        "CVE-2026-48817",
+        "GHSA-x746-7m8f-x49c",
+        "PYSEC-2026-2280"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-2281",
+        "GHSA-wqp7-x3pw-xc5r"
+       ],
+       "aliases": [
+        "CVE-2026-48818",
+        "GHSA-wqp7-x3pw-xc5r",
+        "PYSEC-2026-2281"
+       ],
+       "max_severity": "7.5"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-248",
+        "GHSA-jp82-jpqv-5vv3"
+       ],
+       "aliases": [
+        "CVE-2026-54282",
+        "GHSA-jp82-jpqv-5vv3",
+        "PYSEC-2026-248"
+       ],
+       "max_severity": "5.3"
+      },
+      {
+       "ids": [
+        "PYSEC-2026-249",
+        "GHSA-82w8-qh3p-5jfq"
+       ],
+       "aliases": [
+        "CVE-2026-54283",
+        "GHSA-82w8-qh3p-5jfq",
+        "PYSEC-2026-249"
+       ],
+       "max_severity": "7.5"
+      }
+     ],
+     "vulnerabilities": [
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.0.1"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-48710",
+        "GHSA-86qp-5c8j-p5mr",
+        "X41-2026-002"
+       ],
+       "details": "Starlette reconstructs the requested URL based on the HTTP Host request header and requested path, but does not perform any validation of the Host header value. This allows attackers to inject paths i",
+       "id": "PYSEC-2026-161",
+       "modified": "2026-05-26T15:41:31.112064345Z",
+       "published": "2026-05-22T13:10:03Z",
+       "references": [
+        {
+         "type": "ARTICLE",
+         "url": "https://badhost.org"
+        },
+        {
+         "type": "ARTICLE",
+         "url": "https://www.secwest.net/starlette"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "summary": "BadHost: Missing Host header validation poisons request.url.path, bypassing path-based security checks"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "0.47.2"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2025-54121",
+        "GHSA-2c2j-9gv5-cj73"
+       ],
+       "details": "### Summary\nWhen parsing a multi-part form with large files (greater than the [default max spool size](https://github.com/encode/starlette/blob/fa5355442753f794965ae1af0f87f9fec1b9a3de/starlette/formp",
+       "id": "PYSEC-2026-1941",
+       "modified": "2026-07-07T17:47:58.806073973Z",
+       "published": "2026-07-07T16:02:58.086064Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/encode/starlette/security/advisories/GHSA-2c2j-9gv5-cj73"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-54121"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Starlette has possible denial-of-service vector when parsing large files in multipart forms"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "0.40.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-47874",
+        "GHSA-f96h-pmfr-66vw"
+       ],
+       "details": "### Summary\nStarlette treats `multipart/form-data` parts without a `filename` as text form fields and buffers those in byte strings with no size limit. This allows an attacker to upload arbitrary larg",
+       "id": "PYSEC-2026-1943",
+       "modified": "2026-07-07T17:47:58.815486711Z",
+       "published": "2026-07-07T14:34:43.184287Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/encode/starlette/security/advisories/GHSA-f96h-pmfr-66vw"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-47874"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N",
+         "type": "CVSS_V3"
+        },
+        {
+         "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N",
+         "type": "CVSS_V4"
+        }
+       ],
+       "summary": "Starlette Denial of service (DoS) via multipart/form-data"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.1.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-48817",
+        "GHSA-x746-7m8f-x49c"
+       ],
+       "details": "Starlette is a lightweight ASGI framework/toolkit. In versions 1.0.1 and below, when dispatching a request, HTTPEndpoint selects the handler by lowercasing the HTTP method and looking it up as an attr",
+       "id": "PYSEC-2026-2280",
+       "modified": "2026-07-13T07:15:42.498495396Z",
+       "published": "2026-06-17T20:17:22.427Z",
+       "references": [
+        {
+         "type": "ADVISORY",
+         "url": "https://github.com/Kludex/starlette/releases/tag/1.1.0"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-x746-7m8f-x49c"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+         "type": "CVSS_V3"
+        }
+       ]
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.1.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-48818",
+        "GHSA-wqp7-x3pw-xc5r"
+       ],
+       "details": "Starlette is a lightweight ASGI framework/toolkit. In versions 1.0.1 and earlier, StaticFiles on Windows is vulnerable to SSRF. An UNC path such as \\\\attacker.com\\share can cause os.path.realpath to i",
+       "id": "PYSEC-2026-2281",
+       "modified": "2026-07-13T07:15:42.493904758Z",
+       "published": "2026-06-17T19:18:09.807Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://access.redhat.com/security/cve/CVE-2026-48818"
+        },
+        {
+         "type": "WEB",
+         "url": "https://security.access.redhat.com/data/csaf/v2/vex/2026/cve-2026-48818.json"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+         "type": "CVSS_V3"
+        }
+       ]
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.3.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-54282",
+        "GHSA-jp82-jpqv-5vv3"
+       ],
+       "details": "Starlette is a lightweight ASGI framework/toolkit. Prior to 1.3.0, the HTTP request path is not validated before being used to reconstruct request.url. Because request.url is rebuilt by concatenating ",
+       "id": "PYSEC-2026-248",
+       "modified": "2026-06-27T11:15:06.799060438Z",
+       "published": "2026-06-22T18:16:46.807Z",
+       "references": [
+        {
+         "type": "ADVISORY",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-jp82-jpqv-5vv3"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+         "type": "CVSS_V3"
+        }
+       ]
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0.4.1"
+            },
+            {
+             "fixed": "1.3.1"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-54283",
+        "GHSA-82w8-qh3p-5jfq"
+       ],
+       "details": "Starlette is a lightweight ASGI framework/toolkit. From 0.4.1 until 1.3.1, request.form() accepts max_fields and max_part_size to bound resource consumption while parsing form data. These limits are e",
+       "id": "PYSEC-2026-249",
+       "modified": "2026-06-27T11:15:06.800792374Z",
+       "published": "2026-06-22T18:16:46.943Z",
+       "references": [
+        {
+         "type": "ADVISORY",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-82w8-qh3p-5jfq"
+        }
+       ],
+       "schema_version": "1.7.5",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+         "type": "CVSS_V3"
+        }
+       ]
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "0.47.2"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2025-54121",
+        "PYSEC-2026-1941"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-770"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2025-07-21T19:34:23Z",
+        "nvd_published_at": "2025-07-21T20:15:41Z",
+        "severity": "MODERATE"
+       },
+       "details": "### Summary\nWhen parsing a multi-part form with large files (greater than the [default max spool size](https://github.com/encode/starlette/blob/fa5355442753f794965ae1af0f87f9fec1b9a3de/starlette/formp",
+       "id": "GHSA-2c2j-9gv5-cj73",
+       "modified": "2026-09-10T03:50:25.704876348Z",
+       "published": "2025-07-21T19:34:23Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/encode/starlette/security/advisories/GHSA-2c2j-9gv5-cj73"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-54121"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Starlette has possible denial-of-service vector when parsing large files in multipart forms"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0.4.1"
+            },
+            {
+             "fixed": "1.3.1"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-54283",
+        "PYSEC-2026-249"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-770"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-06-15T20:39:53Z",
+        "nvd_published_at": null,
+        "severity": "HIGH"
+       },
+       "details": "### Summary\n`request.form()` accepts `max_fields` and `max_part_size` to bound resource consumption while parsing form data. These limits are enforced for `multipart/form-data`, but silently ignored f",
+       "id": "GHSA-82w8-qh3p-5jfq",
+       "modified": "2026-09-10T03:51:08.156199030Z",
+       "published": "2026-06-15T20:39:53Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-82w8-qh3p-5jfq"
+        },
+        {
+         "type": "PACKAGE",
+         "url": "https://github.com/Kludex/starlette"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Starlette: request.form() limits silently ignored for application/x-www-form-urlencoded enable DoS"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.0.1"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-48710",
+        "PYSEC-2026-161",
+        "X41-2026-002"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-1289",
+         "CWE-444"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-06-04T13:15:17Z",
+        "nvd_published_at": "2026-05-26T22:16:44Z",
+        "severity": "MODERATE"
+       },
+       "details": "### Summary\nIn affected versions, the HTTP `Host` request header was not validated before being used to reconstruct `request.url`. Because the routing algorithm relies on the raw HTTP path while `requ",
+       "id": "GHSA-86qp-5c8j-p5mr",
+       "modified": "2026-09-10T03:51:08.121685407Z",
+       "published": "2026-06-04T13:15:17Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-86qp-5c8j-p5mr"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-48710"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Starlette has missing Host header validation that poisons request.url.path, bypassing path-based security checks"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "0.40.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2024-47874",
+        "PYSEC-2026-1943"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-770"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2024-10-15T18:12:57Z",
+        "nvd_published_at": "2024-10-15T16:15:05Z",
+        "severity": "HIGH"
+       },
+       "details": "### Summary\nStarlette treats `multipart/form-data` parts without a `filename` as text form fields and buffers those in byte strings with no size limit. This allows an attacker to upload arbitrary larg",
+       "id": "GHSA-f96h-pmfr-66vw",
+       "modified": "2026-09-10T03:50:19.756287586Z",
+       "published": "2024-10-15T18:12:57Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/encode/starlette/security/advisories/GHSA-f96h-pmfr-66vw"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-47874"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N",
+         "type": "CVSS_V3"
+        },
+        {
+         "score": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N",
+         "type": "CVSS_V4"
+        }
+       ],
+       "summary": "Starlette Denial of service (DoS) via multipart/form-data"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.3.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-54282",
+        "PYSEC-2026-248"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-20",
+         "CWE-706"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-06-15T20:38:08Z",
+        "nvd_published_at": "2026-06-22T18:16:46Z",
+        "severity": "LOW"
+       },
+       "details": "### Summary\n\nIn affected versions, the HTTP request path is not validated before being used to reconstruct `request.url`. Because `request.url` is rebuilt by concatenating `{scheme}://{host}{path}` an",
+       "id": "GHSA-jp82-jpqv-5vv3",
+       "modified": "2026-09-10T03:50:50.050800090Z",
+       "published": "2026-06-15T20:38:08Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-jp82-jpqv-5vv3"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-54282"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Starlette: Unvalidated request path concatenated into authority poisons request.url.hostname"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.1.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-48818",
+        "PYSEC-2026-2281"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-918"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-06-15T20:16:30Z",
+        "nvd_published_at": null,
+        "severity": "HIGH"
+       },
+       "details": "### Summary\n\nWhen serving static files on Windows, `StaticFiles` resolves the requested path with [`os.path.realpath`](https://docs.python.org/3/library/os.path.html#os.path.realpath). If a UNC path (",
+       "id": "GHSA-wqp7-x3pw-xc5r",
+       "modified": "2026-09-10T03:50:51.079936646Z",
+       "published": "2026-06-15T20:16:30Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-wqp7-x3pw-xc5r"
+        },
+        {
+         "type": "PACKAGE",
+         "url": "https://github.com/Kludex/starlette"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Starlette: SSRF and NTLM credential theft via UNC paths in StaticFiles on Windows"
+      },
+      {
+       "affected": [
+        {
+         "package": {
+          "ecosystem": "PyPI",
+          "name": "starlette",
+          "purl": "pkg:pypi/starlette"
+         },
+         "ranges": [
+          {
+           "events": [
+            {
+             "introduced": "0"
+            },
+            {
+             "fixed": "1.1.0"
+            }
+           ],
+           "type": "ECOSYSTEM"
+          }
+         ]
+        }
+       ],
+       "aliases": [
+        "CVE-2026-48817",
+        "PYSEC-2026-2280"
+       ],
+       "database_specific": {
+        "cwe_ids": [
+         "CWE-470"
+        ],
+        "github_reviewed": true,
+        "github_reviewed_at": "2026-06-15T20:16:05Z",
+        "nvd_published_at": "2026-06-17T20:17:22Z",
+        "severity": "MODERATE"
+       },
+       "details": "### Summary\n\nWhen dispatching a request, `HTTPEndpoint` selects the handler by lowercasing the HTTP method and looking it up as an attribute with `getattr`, without restricting the lookup to a known s",
+       "id": "GHSA-x746-7m8f-x49c",
+       "modified": "2026-09-10T03:50:12.272722043Z",
+       "published": "2026-06-15T20:16:05Z",
+       "references": [
+        {
+         "type": "WEB",
+         "url": "https://github.com/Kludex/starlette/security/advisories/GHSA-x746-7m8f-x49c"
+        },
+        {
+         "type": "ADVISORY",
+         "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-48817"
+        }
+       ],
+       "schema_version": "1.9.0",
+       "severity": [
+        {
+         "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+         "type": "CVSS_V3"
+        }
+       ],
+       "summary": "Starlette: Arbitrary HTTP method dispatched to `HTTPEndpoint` attributes via `getattr`"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "experimental_config": {
+  "licenses": {
+   "summary": false,
+   "allowlist": null
+  }
+ }
+}

@@ -65,7 +65,7 @@ No hay telemetría.
 - El código de los repositorios **nunca se ejecuta**: se analiza una instantánea en solo lectura.
 - Los motores corren en contenedores efímeros con `--cap-drop ALL`, `no-new-privileges` y límites de memoria, CPU y procesos. Gitleaks, Opengrep, Checkov y zizmor no tienen red; Trivy y Grype solo la usan para su base de vulnerabilidades y, al analizar una imagen, para leerla del registro.
 - Las imágenes de contenedor que analizas **no se ejecutan ni se construyen**: los motores leen el manifiesto y las capas.
-- Las imágenes de Trivy, Gitleaks, Grype, Checkov y zizmor van fijadas por digest. La de Opengrep se construye con el binario oficial comprobado contra su SHA-256.
+- Las imágenes de Trivy, OSV-Scanner, Gitleaks, Grype, Checkov y zizmor van fijadas por digest. La de Opengrep se construye con el binario oficial comprobado contra su SHA-256.
 - Los valores de los secretos encontrados en tu código se redactan: en los hallazgos queda la ubicación y el tipo, no el valor.
 
 ## Concesiones conocidas

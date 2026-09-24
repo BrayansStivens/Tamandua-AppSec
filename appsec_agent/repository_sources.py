@@ -22,6 +22,7 @@ MAX_ARCHIVE = 1_000_000_000      # descarga comprimida, en disco por streaming
 MAX_EXPANSION = 5_000_000_000    # bytes leídos del archivo antes de sospechar bomba
 MAX_FILES = 200_000              # freno de ejecución desbocada
 MAX_FILE = 2_000_000             # por archivo: por encima es generado o datos
+MAX_MANIFEST = 64_000_000        # manifiestos y lockfiles: se reconocen por nombre; un lockfile grande es normal
 MAX_TOTAL = 2_000_000_000        # fuente acumulada; no debería alcanzarse nunca
 IGNORED = {".git", "node_modules", ".venv", "venv", "data", "dist", "build", "__pycache__", ".next",
            "coverage", "htmlcov", "site-packages", "vendor", "bower_components", "target", "out",
@@ -47,6 +48,37 @@ SOURCE_NAMES = {
     "go.mod", "go.sum", "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
     "gemfile.lock", "composer.json", "composer.lock", "cargo.toml", "cargo.lock",
 }
+# Manifiestos y lockfiles de dependencias de cada ecosistema. Se reconocen por su nombre o
+# extensión, nunca por su tamaño: sin ellos el análisis de dependencias no ve nada.
+MANIFEST_NAMES = {
+    # JavaScript / TypeScript
+    "package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock",
+    "deno.json", "deno.lock",
+    # Python
+    "requirements.txt", "pipfile", "pipfile.lock", "poetry.lock", "pyproject.toml", "setup.py", "setup.cfg",
+    "uv.lock", "pdm.lock", "pylock.toml",
+    # .NET
+    "packages.config", "packages.lock.json", "directory.packages.props", "directory.build.props",
+    "paket.dependencies", "paket.lock",
+    # Java, Kotlin, Scala
+    "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle", "settings.gradle.kts", "gradle.lockfile",
+    "libs.versions.toml", "verification-metadata.xml",
+    # Go, Rust, PHP, Ruby
+    "go.mod", "go.sum", "go.work", "go.work.sum", "cargo.toml", "cargo.lock", "composer.json", "composer.lock",
+    "gemfile", "gemfile.lock", "gems.rb", "gems.locked",
+    # Dart, Elixir, Erlang, Swift, Objective-C, C/C++, R, Haskell
+    "pubspec.yaml", "pubspec.lock", "mix.exs", "mix.lock", "rebar.config", "rebar.lock", "package.swift",
+    "package.resolved", "podfile", "podfile.lock", "cartfile", "cartfile.resolved", "conanfile.txt", "conanfile.py",
+    "conan.lock", "vcpkg.json", "renv.lock", "stack.yaml.lock", "cabal.project.freeze",
+}
+MANIFEST_SUFFIXES = {".csproj", ".fsproj", ".vbproj", ".nuspec", ".sbt", ".gradle", ".lock", ".lockfile"}
+
+
+def is_manifest(relative: Path) -> bool:
+    name = relative.name.lower()
+    return name in MANIFEST_NAMES or relative.suffix.lower() in MANIFEST_SUFFIXES or name.startswith("requirements")
+
+
 # Salida de compilación y bundles: texto, pero generado, y ahoga la señal.
 # Los secretos aparecen en cualquier texto, no solo en el código: la documentación, los
 # ejemplos de configuración y las notas son de los sitios más habituales. Estos ficheros
@@ -387,7 +419,7 @@ def _dot_allowed(part: str, *, last: bool, secrets: bool = False) -> bool:
 
 def _analyzable(relative: Path) -> bool:
     name = relative.name.lower()
-    if name in SOURCE_NAMES or name in SECRET_NAMES or name.startswith(".env"):
+    if name in SOURCE_NAMES or name in SECRET_NAMES or name.startswith(".env") or is_manifest(relative):
         return True
     if any(part in name for part in SKIP_NAME_PARTS):
         return False
@@ -425,7 +457,9 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
                 if not _analyzable(relative):
                     stats["skipped_not_analyzable"] += 1
                     continue
-                if member.size > MAX_FILE:
+                # El código de más de 2 MB es casi siempre generado; un manifiesto, no: su límite es otro.
+                limit = MAX_MANIFEST if is_manifest(relative) else MAX_FILE
+                if member.size > limit:
                     stats["skipped_too_large"] += 1
                     continue
                 if count >= MAX_FILES or total + member.size > MAX_TOTAL:
@@ -435,7 +469,7 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
                 source = archive.extractfile(member)
                 if source is None:
                     continue
-                content = source.read(MAX_FILE + 1)
+                content = source.read(limit + 1)
                 if len(content) != member.size:
                     raise SourceError("Archivo de repositorio inválido")
                 target = root / relative

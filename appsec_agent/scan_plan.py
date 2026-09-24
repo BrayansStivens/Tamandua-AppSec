@@ -13,8 +13,9 @@ from __future__ import annotations
 import os
 import re
 from collections import Counter
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
+from .repository_sources import is_manifest
 from .scanners import IMAGES, RULES_DIR, docker_available, image_available
 
 EXTENSIONS = {
@@ -27,9 +28,6 @@ EXTENSIONS = {
 # Nombre del lenguaje en las reglas → nombre mostrado.
 RULE_LANGUAGES = {"python": "Python", "javascript": "JavaScript", "typescript": "TypeScript", "java": "Java",
                   "go": "Go", "php": "PHP", "ruby": "Ruby", "csharp": "C#"}
-LOCKFILES = re.compile(r"(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|requirements[\w.-]*\.txt|"
-                       r"poetry\.lock|Pipfile\.lock|uv\.lock|go\.mod|Cargo\.lock|composer\.lock|Gemfile\.lock|pom\.xml|"
-                       r"gradle\.lockfile|packages\.lock\.json|mix\.lock|pubspec\.lock)")
 SKIP = {"node_modules", ".git", "vendor", "dist", "build", ".next", "venv", ".venv", "__pycache__", "target"}
 
 
@@ -85,7 +83,8 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
         suffix = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
         if suffix in EXTENSIONS:
             languages[EXTENSIONS[suffix]] += 1
-        if LOCKFILES.fullmatch(name):
+        # La misma definición que decide qué entra al snapshot: el plan no promete lo que no se descarga.
+        if is_manifest(PurePosixPath(path)):
             manifests.append(path)
         if name == "Dockerfile" or name.endswith((".tf", ".tfvars", ".bicep")) or name in ("Chart.yaml", "kustomization.yaml", "serverless.yml") \
                 or re.fullmatch(r"(docker-)?compose[\w.-]*\.ya?ml", name):
@@ -97,7 +96,7 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
     detected = [{"name": name, "files": count, "rules": rules.get(name, 0)} for name, count in languages.most_common()]
     runs, skips = ["Snapshot de solo lectura del repositorio y hash SHA-256 del contenido"], [
         "No se instala ni se ejecuta el código del repositorio: el análisis es estático"]
-    opengrep, gitleaks, trivy = engines["opengrep"], engines["gitleaks"], engines["trivy"]
+    opengrep, gitleaks, trivy, osv = engines["opengrep"], engines["gitleaks"], engines["trivy"], engines["osv-scanner"]
     covered = [item for item in detected if item["rules"]]
     uncovered = [item for item in detected if not item["rules"]]
     if opengrep["available"]:
@@ -116,8 +115,10 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
                 if gitleaks["available"] else "Secretos con patrones internos (Gitleaks no está disponible)")
     if trivy["available"]:
         if manifests:
-            runs.append(f"Dependencias con {trivy['name']} {trivy['version']} y su base de avisos local: "
-                        f"{_n(len(manifests), 'manifiesto', 'manifiestos')} ({', '.join(manifests[:4])}{'…' if len(manifests) > 4 else ''}), cruzados con CISA KEV y EPSS")
+            also = f" y {osv['name']} {osv['version']} (base OSV, la de Dependabot incluida)" if osv["available"] else ""
+            runs.append(f"Dependencias con {trivy['name']} {trivy['version']}{also}, con sus bases de avisos en local: "
+                        f"{_n(len(manifests), 'manifiesto', 'manifiestos')} ({', '.join(manifests[:4])}{'…' if len(manifests) > 4 else ''}), "
+                        "cruzados con CISA KEV y EPSS; un aviso que detectan los dos cuenta una vez")
         elif paths is not None:
             skips.append("Dependencias: no hay lockfiles ni manifiestos con versiones que resolver")
         if iac:

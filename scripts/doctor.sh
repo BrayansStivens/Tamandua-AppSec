@@ -79,7 +79,7 @@ echo
 echo "Motores de análisis"
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   for image in $(sed -n 's/.*"image": "\([^"]*\)".*/\1/p' appsec_agent/scanners.py); do
-    if docker image inspect "$image" >/dev/null 2>&1; then pass "$image"; else note "falta $image" "'make build' construye Opengrep y 'make engines' descarga Trivy, Gitleaks, Grype, Checkov y zizmor (si no, se bajan en el primer análisis)."; fi
+    if docker image inspect "$image" >/dev/null 2>&1; then pass "$image"; else note "falta $image" "'make build' construye Opengrep y 'make engines' descarga Trivy, OSV-Scanner, Gitleaks, Grype, Checkov y zizmor (si no, se bajan en el primer análisis)."; fi
   done
 fi
 

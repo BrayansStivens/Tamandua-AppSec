@@ -23,7 +23,7 @@ class PlanTests(unittest.TestCase):
         self.assertGreater(languages["TypeScript"]["rules"], 0)
         self.assertEqual(languages["Rust"]["rules"], 0)
         self.assertNotIn("JavaScript", languages)  # node_modules no cuenta
-        self.assertEqual(result["manifests"], ["uv.lock", "web/package-lock.json"])
+        self.assertEqual(result["manifests"], ["pyproject.toml", "uv.lock", "web/package-lock.json"])
         self.assertEqual(result["iac"], ["Dockerfile", "infra/main.tf"])
         self.assertTrue(any("Opengrep" in item and "Python (14 reglas, 2 ficheros)" in item for item in result["runs"]))
         self.assertTrue(any(item.startswith("Sin reglas SAST propias para Rust (1 fichero)") for item in result["skips"]))

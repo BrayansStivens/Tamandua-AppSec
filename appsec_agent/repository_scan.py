@@ -17,7 +17,8 @@ from .advisories import MAX_DETAILS, dependency_finding, fetch_advisory, load_fe
 from .coverage import owasp_coverage
 from .engine import WEB_TOP_10_2025
 from .config_scanners import merge_repository, run_checkov, run_zizmor
-from .scanners import IMAGES, docker_available, host_mount_problem, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from .dependency_merge import merge_dependencies
+from .scanners import IMAGES, docker_available, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
 
 
 SECRET_RULES = (
@@ -192,20 +193,30 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         report("info", "Trivy 0.74.0: dependencias, infraestructura y secretos…")
         trivy = run_trivy(root, (data_dir or Path("data")) / "trivy-cache", feeds)
         report("ok" if trivy["status"] != "inconclusive" else "warn", f"Trivy: {trivy['detail']}")
+        report("info", f"OSV-Scanner {IMAGES['osv-scanner']['version']}: dependencias con la base OSV (la primera vez descarga las bases de avisos)…")
+        osv = run_osv_scanner(root, (data_dir or Path("data")) / "osv-cache", feeds, resolve=allow_osv_upload)
         report("info", f"Checkov {IMAGES['checkov']['version']}: infraestructura como código y pipelines…")
         checkov = run_checkov(root)
         report("info", f"zizmor {IMAGES['zizmor']['version']}: seguridad de GitHub Actions…")
         zizmor = run_zizmor(root)
-        tools = [sast, secrets_gitleaks, trivy, checkov, zizmor]
+        tools = [sast, secrets_gitleaks, trivy, osv, checkov, zizmor]
         # Un motor que no corrió no es «cero hallazgos»: se dice en claro y la ejecución queda incompleta.
-        failed = [tool["name"] for tool in (sast, secrets_gitleaks, trivy) if tool["status"] == "inconclusive"]
+        failed = [tool["name"] for tool in (sast, secrets_gitleaks, trivy, osv) if tool["status"] == "inconclusive"]
         if failed:
             report("warn", f"No se pudieron ejecutar: {', '.join(failed)}. El resultado no equivale a «sin hallazgos»; "
                            "revisa en el servidor que las imágenes estén construidas (docker compose build).")
         findings.extend(sast["findings"])
         trivy_secrets = [item for item in trivy["findings"] if item["scanner"] == "secrets"]
         findings.extend(merge_secrets(secrets_gitleaks["findings"], trivy_secrets))
-        findings.extend(item for item in trivy["findings"] if item["scanner"] == "sca")
+        # Trivy manda (sus huellas sostienen el triage ya hecho); OSV-Scanner suma lo que Trivy no ve y
+        # confirma lo que coincide, sin repetir el aviso aunque lo nombre con otro identificador.
+        dependencies_found, dependency_merge = merge_dependencies([item for item in trivy["findings"] if item["scanner"] == "sca"],
+                                                                  ("osv-scanner", osv["findings"]))
+        findings.extend(dependencies_found)
+        if osv["status"] == "completed" and osv["findings"]:
+            osv["detail"] += (f" {dependency_merge['joined']} coinciden con Trivy y se unieron al mismo hallazgo; "
+                              f"{dependency_merge['new']} son nuevos.")
+        report("ok" if osv["status"] != "inconclusive" else "warn", f"OSV-Scanner: {osv['detail']}")
         # Lo que Trivy y Checkov (o zizmor y Checkov) ven a la vez queda como un solo hallazgo con los dos motores.
         configuration, joined = merge_repository([item for item in trivy["findings"] if item["scanner"] == "iac"],
                                                  checkov["findings"], zizmor["findings"])
@@ -243,15 +254,18 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     findings = unique
     sast_count = sum(item["scanner"] == "sast" for item in findings)
     secret_count = sum(item["scanner"] == "secrets" for item in findings)
-    trivy_sca = engines and any(tool["tool"] == "trivy" and tool["status"] == "completed" for tool in tools)
+    engine_sca = [tool["name"] for tool in tools if tool["tool"] in ("trivy", "osv-scanner") and tool["status"] == "completed"]
+    trivy_sca = engines and bool(engine_sca)
     dependencies, manifests = _dependencies(root)
     dependency_scope = f"primeras {len(dependencies)} versiones fijadas" if len(dependencies) >= 250 else f"{len(dependencies)} versiones fijadas"
     if trivy_sca:
         report("info", "Cruzando avisos con CISA KEV y EPSS para priorizar…")
         sca_count = sum(item["scanner"] == "sca" for item in findings)
         sca_status = "partial"
-        sca_detail = (f"Dependencias resueltas por Trivy en todos los ecosistemas del snapshot: {sca_count} avisos "
-                      f"con versión corregida, CVSS, KEV y EPSS. OSV no fue necesario.")
+        joined = sum(1 for item in findings if item["scanner"] == "sca" and item.get("also_detected_by"))
+        sca_detail = (f"Dependencias de todos los ecosistemas del snapshot con {' y '.join(engine_sca)}: {sca_count} avisos "
+                      f"únicos con versión corregida, CVSS, KEV y EPSS"
+                      + (f"; {joined} confirmados por los dos motores" if joined else "") + ".")
     elif not manifests:
         sca_status, sca_detail = "not_tested", "No se encontró package-lock.json ni requirements.txt con versiones fijadas."
     elif not dependencies:
@@ -304,7 +318,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             sca_status = "partial"
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError):
             sca_status, sca_detail = "inconclusive", "No se pudo completar la consulta a OSV. No equivale a cero vulnerabilidades."
-    steps.append({"id": "sca", "name": "Dependencias · Trivy" if trivy_sca else "Dependencias · OSV", "status": sca_status, "detail": sca_detail})
+    steps.append({"id": "sca", "name": f"Dependencias · {' + '.join(engine_sca)}" if trivy_sca else "Dependencias · OSV", "status": sca_status, "detail": sca_detail})
     steps.append({"id": "review", "name": "Triage humano", "status": "pending", "detail": "Los resultados estáticos son candidatos; revisar flujo, alcanzabilidad y aplicabilidad."})
     iac_tools = tuple(tool["name"] for tool in tools if tool["tool"] in ("trivy", "checkov") and tool["status"] == "completed")
     iac_ran = engines and bool(iac_tools)
@@ -329,7 +343,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     truncated = bool(snapshot.get("truncated"))
     return {"type": "repository_scan",
             "status": "incomplete" if sca_status == "inconclusive" or truncated or misconfigured or any(
-                tool["tool"] in ("opengrep", "gitleaks", "trivy") and tool["status"] == "inconclusive" for tool in tools) else "completed",
+                tool["tool"] in ("opengrep", "gitleaks", "trivy", "osv-scanner") and tool["status"] == "inconclusive" for tool in tools) else "completed",
             "source": source, "fixture": source["name"], "variant": "code", "context": declared,
             "steps": steps, "findings": findings,
             "owasp_coverage": coverage, "inventory": collect_inventory(root), "unused_dependencies": unused_dependencies(root),

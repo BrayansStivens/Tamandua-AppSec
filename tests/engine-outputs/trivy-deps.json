@@ -1,0 +1,626 @@
+{
+ "SchemaVersion": 2,
+ "Trivy": {
+  "Version": "0.74.0"
+ },
+ "ReportID": "01a0d58a-3f53-7d9f-b00b-ae8a3d913146",
+ "CreatedAt": "2026-09-24T22:30:02.323893843Z",
+ "ArtifactName": "/src",
+ "ArtifactType": "filesystem",
+ "Results": [
+  {
+   "Target": "py/requirements.txt",
+   "Class": "lang-pkgs",
+   "Type": "pip",
+   "Packages": [
+    {
+     "Name": "requests",
+     "Identifier": {
+      "PURL": "pkg:pypi/requests@2.25.0",
+      "UID": "44cfea65a3078b67"
+     },
+     "Version": "2.25.0",
+     "Locations": [
+      {
+       "StartLine": 2,
+       "EndLine": 2
+      }
+     ],
+     "AnalyzedBy": "pip"
+    },
+    {
+     "Name": "starlette",
+     "Identifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "Version": "0.27.0",
+     "Locations": [
+      {
+       "StartLine": 1,
+       "EndLine": 1
+      }
+     ],
+     "AnalyzedBy": "pip"
+    }
+   ],
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2023-32681",
+     "VendorIDs": [
+      "GHSA-j8r2-6x86-q33q"
+     ],
+     "PkgName": "requests",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/requests@2.25.0",
+      "UID": "44cfea65a3078b67"
+     },
+     "InstalledVersion": "2.25.0",
+     "FixedVersion": "2.31.0",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-32681",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:1840cf1eac9fc3ea75c6e2c683e21b078c319cd7760c73dd7db99c2f2674258b",
+     "Title": "python-requests: Unintended leak of Proxy-Authorization header",
+     "Description": "Requests is a HTTP library. Since Requests 2.3.0, Requests has been leaking Proxy-Authorization headers to destination servers when redirected to an HTTPS endpoint. This is a product of how we use `re",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-200"
+     ],
+     "VendorSeverity": {
+      "alma": 2,
+      "amazon": 2,
+      "cbl-mariner": 2,
+      "ghsa": 2,
+      "nvd": 2,
+      "oracle-oval": 2,
+      "photon": 2,
+      "redhat": 2,
+      "rocky": 2,
+      "ubuntu": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:N/A:N",
+       "V3Score": 6.1
+      },
+      "nvd": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:N/A:N",
+       "V3Score": 6.1
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:N/A:N",
+       "V3Score": 6.1
+      }
+     },
+     "References": [
+      "https://access.redhat.com/errata/RHSA-2023:4350",
+      "https://access.redhat.com/security/cve/CVE-2023-32681"
+     ],
+     "PublishedDate": "2023-05-26T18:15:14.147Z",
+     "LastModifiedDate": "2026-06-17T05:59:22.687Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2024-35195",
+     "VendorIDs": [
+      "GHSA-9wx4-h78v-vm56"
+     ],
+     "PkgName": "requests",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/requests@2.25.0",
+      "UID": "44cfea65a3078b67"
+     },
+     "InstalledVersion": "2.25.0",
+     "FixedVersion": "2.32.0",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2024-35195",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:2e9c8e99c8577dcd1da123d4e6278adcb3987ea9a31bfb64e8dd480c3b8d2c75",
+     "Title": "requests: subsequent requests to the same host ignore cert verification",
+     "Description": "Requests is a HTTP library. Prior to 2.32.0, when making requests through a Requests `Session`, if the first request is made with `verify=False` to disable cert verification, all subsequent requests t",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-670"
+     ],
+     "VendorSeverity": {
+      "alma": 2,
+      "amazon": 2,
+      "azure": 2,
+      "cbl-mariner": 2,
+      "ghsa": 2,
+      "oracle-oval": 2,
+      "photon": 2,
+      "redhat": 2,
+      "rocky": 2,
+      "ubuntu": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+       "V3Score": 5.6
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:H/UI:R/S:U/C:H/I:H/A:N",
+       "V3Score": 5.6
+      }
+     },
+     "References": [
+      "https://access.redhat.com/errata/RHSA-2025:7049",
+      "https://access.redhat.com/security/cve/CVE-2024-35195"
+     ],
+     "PublishedDate": "2024-05-20T21:15:09.99Z",
+     "LastModifiedDate": "2026-06-17T07:34:31.23Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2024-47081",
+     "VendorIDs": [
+      "GHSA-9hjg-9r4m-mvj7"
+     ],
+     "PkgName": "requests",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/requests@2.25.0",
+      "UID": "44cfea65a3078b67"
+     },
+     "InstalledVersion": "2.25.0",
+     "FixedVersion": "2.32.4",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2024-47081",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:dcd9286d822f42babce7db085d47798c247cc1216733ace30fb63afa9a97e4cd",
+     "Title": "requests: Requests vulnerable to .netrc credentials leak via malicious URLs",
+     "Description": "Requests is a HTTP library. Due to a URL parsing issue, Requests releases prior to 2.32.4 may leak .netrc credentials to third parties for specific maliciously-crafted URLs. Users should upgrade to ve",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-522"
+     ],
+     "VendorSeverity": {
+      "alma": 2,
+      "amazon": 2,
+      "azure": 2,
+      "cbl-mariner": 2,
+      "ghsa": 2,
+      "oracle-oval": 2,
+      "photon": 2,
+      "redhat": 2,
+      "rocky": 2,
+      "ubuntu": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+       "V3Score": 5.3
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N",
+       "V3Score": 5.3
+      }
+     },
+     "References": [
+      "http://seclists.org/fulldisclosure/2025/Jun/2",
+      "http://www.openwall.com/lists/oss-security/2025/06/03/11"
+     ],
+     "PublishedDate": "2025-06-09T18:15:24.983Z",
+     "LastModifiedDate": "2026-06-17T07:56:30.697Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-25645",
+     "VendorIDs": [
+      "GHSA-gc5v-m9x4-r6x2"
+     ],
+     "PkgName": "requests",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/requests@2.25.0",
+      "UID": "44cfea65a3078b67"
+     },
+     "InstalledVersion": "2.25.0",
+     "FixedVersion": "2.33.0",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-25645",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:2af5d8af24dc3f0259ac562e5cf85e40de1884d28fd9c7387b890d068ce48971",
+     "Title": "requests: Requests: Security bypass due to predictable temporary file creation",
+     "Description": "Requests is a HTTP library. Prior to version 2.33.0, the `requests.utils.extract_zipped_paths()` utility function uses a predictable filename when extracting files from zip archives into the system te",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-377"
+     ],
+     "VendorSeverity": {
+      "azure": 2,
+      "ghsa": 2,
+      "nvd": 2,
+      "photon": 2,
+      "redhat": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:R/S:U/C:N/I:H/A:N",
+       "V3Score": 4.4
+      },
+      "nvd": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:N/I:H/A:N",
+       "V3Score": 5.5
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:N/I:H/A:N",
+       "V3Score": 4.7
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2026-25645",
+      "https://github.com/psf/requests"
+     ],
+     "PublishedDate": "2026-03-25T17:16:52.97Z",
+     "LastModifiedDate": "2026-06-17T10:25:00.443Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2024-47874",
+     "VendorIDs": [
+      "GHSA-f96h-pmfr-66vw"
+     ],
+     "PkgName": "starlette",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "InstalledVersion": "0.27.0",
+     "FixedVersion": "0.40.0",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2024-47874",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:433d8a018b371c96c8ca8f9307f4f994ec8ae718a56e5e11b229acc4f9b431bc",
+     "Title": "starlette: Starlette Denial of service (DoS) via multipart/form-data",
+     "Description": "Starlette is an Asynchronous Server Gateway Interface (ASGI) framework/toolkit. Prior to version 0.40.0, Starlette treats `multipart/form-data` parts without a `filename` as text form fields and buffe",
+     "Severity": "HIGH",
+     "CweIDs": [
+      "CWE-770"
+     ],
+     "VendorSeverity": {
+      "ghsa": 3,
+      "redhat": 3
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N",
+       "V40Vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:N/VA:H/SC:N/SI:N/SA:N",
+       "V40Score": 8.7
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+       "V3Score": 7.5
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2024-47874",
+      "https://github.com/encode/starlette"
+     ],
+     "PublishedDate": "2024-10-15T16:15:05.26Z",
+     "LastModifiedDate": "2026-06-17T07:57:53.817Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-48818",
+     "VendorIDs": [
+      "GHSA-wqp7-x3pw-xc5r"
+     ],
+     "PkgName": "starlette",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "InstalledVersion": "0.27.0",
+     "FixedVersion": "1.1.0",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-48818",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:6461b11be3d4defef9bd392e8501b7b84ed7f745b32532faa62efc56b5907359",
+     "Title": "starlette: Starlette: SSRF and NTLM credential theft via UNC paths in StaticFiles on Windows",
+     "Description": "Starlette is a lightweight ASGI framework/toolkit. In versions 1.0.1 and earlier, StaticFiles on Windows is vulnerable to SSRF. An UNC path such as \\\\attacker.com\\share can cause os.path.realpath to i",
+     "Severity": "HIGH",
+     "CweIDs": [
+      "CWE-918"
+     ],
+     "VendorSeverity": {
+      "ghsa": 3,
+      "redhat": 3
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+       "V3Score": 7.5
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+       "V3Score": 7.5
+      }
+     },
+     "References": [
+      "https://access.redhat.com/errata/RHSA-2026:30087",
+      "https://access.redhat.com/errata/RHSA-2026:30088"
+     ],
+     "PublishedDate": "2026-06-17T19:18:09.807Z",
+     "LastModifiedDate": "2026-08-04T19:16:51.383Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-54283",
+     "VendorIDs": [
+      "GHSA-82w8-qh3p-5jfq"
+     ],
+     "PkgName": "starlette",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "InstalledVersion": "0.27.0",
+     "FixedVersion": "1.3.1",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-54283",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:68d6f26a8e97431ed5c6fe5d8dc75b16f0e706f6f922fb337e9a047ecd0bd40c",
+     "Title": "starlette: Starlette: request.form() limits silently ignored for application/x-www-form-urlencoded enable DoS",
+     "Description": "Starlette is a lightweight ASGI framework/toolkit. From 0.4.1 until 1.3.1, request.form() accepts max_fields and max_part_size to bound resource consumption while parsing form data. These limits are e",
+     "Severity": "HIGH",
+     "CweIDs": [
+      "CWE-770"
+     ],
+     "VendorSeverity": {
+      "ghsa": 3,
+      "redhat": 3
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+       "V3Score": 7.5
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+       "V3Score": 7.5
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2026-54283",
+      "https://github.com/Kludex/starlette"
+     ],
+     "PublishedDate": "2026-06-22T18:16:46.943Z",
+     "LastModifiedDate": "2026-06-26T19:16:55.75Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2025-54121",
+     "VendorIDs": [
+      "GHSA-2c2j-9gv5-cj73"
+     ],
+     "PkgName": "starlette",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "InstalledVersion": "0.27.0",
+     "FixedVersion": "0.47.2",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2025-54121",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:0e269b059641317b5400b14f3ec6d433e203f4088fd078bac1ddb99420f29a7f",
+     "Title": "starlette: Starlette denial-of-service",
+     "Description": "Starlette is a lightweight ASGI (Asynchronous Server Gateway Interface) framework/toolkit, designed for building async web services in Python. In versions 0.47.1 and below, when parsing a multi-part f",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-770"
+     ],
+     "VendorSeverity": {
+      "ghsa": 2,
+      "redhat": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+       "V3Score": 5.3
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L",
+       "V3Score": 5.3
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2025-54121",
+      "https://github.com/encode/starlette"
+     ],
+     "PublishedDate": "2025-07-21T20:15:41.827Z",
+     "LastModifiedDate": "2026-06-17T09:39:29.22Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-48710",
+     "VendorIDs": [
+      "GHSA-86qp-5c8j-p5mr"
+     ],
+     "PkgName": "starlette",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "InstalledVersion": "0.27.0",
+     "FixedVersion": "1.0.1",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-48710",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:7404b48071e40aa9010dc17428c76d0862e920bf6f1fc36bce3211d3c5f1359f",
+     "Title": "starlette: Starlette: Security restriction bypass via malformed HTTP Host header",
+     "Description": "Starlette is a lightweight ASGI framework/toolkit. Prior to version 1.0.1, the HTTP `Host` request header was not validated before being used to reconstruct `request.url`. Because the routing algorith",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-444",
+      "CWE-1289"
+     ],
+     "VendorSeverity": {
+      "ghsa": 2,
+      "nvd": 2,
+      "redhat": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
+       "V3Score": 6.5
+      },
+      "nvd": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
+       "V3Score": 6.5
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:N",
+       "V3Score": 6.5
+      }
+     },
+     "References": [
+      "https://access.redhat.com/errata/RHSA-2026:22992",
+      "https://access.redhat.com/errata/RHSA-2026:22993"
+     ],
+     "PublishedDate": "2026-05-26T22:16:44.02Z",
+     "LastModifiedDate": "2026-09-04T15:59:29.557Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-48817",
+     "VendorIDs": [
+      "GHSA-x746-7m8f-x49c"
+     ],
+     "PkgName": "starlette",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "InstalledVersion": "0.27.0",
+     "FixedVersion": "1.1.0",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-48817",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:a135496374fdb6f87d1d92caa417c230e6e5560512e849fcdf813a7a4bc19887",
+     "Title": "starlette: Starlette: Information disclosure and unintended method execution via non-standard HTTP methods",
+     "Description": "Starlette is a lightweight ASGI framework/toolkit. In versions 1.0.1 and below, when dispatching a request, HTTPEndpoint selects the handler by lowercasing the HTTP method and looking it up as an attr",
+     "Severity": "MEDIUM",
+     "CweIDs": [
+      "CWE-470"
+     ],
+     "VendorSeverity": {
+      "ghsa": 2,
+      "redhat": 2
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+       "V3Score": 5.3
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+       "V3Score": 5.3
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2026-48817",
+      "https://github.com/Kludex/starlette"
+     ],
+     "PublishedDate": "2026-06-17T20:17:22.427Z",
+     "LastModifiedDate": "2026-06-26T19:18:13.38Z"
+    },
+    {
+     "VulnerabilityID": "CVE-2026-54282",
+     "VendorIDs": [
+      "GHSA-jp82-jpqv-5vv3"
+     ],
+     "PkgName": "starlette",
+     "PkgIdentifier": {
+      "PURL": "pkg:pypi/starlette@0.27.0",
+      "UID": "69863d50291e97a9"
+     },
+     "InstalledVersion": "0.27.0",
+     "FixedVersion": "1.3.0",
+     "Status": "fixed",
+     "SeveritySource": "ghsa",
+     "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-54282",
+     "DataSource": {
+      "ID": "ghsa",
+      "Name": "GitHub Security Advisory pip",
+      "URL": "https://github.com/advisories?query=type%3Areviewed+ecosystem%3Apip"
+     },
+     "Fingerprint": "sha256:cf525c00fc4952da53dec03d2f386f340791cc2b480006f6a90deab738a235f1",
+     "Title": "starlette: Starlette: Information disclosure due to improper HTTP request path validation",
+     "Description": "Starlette is a lightweight ASGI framework/toolkit. Prior to 1.3.0, the HTTP request path is not validated before being used to reconstruct request.url. Because request.url is rebuilt by concatenating ",
+     "Severity": "LOW",
+     "CweIDs": [
+      "CWE-706"
+     ],
+     "VendorSeverity": {
+      "ghsa": 1,
+      "nvd": 2,
+      "redhat": 1
+     },
+     "CVSS": {
+      "ghsa": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N",
+       "V3Score": 3.7
+      },
+      "nvd": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N",
+       "V3Score": 5.3
+      },
+      "redhat": {
+       "V3Vector": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N",
+       "V3Score": 4.8
+      }
+     },
+     "References": [
+      "https://access.redhat.com/security/cve/CVE-2026-54282",
+      "https://github.com/Kludex/starlette"
+     ],
+     "PublishedDate": "2026-06-22T18:16:46.807Z",
+     "LastModifiedDate": "2026-06-26T19:18:47.063Z"
+    }
+   ]
+  }
+ ]
+}

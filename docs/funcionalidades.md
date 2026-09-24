@@ -175,7 +175,9 @@ La edición libre de Checkov no trae severidad (la da su plataforma de pago). Pa
 
 Ni Checkov ni zizmor guardan fragmentos de código en el informe: solo regla, archivo y líneas, porque el fragmento puede contener un secreto.
 
-Si Docker no está disponible, el paso lo declara como `not_tested` con el motivo y la revisión sigue con las reglas internas de Python y los patrones de secretos, etiquetados como tales. Cuando Trivy resuelve las dependencias, OSV no se consulta: menos egress y sin enviar nombres de paquetes a nadie.
+Si Docker no está disponible, el paso lo declara como `not_tested` con el motivo y la revisión sigue con las reglas internas de Python y los patrones de secretos, etiquetados como tales. Las dependencias las revisan **Trivy y OSV-Scanner** a la vez. OSV-Scanner usa la base OSV, que incluye la GitHub Advisory Database de Dependabot, y entiende más formatos (`.csproj` y `Directory.Packages.props` de .NET, `gradle.lockfile`, `uv.lock`, `Pipfile.lock`, `pubspec.lock`…). Los dos descargan sus bases de avisos y comparan en local: no se envía la lista de dependencias a nadie. Un aviso que detectan los dos (aunque uno lo llame por su CVE y el otro por su GHSA) queda como **un solo hallazgo**, «detectado por Trivy y OSV-Scanner»; la huella es la de Trivy, así que el triage y los tickets ya creados se conservan.
+
+Los manifiestos y lockfiles entran al snapshot por su nombre, sin el límite de 2 MB del código (un `package-lock.json` grande es normal); tienen un tope de seguridad de 64 MB.
 
 ## Hallazgos de dependencias
 
@@ -185,7 +187,7 @@ Cada aviso de dependencia llega listo para decidir, no como un identificador sue
 
 Con eso, cada hallazgo trae una **prioridad con sus factores visibles** (`act` si está en KEV o combina CVSS ≥ 9 con EPSS alto; `attend`; `track`), una remediación concreta y una **huella estable** independiente de la ruta del lockfile, que es lo que evitará duplicar tickets entre ejecuciones. El panel agrupa los avisos por paquete y dice qué versión los cierra todos; `GET /api/runs/{id}/tickets.json` exporta un ticket por hallazgo con esa forma, pensado para el conector de Jira.
 
-Si el propietario autoriza transmitir **solo nombres y versiones de dependencias** a `api.osv.dev`, activa la casilla del panel para esa ejecución o usa `--allow-osv-upload` en la CLI. Por defecto SCA aparece como `not_tested`. Una consulta inconclusa tampoco se presenta como cero vulnerabilidades.
+Si el propietario autoriza transmitir **solo nombres y versiones de dependencias** a `api.osv.dev`, activa la casilla del panel para esa ejecución o usa `--allow-osv-upload` en la CLI. Con esa autorización, OSV-Scanner también resuelve las dependencias transitivas de manifiestos sin lockfile (consulta deps.dev); sin ella, solo compara lo que declaran los manifiestos y lockfiles. Por defecto SCA aparece como `not_tested`. Una consulta inconclusa tampoco se presenta como cero vulnerabilidades.
 
 ```bash
 python3 -m appsec_agent scan-repository --source-id local:appsec-agent --allow-osv-upload
