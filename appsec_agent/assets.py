@@ -90,17 +90,25 @@ def backfill(data_dir: Path, repositories: list[dict]) -> int:
     return updated
 
 
-def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None = None) -> dict:
+def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None = None,
+              active_accounts: set[str] | None = None) -> dict:
     """Compara lo analizado con la lista COMPLETA de la instalación. Devuelve qué se marcó y qué se borró."""
     from .store import list_runs
     now = now or datetime.now(timezone.utc)
     backfill(data_dir, repositories)
     present = {item["uid"]: item for item in repositories if item.get("uid")}
-    analysed = {asset_key(row) for row in list_runs(data_dir) if asset_key(row).startswith("github#")}
+    names = {asset_key(row): (row.get("source") or {}).get("name") for row in list_runs(data_dir)
+             if asset_key(row).startswith("github#")}
+    analysed = set(names)
     purged, marked = [], []
     with _lock:
         registry = load_registry(data_dir)
         for uid in analysed | set(registry):
+            known_name = (registry.get(uid) or {}).get("name") or names.get(uid)
+            if (active_accounts is not None and isinstance(known_name, str) and "/" in known_name
+                    and known_name.split("/", 1)[0].casefold() not in active_accounts):
+                # Desconectar una organización no equivale a borrar sus repositorios ni sus hallazgos.
+                continue
             entry = registry.setdefault(uid, {})
             if uid in present:
                 entry.update(name=present[uid]["name"], source_id=present[uid]["id"], last_seen=now.isoformat(timespec="seconds"))

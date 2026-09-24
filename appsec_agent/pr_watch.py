@@ -162,23 +162,35 @@ class Watcher:
     def poll(self) -> int:
         from .assets import reconcile
         from .github_app import GitHubAppError, installation_repositories, open_pull_requests
-        installation = self.installation_for()
-        if installation is None:
+        configured = self.installation_for()
+        installations = [configured] if isinstance(configured, int) else configured or []
+        if not installations:
             return 0
-        try:
-            repositories = installation_repositories(installation, fresh=True)
-        except GitHubAppError as exc:
-            _log.warning("pr_repos_failed", extra={"reason": str(exc)})
+        repositories = []
+        failed = False
+        for installation in installations:
+            try:
+                repositories.extend({**item, "installation_id": installation}
+                                    for item in installation_repositories(installation, fresh=True))
+            except GitHubAppError as exc:
+                _log.warning("pr_repos_failed", extra={"reason": f"{installation}: {exc}"})
+                failed = True
+        if failed:
+            # Una respuesta parcial no demuestra que los repositorios de otra cuenta desaparecieron.
             return 0
         migrate(self.data_dir, repositories)
-        # Con la lista completa en la mano se reconcilia qué repositorios ya no existen.
-        reconcile(self.data_dir, repositories)
+        # Solo las cuentas aún conectadas pueden demostrar la ausencia de un repositorio.
+        from .integrations import github_connections
+        accounts = {row["account"].casefold() for row in github_connections(self.data_dir)
+                    if isinstance(row.get("account"), str)}
+        reconcile(self.data_dir, repositories, active_accounts=accounts or None)
         by_uid = {item["uid"]: item for item in repositories}
         queued = 0
         for key, config in load(self.data_dir)["repositories"].items():
             if not config.get("enabled") or key not in by_uid:
                 continue
             source_id, repository = by_uid[key]["id"], by_uid[key]["name"]
+            installation = by_uid[key]["installation_id"]
             try:
                 pulls = open_pull_requests(installation, repository)
             except GitHubAppError as exc:

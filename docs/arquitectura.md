@@ -1,6 +1,6 @@
 # Arquitectura
 
-Tamandua es un único proceso Python (solo biblioteca estándar más `cryptography`) que sirve el panel web, la API y los trabajos en segundo plano. Los motores de análisis corren como contenedores hermanos efímeros con el código montado en solo lectura, sin capacidades y con límites de memoria, CPU y procesos.
+Tamandua es un único proceso Python (biblioteca estándar, `cryptography` para la GitHub App y `reportlab` para los PDF) que sirve el panel web, la API y los trabajos en segundo plano. Los motores de análisis corren como contenedores hermanos efímeros con el código montado en solo lectura, sin capacidades y con límites de memoria, CPU y procesos.
 
 ```mermaid
 flowchart LR
@@ -64,7 +64,7 @@ data/
   feeds/            KEV, EPSS, NVD (cves.sqlite)
   trivy-cache/      base de vulnerabilidades de Trivy
   logs/app.log      JSON por línea, rotado (10 MB × 5), sin secretos
-  integrations.json instalación de GitHub (identificador, cuenta, permisos)
+  integrations.json instalaciones de GitHub conectadas (identificador, cuenta, permisos)
   pr-watch.json     repositorios vigilados y PRs revisados
 config/
   secrets.vault     secretos cifrados
@@ -75,5 +75,5 @@ config/
 
 - **Sin dependencias web en el backend.** Menos superficie de ataque y menos actualizaciones de seguridad que seguir.
 - **Sondeo en vez de webhooks.** El servidor no necesita ser accesible desde internet.
-- **Una GitHub App por instalación**, privada y con cuatro permisos: si una clave se filtra, el daño se limita a esa cuenta y a esos permisos.
+- **Una GitHub App por workspace**, con cuatro permisos. Para varias organizaciones, GitHub exige que pueda instalarse en cualquier cuenta; el administrador escoge explícitamente cuáles conectar al workspace. Una clave filtrada tendría acceso a todas las instalaciones de esa App, por lo que su custodia sigue siendo crítica.
 - **Honestidad en los resultados.** Lo que no se pudo probar sale como `not_tested` con su motivo; un análisis incompleto nunca se presenta como «cero vulnerabilidades».

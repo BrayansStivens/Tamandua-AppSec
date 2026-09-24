@@ -1,6 +1,6 @@
 # Conectar GitHub
 
-Cada instalación de Tamandua usa **su propia** GitHub App: la creas tú, en tu cuenta o en una organización que administres, y solo se puede instalar ahí. GitHub no permite crear Apps por API, así que se hace en su formulario. El panel (**Integraciones**) muestra esta misma guía con los valores ya rellenos para tu instalación y botones para copiarlos.
+Cada instalación de Tamandua usa **su propia** GitHub App: la creas tú, en tu cuenta o en una organización que administres. Si necesitas varias organizaciones, configúrala para que pueda instalarse en cualquier cuenta. GitHub no permite crear Apps por API, así que se hace en su formulario. El panel (**Integraciones**) muestra esta misma guía con los valores ya rellenos para tu instalación y botones para copiarlos.
 
 ## 1. Crear la App
 
@@ -17,7 +17,7 @@ Rellena solo esto:
 | **Homepage URL** | Cualquier URL tuya; p. ej. tu perfil de GitHub o la URL de tu panel. |
 | **Callback URL** | Vacío. |
 | **Request user authorization (OAuth) during installation** | Sin marcar. |
-| **Setup URL** (opcional) | `http://127.0.0.1:8766/oauth/callback` (o tu URL pública + `/oauth/callback`) y marca **Redirect on update**. Así vuelves al panel al instalar. |
+| **Setup URL** (opcional) | `http://127.0.0.1:8766/oauth/callback` (o tu URL pública + `/oauth/callback`) y marca **Redirect on update**. Abre una página que te indica cómo seleccionar la instalación en el panel. |
 | **Webhook → Active** | Desmarcado. El panel consulta los PRs por su cuenta. |
 
 **Repository permissions**, solo estos cuatro:
@@ -31,7 +31,7 @@ Rellena solo esto:
 
 Nada en *Organization permissions* ni en *Account permissions*, y ningún evento suscrito. Si más adelante la App tuviera permisos de más, el panel lo avisa en rojo.
 
-En **Where can this GitHub App be installed?** elige **Only on this account** y pulsa **Create GitHub App**.
+En **Where can this GitHub App be installed?** elige **Any account** si necesitas instalarla en varias organizaciones. Para una sola cuenta puedes usar **Only on this account**. Después pulsa **Create GitHub App**.
 
 ## 2. App ID y clave privada
 
@@ -48,9 +48,9 @@ La clave no vuelve a salir del servidor. **Borra el `.pem` de tu carpeta de desc
 
 ## 4. Instalarla en tus repositorios
 
-Pulsa **Instalar en GitHub**, elige **Only select repositories** y marca los que quieras analizar. Vuelve al panel y pulsa **Ya la instalé** (si configuraste la Setup URL, vuelves solo). Los repositorios aparecen en **Repositorios** y en **Nuevo análisis**.
+Pulsa **Instalar en GitHub**, elige una cuenta y **Only select repositories**, y marca los repositorios que quieras analizar. Repite la instalación en cada organización. En el panel pulsa **Buscar instalaciones** y **Conectar cuenta** en cada organización que quieras usar. Instalar la App no incorpora automáticamente las cuentas a este workspace. Los repositorios de las cuentas conectadas aparecen en **Repositorios** y en **Nuevo análisis**; allí puedes filtrar por organización.
 
-Para añadir o quitar repositorios más tarde: **Integraciones → Cambiar repositorios en GitHub**.
+Para añadir o quitar repositorios más tarde: **Integraciones → Cambiar repositorios** en la cuenta correspondiente. Para dejar de usar una organización aquí, pulsa **Desconectar cuenta**.
 
 ## Revisión de pull requests
 
@@ -80,4 +80,4 @@ El entorno manda sobre el almacén. Monta el `.pem` en solo lectura.
 | *La clave privada debe ser RSA de al menos 2048 bits* | Has subido otro fichero; usa el `.pem` que descarga GitHub. |
 | *La App todavía no está instalada en ninguna cuenta* | Falta el paso 4, o lo cancelaste en GitHub. |
 | *Faltan permisos* | Cambiaste permisos en la App y la instalación no ha aceptado la actualización: acéptala en GitHub (*Settings → Applications → Installed GitHub Apps*). |
-| GitHub rechaza la Setup URL | Déjala vacía y usa **Ya la instalé**; funciona igual. |
+| GitHub rechaza la Setup URL | Déjala vacía y usa **Buscar instalaciones**; funciona igual. |

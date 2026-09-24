@@ -177,7 +177,8 @@ class GateTests(HttpCase):
     def test_everything_requires_a_session(self):
         status, body, _ = self.call("GET", "/api/auth/session")
         self.assertEqual((status, body["authenticated"], body["setup_required"]), (200, False, True))
-        for path in ("/api/runs", "/api/providers", "/api/dashboard", "/api/sources", "/api/runs/x/report.md"):
+        for path in ("/api/runs", "/api/providers", "/api/dashboard", "/api/sources", "/api/runs/x/report.md",
+                     "/api/assets/export?key=x&artifact=report.pdf", "/api/threat-models/x/report.pdf"):
             self.assertEqual(self.call("GET", path)[0], 401, path)
         status, body, _ = self.call("GET", "/api/health")
         self.assertEqual(set(body), {"status", "version"})  # sin sesión no se cuenta el estado interno

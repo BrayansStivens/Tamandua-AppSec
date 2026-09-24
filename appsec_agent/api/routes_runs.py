@@ -13,18 +13,47 @@ from .. import exclusions, findings_registry, jira, triage
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
 from ..dashboard import compute as compute_dashboard
-from ..integrations import github_installation
+from ..integrations import github_installations
 from ..repository_sources import available_sources
 from ..scanners import docker_available
 from ..scan_plan import plan as scan_plan
 from ..github_app import GitHubAppError
 from ..repository_sources import SourceError
-from ..store import _run_dir, list_runs, load_run, page_runs, render_profile_report, render_repository_report
+from ..pdf_reports import render_pdf
+from ..store import _run_dir, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
 from ..store import render_repository_sarif, render_tickets
 from .core import VERSION, Request, route
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
-PROFILE_REPORTS = ("report-soc2.md", "report-iso27001.md", "report-custom.md")
+PROFILE_REPORTS = ("report-soc2.md", "report-iso27001.md", "report-custom.md",
+                   "report-soc2.pdf", "report-iso27001.pdf", "report-custom.pdf")
+
+
+def _artifact(request: Request, record: dict, artifact: str):
+    repository = record.get("type") in FINDING_RUNS or record.get("type") == "asset_state"
+    if artifact == "tickets.json" and repository:
+        return request.json(200, render_tickets(record))
+    if artifact in ("report.md", "report.pdf") and repository:
+        report = render_asset_report(record) if record["type"] == "asset_state" else render_repository_report(record)
+        if artifact.endswith(".pdf"):
+            return request.send(200, render_pdf(report, title="Informe de hallazgos", kind="Registro técnico",
+                                                 reference=record["id"]), "application/pdf")
+        return request.send(200, report.encode("utf-8"), "text/markdown; charset=utf-8")
+    if artifact == "findings.sarif" and repository:
+        return request.send(200, json.dumps(render_repository_sarif(record), ensure_ascii=False, indent=2).encode("utf-8"),
+                            "application/sarif+json")
+    if artifact in PROFILE_REPORTS:
+        profile = artifact.removeprefix("report-").rsplit(".", 1)[0]
+        report = render_profile_report(record, profile, request.arg("title", ""))
+        if artifact.endswith(".pdf"):
+            label = {"soc2": "SOC 2 Tipo II", "iso27001": "ISO/IEC 27001:2022", "custom": "Personalizado"}[profile]
+            return request.send(200, render_pdf(report, title=f"Evidencia técnica para {label}",
+                                                 kind="Dossier para revisión", reference=record["id"]), "application/pdf")
+        return request.send(200, report.encode("utf-8"), "text/markdown; charset=utf-8")
+    if artifact in ("report.md", "findings.sarif"):
+        content_type = "text/markdown; charset=utf-8" if artifact == "report.md" else "application/sarif+json"
+        return request.send(200, (_run_dir(request.data_dir, record["id"]) / artifact).read_bytes(), content_type)
+    return request.json(404, {"error": "Formato no disponible para esta ejecución"})
 
 
 @route("GET", "/api/health", public=True, enrolment=True)
@@ -82,6 +111,27 @@ def asset_state(request: Request):
     return request.json(200, jira.annotate(request.data_dir, view))
 
 
+@route("GET", "/api/assets/export")
+def asset_export(request: Request):
+    """Exportación del estado actual; no existe un ID de ejecución para esta vista."""
+    key = request.arg("key") or ""
+    status = request.arg("status", "open")
+    artifact = request.arg("artifact") or ""
+    if not key or len(key) > 200 or status not in ("open", "fixed", "excluded", "all"):
+        return request.json(400, {"error": "Activo o estado inválido"})
+    if artifact not in ("tickets.json", "report.md", "report.pdf", "findings.sarif", *PROFILE_REPORTS, "record.json"):
+        return request.json(404, {"error": "Formato no disponible"})
+    if not any(row["key"] == key for row in assets_overview(request.data_dir)):
+        return request.json(404, {"error": "Activo no encontrado"})
+    record = jira.annotate(request.data_dir, findings_registry.view(request.data_dir, key, status=status))
+    if artifact == "record.json":
+        return request.json(200, record)
+    try:
+        return _artifact(request, record, artifact)
+    except ValueError as exc:
+        return request.json(400, {"error": str(exc)})
+
+
 @route("GET", "/api/assets/exclusions")
 def asset_exclusions(request: Request):
     """Rutas excluidas de un repositorio: cualquiera las ve; solo un administrador las cambia."""
@@ -134,23 +184,9 @@ def run_detail(request: Request):
     try:
         # Las vistas de una revisión de código reflejan el triage actual, no el del día del escaneo.
         record = jira.annotate(request.data_dir, triage.annotate(request.data_dir, load_run(request.data_dir, run_id)))
-        repository = record.get("type") in FINDING_RUNS
         if not separator:
             return request.json(200, record)
-        if artifact == "tickets.json":
-            return request.json(200, render_tickets(record))
-        if artifact == "report.md" and repository:
-            return request.send(200, render_repository_report(record).encode("utf-8"), "text/markdown; charset=utf-8")
-        if artifact == "findings.sarif" and repository:
-            return request.send(200, json.dumps(render_repository_sarif(record), ensure_ascii=False, indent=2).encode("utf-8"),
-                                "application/sarif+json")
-        if artifact in ("report.md", "findings.sarif"):
-            content_type = "text/markdown; charset=utf-8" if artifact == "report.md" else "application/sarif+json"
-            return request.send(200, (_run_dir(request.data_dir, run_id) / artifact).read_bytes(), content_type)
-        if artifact in PROFILE_REPORTS:
-            profile = artifact.removeprefix("report-").removesuffix(".md")
-            report = render_profile_report(record, profile, request.arg("title", ""))
-            return request.send(200, report.encode("utf-8"), "text/markdown; charset=utf-8")
+        return _artifact(request, record, artifact)
     except (ValueError, OSError, json.JSONDecodeError):
         pass
     return request.json(404, {"error": "Ejecución no encontrada"})
@@ -226,15 +262,16 @@ def repository_plan(request: Request):
     source_id = request.arg("source_id")
     with request.state.code_lock:
         tokens = request.state.code_tokens.copy()
-    installation = github_installation(request.data_dir)
+    installations = github_installations(request.data_dir)
     try:
-        listing = available_sources(tokens, installation)
+        listing = available_sources(tokens, installations)
     except (SourceError, GitHubAppError) as exc:
         return request.json(502, {"error": str(exc)})
-    if not any(item["id"] == source_id for item in listing["sources"]):
+    source = next((item for item in listing["sources"] if item["id"] == source_id), None)
+    if source is None:
         return request.json(400, {"error": "Repositorio no disponible para la credencial configurada"})
     try:
-        return request.json(200, scan_plan(source_id, installation_id=installation))
+        return request.json(200, scan_plan(source_id, installation_id=source.get("installation_id")))
     except GitHubAppError as exc:
         return request.json(502, {"error": str(exc)})
 
@@ -252,9 +289,9 @@ def repository_scan(request: Request):
         return request.json(400, {"error": "Repositorio inválido"})
     with state.code_lock:
         tokens = state.code_tokens.copy()
-    installation = github_installation(request.data_dir)
+    installations = github_installations(request.data_dir)
     # Se valida que el repositorio exista para esta credencial antes de encolar nada.
-    listing = available_sources(tokens, installation)
+    listing = available_sources(tokens, installations)
     source = next((item for item in listing["sources"] if item["id"] == payload["source_id"]), None)
     if source is None:
         return request.json(400, {"error": "Repositorio no disponible para la credencial configurada"})
@@ -263,7 +300,7 @@ def repository_scan(request: Request):
     queued = state.jobs.enqueue_repository_scan(source_id=payload["source_id"], source_name=source["name"],
                                                 allow_osv_upload=payload["allow_osv_upload"],
                                                 context=payload.get("context", ""), tokens=tokens,
-                                                installation_id=installation, uid=source.get("uid"))
+                                                installation_id=source.get("installation_id"), uid=source.get("uid"))
     return request.json(202, {"run": queued})
 
 
@@ -311,4 +348,3 @@ def registry_save(request: Request):
                                                               by=request.user["username"])})
     except ImageError as exc:
         return request.json(400, {"error": str(exc)})
-

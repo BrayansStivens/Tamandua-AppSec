@@ -10,7 +10,7 @@ from .. import jira, logging_setup, triage
 from ..domains import DomainError, check_reachability, list_domains, register_domain, verify_domain
 from ..github_app import REQUIRED_PERMISSIONS, GitHubAppError, app_installations, app_permissions, config as github_config, forget as forget_installation
 from ..github_app import forget_app, install_url, installation_details, permission_review, save_credentials, verify_app
-from ..integrations import clear_github, github_installation, load as load_integrations, save_github
+from ..integrations import clear_github, github_connections, github_installations, save_github
 from ..providers import ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
 from ..repository_sources import SourceError, available_sources, list_repositories
 from ..store import load_run, render_tickets
@@ -24,7 +24,7 @@ from .core import Request, public_url, route
 def sources(request: Request):
     with request.state.code_lock:
         tokens = request.state.code_tokens.copy()
-    return request.json(200, available_sources(tokens, github_installation(request.data_dir)))
+    return request.json(200, available_sources(tokens, github_installations(request.data_dir)))
 
 
 @route("POST", "/api/integrations/code", admin=True, action="connect-code", body=1024)
@@ -152,26 +152,33 @@ def _landing(request: Request, title: str, detail: str):
 
 def github_status(request: Request, *, live: bool = False) -> dict:
     state = github_config()
-    record = load_integrations(request.data_dir).get("github")
-    status = {**state, "connected": isinstance(record, dict), "installation": record,
+    records = github_connections(request.data_dir)
+    status = {**state, "connected": bool(records), "installation": records[0] if records else None,
+              "installations": records,
               "public_url": public_url(request.port), "required_permissions": REQUIRED_PERMISSIONS}
     if live and state["configured"]:
         # Los permisos cambian en GitHub sin avisar: se leen de allí, no de lo guardado al conectar.
         try:
             declared = app_permissions()
-            granted = installation_details(record["installation_id"]).get("permissions", {}) if isinstance(record, dict) else declared
-            if isinstance(record, dict):
-                status["installation"] = {**record, "permissions": granted}
-            status["permissions"] = permission_review(declared, granted)
+            current = []
+            for record in records:
+                try:
+                    granted = installation_details(record["installation_id"]).get("permissions", {})
+                    current.append({**record, "permissions": granted, "permission_review": permission_review(declared, granted)})
+                except GitHubAppError:
+                    current.append(record)
+            status["installations"] = current
+            status["installation"] = current[0] if current else None
+            status["permissions"] = current[0].get("permission_review") if current else permission_review(declared, declared)
         except GitHubAppError:
             status["permissions"] = None
     return status
 
 
-def _attach(request: Request, installation_id: int | None = None) -> dict | None:
+def _attach(request: Request, installation_id: int) -> dict | None:
     """Guarda la instalación de NUESTRA App: el id se contrasta con GitHub, no se cree tal cual."""
     rows = app_installations()
-    chosen = next((row for row in rows if installation_id is None or row["installation_id"] == installation_id), None)
+    chosen = next((row for row in rows if row["installation_id"] == installation_id), None)
     if chosen is None:
         return None
     details = installation_details(chosen["installation_id"])
@@ -192,48 +199,63 @@ def github_app_credentials(request: Request):
         return request.json(400, {"error": "Solicitud inválida"})
     if github_config()["source"] == "entorno":
         return request.json(409, {"error": "La App viene de variables de entorno del servidor; cámbiala allí"})
+    previous_app = github_config().get("app_id")
     try:
         verified = verify_app(payload["app_id"], payload["private_key"])
     except GitHubAppError as exc:
         return request.json(400, {"error": str(exc)})
     save_credentials(verified)
+    if previous_app != verified["app_id"]:
+        clear_github(request.data_dir)
     logging_setup.get("github").info("github_app_saved", extra={"user": request.user["username"], "reason": f"{verified['owner']}/{verified['slug']}"})
-    # Si ya estaba instalada (p. ej. se reconfigura), se conecta sola.
-    try:
-        _attach(request)
-    except GitHubAppError:
-        pass
     return request.json(200, {**github_status(request, live=True), "events": verified["events"]})
 
 
 @route("POST", "/api/integrations/github", admin=True, action="connect-github", body=256)
 def github_action(request: Request):
     payload = request.payload
-    if not isinstance(payload, dict) or set(payload) != {"action"} or payload["action"] not in ("install", "detect", "disconnect", "forget_app"):
+    if (not isinstance(payload, dict) or not set(payload) <= {"action", "installation_id"}
+            or payload.get("action") not in ("install", "detect", "connect", "disconnect", "forget_app")
+            or ("installation_id" in payload and (payload["action"] not in ("disconnect", "connect")
+                                                 or not isinstance(payload["installation_id"], int)
+                                                 or isinstance(payload["installation_id"], bool) or payload["installation_id"] <= 0))
+            or (payload.get("action") == "connect" and "installation_id" not in payload)):
         return request.json(400, {"error": "Acción de integración inválida"})
     action = payload["action"]
     if action in ("disconnect", "forget_app"):
-        installation = github_installation(request.data_dir)
-        clear_github(request.data_dir)
-        if installation is not None:
-            forget_installation(installation)
         if action == "forget_app":
             if github_config()["source"] == "entorno":
                 return request.json(409, {"error": "La App viene de variables de entorno del servidor; quítala allí"})
+        installation_id = payload.get("installation_id")
+        if installation_id is not None and installation_id not in github_installations(request.data_dir):
+            return request.json(404, {"error": "Esa instalación no está conectada"})
+        to_forget = [installation_id] if installation_id is not None else github_installations(request.data_dir)
+        clear_github(request.data_dir, installation_id)
+        for current in to_forget:
+            forget_installation(current)
+        if action == "forget_app":
             forget_app()
         return request.json(200, github_status(request))
     try:
         if action == "install":
             return request.json(200, {"url": install_url()})
-        if _attach(request) is None:
+        if action == "connect":
+            if _attach(request, payload["installation_id"]) is None:
+                return request.json(404, {"error": "Esta instalación no pertenece a la GitHub App configurada"})
+            return request.json(200, github_status(request, live=True))
+        rows = app_installations()
+        if not rows:
             return request.json(404, {"error": "La App todavía no está instalada en ninguna cuenta. Pulsa Instalar en GitHub y elige los repositorios."})
+        connected = set(github_installations(request.data_dir))
+        status = github_status(request, live=True)
+        status["available_installations"] = [{**row, "connected": row["installation_id"] in connected} for row in rows]
+        return request.json(200, status)
     except GitHubAppError as exc:
         return request.json(400, {"error": str(exc)})
-    return request.json(200, github_status(request, live=True))
 
 
-# Vuelta opcional tras instalar (Setup URL de la App). Pública porque la cookie SameSite=Strict
-# no viaja desde github.com; no hace falta `state`: el id se acepta solo si es de nuestra App.
+# Vuelta opcional tras instalar (Setup URL de la App). La cookie SameSite=Strict no viaja
+# desde github.com: no se conecta nada aquí; el administrador elige la cuenta en el panel.
 @route("GET", "/oauth/callback", public=True)
 def github_callback(request: Request):
     raw = request.arg("installation_id", "") or ""
@@ -242,14 +264,14 @@ def github_callback(request: Request):
     # Pública y con llamada a GitHub detrás: con límite, para que no sirva para agotar la cuota de la App.
     scope = f"oauth-callback:{request.client}"
     if request.auth.throttle.reserve(scope):
-        return _landing(request, "Demasiados intentos", "Espera unos minutos y vuelve a pulsar «Ya la instalé» en Integraciones.")
+        return _landing(request, "Demasiados intentos", "Espera unos minutos y vuelve a pulsar «Buscar instalaciones» en Integraciones.")
     try:
-        if _attach(request, int(raw)) is None:
+        if not any(row["installation_id"] == int(raw) for row in app_installations()):
             return _landing(request, "Instalación desconocida", "Esa instalación no pertenece a la GitHub App configurada en este panel.")
     except (GitHubAppError, ValueError) as exc:
         return _landing(request, "La conexión con GitHub falló", str(exc))
     request.auth.throttle.succeeded(scope)
-    return request.redirect(public_url(request.port) + "/#/integraciones")
+    return _landing(request, "Instalación disponible", "Vuelve al panel, pulsa «Buscar instalaciones» y elige la cuenta que quieres conectar.")
 
 
 # -------------------------------------------------------------------- Jira

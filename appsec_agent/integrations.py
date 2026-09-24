@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 class IntegrationError(ValueError):
     pass
+
+
+_lock = threading.Lock()
 
 
 def _path(data_dir: Path) -> Path:
@@ -48,21 +52,45 @@ def save_github(data_dir: Path, installation_id: int, details: dict, connected_b
               "permissions": details.get("permissions") or {},
               "connected_by": connected_by,
               "connected_at": datetime.now(timezone.utc).isoformat()}
-    data = load(data_dir)
-    data["github"] = record
-    _write(data_dir, data)
+    with _lock:
+        data = load(data_dir)
+        records = github_connections(data_dir)
+        records = [item for item in records if item["installation_id"] != installation_id]
+        records.append(record)
+        data["github"] = records[0] if len(records) == 1 else records
+        _write(data_dir, data)
     return record
 
 
+def github_connections(data_dir: Path) -> list[dict]:
+    """Instalaciones conectadas, aceptando el registro antiguo de una sola cuenta."""
+    value = load(data_dir).get("github")
+    rows = [value] if isinstance(value, dict) else value if isinstance(value, list) else []
+    return [row for row in rows if isinstance(row, dict) and isinstance(row.get("installation_id"), int)
+            and not isinstance(row["installation_id"], bool) and row["installation_id"] > 0]
+
+
+def github_installations(data_dir: Path) -> list[int]:
+    return [row["installation_id"] for row in github_connections(data_dir)]
+
+
 def github_installation(data_dir: Path) -> int | None:
-    record = load(data_dir).get("github")
-    if not isinstance(record, dict):
-        return None
-    installation_id = record.get("installation_id")
-    return installation_id if isinstance(installation_id, int) and installation_id > 0 else None
+    rows = github_installations(data_dir)
+    return rows[0] if rows else None
 
 
-def clear_github(data_dir: Path) -> None:
-    data = load(data_dir)
-    if data.pop("github", None) is not None:
-        _write(data_dir, data)
+def clear_github(data_dir: Path, installation_id: int | None = None) -> None:
+    with _lock:
+        data = load(data_dir)
+        if installation_id is None:
+            changed = data.pop("github", None) is not None
+        else:
+            current = github_connections(data_dir)
+            rows = [row for row in current if row["installation_id"] != installation_id]
+            changed = len(rows) != len(current)
+            if rows:
+                data["github"] = rows[0] if len(rows) == 1 else rows
+            else:
+                data.pop("github", None)
+        if changed:
+            _write(data_dir, data)

@@ -250,6 +250,33 @@ def render_repository_report(record: dict) -> str:
     return "\n".join(lines)
 
 
+def render_asset_report(record: dict) -> str:
+    """Exporta el registro acumulado sin presentarlo como un escaneo puntual."""
+    findings = _ordered_findings(record)
+    lifecycle = record.get("summary", {}).get("lifecycle") or {}
+    lines = [f"# Estado actual de hallazgos · {record['source']['name']}", "",
+             f"Activo: `{record['source']['id']}` · corte UTC: `{record.get('created_at') or 'sin fecha'}`",
+             "", "## Alcance", "",
+             "Vista acumulada del registro de hallazgos de este activo. Combina escaneos completos y revisiones de PR; "
+             "no representa una prueba independiente ni demuestra cobertura continua.", "",
+             "## Resumen", "",
+             f"- {len(findings)} hallazgos incluidos en esta vista.",
+             f"- {lifecycle.get('open', 0)} abiertos; {lifecycle.get('fixed', 0)} remediados; "
+             f"{lifecycle.get('suppressed', 0)} descartados en triage; {lifecycle.get('excluded', 0)} excluidos.", "",
+             "## Hallazgos", ""]
+    if not findings:
+        lines += ["La vista seleccionada no contiene hallazgos.", ""]
+    for finding in findings:
+        lines += _finding_block(finding)
+        state = finding.get("lifecycle") or {}
+        lines += [f"Ciclo de vida: **{state.get('status') or 'desconocido'}** · "
+                  f"primera observación `{state.get('first_seen') or '—'}` · "
+                  f"última observación `{state.get('last_seen') or '—'}`.", ""]
+    lines += ["## Límites", "", "- El registro refleja solo las herramientas, rutas y repositorios analizados.",
+              "- Consulta cada ejecución original para sus pasos, versiones y cobertura específica.", ""]
+    return "\n".join(lines)
+
+
 def render_tickets(record: dict) -> list[dict]:
     """Un ticket por hallazgo, con huella estable: la forma que necesitará el conector de Jira."""
     jira_priority = {"act": "Highest", "attend": "High", "track": "Medium"}
@@ -371,24 +398,51 @@ def render_profile_report(record: dict, profile: str, title: str = "") -> str:
         "iso27001": "ISO/IEC 27001:2022",
         "custom": "Personalizado",
     }
-    if profile not in labels or record.get("type") not in ("lab_scan", "repository_scan", "image_scan"):
+    if profile not in labels or record.get("type") not in ("lab_scan", "repository_scan", "image_scan", "pr_review", "asset_state"):
         raise ValueError("Perfil o ejecución no compatible")
     if title and (len(title) > 100 or not all(ch.isprintable() and ch not in "#`[]<>" for ch in title)):
         raise ValueError("Título inválido")
     heading = title.strip() if title else f"Evidencia técnica para {labels[profile]}"
-    is_repository = record["type"] in ("repository_scan", "image_scan")
-    technical_report = render_repository_report(record) if is_repository else render_scan_report(record)
-    scope = (f"`{record['source']['name']}`, " + (f"imagen `{record['source']['image'].get('reference')}` leída del registro"
+    is_state = record["type"] == "asset_state"
+    is_repository = record["type"] in ("repository_scan", "image_scan", "pr_review", "asset_state")
+    technical_report = (render_asset_report(record) if record["type"] == "asset_state" else
+                        render_repository_report(record) if is_repository else render_scan_report(record))
+    scope = (f"`{record['source']['name']}`, registro acumulado de hallazgos; consultar ejecuciones originales para cobertura."
+             if record["type"] == "asset_state" else
+             f"`{record['source']['name']}`, " + (f"imagen `{record['source']['image'].get('reference')}` leída del registro"
              if record["source"].get("image") else f"snapshot SHA-256 `{record['source'].get('sha256')}`") + "; análisis estático puntual."
              if is_repository else "`tenant-api-lab`, variante sintética indicada abajo; no incluye producción ni terceros.")
-    lines = [f"# {heading}", "", f"Perfil: **{labels[profile]}** · Run: `{record['id']}` · UTC: `{record['created_at']}`", "",
+    profile_rows = {
+        "soc2": [
+            ("Diseño del control", "Objetivo, responsables y frecuencia", "Descripción aprobada del control y dueño"),
+            ("Operación", "Fecha, fuente, pasos y hallazgos de esta ejecución", "Muestras distribuidas a lo largo del periodo de evaluación"),
+            ("Excepciones", "Hallazgos y decisiones de triage", "Tickets, aprobaciones y prueba de remediación"),
+        ],
+        "iso27001": [
+            ("Alcance del SGSI", "Activo y fuente analizada", "Alcance aprobado y relación con el inventario de activos"),
+            ("Tratamiento de riesgos", "Hallazgos, severidad y triage", "Evaluación de riesgos y plan de tratamiento aprobados"),
+            ("Mejora y seguimiento", "Pasos y límites del análisis puntual", "Declaración de aplicabilidad y evidencias de seguimiento"),
+        ],
+        "custom": [
+            ("Alcance", "Activo, fecha y cobertura técnica", "Definir criterio y periodo de revisión"),
+            ("Resultado", "Hallazgos y decisiones de triage", "Agregar validación y aprobación del responsable"),
+        ],
+    }[profile]
+    lines = [f"# {heading}", "", f"Perfil: **{labels[profile]}** · {'Registro' if is_state else 'Run'}: `{record['id']}` · UTC: `{record['created_at']}`", "",
              "> Documento de apoyo para el equipo de seguridad. No es una auditoría SOC 2, una certificación ISO 27001 ni una opinión de cumplimiento.", "",
              "## Contexto para revisión", "",
              "- Organización y propietario del control: completar por el equipo responsable.",
              f"- Sistema y alcance: {scope}",
-             "- Evidencia: identificador de run, hash del código, pasos de prueba, observaciones y estado de cobertura.",
-             "- Frecuencia y periodo de observación: una ejecución puntual; no demuestra operación continua del control.",
+             "- Evidencia: " + ("estado acumulado, huellas de hallazgos y decisiones de triage; consultar cada ejecución para hash y pasos de prueba."
+                              if is_state else "identificador de run, hash del código, pasos de prueba, observaciones y estado de cobertura."),
+             "- Frecuencia y periodo de observación: " + ("registro acumulado; sus entradas no demuestran por sí solas operación continua del control."
+                                                     if is_state else "una ejecución puntual; no demuestra operación continua del control."),
              "- Evaluación de aplicabilidad y controles: requiere revisión humana y documentación adicional.", "",
+             "## Matriz de preparación de evidencia", "",
+             "| Aspecto | Evidencia técnica en este dossier | Documentación aún necesaria |",
+             "|---|---|---|",
+             *[f"| {aspect} | {available} | {missing} |" for aspect, available, missing in profile_rows], "",
+             "La matriz es una guía de preparación; no evalúa la eficacia de controles ni sustituye el criterio del auditor.", "",
              "## Registro técnico adjunto", "", technical_report]
     return "\n".join(lines)
 

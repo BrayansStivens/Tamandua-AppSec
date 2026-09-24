@@ -8,6 +8,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { JiraExportDialog, useJiraStatus, type TicketLink } from '@/components/jira'
 import { SUPPRESSED, TriageActions, TriageBadge, TriageDialog, TriageHistory, triageLabel, type TriageState, type TriageStatus } from '@/components/triage'
+import { api, query as buildQuery } from '@/lib/api'
 
 export type Priority = { action: 'act' | 'attend' | 'track'; factors: string[] }
 export type Package = { ecosystem: string; name: string; version: string; fixed_version: string | null; introduced: string | null; dev?: boolean; direct?: boolean | null }
@@ -62,7 +63,7 @@ function groupFindings(findings: RepositoryFinding[]): Group[] {
 // Remediado automáticamente (el registro ya no lo ve) cuenta igual que remediado a mano.
 const statusOf = (finding: RepositoryFinding): TriageStatus => finding.lifecycle?.status === 'fixed' ? 'fixed' : finding.triage?.status ?? 'open'
 
-export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView = 'active' }: { run: RepositoryRun; onNew: () => void; onChanged: () => void; canAccept: boolean; initialView?: string }) {
+export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView = 'active', exportStatus = 'open' }: { run: RepositoryRun; onNew: () => void; onChanged: () => void; canAccept: boolean; initialView?: string; exportStatus?: 'open' | 'fixed' | 'excluded' | 'all' }) {
   const [query, setQuery] = useState('')
   const [severity, setSeverity] = useState('all')
   const [action, setAction] = useState('all')
@@ -74,6 +75,8 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const [exporting, setExporting] = useState<string[] | null>(null)
   const [jira] = useJiraStatus()
   const [offset, setOffset] = useState(0)
+  const [downloadError, setDownloadError] = useState('')
+  const [downloading, setDownloading] = useState<string | null>(null)
   const PAGE = 50
   const findings = useMemo(() => run.findings ?? [], [run.findings])
   // Las cifras de arriba cuentan solo lo pendiente: lo descartado en triage no es trabajo.
@@ -89,6 +92,19 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const toggle = (fingerprints: string[], on: boolean) => setSelected(previous => { const next = new Set(previous); for (const item of fingerprints) { if (on) next.add(item); else next.delete(item) } return next })
   const allOnPage = pageFingerprints.length > 0 && pageFingerprints.every(item => selected.has(item))
   const decided = () => { setDecision(null); setSelected(new Set()); onChanged() }
+  const exportFile = async (artifact: string) => {
+    setDownloadError(''); setDownloading(artifact)
+    try {
+      const isState = run.type === 'asset_state'
+      const source = run.source as { id?: string; name?: string } | undefined
+      const path = isState
+        ? `/api/assets/export?${buildQuery({ key: source?.id, status: exportStatus, artifact: artifact === 'run.json' ? 'record.json' : artifact })}`
+        : artifact === 'run.json' ? `/api/runs/${run.id}` : `/api/runs/${run.id}/${artifact}`
+      const name = (source?.name ?? 'hallazgos').replace(/[^a-z0-9-]+/gi, '-').slice(0, 50) || 'hallazgos'
+      await api.download(path, `${name}-${isState ? 'estado' : run.id.slice(0, 8)}-${artifact}`)
+    } catch (caught) { setDownloadError(caught instanceof Error ? caught.message : String(caught)) }
+    finally { setDownloading(null) }
+  }
 
   return <div className="space-y-6">
     {run.type === 'asset_state' ? <div className="space-y-2 rounded-2xl border border-app-line bg-panel p-5">
@@ -155,9 +171,10 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
     </CardContent></Card>
 
     <div className="flex flex-wrap gap-2">{[
-      ['Tickets (Jira)', `/api/runs/${run.id}/tickets.json`], ['Markdown', `/api/runs/${run.id}/report.md`], ['SARIF', `/api/runs/${run.id}/findings.sarif`], ['JSON', `/api/runs/${run.id}`],
-      ['SOC 2 Tipo II', `/api/runs/${run.id}/report-soc2.md`], ['ISO 27001', `/api/runs/${run.id}/report-iso27001.md`],
-    ].map(([label, url]) => <a key={label} href={url} download><Button variant="outline" size="sm" className="border-app-line bg-app-soft"><ArrowDownToLine /> {label}</Button></a>)}</div>
+      ['Informe PDF', 'report.pdf'], ['SOC 2 Tipo II · PDF', 'report-soc2.pdf'], ['ISO/IEC 27001 · PDF', 'report-iso27001.pdf'],
+      ['Markdown', 'report.md'], ['SARIF', 'findings.sarif'], ['JSON', 'run.json'], ['Tickets (Jira)', 'tickets.json'],
+    ].map(([label, artifact]) => <Button key={artifact} variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" onClick={() => void exportFile(artifact)}><ArrowDownToLine />{downloading === artifact ? 'Preparando…' : label}</Button>)}</div>
+    {downloadError && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">No se pudo descargar el informe: {downloadError}</div>}
 
     <JiraExportDialog key={exporting?.join(',') ?? 'none'} runId={run.id} fingerprints={exporting} onClose={() => { setExporting(null); setSelected(new Set()) }} onDone={onChanged} />
     <TriageDialog key={decision ? `${decision.status}:${decision.fingerprints.length}` : 'none'} runId={run.id} status={decision?.status ?? null} fingerprints={decision?.fingerprints ?? []} onClose={() => setDecision(null)} onDone={decided} />

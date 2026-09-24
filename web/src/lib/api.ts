@@ -41,6 +41,19 @@ export const api = {
     method: 'POST', credentials: 'same-origin', signal: init?.signal,
     headers: { 'Content-Type': 'application/json', 'X-AppSec-Agent-Action': action }, body: JSON.stringify(body),
   }).then(response => parse<T>(response, path))),
+  download: (path: string, filename: string) => track(fetch(path, { credentials: 'same-origin' }).then(async response => {
+    if (!response.ok) { await parse(response, path); throw new ApiError(`Error ${response.status}`, response.status) }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.append(link)
+      link.click()
+      link.remove()
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 60_000) }
+  })),
 }
 
 export const query = (params: Record<string, string | number | undefined | null>) =>

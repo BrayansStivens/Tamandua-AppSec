@@ -94,7 +94,7 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
     {loading && !detail ? <Skeleton tiles={6} rows={5} />
       : detail && (detail.status === 'queued' || detail.status === 'running' || detail.status === 'failed')
         ? <RunProgress run={detail as unknown as RunningRun} onFinished={() => void load()} />
-        : detail ? <RepositoryResult key={`${run}:${tab}`} run={detail} onNew={onNew} canAccept={user.role === 'admin'} onChanged={() => void load()} initialView={run === CURRENT && tab !== 'open' ? 'all' : 'active'} /> : null}
+        : detail ? <RepositoryResult key={`${run}:${tab}`} run={detail} onNew={onNew} canAccept={user.role === 'admin'} onChanged={() => void load()} initialView={run === CURRENT && tab !== 'open' ? 'all' : 'active'} exportStatus={tab} /> : null}
   </div>
 }
 

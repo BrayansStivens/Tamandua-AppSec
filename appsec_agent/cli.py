@@ -13,7 +13,7 @@ from .auth import AuthError, Sessions, Users
 from .engine import scan_fixture
 from .fixture import FixtureError, verify_fixture
 from .github_app import GitHubAppError, config as github_config
-from .integrations import github_installation
+from .integrations import github_installations
 from .providers import PROVIDERS, check_provider, provider_status
 from .repository_scan import scan_repository
 from .repository_sources import SourceError, available_sources, snapshot_source
@@ -85,14 +85,16 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(list_runs(args.data_dir), ensure_ascii=False, indent=2))
             return 0
         if args.command == "sources":
-            print(json.dumps(available_sources(None, github_installation(args.data_dir), include_workspace=True),
+            print(json.dumps(available_sources(None, github_installations(args.data_dir), include_workspace=True),
                              ensure_ascii=False, indent=2))
             return 0
         if args.command == "scan-repository":
             (args.data_dir / "work").mkdir(parents=True, exist_ok=True)
             with TemporaryDirectory(prefix="snapshot-", dir=args.data_dir / "work") as temporary:
+                listing = available_sources(None, github_installations(args.data_dir), include_workspace=True)
+                selected = next((item for item in listing["sources"] if item["id"] == args.source_id), None)
                 root, source = snapshot_source(args.source_id, Path(temporary), None,
-                                               github_installation(args.data_dir))
+                                               selected.get("installation_id") if selected else None)
                 record = save_repository_scan(args.data_dir, scan_repository(root, source,
                                                                             allow_osv_upload=args.allow_osv_upload,
                                                                             data_dir=args.data_dir))

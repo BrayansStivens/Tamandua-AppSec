@@ -168,7 +168,7 @@ def list_repositories(provider: str, token: str | None = None) -> list[dict]:
     return result
 
 
-def available_sources(tokens: dict[str, str] | None = None, installation_id: int | None = None, *,
+def available_sources(tokens: dict[str, str] | None = None, installation_id: int | list[int] | None = None, *,
                       include_workspace: bool | None = None) -> dict:
     """Repositorios analizables. El código de la propia herramienta solo aparece en la CLI (desarrollo y
     dogfooding) o si se pide con APPSEC_AGENT_SHOW_WORKSPACE=1: a un usuario del panel no le sirve."""
@@ -178,14 +178,24 @@ def available_sources(tokens: dict[str, str] | None = None, installation_id: int
     sources = ([{"id": "local:appsec-agent", "name": "appsec-agent · código propio", "provider": "local",
                  "private": True, "branch": "workspace"}] if include_workspace else [])
     statuses = {}
-    if installation_id is not None:
-        # La App solo ve los repositorios que el usuario marcó al instalarla.
+    installations = [installation_id] if isinstance(installation_id, int) else installation_id or []
+    if installations:
+        # Cada instalación autoriza únicamente los repositorios elegidos en esa cuenta.
         from .github_app import GitHubAppError, installation_repositories
-        try:
-            sources.extend(installation_repositories(installation_id))
-            statuses["github"] = {"configured": True, "origin": "github_app"}
-        except GitHubAppError as exc:
-            statuses["github"] = {"configured": True, "origin": "github_app", "error": str(exc)}
+        errors = []
+        seen = set()
+        for current in installations:
+            try:
+                for entry in installation_repositories(current):
+                    key = entry.get("uid") or entry["id"]
+                    if key not in seen:
+                        sources.append({**entry, "installation_id": current, "account": entry["name"].split("/", 1)[0]})
+                        seen.add(key)
+            except GitHubAppError as exc:
+                errors.append(f"Instalación {current}: {exc}")
+        statuses["github"] = {"configured": True, "origin": "github_app"}
+        if errors:
+            statuses["github"]["error"] = " · ".join(errors)
     for provider, env in (("github", "GITHUB_TOKEN"), ("gitlab", "GITLAB_TOKEN")):
         if provider in statuses:
             continue

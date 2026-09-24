@@ -152,6 +152,10 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertIn(b"SOC 2 Tipo II", report)
         self.assertIn(b"no demuestra", report)
+        for profile in ("soc2", "iso27001"):
+            status, pdf = self.request("GET", f"/api/runs/{run_id}/report-{profile}.pdf")
+            self.assertEqual(status, 200)
+            self.assertTrue(pdf.startswith(b"%PDF-"))
 
     def test_repository_scan_is_queued_and_never_opts_in_to_osv_implicitly(self):
         headers = {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-repository"}

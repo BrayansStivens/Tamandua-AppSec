@@ -14,7 +14,8 @@ from appsec_agent import pr_review, pr_watch
 from appsec_agent.jobs import ScanJobs
 from appsec_agent.auth import Users
 from appsec_agent.github_app import GitHubAppError, PULLS_FORBIDDEN
-from appsec_agent.store import load_run, save_repository_scan
+from appsec_agent.store import load_run, save_repository_scan, render_profile_report
+from appsec_agent.pdf_reports import render_pdf
 from test_auth import PASSWORD, HttpCase
 
 SHA = "c" * 40
@@ -159,6 +160,9 @@ class JobTests(unittest.TestCase):
         self.assertIn("> [!WARNING]", body)
         self.assertIn("**1 hallazgo nuevo**", body)
         self.assertEqual(pr_watch.reviewed(self.data_dir, "github:org/api")["12"]["head_sha"], SHA)
+        report = render_profile_report(record, "soc2")
+        self.assertIn("una ejecución puntual", report)
+        self.assertTrue(render_pdf(report, title="SOC 2 Tipo II", kind="Revisión de PR").startswith(b"%PDF-"))
 
     def test_without_write_permission_the_review_still_happens(self):
         record = self.run_review({"contents": "read", "metadata": "read"})
@@ -221,6 +225,30 @@ class SecretInDocsTests(unittest.TestCase):
 
 
 class WatcherTests(unittest.TestCase):
+    def test_poll_routes_each_organization_to_its_own_installation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            data_dir = Path(directory)
+            pr_watch.configure(data_dir, "github#1", enabled=True, by="operadora")
+            pr_watch.configure(data_dir, "github#2", enabled=True, by="operadora")
+            queued = []
+
+            class Jobs:
+                def pending(self):
+                    return 0
+
+                def enqueue_pr_review(self, **kwargs):
+                    queued.append((kwargs["source_id"], kwargs["installation_id"]))
+
+            def repositories(installation, *, fresh):
+                name = "acme/api" if installation == 77 else "beta/web"
+                return [{"id": f"github:{name}", "uid": "github#1" if installation == 77 else "github#2", "name": name}]
+
+            pulls = [{"number": 1, "head_sha": "a" * 40, "draft": False}]
+            with patch("appsec_agent.github_app.installation_repositories", side_effect=repositories), \
+                    patch("appsec_agent.github_app.open_pull_requests", return_value=pulls):
+                self.assertEqual(pr_watch.Watcher(data_dir, Jobs(), lambda: [77, 88]).poll(), 2)
+            self.assertEqual(queued, [("github:acme/api", 77), ("github:beta/web", 88)])
+
     def test_poll_enqueues_each_head_once_and_skips_drafts(self):
         with tempfile.TemporaryDirectory() as directory:
             data_dir = Path(directory)
@@ -257,7 +285,7 @@ class RouteTests(HttpCase):
             Users(self.data_dir).create("operadora", PASSWORD, role="admin")
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
             cookie = cookies[0].split("; ")[0]
-            with patch("appsec_agent.api.routes_prs.github_installation", return_value=7), \
+            with patch("appsec_agent.api.routes_prs.github_installations", return_value=[7]), \
                     patch("appsec_agent.api.routes_prs.installation_repositories", return_value=[{"id": "github:org/api", "uid": "github#1", "name": "org/api"}]), \
                     patch("appsec_agent.api.routes_prs.open_pull_requests", side_effect=GitHubAppError(PULLS_FORBIDDEN)):
                 status, body, _ = self.call("GET", "/api/pull-requests?source_id=github:org/api", headers={"Cookie": cookie})

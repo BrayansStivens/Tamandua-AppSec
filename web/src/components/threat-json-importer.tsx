@@ -87,7 +87,7 @@ export function ThreatJsonImporter({ onClose, onImported }: { onClose: () => voi
     const link = document.createElement('a')
     link.href = url; link.download = `modelo-amenazas-${selected ?? 'personalizado'}.json`
     document.body.append(link); link.click(); link.remove()
-    URL.revokeObjectURL(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
   const copy = async (value: string, message: string) => {
     try { await navigator.clipboard.writeText(value); setNotice(message); setError('') }

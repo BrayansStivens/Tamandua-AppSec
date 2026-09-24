@@ -113,28 +113,18 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
     try { const data = await api.post<View>('/api/threat-models', 'save-threat-model', { id, model: payloadOf(next) }); setView(data); setDraft(data.model); return true }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)); return false } finally { setBusy(false) }
   }
-  const downloadDiagram = async () => {
+  const downloadFile = async (file: string) => {
     if (dirty && !(await saveModel(draft))) return
-    const link = document.createElement('a')
-    link.href = `/api/threat-models/${id}/diagram.svg`
-    link.download = `${draft.name.replace(/[^a-z0-9-]+/gi, '-').slice(0, 60) || 'modelo'}-diagrama.svg`
-    document.body.append(link)
-    link.click()
-    link.remove()
-  }
-  const downloadJson = async () => {
-    if (dirty && !(await saveModel(draft))) return
-    const link = document.createElement('a')
-    link.href = `/api/threat-models/${id}/model.json`
-    link.download = `${draft.name.replace(/[^a-z0-9-]+/gi, '-').slice(0, 60) || 'modelo'}.json`
-    document.body.append(link)
-    link.click()
-    link.remove()
+    try {
+      setError('')
+      const name = draft.name.replace(/[^a-z0-9-]+/gi, '-').slice(0, 60) || 'modelo'
+      await api.download(`/api/threat-models/${id}/${file}`, `${name}-${file}`)
+    } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) }
   }
   return <div className="space-y-5">
     <div className="flex flex-col gap-4 rounded-2xl border border-app-line bg-panel p-5">
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><button onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-xs text-app-subtle hover:text-app-fg"><ArrowLeft className="size-3" />Modelos</button><h2 className="text-xl font-semibold">{view.model.name}</h2><div className="mt-1.5 flex flex-wrap items-center gap-2"><button onClick={() => setPicking(true)} className="inline-flex items-center gap-1 rounded-lg border border-brand/30 bg-brand/[0.07] px-2 py-0.5 text-xs font-medium text-brand hover:bg-brand/10" title="Cambiar el enfoque">{GUIDES[methodology].name}<Pencil className="size-3" /></button><button onClick={() => toggleGuide(!guide)} aria-pressed={guide} className="inline-flex items-center gap-1 rounded-lg border border-app-line px-2 py-0.5 text-xs text-app-muted hover:text-app-fg"><BookOpen className="size-3" />{guide ? 'Ocultar guía' : 'Guía'}</button></div><p className="mt-1 text-xs text-app-subtle">{view.model.components.length} componentes · {view.model.flows.length} flujos · {view.model.boundaries.length} fronteras{view.model.updated_at ? ` · ${formatDate(view.model.updated_at)} por ${view.model.updated_by}` : ''}</p></div>
-        <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={busy} className="border-app-line bg-app-soft" onClick={() => void downloadJson()}><ArrowDownToLine />Modelo JSON</Button><Button size="sm" variant="outline" disabled={busy} className="border-app-line bg-app-soft" onClick={() => void downloadDiagram()}><ArrowDownToLine />Diagrama SVG</Button>{[['Threat Dragon', 'threat-dragon.json'], ['pytm', 'tm.py'], ['Informe', 'report.md']].map(([label, file]) => <a key={file} href={`/api/threat-models/${id}/${file}`} download={`${view.model.name}-${file}`}><Button size="sm" variant="outline" className="border-app-line bg-app-soft"><ArrowDownToLine />{label}</Button></a>)}{user.role === 'admin' && <Button size="sm" variant="ghost" onClick={() => void remove()} aria-label="Borrar modelo"><Trash2 /></Button>}</div></div>
+        <div className="flex flex-wrap gap-2">{[['Modelo JSON', 'model.json'], ['Diagrama SVG', 'diagram.svg'], ['Informe PDF', 'report.pdf'], ['SOC 2 Tipo II · PDF', 'report-soc2.pdf'], ['ISO/IEC 27001 · PDF', 'report-iso27001.pdf'], ['Threat Dragon', 'threat-dragon.json'], ['pytm', 'tm.py'], ['Markdown', 'report.md']].map(([label, file]) => <Button key={file} size="sm" variant="outline" disabled={busy} className="border-app-line bg-app-soft" onClick={() => void downloadFile(file)}><ArrowDownToLine />{label}</Button>)}{user.role === 'admin' && <Button size="sm" variant="ghost" onClick={() => void remove()} aria-label="Borrar modelo"><Trash2 /></Button>}</div></div>
       <ProjectRepositories draft={draft} setDraft={setDraft} catalog={catalog} onError={setError} />
       {methodology === 'custom' && <CustomModulesPicker value={draft.custom_modules ?? ['manual', 'elements']} onChange={custom_modules => setDraft({ ...draft, custom_modules })} />}
       {tabs.some(([key]) => key === 'threats') && <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{(['evidenced', 'open', 'mitigated', 'accepted', 'not_applicable'] as const).map(status => <div key={status} className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.by_status[status] ?? 0}</div><div className="text-xs text-app-muted">{statusLabel[status]}</div></div>)}<div className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.total}</div><div className="text-xs text-app-muted">Total</div></div></div>}

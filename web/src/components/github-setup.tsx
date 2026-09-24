@@ -9,8 +9,11 @@ export type PermissionReview = { required: Record<string, string>; declared: Rec
 export type GitHubStatus = {
   configured: boolean; missing: string[]; connected: boolean; app_id: string; slug: string; owner: string | null; name: string | null; html_url: string | null
   source: 'entorno' | 'almacén cifrado' | null; public_url: string; permissions?: PermissionReview | null; required_permissions: Record<string, string>
-  installation: { installation_id: number; account: string | null; account_type: string | null; repository_selection: 'all' | 'selected' | null; permissions: Record<string, string>; connected_by: string | null; connected_at: string } | null
+  installation: GitHubInstallation | null; installations: GitHubInstallation[]
+  available_installations?: { installation_id: number; account: string | null; account_type: string | null; repository_selection: string | null; connected: boolean }[]
 }
+
+export type GitHubInstallation = { installation_id: number; account: string | null; account_type: string | null; repository_selection: 'all' | 'selected' | null; permissions: Record<string, string>; connected_by: string | null; connected_at: string; permission_review?: PermissionReview }
 
 const PERMISSION_LABEL: Record<string, string> = { contents: 'Contents', metadata: 'Metadata', pull_requests: 'Pull requests', statuses: 'Commit statuses' }
 const LEVEL_LABEL: Record<string, string> = { read: 'Read-only', write: 'Read and write' }
@@ -84,8 +87,8 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
         <ul className="space-y-1">{Object.entries(status.required_permissions).map(([name, level]) => <li key={name} className="flex items-center justify-between gap-3 rounded-md border border-app-line px-2.5 py-1"><span className="text-app-secondary">{PERMISSION_LABEL[name] ?? name}</span><span className="font-mono text-[11px]">{LEVEL_LABEL[level] ?? level}</span></li>)}</ul>
         <p>Nada en <em>Organization</em> ni <em>Account permissions</em>, y ningún evento. Cuanto menos permiso, menos daño si la clave se filtrara.</p>
       </Step>
-      <Step number={5} title="Solo en tu cuenta">
-        <p>En «Where can this GitHub App be installed?» elige <strong className="font-medium text-app-secondary">Only on this account</strong> y pulsa <strong className="font-medium text-app-secondary">Create GitHub App</strong>.</p>
+      <Step number={5} title="Cuentas donde se puede instalar">
+        <p>En «Where can this GitHub App be installed?» elige <strong className="font-medium text-app-secondary">Any account</strong> si vas a conectar varias organizaciones. Después pulsa <strong className="font-medium text-app-secondary">Create GitHub App</strong>.</p>
       </Step>
       <Step number={6} title="Copia el App ID y genera la clave privada">
         <p>El <strong className="font-medium text-app-secondary">App ID</strong> aparece arriba, en «About». Baja hasta <strong className="font-medium text-app-secondary">Private keys</strong> y pulsa «Generate a private key»: se descarga un fichero <code className="font-mono">.pem</code>.</p>
@@ -119,25 +122,50 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
 export function GitHubInstall({ status, canManage, onChanged }: { status: GitHubStatus; canManage: boolean; onChanged: (next: GitHubStatus) => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [available, setAvailable] = useState<NonNullable<GitHubStatus['available_installations']>>([])
   const detect = async () => {
     setBusy(true); setError('')
-    try { onChanged(await api.post<GitHubStatus>('/api/integrations/github', 'connect-github', { action: 'detect' })) }
+    try {
+      const next = await api.post<GitHubStatus>('/api/integrations/github', 'connect-github', { action: 'detect' })
+      setAvailable(next.available_installations ?? []); onChanged(next)
+    }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
+  }
+  const connect = async (installationId: number) => {
+    setBusy(true); setError('')
+    try {
+      const next = await api.post<GitHubStatus>('/api/integrations/github', 'connect-github', { action: 'connect', installation_id: installationId })
+      setAvailable(current => current.map(item => item.installation_id === installationId ? { ...item, connected: true } : item))
+      onChanged(next)
+    } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
   const review = status.permissions
   return <div className="mt-4 space-y-3">
     <div className="flex items-start gap-2 rounded-lg border border-app-line bg-app-soft px-3 py-2.5 text-sm"><CircleCheck className="mt-0.5 size-4 shrink-0 text-brand" />
-      <span>App <strong className="font-medium">{status.name ?? status.slug}</strong>{status.owner ? <> de <strong className="font-medium">{status.owner}</strong></> : null} verificada. Falta instalarla y elegir qué repositorios puede leer.</span></div>
+      <span>App <strong className="font-medium">{status.name ?? status.slug}</strong>{status.owner ? <> de <strong className="font-medium">{status.owner}</strong></> : null} verificada. {status.connected ? 'Puedes añadir otra organización y elegir sus repositorios.' : 'Instálala en las organizaciones que necesites y elige sus repositorios.'}</span></div>
     {review && (review.excess.length > 0 || review.missing.length > 0) && <PermissionWarning review={review} />}
     <ol className="ml-4 list-decimal space-y-1 text-xs leading-5 text-app-muted">
       <li>Pulsa <strong className="font-medium text-app-secondary">Instalar en GitHub</strong> y elige <strong className="font-medium text-app-secondary">Only select repositories</strong> con los que quieras analizar.</li>
-      <li>Vuelve y pulsa <strong className="font-medium text-app-secondary">Ya la instalé</strong> (si pusiste la Setup URL, vuelves aquí solo).</li>
+      <li>Vuelve y pulsa <strong className="font-medium text-app-secondary">Buscar instalaciones</strong>; selecciona las organizaciones que quieres usar en este workspace.</li>
     </ol>
     {error && <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">{error}</div>}
     <div className="flex flex-wrap gap-2">
       <a href={`https://github.com/apps/${status.slug}/installations/new`} target="_blank" rel="noopener noreferrer"><Button disabled={!canManage} className="bg-primary text-primary-foreground hover:bg-primary/90">Instalar en GitHub <ExternalLink /></Button></a>
-      <Button variant="outline" disabled={!canManage || busy} onClick={() => void detect()} className="border-app-line bg-app-soft">{busy ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}Ya la instalé</Button>
+      <Button variant="outline" disabled={!canManage || busy} onClick={() => void detect()} className="border-app-line bg-app-soft">{busy ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}Buscar instalaciones</Button>
     </div>
+    {available.length > 0 && <div className="space-y-2 rounded-lg border border-app-line bg-app-soft p-3">
+      <p className="text-xs font-medium text-app-secondary">Cuentas donde la App está instalada</p>
+      {available.map(item => {
+        const connected = status.installations.some(current => current.installation_id === item.installation_id)
+        return <div key={item.installation_id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-app-line bg-panel px-3 py-2 text-sm">
+          <div><p className="font-medium">{item.account ?? `Instalación #${item.installation_id}`}</p>
+            <p className="text-xs text-app-muted">{item.account_type === 'Organization' ? 'Organización' : 'Cuenta personal'} · {item.repository_selection === 'selected' ? 'Repositorios seleccionados' : 'Todos los repositorios'}</p></div>
+          <Button size="sm" variant={connected ? 'outline' : 'default'} disabled={busy || !canManage || connected} onClick={() => void connect(item.installation_id)}>
+            {connected ? 'Conectada' : 'Conectar cuenta'}
+          </Button>
+        </div>
+      })}
+    </div>}
   </div>
 }
 

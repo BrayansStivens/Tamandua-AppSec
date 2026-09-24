@@ -19,9 +19,9 @@ def make_handler(data_dir: Path, *, watch_pull_requests: bool = False):
     state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir),
                   auth=Authenticator(data_dir))
     if watch_pull_requests:
-        from ..integrations import github_installation
+        from ..integrations import github_installations
         from ..pr_watch import Watcher
-        Watcher(data_dir, state.jobs, lambda: github_installation(data_dir)).start()
+        Watcher(data_dir, state.jobs, lambda: github_installations(data_dir)).start()
         from ..cve_db import Syncer
         Syncer(data_dir).start()
     return build_handler(state)

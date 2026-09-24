@@ -17,7 +17,7 @@ Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Con
 - **Ciclo de vida de hallazgos** por repositorio: remediación automática cuando un escaneo o un commit del PR ya no lo encuentra, triage con motivo e historial.
 - **CVE tracker**: copia local completa de NVD con buscador, filtros por severidad/año/KEV y «¿te afecta?».
 - **Modelado de amenazas** STRIDE propuesto a partir de tus repositorios, con editor visual de diagramas y amenazas con indicios en hallazgos reales.
-- **Informes** JSON, Markdown y SARIF; exportación a **Jira** sin duplicados.
+- **Informes** PDF paginados para hallazgos y amenazas (general, SOC 2 Tipo II e ISO/IEC 27001:2022), además de JSON, Markdown y SARIF; exportación a **Jira** sin duplicados.
 - **Equipo**: invitaciones, roles y segundo factor (TOTP).
 
 **En desarrollo** (se ven en gris en el panel y aún no dan resultados): pruebas dinámicas (DAST) de aplicaciones web y API sobre dominios verificados, GitLab, Bitbucket y Azure DevOps, y asistencia con IA opcional. También vendrán una API pública con tokens y un modo CLI para CI.
@@ -57,7 +57,7 @@ Abre <http://127.0.0.1:8766> y:
 ## Seguridad, en corto
 
 - Secretos (clave de la GitHub App, claves de IA, token de Jira) **cifrados con AES-256-GCM** en `config/`, separado de `data/`. Nunca vuelven al navegador ni aparecen en los logs.
-- GitHub App **privada** con solo cuatro permisos (`contents: read`, `metadata: read`, `pull_requests: write`, `statuses: write`), sin webhooks ni OAuth; tokens de una hora en memoria.
+- GitHub App con solo cuatro permisos (`contents: read`, `metadata: read`, `pull_requests: write`, `statuses: write`), sin webhooks ni OAuth; tokens de una hora en memoria. Para varias organizaciones se configura como **Any account** y se conecta cada instalación explícitamente en el panel.
 - Panel en `127.0.0.1` por defecto. Si lo publicas fuera de tu máquina sin **HTTPS**, el servidor no arranca.
 - Credenciales de registros privados cifradas y pasadas a los motores por variable de entorno; los registros de red interna se bloquean salvo permiso expreso.
 - Sin telemetría. Solo se consulta OSV con los nombres de tus dependencias si lo autorizas en cada análisis.

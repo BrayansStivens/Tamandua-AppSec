@@ -1240,3 +1240,34 @@ def to_markdown(model: dict, rows: list[dict]) -> str:
     lines += ["> Las amenazas salen de reglas sobre el modelo declarado y de lo que escribe el equipo: si el modelo no refleja el sistema, "
               "tampoco lo harán las amenazas. Los indicios de los análisis son señales para revisar, no confirmaciones.", ""]
     return "\n".join(lines)
+
+
+def to_profile_markdown(model: dict, rows: list[dict], profile: str) -> str:
+    """Dossier de preparación: un modelo no equivale a una auditoría ni a pruebas operativas."""
+    labels = {"soc2": "SOC 2 Tipo II", "iso27001": "ISO/IEC 27001:2022"}
+    if profile not in labels:
+        raise ValueError("Perfil de informe inválido")
+    counts = summary(rows)
+    matrix = ([
+        ("Alcance y riesgos", "Componentes, flujos, fronteras y amenazas del modelo", "Descripción aprobada del sistema y alcance del examen"),
+        ("Diseño de controles", "Mitigaciones y decisiones declaradas por el equipo", "Controles aprobados, propietarios y frecuencia"),
+        ("Operación durante el periodo", "Indicios enlazados a análisis puntuales", "Muestras y evidencias de operación a lo largo del periodo"),
+    ] if profile == "soc2" else [
+        ("Alcance del SGSI", "Activos y fronteras representados", "Alcance aprobado e inventario completo"),
+        ("Evaluación de riesgos", "Amenazas, impacto y decisiones del modelo", "Criterios de riesgo y evaluación aprobada"),
+        ("Tratamiento y seguimiento", "Mitigaciones propuestas e indicios enlazados", "Plan de tratamiento, declaración de aplicabilidad y seguimiento"),
+    ])
+    lines = [f"# Modelo de amenazas · evidencia para {labels[profile]}", "",
+             f"Proyecto: **{model['name']}** · actualizado: `{model.get('updated_at') or 'sin fecha'}`", "",
+             "> Documento técnico de preparación. No es una auditoría SOC 2, una certificación ISO 27001 ni una opinión de cumplimiento.", "",
+             "## Lectura ejecutiva", "",
+             f"- {len(model.get('components', []))} componentes, {len(model.get('flows', []))} flujos y {len(model.get('boundaries', []))} fronteras de confianza.",
+             f"- {counts['total']} amenazas; {counts['by_status']['evidenced']} con indicios provenientes de análisis y "
+             f"{counts['by_status']['open']} abiertas sin indicios.",
+             "- El diagrama y las decisiones son declaraciones del equipo; requieren revisión y aprobación humana.", "",
+             "## Matriz de preparación de evidencia", "",
+             "| Aspecto | Disponible en el modelo | Documentación aún necesaria |", "|---|---|---|",
+             *[f"| {aspect} | {available} | {missing} |" for aspect, available, missing in matrix], "",
+             "Las amenazas potenciales no prueban fallas reales; un estado mitigado declarado tampoco demuestra eficacia operativa.", "",
+             "## Modelo y registro técnico", "", to_markdown(model, rows)]
+    return "\n".join(lines)

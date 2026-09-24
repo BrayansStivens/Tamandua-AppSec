@@ -387,7 +387,13 @@ class RouteTests(HttpCase):
             cookie = cookies[0].split("; ")[0]
             scan = _scan("org/shop", [{**_finding("c" * 64, cwe=(89,)), "scanner": "sast", "package": None}], datetime.now(timezone.utc).isoformat())
             scan["source"]["id"] = REPO
-            save_repository_scan(self.data_dir, {**scan, "inventory": {"packages": {"npm": ["express", "pg"]}, "services": []}})
+            stored = save_repository_scan(self.data_dir, {**scan, "inventory": {"packages": {"npm": ["express", "pg"]}, "services": []}})
+            for artifact in ("report.md", "report.pdf", "report-soc2.pdf", "report-iso27001.pdf",
+                             "findings.sarif", "tickets.json"):
+                status, content = self.call("GET", f"/api/runs/{stored['id']}/{artifact}", headers={"Cookie": cookie})[:2]
+                self.assertEqual(status, 200, artifact)
+                if artifact.endswith(".pdf"):
+                    self.assertTrue(content.startswith(b"%PDF-"), artifact)
             status, created, _ = self.post("/api/threat-models", "save-threat-model", {"name": "Tienda", "suggest": [REPO]}, cookie)
             self.assertEqual(status, 200, created)
             self.assertIn("database", {item["kind"] for item in created["model"]["components"]})
@@ -399,8 +405,18 @@ class RouteTests(HttpCase):
             self.assertEqual(next(row for row in decided["threats"] if row["id"] == threat)["status"], "mitigated")
             status, _, _ = self.post("/api/threat-models", "save-threat-model", {"id": model_id, "model": {**decided["model"], "name": "Tienda v2"}}, cookie)
             self.assertEqual(status, 200)
-            for artifact in ("threat-dragon.json", "tm.py", "report.md", "diagram.svg", "model.json"):
+            for artifact in ("threat-dragon.json", "tm.py", "report.md", "report.pdf", "report-soc2.pdf",
+                             "report-iso27001.pdf", "diagram.svg", "model.json"):
                 self.assertEqual(self.call("GET", f"/api/threat-models/{model_id}/{artifact}", headers={"Cookie": cookie})[0], 200)
+            status, pdf = self.call("GET", f"/api/threat-models/{model_id}/report.pdf", headers={"Cookie": cookie})[:2]
+            self.assertEqual(status, 200)
+            self.assertTrue(pdf.startswith(b"%PDF-"))
+            self.assertIn("operación a lo largo del periodo", tm.to_profile_markdown(decided["model"], decided["threats"], "soc2"))
+            for artifact in ("report.md", "report.pdf", "report-soc2.pdf", "report-iso27001.pdf", "findings.sarif", "tickets.json", "record.json"):
+                status, body = self.call("GET", f"/api/assets/export?key={REPO}&status=all&artifact={artifact}", headers={"Cookie": cookie})[:2]
+                self.assertEqual(status, 200, (artifact, str(body)[:300]))
+                if artifact.endswith(".pdf"):
+                    self.assertTrue(body.startswith(b"%PDF-"), artifact)
             portable = tm.to_portable(decided["model"], {REPO: {"name": "org/shop"}})
             before = len(tm.list_models(self.data_dir))
             status, preview, _ = self.post("/api/threat-models/validate", "validate-threat-model", portable, cookie)

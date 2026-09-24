@@ -1,7 +1,7 @@
 """GitHub App propia de cada instalación: la creas en GitHub y la conectas aquí.
 
-Tamandua es autoalojado: cada persona o equipo crea **su** GitHub App (privada,
-«Only on this account») siguiendo la guía del panel y pega aquí dos datos: el App ID
+Tamandua es autoalojado: cada persona o equipo crea **su** GitHub App ("Any account"
+si necesita varias organizaciones) siguiendo la guía del panel y pega aquí dos datos: el App ID
 y la clave privada (.pem). El panel las verifica contra GitHub antes de guardarlas y
 de ahí saca el nombre, la cuenta y los permisos; no hace falta client secret, OAuth
 ni ningún token personal.
@@ -202,12 +202,20 @@ def _app_jwt() -> str:
 
 
 def app_installations() -> list[dict]:
-    """Dónde está instalada la App. Una App privada solo puede estarlo en su propia cuenta."""
-    rows = _get(f"{API}/app/installations?per_page=100", _app_jwt(), jwt=True)
-    return [{"installation_id": item["id"], "account": (item.get("account") or {}).get("login"),
-             "account_type": (item.get("account") or {}).get("type"),
-             "repository_selection": item.get("repository_selection")}
-            for item in rows if isinstance(item, dict) and isinstance(item.get("id"), int)] if isinstance(rows, list) else []
+    """Todas las cuentas donde está instalada la App, incluidas páginas adicionales."""
+    token = _app_jwt()
+    result = []
+    for page in range(1, 101):
+        rows = _get(f"{API}/app/installations?per_page=100&page={page}", token, jwt=True)
+        if not isinstance(rows, list):
+            raise GitHubAppError("GitHub devolvió una lista de instalaciones inválida")
+        result.extend({"installation_id": item["id"], "account": (item.get("account") or {}).get("login"),
+                       "account_type": (item.get("account") or {}).get("type"),
+                       "repository_selection": item.get("repository_selection")}
+                      for item in rows if isinstance(item, dict) and isinstance(item.get("id"), int))
+        if len(rows) < 100:
+            return result
+    raise GitHubAppError("La App tiene más instalaciones de las que se pueden listar")
 
 
 _tokens: dict[int, tuple[str, float]] = {}

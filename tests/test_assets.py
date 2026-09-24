@@ -51,6 +51,13 @@ class AssetTests(unittest.TestCase):
         self.assertEqual(list_runs(self.data_dir), [])
         self.assertNotIn("github#7", pr_watch.load(self.data_dir)["repositories"])
 
+    def test_disconnecting_an_organization_does_not_mark_its_history_removed(self):
+        result = assets.reconcile(self.data_dir, [], active_accounts={"otra"})
+        self.assertEqual(result["marked"], [])
+        self.assertIsNone(assets.overview(self.data_dir)[0]["removed_at"])
+        result = assets.reconcile(self.data_dir, [], active_accounts={"org"})
+        self.assertEqual(result["marked"], ["github#7"])
+
     def test_backfill_gives_old_runs_their_stable_identity(self):
         legacy = _scan("org/legado", [_finding("c" * 64)], datetime.now(timezone.utc).isoformat())
         record = save_repository_scan(self.data_dir, legacy)

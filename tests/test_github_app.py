@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from appsec_agent import github_app
 from appsec_agent.github_app import GitHubAppError, config, install_url
-from appsec_agent.integrations import github_installation, load, save_github
+from appsec_agent.integrations import clear_github, github_installation, github_installations, load, save_github
 
 try:
     from cryptography.hazmat.primitives import hashes, serialization
@@ -154,6 +154,28 @@ class GitHubAppTests(unittest.TestCase):
             self.assertEqual(set(load(data_dir)), {"github"})
             with self.assertRaises(ValueError):
                 save_github(data_dir, 0, details, None)
+
+    def test_connections_migrate_from_single_record_and_can_remove_one_account(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            save_github(data_dir, 77, {"account": "acme"}, "admin")
+            self.assertIsInstance(load(data_dir)["github"], dict)
+            save_github(data_dir, 88, {"account": "beta"}, "admin")
+            self.assertEqual(github_installations(data_dir), [77, 88])
+            self.assertEqual([row["account"] for row in load(data_dir)["github"]], ["acme", "beta"])
+            clear_github(data_dir, 77)
+            self.assertEqual(github_installations(data_dir), [88])
+            self.assertIsInstance(load(data_dir)["github"], dict)
+
+    def test_app_installations_reads_more_than_one_page(self):
+        first = [{"id": index, "account": {"login": "org" + str(index), "type": "Organization"}}
+                 for index in range(1, 101)]
+        second = [{"id": 101, "account": {"login": "extra", "type": "Organization"}}]
+        with patch("appsec_agent.github_app._app_jwt", return_value="jwt"), \
+                patch("appsec_agent.github_app._get", side_effect=[first, second]) as fetch:
+            rows = github_app.app_installations()
+        self.assertEqual((len(rows), rows[-1]["account"]), (101, "extra"))
+        self.assertIn("page=2", fetch.call_args_list[-1].args[0])
 
 
 if __name__ == "__main__":

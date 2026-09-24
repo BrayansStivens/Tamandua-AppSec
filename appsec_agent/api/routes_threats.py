@@ -7,11 +7,12 @@ import json
 from .. import threat_model as tm
 from ..domains import list_domains
 from ..github_app import GitHubAppError
-from ..integrations import github_installation
+from ..integrations import github_installations
 from ..inventory import live as live_inventory
 from ..repository_sources import SourceError, available_sources
 from ..assets import asset_key
 from ..store import list_runs, load_run
+from ..pdf_reports import render_pdf
 from .core import Request, route
 
 
@@ -21,10 +22,11 @@ def _assets(request: Request) -> dict[str, dict]:
     with request.state.code_lock:
         tokens = request.state.code_tokens.copy()
     try:
-        for source in available_sources(tokens, github_installation(request.data_dir))["sources"]:
+        for source in available_sources(tokens, github_installations(request.data_dir))["sources"]:
             # Se enlaza por identidad estable: el modelo sobrevive a un renombrado del repositorio.
             key = source.get("uid") or source["id"]
-            assets[key] = {"id": key, "source_id": source["id"], "name": source["name"], "kind": "repository", "last_run": None}
+            assets[key] = {"id": key, "source_id": source["id"], "name": source["name"], "kind": "repository",
+                           "installation_id": source.get("installation_id"), "last_run": None}
     except (SourceError, GitHubAppError):
         pass
     for row in list_runs(request.data_dir):
@@ -68,6 +70,16 @@ def model_detail(request: Request):
         return request.send(200, tm.to_pytm(view["model"]).encode("utf-8"), "text/x-python; charset=utf-8")
     if artifact == "report.md":
         return request.send(200, tm.to_markdown(view["model"], view["threats"]).encode("utf-8"), "text/markdown; charset=utf-8")
+    if artifact == "report.pdf":
+        return request.send(200, render_pdf(tm.to_markdown(view["model"], view["threats"]),
+                                             title=f"Modelo de amenazas · {view['model']['name']}",
+                                             kind="Análisis de amenazas", reference=model_id), "application/pdf")
+    if artifact in ("report-soc2.pdf", "report-iso27001.pdf"):
+        profile = artifact.removeprefix("report-").removesuffix(".pdf")
+        label = "SOC 2 Tipo II" if profile == "soc2" else "ISO/IEC 27001:2022"
+        report = tm.to_profile_markdown(view["model"], view["threats"], profile)
+        return request.send(200, render_pdf(report, title=f"Amenazas · evidencia para {label}",
+                                             kind="Dossier para revisión", reference=model_id), "application/pdf")
     if artifact == "diagram.svg":
         return request.send(200, tm.to_svg(view["model"]).encode("utf-8"), "image/svg+xml; charset=utf-8")
     if artifact == "model.json":
@@ -144,11 +156,11 @@ def _read_repositories(request: Request, assets: dict, chosen) -> list[dict] | s
             or any(not isinstance(item, str) or assets.get(item, {}).get("kind") != "repository" for item in chosen)):
         return "Elige entre 1 y 10 repositorios"
     repositories = []
-    installation = github_installation(request.data_dir)
     for item in chosen:
         # El inventario se lee en el momento: no depende de si hay escaneo ni de lo antiguo que sea.
         try:
-            inventory = live_inventory(assets[item].get("source_id") or item, installation_id=installation)
+            inventory = live_inventory(assets[item].get("source_id") or item,
+                                       installation_id=assets[item].get("installation_id"))
         except (GitHubAppError, SourceError, OSError) as exc:
             return f"No se pudieron leer los manifiestos de {assets[item]['name']}: {exc}"
         record = load_run(request.data_dir, assets[item]["last_run"]) if assets[item]["last_run"] else {}

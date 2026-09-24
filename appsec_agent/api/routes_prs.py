@@ -6,7 +6,7 @@ import re
 
 from .. import pr_watch
 from ..github_app import GitHubAppError, installation_repositories, open_pull_requests, pull_request
-from ..integrations import github_installation
+from ..integrations import github_installations
 from ..store import list_runs
 from .core import Request, route
 
@@ -15,14 +15,14 @@ def _repository(request: Request, source_id) -> tuple[int, str, str] | None:
     """Solo repositorios que la instalación cubre. Devuelve instalación, nombre e identidad estable."""
     if not isinstance(source_id, str) or not re.fullmatch(r"github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", source_id):
         return None
-    installation = github_installation(request.data_dir)
-    if installation is None:
-        return None
-    try:
-        entry = next((item for item in installation_repositories(installation) if item["id"] == source_id), None)
-    except GitHubAppError:
-        return None
-    return (installation, entry["name"], entry["uid"]) if entry else None
+    for installation in github_installations(request.data_dir):
+        try:
+            entry = next((item for item in installation_repositories(installation) if item["id"] == source_id), None)
+        except GitHubAppError:
+            continue
+        if entry:
+            return installation, entry["name"], entry["uid"]
+    return None
 
 
 @route("GET", "/api/pull-requests")
@@ -50,14 +50,17 @@ def pulls(request: Request):
     return request.json(200, {"settings": settings, "pulls": rows})
 
 
-def _installed(request: Request) -> tuple[int, list[dict]] | None:
-    installation = github_installation(request.data_dir)
-    if installation is None:
+def _installed(request: Request) -> list[dict] | None:
+    installations = github_installations(request.data_dir)
+    if not installations:
         return None
-    try:
-        return installation, installation_repositories(installation)
-    except GitHubAppError:
-        return None
+    repositories = []
+    for installation in installations:
+        try:
+            repositories.extend({**item, "installation_id": installation} for item in installation_repositories(installation))
+        except GitHubAppError:
+            continue
+    return repositories
 
 
 @route("GET", "/api/pull-requests/watch")
@@ -66,11 +69,11 @@ def watch_overview(request: Request):
     target = _installed(request)
     if target is None:
         return request.json(400, {"error": "Conecta la GitHub App para vigilar pull requests"})
-    pr_watch.migrate(request.data_dir, target[1])
+    pr_watch.migrate(request.data_dir, target)
     reviewed = pr_watch.load(request.data_dir)["reviewed"]
     rows = [{"id": item["id"], "uid": item["uid"], "name": item["name"], "private": item.get("private"),
              **pr_watch.settings(request.data_dir, item["uid"]), "reviewed": len(reviewed.get(item["uid"], {}))}
-            for item in target[1]]
+            for item in target]
     return request.json(200, {"repositories": rows, "interval": pr_watch.interval(),
                               "enabled": sum(1 for row in rows if row["enabled"])})
 
@@ -87,7 +90,7 @@ def pr_settings(request: Request):
     if not isinstance(chosen, list) or not 1 <= len(chosen) <= 200 or not all(isinstance(item, str) for item in chosen):
         return request.json(400, {"error": "Indica entre 1 y 200 repositorios"})
     target = _installed(request)
-    uid_of = {item["id"]: item["uid"] for item in target[1]} if target else {}
+    uid_of = {item["id"]: item["uid"] for item in target} if target else {}
     if not set(chosen) <= set(uid_of):
         return request.json(400, {"error": "Hay repositorios que no están en la GitHub App conectada"})
     try:

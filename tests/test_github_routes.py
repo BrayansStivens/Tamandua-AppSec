@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from appsec_agent.auth import Users
 from appsec_agent.github_app import GitHubAppError
-from appsec_agent.integrations import github_installation
+from appsec_agent.integrations import github_installation, github_installations
 
 from tests.test_auth import PASSWORD, HttpCase
 
@@ -44,7 +44,10 @@ class GitHubRoutesTests(HttpCase):
             self.assertEqual(status, 200)  # página de aviso, no se guarda nada
             self.assertIsNone(github_installation(self.data_dir))
             status, _, _ = self.call("GET", "/oauth/callback?installation_id=77&setup_action=install")
-            self.assertEqual(status, 302)
+            self.assertEqual(status, 200)
+            self.assertIsNone(github_installation(self.data_dir))
+            status, _, _ = self.post("/api/integrations/github", "connect-github", {"action": "connect", "installation_id": 77}, self.admin)
+            self.assertEqual(status, 200)
             self.assertEqual(github_installation(self.data_dir), 77)
             statuses = [self.call("GET", "/oauth/callback?installation_id=999")[1] for _ in range(6)]
             self.assertIn(b"Demasiados intentos", statuses[-1])
@@ -55,3 +58,42 @@ class GitHubRoutesTests(HttpCase):
         self.assertEqual(status, 404)
         self.assertIn("Instalar en GitHub", answer["error"])
         self.assertEqual(self.post("/api/integrations/github", "connect-github", {"action": "create"}, self.admin)[0], 400)
+
+    def test_two_organizations_are_listed_and_each_scan_uses_its_installation(self):
+        accounts = [{"installation_id": 77, "account": "acme"}, {"installation_id": 88, "account": "beta"}]
+        repos = {77: [{"id": "github:acme/api", "uid": "github#1", "name": "acme/api", "provider": "github", "private": True}],
+                 88: [{"id": "github:beta/web", "uid": "github#2", "name": "beta/web", "provider": "github", "private": True}]}
+        with patch("appsec_agent.api.routes_sources.app_installations", return_value=accounts), \
+                patch("appsec_agent.api.routes_sources.installation_details", side_effect=lambda installation: {
+                    "account": "acme" if installation == 77 else "beta", "permissions": {}}), \
+                patch("appsec_agent.github_app.installation_repositories", side_effect=lambda installation: repos[installation]), \
+                patch("appsec_agent.api.routes_prs.installation_repositories", side_effect=lambda installation: repos[installation]):
+            status, body, _ = self.post("/api/integrations/github", "connect-github", {"action": "detect"}, self.admin)
+            self.assertEqual((status, body["connected"]), (200, False))
+            self.assertEqual([item["account"] for item in body["available_installations"]], ["acme", "beta"])
+            self.assertNotIn("available_installations", self.call("GET", "/api/integrations/github", headers={"Cookie": self.member})[1])
+            self.assertEqual(self.post("/api/integrations/github", "connect-github", {"action": "connect", "installation_id": 999}, self.admin)[0], 404)
+            self.assertEqual(github_installations(self.data_dir), [])
+            for installation in (77, 88):
+                status, body, _ = self.post("/api/integrations/github", "connect-github",
+                                            {"action": "connect", "installation_id": installation}, self.admin)
+            self.assertEqual((status, github_installations(self.data_dir)), (200, [77, 88]))
+            self.assertEqual([item["account"] for item in body["installations"]], ["acme", "beta"])
+            _, listing, _ = self.call("GET", "/api/sources", headers={"Cookie": self.member})
+            self.assertEqual({item["name"]: item["installation_id"] for item in listing["sources"]},
+                             {"acme/api": 77, "beta/web": 88})
+            with patch("appsec_agent.api.routes_runs.scan_plan", side_effect=lambda source, installation_id: {
+                    "source": source, "installation_id": installation_id}):
+                _, plan, _ = self.call("GET", "/api/repositories/plan?source_id=github:beta/web", headers={"Cookie": self.member})
+                self.assertEqual(plan["installation_id"], 88)
+            with patch("appsec_agent.jobs.ScanJobs.enqueue_repository_scan", return_value={"id": "queued"}) as enqueue:
+                status, _, _ = self.post("/api/repositories/scans", "scan-repository",
+                                          {"source_id": "github:beta/web", "allow_osv_upload": False}, self.member)
+                self.assertEqual(status, 202)
+                self.assertEqual(enqueue.call_args.kwargs["installation_id"], 88)
+            _, watch, _ = self.call("GET", "/api/pull-requests/watch", headers={"Cookie": self.member})
+            self.assertEqual({item["name"] for item in watch["repositories"]}, {"acme/api", "beta/web"})
+            self.assertEqual(self.post("/api/integrations/github", "connect-github", {"action": "disconnect", "installation_id": 77}, self.admin)[0], 200)
+            self.assertEqual(github_installations(self.data_dir), [88])
+            _, listing, _ = self.call("GET", "/api/sources", headers={"Cookie": self.member})
+            self.assertEqual([item["name"] for item in listing["sources"]], ["beta/web"])

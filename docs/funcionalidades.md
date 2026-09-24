@@ -63,7 +63,7 @@ Hay carpetas que no conviene mirar: ejemplos vulnerables a propósito (como `fix
 - Las exclusiones viven en el servidor (`data/exclusions.json`), **no en el repositorio**: un fichero en el repositorio permitiría que un PR se excluyera a sí mismo. Por la misma razón no se aplica el `.gitleaks.toml` del repositorio.
 - No se admiten patrones que lo excluyan todo (`**`, `*/**`), rutas absolutas ni `..`.
 
-La identidad del repositorio es la de GitHub (su id numérico): un repositorio renombrado sigue siendo el mismo, y los hallazgos de uno eliminado se retiran tras 24 horas de gracia. Se puede filtrar por ejecución, ver abiertos, remediados o todos, y exportar a JSON, Markdown, SARIF o Jira.
+La identidad del repositorio es la de GitHub (su id numérico): un repositorio renombrado sigue siendo el mismo, y los hallazgos de uno eliminado se retiran tras 24 horas de gracia. Se puede filtrar por ejecución, ver abiertos, remediados o todos, y exportar a PDF, JSON, Markdown, SARIF o Jira. La vista «Estado actual» exporta su registro acumulado por una ruta propia; no se confunde con una ejecución individual. Los dosieres PDF para SOC 2 Tipo II e ISO/IEC 27001:2022 son evidencia técnica para revisión, no certificaciones ni opiniones de cumplimiento.
 
 ## CVE tracker
 
@@ -126,7 +126,7 @@ El resultado queda en el panel como una ejecución más (con triage compartido c
 
   El diagrama base es común a todos los enfoques. Las secciones específicas sí se validan: STRIDE y LINDDUN admiten amenazas propias; PASTA admite sus etapas y árboles; Árboles admite árboles; ATT&CK admite técnicas. **Personalizado** admite cualquier combinación, pero cada sección debe tener su módulo activado en `custom_modules`. Un JSON incompatible se rechaza con un mensaje que indica qué sección sobra y sugiere elegir otro enfoque o personalizado. Al exportar un enfoque fijo solo se incluyen sus secciones activas; los datos de otro enfoque que puedan quedar guardados tras cambiar de plantilla no se mezclan en ese archivo.
 
-- **Otras exportaciones**: el diagrama por separado en SVG (`diagram.svg`, con cambios pendientes guardados antes de descargar), JSON de OWASP Threat Dragon v2, script de OWASP pytm (`tm.py`, para quien siga modelando como código) e informe Markdown. La estructura del JSON de Threat Dragon sigue el formato v2, pero no se ha probado su importación en Threat Dragon.
+- **Otras exportaciones**: el diagrama por separado en SVG (`diagram.svg`, con cambios pendientes guardados antes de descargar), JSON de OWASP Threat Dragon v2, script de OWASP pytm (`tm.py`, para quien siga modelando como código), Markdown e informes PDF general, SOC 2 Tipo II e ISO/IEC 27001:2022. Los PDF incluyen una matriz de preparación de evidencia y límites explícitos; las amenazas del modelo no se presentan como fallas confirmadas. La estructura del JSON de Threat Dragon sigue el formato v2, pero no se ha probado su importación en Threat Dragon. Las descargas pasan por la API autenticada y muestran el error real si fallan.
 
 ## Jira
 
