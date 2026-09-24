@@ -156,6 +156,42 @@ class ModelTests(unittest.TestCase):
         with self.assertRaises(tm.ModelError):
             model(pasta={"inventada": "x"})
 
+    def test_a_project_starts_without_repositories_and_links_them_later(self):
+        blank = tm.validate({"name": "Plataforma", "components": [], "flows": [], "boundaries": []}, known_assets={REPO})
+        self.assertEqual(blank["repositories"], [])
+        linked = tm.validate({**blank, "repositories": [REPO, REPO]}, known_assets={REPO})
+        self.assertEqual(linked["repositories"], [REPO])
+        with self.assertRaises(tm.ModelError):
+            tm.validate({**blank, "repositories": ["github:ajeno/repo"]}, known_assets={REPO})
+        # Un repositorio que usa un componente forma parte del proyecto aunque no se añadiera a mano.
+        self.assertEqual(model()["repositories"], [REPO])
+
+    def test_proposals_merge_into_what_the_team_already_drew(self):
+        other = "github:org/pagos"
+        drawn = tm.validate({**model(), "components": [{**item, "position": {"x": 100 + index * 300, "y": 90}} for index, item in enumerate(model()["components"])],
+                             "boundaries": [{**item, "box": {"x": 60 + index * 300, "y": 40, "width": 256, "height": 200}} for index, item in enumerate(model()["boundaries"])]},
+                            known_assets={REPO, other})
+        proposal = tm.validate({"name": "x", "components": [
+            {"id": "usuario", "name": "Usuario", "kind": "actor", "internet_facing": True},
+            {"id": "pagos", "name": "API de pagos", "kind": "api", "asset": other, "authenticates": True},
+            {"id": "pg", "name": "PostgreSQL", "kind": "database", "data": ["pii"]}],
+            "flows": [{"id": "a", "source": "usuario", "target": "pagos", "protocol": "https"},
+                      {"id": "b", "source": "pagos", "target": "pg", "protocol": "sql", "authenticated": True}],
+            "boundaries": [{"id": "aplicacion", "name": "Aplicación", "components": ["pagos"]}]}, known_assets={REPO, other})
+        merged, added = tm.merge_proposal(drawn, proposal)
+        self.assertEqual(added, {"components": 1, "flows": 2})      # «Usuario» y «PostgreSQL» ya existían
+        names = [item["name"] for item in merged["components"]]
+        self.assertEqual(names.count("Usuario"), 1)
+        self.assertEqual(names.count("PostgreSQL"), 1)
+        new = next(item for item in merged["components"] if item["name"] == "API de pagos")
+        app = next(item for item in merged["boundaries"] if item["name"] == "Aplicación")
+        self.assertIn(new["id"], app["components"])
+        box = app["box"]
+        self.assertTrue(box["x"] <= new["position"]["x"] <= box["x"] + box["width"])
+        self.assertTrue(box["y"] <= new["position"]["y"] <= box["y"] + box["height"])     # dentro de su frontera dibujada
+        self.assertIn(("usuario", new["id"]), {(flow["source"], flow["target"]) for flow in merged["flows"]})
+        self.assertEqual(tm.validate(merged, known_assets={REPO, other})["repositories"], [REPO, other])
+
     def test_several_repositories_name_their_processes(self):
         inventory = {"packages": {"pypi": ["fastapi"]}}
         draft = tm.suggest("S", [{"id": "github:o/a", "name": "o/a", "inventory": inventory, "findings": []},

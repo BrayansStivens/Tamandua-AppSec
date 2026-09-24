@@ -8,7 +8,7 @@ import '@xyflow/react/dist/style.css'
 import { Globe2, LayoutGrid, Lock, Plus, Square, Trash2, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { newId, PROCESSES, STORES, type Box, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/components/threat-model-types'
+import { assetGroups, newId, PROCESSES, STORES, type Box, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/components/threat-model-types'
 
 // Editor visual del modelo: los componentes se arrastran, los flujos se crean uniendo sus puntos y las
 // fronteras son cajas que se mueven y redimensionan. La pertenencia a una frontera sale de dónde está
@@ -138,13 +138,13 @@ function useDarkMode() {
   return dark
 }
 
-type Props = { model: Model; setModel: (model: Model) => void; threats: Threat[]; catalog: Catalog }
+type Props = { model: Model; setModel: (model: Model) => void; threats: Threat[]; catalog: Catalog; compact?: boolean }
 
 export function ThreatCanvas(props: Props) {
   return <ReactFlowProvider><Canvas {...props} /></ReactFlowProvider>
 }
 
-function Canvas({ model, setModel, threats, catalog }: Props) {
+function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
   const dark = useDarkMode()
   const flow = useReactFlow()
   const [nodes, setNodes] = useState<CanvasNode[]>(() => build(model, threats, catalog.kinds, []))
@@ -251,7 +251,8 @@ function Canvas({ model, setModel, threats, catalog }: Props) {
   }
 
   const selectedNode = nodes.find(node => node.selected)
-  return <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+  // Con la guía abierta el panel de edición baja bajo el lienzo: el diagrama necesita el ancho.
+  return <div className={`grid gap-4 ${compact ? '' : 'xl:grid-cols-[minmax(0,1fr)_320px]'}`}>
     <div className="tm-canvas h-[640px] overflow-hidden rounded-2xl border border-app-line bg-inset">
       <ReactFlow<CanvasNode, Edge<FlowData, 'flow'>> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
@@ -322,7 +323,7 @@ function Inspector({ model, setModel, catalog, node, flowId: selected, onRemove 
         <div className={field}><span className={label}>Tipo</span><select value={item.kind} onChange={event => update({ kind: event.target.value as Kind })} className={select}>{Object.entries(catalog.kinds).map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></div>
         <div className={field}><span className={label}>Tecnología</span><Input value={item.technology ?? ''} maxLength={80} placeholder="p. ej. Django" onChange={event => update({ technology: event.target.value })} className="h-8 border-app-line bg-app-soft" /></div>
       </div>
-      <div className={field}><span className={label}>Código (repositorio)</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, path: event.target.value ? item.path : '' })} className={select}><option value="">Sin enlazar</option>{catalog.assets.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></div>
+      <div className={field}><span className={label}>Código (repositorio)</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, path: event.target.value ? item.path : '' })} className={select}><option value="">Sin enlazar</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select></div>
       {item.asset && <div className={field}><span className={label}>Carpeta dentro del repositorio</span><Input value={item.path ?? ''} maxLength={200} placeholder="vacío = todo el repositorio · p. ej. frontend/" onChange={event => update({ path: event.target.value })} className="h-8 border-app-line bg-app-soft font-mono text-xs" />
         <p className="text-[11px] leading-4 text-app-subtle">Solo los hallazgos de esa carpeta cuentan como indicios de sus amenazas. En un monorepo evita que el backend «evidencie» amenazas del frontend.</p></div>}
       <div className={field}><span className={label}>Datos que guarda o maneja</span><Chips value={item.data} options={catalog.classifications} onChange={data => update({ data })} /></div>

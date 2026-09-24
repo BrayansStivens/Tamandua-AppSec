@@ -81,22 +81,12 @@ def save_model(request: Request):
         if "suggest" in payload:
             # Modelo nuevo propuesto desde el inventario del último escaneo de cada repositorio elegido.
             chosen = payload["suggest"]
-            if (not isinstance(chosen, list) or not 1 <= len(chosen) <= 10
-                    or any(not isinstance(item, str) or assets.get(item, {}).get("kind") != "repository" for item in chosen)):
-                return request.json(400, {"error": "Elige entre 1 y 10 repositorios"})
-            repositories = []
-            installation = github_installation(request.data_dir)
-            for item in chosen:
-                # El inventario se lee en el momento: no depende de si hay escaneo ni de lo antiguo que sea.
-                try:
-                    inventory = live_inventory(assets[item].get("source_id") or item, installation_id=installation)
-                except (GitHubAppError, SourceError, OSError) as exc:
-                    return request.json(400, {"error": f"No se pudieron leer los manifiestos de {assets[item]['name']}: {exc}"})
-                record = load_run(request.data_dir, assets[item]["last_run"]) if assets[item]["last_run"] else {}
-                repositories.append({"id": item, "name": assets[item]["name"],
-                                     "inventory": inventory or record.get("inventory"), "findings": record.get("findings", [])})
+            repositories = _read_repositories(request, assets, chosen)
+            if isinstance(repositories, str):
+                return request.json(400, {"error": repositories})
             draft = tm.suggest(tm._text(payload.get("name"), 80, "El nombre", required=True), repositories)
             draft["methodology"] = payload.get("methodology") or "stride"
+            draft["repositories"] = chosen
             model = tm.validate(draft, known_assets=set(assets))
             return request.json(200, _view(request, tm.save(request.data_dir, model, by=request.user["username"])))
         model = tm.validate(payload.get("model"), known_assets=set(assets))
@@ -107,6 +97,45 @@ def save_model(request: Request):
         return request.json(400, {"error": str(exc)})
     except (OSError, ValueError):
         return request.json(400, {"error": "No se pudo guardar el modelo"})
+
+
+def _read_repositories(request: Request, assets: dict, chosen) -> list[dict] | str:
+    """Manifiestos de los repositorios elegidos, leídos en el momento. Devuelve el error como texto."""
+    if (not isinstance(chosen, list) or not 1 <= len(chosen) <= 10
+            or any(not isinstance(item, str) or assets.get(item, {}).get("kind") != "repository" for item in chosen)):
+        return "Elige entre 1 y 10 repositorios"
+    repositories = []
+    installation = github_installation(request.data_dir)
+    for item in chosen:
+        # El inventario se lee en el momento: no depende de si hay escaneo ni de lo antiguo que sea.
+        try:
+            inventory = live_inventory(assets[item].get("source_id") or item, installation_id=installation)
+        except (GitHubAppError, SourceError, OSError) as exc:
+            return f"No se pudieron leer los manifiestos de {assets[item]['name']}: {exc}"
+        record = load_run(request.data_dir, assets[item]["last_run"]) if assets[item]["last_run"] else {}
+        repositories.append({"id": item, "name": assets[item]["name"],
+                             "inventory": inventory or record.get("inventory"), "findings": record.get("findings", [])})
+    return repositories
+
+
+@route("POST", "/api/threat-models/propose", action="propose-components", body=600_000)
+def propose(request: Request):
+    """Componentes propuestos desde repositorios, fusionados en el borrador que se está editando. No guarda nada."""
+    payload = request.payload
+    if not isinstance(payload, dict) or set(payload) != {"model", "repositories"}:
+        return request.json(400, {"error": "Solicitud inválida"})
+    assets = _assets(request)
+    try:
+        current = tm.validate(payload["model"], known_assets=set(assets))
+        repositories = _read_repositories(request, assets, payload["repositories"])
+        if isinstance(repositories, str):
+            return request.json(400, {"error": repositories})
+        proposal = tm.validate(tm.suggest(current["name"], repositories), known_assets=set(assets))
+        merged, added = tm.merge_proposal(current, proposal)
+        merged = tm.validate({**merged, "repositories": [*current.get("repositories", []), *payload["repositories"]]}, known_assets=set(assets))
+    except tm.ModelError as exc:
+        return request.json(400, {"error": str(exc)})
+    return request.json(200, {"model": merged, "added": added})
 
 
 @route("POST", "/api/threat-models/decide", action="threat-decision", body=1024)

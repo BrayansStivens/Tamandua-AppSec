@@ -13,7 +13,7 @@ import { formatDate } from '@/lib/types'
 import { ThreatCanvas } from '@/components/threat-canvas'
 import { categoryHelp, GUIDES, type Methodology } from '@/components/threat-guides'
 import { AttackMappings, AttackTrees, GuidePanel, ManualThreatDialog, MethodDialog, MethodPicker, PastaStages } from '@/components/threat-methods'
-import { newId, type Catalog, type Component, type Flow, type Kind, type Model, type Threat, type View, type Asset, type ManualThreat } from '@/components/threat-model-types'
+import { assetGroups, newId, type Catalog, type Component, type Flow, type Kind, type Model, type Threat, type View, type Asset, type ManualThreat } from '@/components/threat-model-types'
 
 const statusLabel = { evidenced: 'Con indicios', open: 'Abierta', mitigated: 'Mitigada', accepted: 'Aceptada', not_applicable: 'No aplica' }
 const statusClass = { evidenced: 'border-amber-500/50 bg-amber-500/15 text-amber-900 dark:text-amber-200', open: 'border-app-line text-app-secondary', mitigated: 'border-brand/30 text-brand', accepted: 'border-violet-500/30 text-violet-800 dark:text-violet-300', not_applicable: 'border-app-line text-app-subtle' }
@@ -33,7 +33,7 @@ export function ThreatModels({ user, onOpenRun }: { user: SessionUser; onOpenRun
   if (openId) return <Editor id={openId} catalog={catalog} user={user} onBack={() => { setOpenId(null); void load() }} onOpenRun={onOpenRun} />
   return <div className="space-y-5">
     <Card className="border-app-line bg-panel"><CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3"><div><CardTitle>Modelos de amenazas</CardTitle><CardDescription className="mt-1 max-w-3xl leading-6">Dibuja el sistema —componentes, flujos de datos y fronteras de confianza— y analízalo con el enfoque que prefieras. Si el código de un componente tiene hallazgos abiertos relacionados, la amenaza aparece <strong>con indicios</strong>: una señal para revisar, no una confirmación.</CardDescription></div><Button onClick={() => setCreating(true)} className="bg-primary text-primary-foreground hover:bg-primary/90"><Plus />Nuevo modelo</Button></CardHeader>
-      <CardContent>{catalog.models.length === 0 ? <div className="flex flex-col items-center gap-2 py-12 text-center"><Network className="size-7 text-app-subtle" /><p className="font-medium">Aún no hay modelos</p><p className="max-w-md text-sm text-app-muted">Empieza con una propuesta hecha a partir de lo que ya escaneaste: se detectan frameworks, bases de datos y servicios externos, y tú la corriges.</p></div>
+      <CardContent>{catalog.models.length === 0 ? <div className="flex flex-col items-center gap-2 py-12 text-center"><Network className="size-7 text-app-subtle" /><p className="font-medium">Aún no hay modelos</p><p className="max-w-md text-sm text-app-muted">Crea un proyecto para un sistema o una funcionalidad. Puedes dibujarlo a mano o proponer componentes desde uno o varios repositorios, ahora o más adelante.</p></div>
         : <div className="divide-y divide-app-line rounded-xl border border-app-line">{catalog.models.map(item => <button key={item.id} onClick={() => setOpenId(item.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-app-soft"><Network className="size-4 text-app-subtle" /><span className="min-w-0 flex-1"><span className="block text-sm font-medium">{item.name}<span className="ml-2 rounded border border-app-line px-1.5 py-0.5 align-middle text-[10px] font-normal text-app-subtle">{GUIDES[(item.methodology ?? 'stride') as Methodology]?.name ?? item.methodology}</span></span><span className="block truncate text-xs text-app-subtle">{item.components} componentes · {item.flows} flujos{item.updated_at ? ` · actualizado ${formatDate(item.updated_at)} por ${item.updated_by}` : ''}</span></span><ChevronRight className="size-4 text-app-subtle" /></button>)}</div>}</CardContent></Card>
     <CreateDialog open={creating} assets={catalog.assets} onClose={() => setCreating(false)} onCreated={id => { setCreating(false); setOpenId(id) }} />
   </div>
@@ -53,22 +53,22 @@ function CreateDialog({ open, assets, onClose, onCreated }: { open: boolean; ass
     try {
       // Sin nombre, el sistema se llama como sus repositorios: el nombre no debe bloquear la propuesta.
       const fallback = assets.filter(item => chosen.includes(item.id)).map(item => item.name.split('/').pop()).join(' + ').slice(0, 80)
-      const finalName = name.trim() || fallback || 'Nuevo sistema'
-      const body = chosen.length ? { name: finalName, suggest: chosen, methodology } : { model: { name: finalName, methodology, components: [], flows: [], boundaries: [] } }
+      const finalName = name.trim() || fallback || 'Nuevo proyecto'
+      const body = chosen.length ? { name: finalName, suggest: chosen, methodology } : { model: { name: finalName, methodology, components: [], flows: [], boundaries: [], repositories: [] } }
       onCreated((await api.post<View>('/api/threat-models', 'save-threat-model', body)).model.id)
       setName(''); setChosen([])
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
   return <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
-    <DialogHeader><DialogTitle>Nuevo modelo de amenazas</DialogTitle><DialogDescription>Elige los repositorios que forman el sistema. Se leen en el momento sus manifiestos (package.json, pyproject, go.mod, Cargo.toml, compose) y se propone cada componente citando de qué dependencia sale. O déjalo vacío para empezar en blanco.</DialogDescription></DialogHeader>
+    <DialogHeader><DialogTitle>Nuevo proyecto de modelado</DialogTitle><DialogDescription>Un proyecto modela un sistema o una funcionalidad. No necesita repositorios para empezar: puedes asociarlos después, uno o varios (microservicios, microfrontends), y proponer componentes desde ellos.</DialogDescription></DialogHeader>
     <form className="space-y-4" onSubmit={submit}>
       <div className="space-y-1.5"><span className="text-xs text-app-muted">Enfoque</span><MethodPicker value={methodology} onChange={setMethodology} /><p className="text-[11px] leading-4 text-app-subtle">Se puede cambiar después sin perder el diagrama.</p></div>
-      <div className="space-y-1.5"><label htmlFor="tm-name" className="text-xs text-app-muted">Nombre del sistema (opcional)</label><Input id="tm-name" autoFocus maxLength={80} value={name} onChange={event => setName(event.target.value)} placeholder="Si lo dejas vacío, se usan los nombres de los repositorios" className="border-app-line bg-app-soft" /></div>
-      <div className="space-y-1.5"><div className="flex items-center justify-between gap-2"><span className="text-xs text-app-muted">Repositorios{chosen.length ? ` · ${chosen.length} elegidos` : ''}</span><Input aria-label="Buscar repositorio" value={filter} onChange={event => setFilter(event.target.value)} placeholder="Buscar…" className="h-7 w-40 border-app-line bg-app-soft text-xs" /></div>
+      <div className="space-y-1.5"><label htmlFor="tm-name" className="text-xs text-app-muted">Nombre del proyecto</label><Input id="tm-name" autoFocus maxLength={80} value={name} onChange={event => setName(event.target.value)} placeholder="p. ej. Pagos, Portal de clientes, Login" className="border-app-line bg-app-soft" /></div>
+      <details className="rounded-lg border border-app-line px-3 py-2" open={chosen.length > 0}><summary className="cursor-pointer text-xs text-app-muted">Partir de repositorios (opcional){chosen.length ? ` · ${chosen.length} elegidos` : ''}</summary><div className="mt-2 space-y-1.5"><p className="text-[11px] leading-4 text-app-subtle">Se leen sus manifiestos (package.json, pyproject, go.mod, Cargo.toml, compose) y se propone cada componente citando de qué dependencia sale.</p><div className="flex items-center justify-end gap-2"><Input aria-label="Buscar repositorio" value={filter} onChange={event => setFilter(event.target.value)} placeholder="Buscar…" className="h-7 w-40 border-app-line bg-app-soft text-xs" /></div>
         {repositories.length ? <div className="max-h-64 space-y-0.5 overflow-y-auto rounded-lg border border-app-line p-2">{repositories.map(item => <label key={item.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-app-soft"><input type="checkbox" className="size-4 accent-brand" checked={chosen.includes(item.id)} onChange={event => setChosen(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} /><span className="min-w-0 flex-1 truncate">{item.name}</span>{item.last_run ? <span className="shrink-0 text-[10px] text-brand">escaneado</span> : <span className="shrink-0 text-[10px] text-app-subtle">sin escanear</span>}</label>)}</div> : <p className="text-xs text-app-subtle">{filter ? 'Ningún repositorio coincide.' : 'Conecta GitHub en Integraciones para elegir repositorios.'}</p>}
-        <p className="text-[11px] leading-4 text-app-subtle">Los repositorios sin escanear se modelan igual, pero sus amenazas no tendrán evidencia hasta que los escanees.</p></div>
+        <p className="text-[11px] leading-4 text-app-subtle">Los repositorios sin escanear se modelan igual, pero sus amenazas no tendrán indicios hasta que los analices.</p></div></details>
       {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
-      <DialogFooter><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={busy} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : chosen.length ? <Sparkles /> : <Plus />}{busy && chosen.length ? 'Leyendo manifiestos…' : chosen.length ? 'Proponer modelo' : 'Crear en blanco'}</Button></DialogFooter>
+      <DialogFooter><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={busy} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : chosen.length ? <Sparkles /> : <Plus />}{busy && chosen.length ? 'Leyendo manifiestos…' : chosen.length ? 'Crear y proponer componentes' : 'Crear proyecto'}</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>
 }
@@ -111,6 +111,7 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
     <div className="flex flex-col gap-4 rounded-2xl border border-app-line bg-panel p-5">
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><button onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-xs text-app-subtle hover:text-app-fg"><ArrowLeft className="size-3" />Modelos</button><h2 className="text-xl font-semibold">{view.model.name}</h2><div className="mt-1.5 flex flex-wrap items-center gap-2"><button onClick={() => setPicking(true)} className="inline-flex items-center gap-1 rounded-lg border border-brand/30 bg-brand/[0.07] px-2 py-0.5 text-xs font-medium text-brand hover:bg-brand/10" title="Cambiar el enfoque">{GUIDES[methodology].name}<Pencil className="size-3" /></button><button onClick={() => toggleGuide(!guide)} aria-pressed={guide} className="inline-flex items-center gap-1 rounded-lg border border-app-line px-2 py-0.5 text-xs text-app-muted hover:text-app-fg"><BookOpen className="size-3" />{guide ? 'Ocultar guía' : 'Guía'}</button></div><p className="mt-1 text-xs text-app-subtle">{view.model.components.length} componentes · {view.model.flows.length} flujos · {view.model.boundaries.length} fronteras{view.model.updated_at ? ` · ${formatDate(view.model.updated_at)} por ${view.model.updated_by}` : ''}</p></div>
         <div className="flex flex-wrap gap-2">{[['Threat Dragon', 'threat-dragon.json'], ['pytm', 'tm.py'], ['Informe', 'report.md']].map(([label, file]) => <a key={file} href={`/api/threat-models/${id}/${file}`} download={`${view.model.name}-${file}`}><Button size="sm" variant="outline" className="border-app-line bg-app-soft"><ArrowDownToLine />{label}</Button></a>)}{user.role === 'admin' && <Button size="sm" variant="ghost" onClick={() => void remove()} aria-label="Borrar modelo"><Trash2 /></Button>}</div></div>
+      <ProjectRepositories draft={draft} setDraft={setDraft} catalog={catalog} onError={setError} />
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{(['evidenced', 'open', 'mitigated', 'accepted', 'not_applicable'] as const).map(status => <div key={status} className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.by_status[status] ?? 0}</div><div className="text-xs text-app-muted">{statusLabel[status]}</div></div>)}<div className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.total}</div><div className="text-xs text-app-muted">Total</div></div></div>
     </div>
     {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
@@ -118,13 +119,41 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
       {dirty && <span className="ml-auto flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">Cambios sin guardar<Button size="sm" onClick={() => void save()} disabled={busy} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <Save />}Guardar y recalcular</Button></span>}</div>
     <div className={guide ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]' : ''}><div className="min-w-0 space-y-5">
       {current === 'threats' && <Threats view={view} draft={draft} methodology={methodology} busy={busy} onChanged={setView} onOpenRun={onOpenRun} onSaveModel={saveModel} />}
-      {current === 'diagram' && <ThreatCanvas model={draft} setModel={setDraft} threats={view.threats} catalog={catalog} />}
+      {current === 'diagram' && <ThreatCanvas model={draft} setModel={setDraft} threats={view.threats} catalog={catalog} compact={guide} />}
       {current === 'elements' && <Elements draft={draft} setDraft={setDraft} catalog={catalog} />}
       {current === 'stages' && <PastaStages model={draft} setModel={setDraft} threats={view.threats} catalog={catalog} onGo={setTab} />}
       {current === 'trees' && <AttackTrees model={draft} setModel={setDraft} />}
       {current === 'attack' && <AttackMappings model={draft} setModel={setDraft} catalog={catalog} />}
     </div>{guide && <GuidePanel methodology={methodology} onClose={() => toggleGuide(false)} />}</div>
     {picking && <MethodDialog current={methodology} onClose={() => setPicking(false)} onPick={next => { setPicking(false); setDraft({ ...draft, methodology: next }); setTab('') }} />}
+  </div>
+}
+
+// Repositorios del proyecto: se asocian cuando se quiera y de ellos se pueden proponer componentes.
+function ProjectRepositories({ draft, setDraft, catalog, onError }: { draft: Model; setDraft: (model: Model) => void; catalog: Catalog; onError: (text: string) => void }) {
+  const [busy, setBusy] = useState('')
+  const linked = draft.repositories ?? []
+  const names = Object.fromEntries(catalog.assets.map(item => [item.id, item.name]))
+  const available = catalog.assets.filter(item => item.kind === 'repository' && !linked.includes(item.id))
+  const inUse = new Set(draft.components.map(item => item.asset).filter(Boolean))
+  const propose = async (repositories: string[]) => {
+    setBusy(repositories.join(',')); onError('')
+    try {
+      const result = await api.post<{ model: Model; added: { components: number; flows: number } }>('/api/threat-models/propose', 'propose-components', { model: payloadOf(draft), repositories })
+      setDraft({ ...draft, ...result.model })
+      if (!result.added.components && !result.added.flows) onError('No hay componentes nuevos que proponer desde ese repositorio: lo detectado ya está en el diagrama.')
+    } catch (caught) { onError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy('') }
+  }
+  return <div className="flex flex-wrap items-center gap-2 rounded-xl border border-app-line bg-inset px-3 py-2">
+    <span className="text-xs font-medium text-app-muted">Repositorios del proyecto</span>
+    {linked.length === 0 && <span className="text-xs text-app-subtle">ninguno todavía · el modelo no los necesita, pero con ellos se proponen componentes y aparecen indicios</span>}
+    {linked.map(id => <span key={id} className="inline-flex items-center gap-1 rounded-lg border border-app-line bg-panel py-0.5 pr-1 pl-2 text-xs">
+      {names[id] ?? id}
+      <button onClick={() => void propose([id])} disabled={!!busy} className="rounded px-1 text-brand hover:bg-brand/10" title="Proponer componentes desde este repositorio">{busy === id ? <LoaderCircle className="size-3 animate-spin" /> : <Sparkles className="size-3" />}</button>
+      {!inUse.has(id) && <button onClick={() => setDraft({ ...draft, repositories: linked.filter(item => item !== id) })} className="rounded px-1 text-app-subtle hover:text-app-fg" aria-label={`Quitar ${names[id] ?? id}`}>×</button>}
+    </span>)}
+    {available.length > 0 && <select aria-label="Asociar un repositorio" value="" onChange={event => { if (event.target.value) setDraft({ ...draft, repositories: [...linked, event.target.value] }) }} className={select}>
+      <option value="">+ Asociar repositorio…</option>{available.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
   </div>
 }
 
@@ -138,7 +167,7 @@ const TABS: Record<Methodology, [string, string][]> = {
 }
 
 function payloadOf(model: Model) {
-  return { name: model.name, description: model.description, methodology: model.methodology ?? 'stride', components: model.components, flows: model.flows,
+  return { name: model.name, description: model.description, methodology: model.methodology ?? 'stride', repositories: model.repositories ?? [], components: model.components, flows: model.flows,
            boundaries: model.boundaries, manual_threats: model.manual_threats ?? [], attack_trees: model.attack_trees ?? [],
            attack_mappings: model.attack_mappings ?? [], pasta: Object.fromEntries(Object.entries(model.pasta ?? {}).filter(([, text]) => text.trim())) }
 }
@@ -235,7 +264,7 @@ function Elements({ draft, setDraft, catalog }: { draft: Model; setDraft: (model
           <td className={cell}><Input aria-label="Nombre" value={item.name} maxLength={80} onChange={event => updateComponent(item.id, { name: event.target.value })} className="h-8 border-app-line bg-app-soft" /><Input aria-label="Tecnología" value={item.technology ?? ''} maxLength={80} placeholder="Tecnología" onChange={event => updateComponent(item.id, { technology: event.target.value })} className="mt-1 h-7 border-app-line bg-app-soft text-xs" />{item.origin === 'suggested' && <span className="mt-1 block max-w-64 text-[10px] leading-4 text-brand" title={item.description}>{item.description || 'propuesto desde el repositorio'}</span>}</td>
           <td className={cell}><select aria-label="Tipo" value={item.kind} onChange={event => updateComponent(item.id, { kind: event.target.value as Kind })} className={select}>{Object.entries(catalog.kinds).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></td>
           <td className={cell}><select aria-label="Frontera" value={boundaryOf(item.id)} onChange={event => moveTo(item.id, event.target.value)} className={select}><option value="">Ninguna</option>{draft.boundaries.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></td>
-          <td className={cell}><select aria-label="Activo enlazado" value={item.asset ?? ''} onChange={event => updateComponent(item.id, { asset: event.target.value || null })} className={`${select} max-w-48`}><option value="">Sin enlazar</option>{catalog.assets.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></td>
+          <td className={cell}><select aria-label="Activo enlazado" value={item.asset ?? ''} onChange={event => updateComponent(item.id, { asset: event.target.value || null })} className={`${select} max-w-48`}><option value="">Sin enlazar</option>{assetGroups(catalog, draft).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select></td>
           <td className={cell}><Chips value={item.data} options={catalog.classifications} onChange={data => updateComponent(item.id, { data })} /></td>
           <td className={`${cell} space-y-1 text-xs`}>{([['internet_facing', 'Expuesto a Internet'], ['authenticates', 'Autentica'], ['encrypted_at_rest', 'Cifrado en reposo']] as const).map(([key, label]) => <label key={key} className="flex items-center gap-1.5 whitespace-nowrap"><input type="checkbox" className="size-3.5 accent-brand" checked={item[key]} onChange={event => updateComponent(item.id, { [key]: event.target.checked })} />{label}</label>)}</td>
           <td className={cell}><Button size="xs" variant="ghost" aria-label={`Quitar ${item.name}`} onClick={() => removeComponent(item.id)}><Trash2 /></Button></td>

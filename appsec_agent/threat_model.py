@@ -175,6 +175,13 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
     for key, items in (("components", components), ("flows", flows), ("boundaries", boundaries)):
         if len(items) > LIMITS[key]:
             raise ModelError(f"Máximo {LIMITS[key]} {key} por modelo")
+    repositories = payload.get("repositories") or []
+    if not isinstance(repositories, list) or len(repositories) > 50 or any(not isinstance(item, str) for item in repositories):
+        raise ModelError("Repositorios del proyecto inválidos (como mucho 50)")
+    if any(item not in known_assets for item in repositories):
+        raise ModelError("Un repositorio del proyecto no existe o ya no hay acceso a él")
+    # Los repositorios que usan los componentes forman parte del proyecto aunque no se hayan añadido a mano.
+    model["repositories"] = list(dict.fromkeys([*repositories, *(item["asset"] for item in components if item.get("asset") and not item["asset"].startswith("domain:"))]))
     try:
         # Lo propio del enfoque elegido: amenazas escritas a mano, árboles, técnicas ATT&CK, etapas PASTA.
         extras = threat_methods.validate(payload, elements=ids | flow_ids)
@@ -222,6 +229,7 @@ def list_models(data_dir: Path) -> list[dict]:
             continue
         rows.append({key: model.get(key) for key in ("id", "name", "description", "updated_at", "updated_by", "created_at")}
                     | {"components": len(model.get("components", [])), "flows": len(model.get("flows", [])),
+                       "repositories": len(model.get("repositories") or []),
                        "methodology": model.get("methodology") or "stride"})
     return sorted(rows, key=lambda row: row.get("updated_at") or "", reverse=True)
 
@@ -402,6 +410,82 @@ def suggest(name: str, repositories: list[dict]) -> dict:
                         for item in repositories)
     return {"name": name, "description": f"Propuesta a partir de las dependencias de: {sources}"[:1000] + ". Revisa componentes, flujos y datos.",
             "components": components, "flows": flows, "boundaries": [item for item in boundaries if item["components"]]}
+
+
+NODE_W, ROW, PAD = 184, 124, 36  # mismas medidas que el editor del panel
+
+
+def merge_proposal(model: dict, proposal: dict) -> tuple[dict, dict]:
+    """Añade a un modelo lo que se propone desde nuevos repositorios, sin duplicar lo que ya hay.
+
+    Un componente propuesto es el mismo que uno existente si coinciden tipo y repositorio (procesos) o
+    tipo y nombre (actores, almacenes, terceros). Los nuevos se colocan dentro de su frontera si ya
+    está dibujada, o a la derecha de lo dibujado: no se pierde la disposición que hizo el equipo.
+    """
+    merged = json.loads(json.dumps(model))
+    components = merged.setdefault("components", [])
+    flows = merged.setdefault("flows", [])
+    boundaries = merged.setdefault("boundaries", [])
+    used = {item["id"] for item in components}
+    same: dict[str, str] = {}
+    added = []
+
+    def key(item: dict) -> tuple:
+        return (item["kind"], item.get("asset")) if item["kind"] in PROCESSES and item.get("asset") else (item["kind"], item["name"].lower())
+    existing = {key(item): item["id"] for item in components}
+    for item in proposal.get("components", []):
+        if key(item) in existing:
+            same[item["id"]] = existing[key(item)]
+            continue
+        new = {**item, "id": _slug(item["name"], used)}
+        same[item["id"]] = new["id"]
+        existing[key(new)] = new["id"]
+        components.append(new)
+        added.append(new["id"])
+    pairs = {(flow["source"], flow["target"]) for flow in flows}
+    flow_ids = {flow["id"] for flow in flows}
+    new_flows = 0
+    for flow in proposal.get("flows", []):
+        source, target = same.get(flow["source"]), same.get(flow["target"])
+        if not source or not target or source == target or (source, target) in pairs:
+            continue
+        pairs.add((source, target))
+        flows.append({**flow, "id": _slug(f"{source}-{target}", flow_ids), "source": source, "target": target})
+        new_flows += 1
+    placed = {member for boundary in boundaries for member in boundary["components"]}
+    by_name = {boundary["name"].lower(): boundary for boundary in boundaries}
+    boundary_ids = {boundary["id"] for boundary in boundaries}
+    drawn = any(item.get("position") for item in components)
+    right = max([item["position"]["x"] + NODE_W for item in components if item.get("position")]
+                + [boundary["box"]["x"] + boundary["box"]["width"] for boundary in boundaries if boundary.get("box")] or [0]) + 80
+    for proposed in proposal.get("boundaries", []):
+        members = [same[member] for member in proposed["components"] if same.get(member) in added and same[member] not in placed]
+        if not members:
+            continue
+        target = by_name.get(proposed["name"].lower())
+        if target is None:
+            target = {"id": _slug(proposed["id"], boundary_ids), "name": proposed["name"], "components": []}
+            if drawn:
+                target["box"] = {"x": right - PAD, "y": 40, "width": NODE_W + PAD * 2, "height": 70}
+                right += NODE_W + PAD * 2 + 60
+            boundaries.append(target)
+            by_name[target["name"].lower()] = target
+        for member in members:
+            target["components"].append(member)
+            placed.add(member)
+            if drawn:
+                component = next(item for item in components if item["id"] == member)
+                box = target.get("box")
+                if box:
+                    inside = [item["position"]["y"] for item in components if item["id"] in target["components"] and item.get("position")]
+                    component["position"] = {"x": box["x"] + PAD, "y": (max(inside) + ROW) if inside else box["y"] + 50}
+                    box["height"] = max(box["height"], component["position"]["y"] - box["y"] + ROW)
+    for member in added:  # sin frontera: a la derecha de lo dibujado
+        component = next(item for item in components if item["id"] == member)
+        if drawn and not component.get("position"):
+            component["position"] = {"x": right, "y": 90}
+            right += NODE_W + 60
+    return merged, {"components": len(added), "flows": new_flows}
 
 
 # ------------------------------------------------------------ STRIDE
