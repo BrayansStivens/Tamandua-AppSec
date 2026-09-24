@@ -1,0 +1,32 @@
+{
+  "format": "appsec-agent-threat-model",
+  "version": 1,
+  "model": {
+    "name": "Portal de clientes · PASTA",
+    "description": "Ejemplo de análisis de riesgo de acceso a cuentas.",
+    "methodology": "pasta",
+    "components": [
+      { "id": "cliente", "name": "Cliente", "kind": "actor", "position": { "x": 60, "y": 180 } },
+      { "id": "api", "name": "API de clientes", "kind": "api", "internet_facing": true, "position": { "x": 410, "y": 100 } },
+      { "id": "datos", "name": "Base de datos", "kind": "database", "data": ["pii"], "position": { "x": 710, "y": 280 } }
+    ],
+    "flows": [
+      { "id": "solicitud", "source": "cliente", "target": "api", "protocol": "https", "data": ["credentials"] },
+      { "id": "consulta", "source": "api", "target": "datos", "protocol": "sql", "data": ["pii"] }
+    ],
+    "boundaries": [
+      { "id": "interna", "name": "Zona interna", "components": ["api", "datos"], "box": { "x": 350, "y": 40, "width": 630, "height": 480 } }
+    ],
+    "pasta": {
+      "objectives": "Evitar el acceso indebido a cuentas y la exposición de datos personales.",
+      "scope": "Login, API de clientes y base de datos; quedan fuera los servicios de analítica.",
+      "risk": "La exposición de una cuenta tendría impacto alto; revisar controles de autorización antes del lanzamiento."
+    },
+    "attack_trees": [
+      { "id": "tomar-cuenta", "goal": "Consultar los datos de otra cuenta", "nodes": [
+        { "id": "raiz", "parent": null, "text": "Obtener acceso a una cuenta ajena", "gate": "or" },
+        { "id": "ids", "parent": "raiz", "text": "Manipular el ID de cuenta en la API", "gate": "or", "element": "api", "difficulty": "low" }
+      ] }
+    ]
+  }
+}

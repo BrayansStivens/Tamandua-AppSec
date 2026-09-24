@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -37,6 +38,16 @@ def model(**overrides):
 
 
 class ModelTests(unittest.TestCase):
+    def test_every_ui_json_example_is_importable(self):
+        examples = Path(__file__).resolve().parents[1] / "web/src/examples/threat-models"
+        for method in ("stride", "linddun", "pasta", "attack_trees", "attack", "custom"):
+            with self.subTest(method=method):
+                document = json.loads((examples / f"{method}.json").read_text(encoding="utf-8"))
+                imported = tm.from_portable(document)
+                self.assertEqual(imported["methodology"], method)
+                self.assertEqual(len(imported["components"]), 3)
+                self.assertEqual(len(imported["flows"]), 2)
+
     def test_validation_rejects_dangling_and_unknown(self):
         good = model()
         bad_flow = {**good, "flows": [{"id": "x", "source": "api", "target": "nope", "protocol": "https"}]}
@@ -109,6 +120,10 @@ class ModelTests(unittest.TestCase):
         odd = [{**item, "position": {"x": "1", "y": 2}} if item["id"] == "usuario" else item for item in model()["components"]]
         self.assertIsNone(model(components=odd)["components"][0]["position"])
         self.assertEqual(tm._layout(placed)["nodes"]["usuario"], {"x": 10.3, "y": -4})  # las exportaciones usan lo dibujado
+        partly_placed = model(components=[{**item, "position": {"x": 777, "y": 88}} if item["id"] == "api" else item
+                                          for item in model()["components"]])
+        self.assertEqual(tm._layout(partly_placed)["nodes"]["api"], {"x": 777, "y": 88})
+        self.assertIn("usuario", tm._layout(partly_placed)["nodes"])
 
     def test_linddun_looks_at_privacy_not_security(self):
         rows = tm.threats(model(methodology="linddun"))
@@ -244,6 +259,80 @@ class ModelTests(unittest.TestCase):
         ast.parse(tm.to_pytm(current))
         self.assertIn("## Amenazas", tm.to_markdown(current, rows))
 
+    def test_custom_components_and_selected_tools(self):
+        custom = model(methodology="custom", custom_modules=["stride", "linddun", "trees"],
+                       components=[*model()["components"], {"id": "motor", "name": "Motor de pagos", "kind": "custom",
+                       "custom_kind": "Motor de reglas", "custom_base": "api", "internet_facing": True,
+                       "authenticates": False, "data": ["pii"]}])
+        self.assertEqual(custom["components"][-1]["custom_kind"], "Motor de reglas")
+        self.assertEqual(custom["custom_modules"], ["stride", "linddun", "trees"])
+        rows = tm.threats(custom)
+        self.assertEqual({row["framework"] for row in rows}, {"stride", "linddun"})
+        self.assertIn(("TM-S01", "motor"), {(row["rule"], row["element"]) for row in rows})
+        self.assertIn(("PV-Nr01", "motor"), {(row["rule"], row["element"]) for row in rows})
+        self.assertIn("Motor de reglas", tm.to_markdown(custom, rows))
+        ast.parse(tm.to_pytm(custom))
+        self.assertIn("motor", {cell["id"] for cell in tm.to_threat_dragon(custom, rows)["detail"]["diagrams"][0]["cells"]})
+        with self.assertRaises(tm.ModelError):
+            model(methodology="custom", custom_modules=["inventado"])
+        with self.assertRaises(tm.ModelError):
+            model(components=[{"id": "x", "name": "X", "kind": "custom", "custom_kind": "X", "custom_base": "inventado"}])
+
+    def test_svg_export_escapes_labels_and_keeps_layout(self):
+        current = model(components=[{**item, "name": '<script>alert("x")</script>', "position": {"x": 120, "y": 80}} if item["id"] == "api"
+                                    else {**item, "position": {"x": 350 + index * 210, "y": 100}} for index, item in enumerate(model()["components"])],
+                        boundaries=[])
+        svg = tm.to_svg(current)
+        root = ET.fromstring(svg)
+        self.assertEqual(root.tag, "{http://www.w3.org/2000/svg}svg")
+        self.assertIn('&lt;script&gt;', svg)
+        self.assertNotIn('<script>', svg)
+        self.assertIn('x="120" y="80"', svg)
+
+    def test_portable_json_round_trip_detaches_assets(self):
+        original = model(methodology="custom", custom_modules=["stride", "trees", "manual"],
+                         repository_refs=["grupo/por-conectar"])
+        document = tm.to_portable(original, {REPO: {"name": "org/shop"}})
+        self.assertEqual(document["format"], "appsec-agent-threat-model")
+        self.assertEqual(document["model"]["components"][1]["asset_ref"], "org/shop")
+        self.assertEqual(set(document["model"]["repository_refs"]), {"org/shop", "grupo/por-conectar"})
+        imported = tm.from_portable(json.loads(json.dumps(document)))
+        self.assertEqual(imported["methodology"], "custom")
+        self.assertEqual(imported["custom_modules"], ["stride", "trees", "manual"])
+        self.assertEqual(imported["components"][1]["asset"], None)
+        self.assertEqual(imported["components"][1]["asset_ref"], "org/shop")
+        self.assertEqual(imported["repositories"], [])
+        self.assertEqual(imported["flows"], original["flows"])
+        self.assertEqual(tm.to_portable(imported)["model"]["repository_refs"], document["model"]["repository_refs"])
+        simple = tm.from_portable({**document["model"], "repositories": ["sin/crear"]})
+        self.assertIn("sin/crear", simple["repository_refs"])
+        for invalid in ({"format": "otro", "version": 1, "model": document["model"]},
+                        {**document["model"], "flows": [{"id": "x", "source": "inexistente", "target": "api", "protocol": "https"}]}):
+            with self.assertRaises(tm.ModelError):
+                tm.from_portable(invalid)
+
+    def test_portable_import_checks_method_specific_sections(self):
+        tree = {"id": "cuenta", "goal": "Entrar", "nodes": [{"id": "ruta", "parent": None, "text": "Robar sesión"}]}
+        mapping = {"technique": "T1190", "element": "api"}
+        base = model(methodology="custom", custom_modules=["manual", "trees", "attack", "pasta"],
+                     attack_trees=[tree], attack_mappings=[mapping], pasta={"objectives": "Proteger cuentas"})
+        complete = tm.to_portable(base)["model"]
+        self.assertEqual(len(tm.from_portable(complete)["attack_trees"]), 1)
+        for method, forbidden, section in (("stride", "árboles", "attack_trees"),
+                                           ("linddun", "técnicas", "attack_mappings"),
+                                           ("attack_trees", "etapas", "pasta"),
+                                           ("attack", "árboles", "attack_trees")):
+            document = {**tm.to_portable(model(methodology=method))["model"], section: complete[section]}
+            with self.subTest(method=method), self.assertRaisesRegex(tm.ModelError, forbidden):
+                tm.from_portable(document)
+            current = model(methodology=method, attack_trees=[tree], attack_mappings=[mapping], pasta={"objectives": "Proteger cuentas"})
+            exported = tm.to_portable(current)["model"]
+            self.assertNotIn(section, exported)
+            self.assertNotIn("custom_modules", exported)
+            tm.from_portable(exported)
+        with self.assertRaisesRegex(tm.ModelError, "árboles"):
+            tm.from_portable({**complete, "custom_modules": ["manual", "attack", "pasta"]})
+
 
 class RouteTests(HttpCase):
     def test_suggest_edit_decide_and_export(self):
@@ -265,10 +354,31 @@ class RouteTests(HttpCase):
             self.assertEqual(next(row for row in decided["threats"] if row["id"] == threat)["status"], "mitigated")
             status, _, _ = self.post("/api/threat-models", "save-threat-model", {"id": model_id, "model": {**decided["model"], "name": "Tienda v2"}}, cookie)
             self.assertEqual(status, 200)
-            for artifact in ("threat-dragon.json", "tm.py", "report.md"):
+            for artifact in ("threat-dragon.json", "tm.py", "report.md", "diagram.svg", "model.json"):
                 self.assertEqual(self.call("GET", f"/api/threat-models/{model_id}/{artifact}", headers={"Cookie": cookie})[0], 200)
+            portable = tm.to_portable(decided["model"], {REPO: {"name": "org/shop"}})
+            before = len(tm.list_models(self.data_dir))
+            status, preview, _ = self.post("/api/threat-models/validate", "validate-threat-model", portable, cookie)
+            self.assertEqual(status, 200, preview)
+            self.assertEqual(preview["name"], decided["model"]["name"])
+            self.assertEqual(preview["components"], len(decided["model"]["components"]))
+            self.assertEqual(len(tm.list_models(self.data_dir)), before)
+            status, imported, _ = self.post("/api/threat-models/import", "import-threat-model", portable, cookie)
+            self.assertEqual(status, 200, imported)
+            self.assertNotEqual(imported["model"]["id"], model_id)
+            self.assertEqual(imported["model"]["repositories"], [])
+            self.assertIn("org/shop", imported["model"]["repository_refs"])
+            bad = {**portable, "model": {**portable["model"], "methodology": "stride", "custom_modules": None,
+                                         "attack_trees": [{"id": "ruta", "goal": "Entrar", "nodes": []}]}}
+            bad["model"].pop("custom_modules")
+            status, validation_error, _ = self.post("/api/threat-models/validate", "validate-threat-model", bad, cookie)
+            self.assertEqual(status, 400)
+            self.assertIn("árboles de ataque", validation_error["error"])
+            status, rejected, _ = self.post("/api/threat-models/import", "import-threat-model", bad, cookie)
+            self.assertEqual(status, 400)
+            self.assertIn("árboles de ataque", rejected["error"])
             status, listing, _ = self.call("GET", "/api/threat-models", headers={"Cookie": cookie})
-            self.assertEqual(listing["models"][0]["name"], "Tienda v2")
+            self.assertIn("Tienda v2", [item["name"] for item in listing["models"]])
 
 
 if __name__ == "__main__":

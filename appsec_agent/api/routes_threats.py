@@ -68,13 +68,19 @@ def model_detail(request: Request):
         return request.send(200, tm.to_pytm(view["model"]).encode("utf-8"), "text/x-python; charset=utf-8")
     if artifact == "report.md":
         return request.send(200, tm.to_markdown(view["model"], view["threats"]).encode("utf-8"), "text/markdown; charset=utf-8")
+    if artifact == "diagram.svg":
+        return request.send(200, tm.to_svg(view["model"]).encode("utf-8"), "image/svg+xml; charset=utf-8")
+    if artifact == "model.json":
+        document = tm.to_portable(view["model"], _assets(request))
+        return request.send(200, json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8"),
+                            "application/json; charset=utf-8")
     return request.json(404, {"error": "Ruta no encontrada"})
 
 
 @route("POST", "/api/threat-models", action="save-threat-model", body=600_000)
 def save_model(request: Request):
     payload = request.payload
-    if not isinstance(payload, dict) or not set(payload) <= {"id", "model", "suggest", "name", "methodology"}:
+    if not isinstance(payload, dict) or not set(payload) <= {"id", "model", "suggest", "name", "methodology", "custom_modules"}:
         return request.json(400, {"error": "Solicitud inválida"})
     assets = _assets(request)
     try:
@@ -86,6 +92,7 @@ def save_model(request: Request):
                 return request.json(400, {"error": repositories})
             draft = tm.suggest(tm._text(payload.get("name"), 80, "El nombre", required=True), repositories)
             draft["methodology"] = payload.get("methodology") or "stride"
+            draft["custom_modules"] = payload.get("custom_modules", ["manual", "elements"])
             draft["repositories"] = chosen
             model = tm.validate(draft, known_assets=set(assets))
             return request.json(200, _view(request, tm.save(request.data_dir, model, by=request.user["username"])))
@@ -97,6 +104,36 @@ def save_model(request: Request):
         return request.json(400, {"error": str(exc)})
     except (OSError, ValueError):
         return request.json(400, {"error": "No se pudo guardar el modelo"})
+
+
+@route("POST", "/api/threat-models/import", action="import-threat-model", body=600_000)
+def import_model(request: Request):
+    try:
+        model = tm.from_portable(request.payload)
+        return request.json(200, _view(request, tm.save(request.data_dir, model, by=request.user["username"])))
+    except tm.ModelError as exc:
+        return request.json(400, {"error": str(exc)})
+    except (OSError, ValueError):
+        return request.json(400, {"error": "No se pudo importar el modelo"})
+
+
+@route("POST", "/api/threat-models/validate", action="validate-threat-model", body=600_000)
+def validate_import(request: Request):
+    """Comprueba el formato portátil sin crear ni modificar un modelo."""
+    try:
+        model = tm.from_portable(request.payload)
+    except tm.ModelError as exc:
+        return request.json(400, {"error": str(exc)})
+    return request.json(200, {
+        "name": model["name"], "methodology": model["methodology"],
+        "components": len(model["components"]), "flows": len(model["flows"]),
+        "boundaries": len(model["boundaries"]),
+        "repository_refs": len(model["repository_refs"]),
+        "manual_threats": len(model["manual_threats"]),
+        "attack_trees": len(model["attack_trees"]),
+        "attack_mappings": len(model["attack_mappings"]),
+        "pasta_stages": len(model["pasta"]),
+    })
 
 
 def _read_repositories(request: Request, assets: dict, chosen) -> list[dict] | str:

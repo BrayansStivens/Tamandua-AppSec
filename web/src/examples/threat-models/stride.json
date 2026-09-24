@@ -1,0 +1,24 @@
+{
+  "format": "appsec-agent-threat-model",
+  "version": 1,
+  "model": {
+    "name": "Portal de clientes · STRIDE",
+    "description": "Ejemplo de inicio de sesión y consulta de datos personales.",
+    "methodology": "stride",
+    "components": [
+      { "id": "cliente", "name": "Cliente", "kind": "actor", "position": { "x": 60, "y": 180 } },
+      { "id": "api", "name": "API de clientes", "kind": "api", "internet_facing": true, "authenticates": true, "position": { "x": 410, "y": 100 } },
+      { "id": "datos", "name": "Base de datos", "kind": "database", "data": ["pii"], "encrypted_at_rest": true, "position": { "x": 710, "y": 280 } }
+    ],
+    "flows": [
+      { "id": "solicitud", "source": "cliente", "target": "api", "protocol": "https", "data": ["credentials"] },
+      { "id": "consulta", "source": "api", "target": "datos", "protocol": "sql", "data": ["pii"], "authenticated": true, "encrypted": true }
+    ],
+    "boundaries": [
+      { "id": "interna", "name": "Zona interna", "components": ["api", "datos"], "box": { "x": 350, "y": 40, "width": 630, "height": 480 } }
+    ],
+    "manual_threats": [
+      { "id": "acceso-ajeno", "title": "Acceso a datos de otra cuenta", "category": "E", "element": "api", "severity": "high", "scenario": "Un cliente cambia el identificador de la cuenta en la solicitud y consulta datos ajenos.", "mitigation": "Comprobar autorización por objeto en cada operación." }
+    ]
+  }
+}

@@ -111,14 +111,14 @@ export const GUIDES: Record<Methodology, Guide> = {
   },
   custom: {
     name: 'Personalizado',
-    purpose: 'Tu propio método: escribes las amenazas con título, categoría libre, elemento, escenario, posibilidad, impacto, responsable y mitigación.',
-    when: 'Si ya tienes un método en tu equipo o quieres empezar sin reglas automáticas.',
+    purpose: 'Combina a voluntad STRIDE, LINDDUN, amenazas propias, PASTA, árboles de ataque y MITRE ATT&CK sobre el mismo diagrama.',
+    when: 'Cuando necesitas un proceso de modelado adaptado a tu equipo o a un sistema concreto.',
     steps: [
-      'Dibuja el sistema en el diagrama (opcional, pero ayuda a no olvidar flujos).',
-      'Añade cada amenaza describiendo el escenario: quién hace qué, sobre qué activo y con qué consecuencia.',
-      'Valora posibilidad e impacto y asigna responsable y mitigación.',
+      'Elige las herramientas que quieres usar; puedes activarlas o quitarlas sin borrar su contenido.',
+      'Dibuja el sistema y edita sus componentes, flujos y fronteras.',
+      'Revisa las amenazas calculadas y añade escenarios propios cuando corresponda.',
     ],
-    tips: ['Puedes usar las categorías que quieras; se agrupan en la lista de amenazas.'],
+    tips: ['El diagrama siempre está disponible; las demás herramientas son opcionales y se guardan con el modelo.'],
   },
 }
 

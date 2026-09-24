@@ -26,6 +26,7 @@ METHODOLOGIES = {
 RULE_BASED = {"stride": "stride", "pasta": "stride", "linddun": "linddun"}
 SEVERITIES = ("critical", "high", "medium", "low")
 LIMITS = {"manual_threats": 200, "attack_trees": 20, "tree_nodes": 120, "attack_mappings": 300}
+CUSTOM_MODULES = {"stride", "linddun", "manual", "pasta", "trees", "attack", "elements"}
 ID = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 
 
@@ -185,6 +186,10 @@ def validate(payload: dict, *, elements: set[str]) -> dict:
     if methodology not in METHODOLOGIES:
         raise MethodError("Enfoque de modelado desconocido")
     result: dict = {"methodology": methodology}
+    modules = payload.get("custom_modules", ["manual", "elements"])
+    if not isinstance(modules, list) or len(modules) > len(CUSTOM_MODULES) or any(not isinstance(item, str) or item not in CUSTOM_MODULES for item in modules):
+        raise MethodError("Herramientas personalizadas inválidas")
+    result["custom_modules"] = list(dict.fromkeys(modules))
 
     manual, used = [], set()
     raw_manual = payload.get("manual_threats") or []

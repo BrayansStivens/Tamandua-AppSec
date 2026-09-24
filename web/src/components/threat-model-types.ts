@@ -1,8 +1,9 @@
 export type Point = { x: number; y: number }
 export type Box = Point & { width: number; height: number }
 // Tipos del modelo de amenazas compartidos por la vista y el editor de diagramas.
-export type Kind = 'actor' | 'web_app' | 'api' | 'service' | 'function' | 'database' | 'cache' | 'queue' | 'storage' | 'external' | 'identity'
-export type Component = { id: string; name: string; kind: Kind; description?: string; technology?: string; asset?: string | null; path?: string; position?: Point | null; data: string[]; internet_facing: boolean; authenticates: boolean; encrypted_at_rest: boolean; origin?: string }
+export type Kind = 'actor' | 'web_app' | 'api' | 'service' | 'function' | 'database' | 'cache' | 'queue' | 'storage' | 'external' | 'identity' | 'custom'
+export type Component = { id: string; name: string; kind: Kind; custom_kind?: string; custom_base?: Exclude<Kind, 'custom'>; description?: string; technology?: string; asset?: string | null; asset_ref?: string; path?: string; position?: Point | null; data: string[]; internet_facing: boolean; authenticates: boolean; encrypted_at_rest: boolean; origin?: string }
+export type CustomModule = 'stride' | 'linddun' | 'manual' | 'pasta' | 'trees' | 'attack' | 'elements'
 export type Flow = { id: string; source: string; target: string; name?: string; protocol: string; data: string[]; authenticated: boolean; encrypted: boolean }
 export type Boundary = { id: string; name: string; components: string[]; box?: Box | null }
 export type Level = 'low' | 'medium' | 'high'
@@ -11,7 +12,7 @@ export type TreeNode = { id: string; parent: string | null; text: string; gate: 
 export type AttackTree = { id: string; goal: string; nodes: TreeNode[] }
 export type AttackMapping = { technique: string; element?: string; status: 'relevant' | 'mitigated' | 'not_applicable'; note?: string }
 export type Model = { id: string; name: string; description?: string; components: Component[]; flows: Flow[]; boundaries: Boundary[]; updated_at?: string; updated_by?: string;
-  methodology?: import('./threat-guides').Methodology; repositories?: string[]; manual_threats?: ManualThreat[]; attack_trees?: AttackTree[]; attack_mappings?: AttackMapping[]; pasta?: Record<string, string> }
+  methodology?: import('./threat-guides').Methodology; custom_modules?: CustomModule[]; repositories?: string[]; repository_refs?: string[]; manual_threats?: ManualThreat[]; attack_trees?: AttackTree[]; attack_mappings?: AttackMapping[]; pasta?: Record<string, string> }
 export type MethodsCatalog = { methodologies: Record<string, string>; linddun: Record<string, string>; tactics: Record<string, string>;
   techniques: Record<string, { name: string; name_es: string; tactics: string[] }>; suggestions: Record<string, string[]>; pasta_stages: { key: string; title: string }[] }
 export type Evidence = { asset: string; run_id: string; fingerprint: string; title: string; severity: string; location: string }

@@ -8,6 +8,7 @@ import '@xyflow/react/dist/style.css'
 import { Globe2, LayoutGrid, Lock, Plus, Square, Trash2, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { assetGroups, newId, PROCESSES, STORES, type Box, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/components/threat-model-types'
 
 // Editor visual del modelo: los componentes se arrastran, los flujos se crean uniendo sus puntos y las
@@ -58,7 +59,7 @@ function build(model: Model, threats: Threat[], kinds: Record<Kind, string>, pre
   const components: CanvasNode[] = model.components.map(item => {
     const old = before[componentId(item.id)]
     return { id: componentId(item.id), type: 'component', position: item.position ?? old?.position ?? fallback.positions[item.id] ?? { x: 60, y: 60 },
-             data: { component: item, kindLabel: kinds[item.kind] ?? item.kind, flagged: flagged.has(item.id) }, zIndex: 1,
+             data: { component: item, kindLabel: item.custom_kind || kinds[item.kind] || item.kind, flagged: flagged.has(item.id) }, zIndex: 1,
              selected: old?.selected ?? false, measured: old?.measured }
   })
   return [...boundaries, ...components]
@@ -88,7 +89,8 @@ function membership(nodes: CanvasNode[]): Record<string, string[]> {
 
 function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'component'>>) {
   const { component, kindLabel, flagged } = data
-  const shape = PROCESSES.includes(component.kind) ? 'rounded-full px-5' : STORES.includes(component.kind) ? 'rounded-none border-x-0 border-y-2' : 'rounded-lg'
+  const base = component.kind === 'custom' ? component.custom_base ?? 'service' : component.kind
+  const shape = PROCESSES.includes(base) ? 'rounded-full px-5' : STORES.includes(base) ? 'rounded-none border-x-0 border-y-2' : 'rounded-lg'
   const sensitive = component.data.some(item => SENSITIVE.includes(item))
   return <div title={component.name} className={`tm-node flex min-h-[72px] w-[184px] flex-col items-center justify-center border bg-panel px-3 py-2 text-center shadow-sm ${shape}
     ${flagged ? 'border-amber-500 ring-2 ring-amber-500/40' : 'border-app-line'} ${selected ? 'outline-2 outline-offset-2 outline-brand' : ''}`}>
@@ -235,7 +237,7 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
     const current = modelRef.current
     const at = center()
     const id = newId(catalog.kinds[kind] ?? 'componente', current.components.map(item => item.id))
-    setModel({ ...current, components: [...current.components, { id, name: catalog.kinds[kind] ?? 'Componente', kind, data: [], internet_facing: kind === 'actor',
+    setModel({ ...current, components: [...current.components, { id, name: kind === 'custom' ? 'Nuevo componente' : catalog.kinds[kind] ?? 'Componente', kind, custom_kind: kind === 'custom' ? 'Tipo propio' : '', custom_base: kind === 'custom' ? 'service' : undefined, data: [], internet_facing: kind === 'actor',
       authenticates: PROCESSES.includes(kind), encrypted_at_rest: false, position: { x: Math.round(at.x - NODE_W / 2), y: Math.round(at.y - NODE_H / 2) } }] })
   }
   const addBoundary = () => {
@@ -262,10 +264,7 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
         <Controls showInteractive={false} />
         <Panel position="top-left" className="flex flex-wrap gap-1.5">
-          <select aria-label="Añadir componente" value="" onChange={event => { if (event.target.value) addComponent(event.target.value as Kind) }} className="h-8 rounded-lg border border-app-line bg-panel px-2 text-xs text-app-fg shadow-sm">
-            <option value="">+ Componente…</option>
-            {Object.entries(catalog.kinds).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-          </select>
+          <Select value={null} onValueChange={value => { if (value) addComponent(value as Kind) }}><SelectTrigger aria-label="Añadir componente" className="h-8 border-app-line bg-panel text-xs shadow-sm"><Plus className="size-3.5" /><SelectValue placeholder="Componente…" /></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select>
           <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={addBoundary}><Square />Frontera</Button>
           <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={tidy} title="Colocar en columnas por frontera"><LayoutGrid />Ordenar</Button>
         </Panel>
@@ -320,15 +319,18 @@ function Inspector({ model, setModel, catalog, node, flowId: selected, onRemove 
     return <aside className="space-y-4 rounded-2xl border border-app-line bg-panel p-4">
       <div className={field}><span className={label}>Nombre</span><Input value={item.name} maxLength={80} onChange={event => update({ name: event.target.value })} className="h-8 border-app-line bg-app-soft" /></div>
       <div className="grid grid-cols-2 gap-2">
-        <div className={field}><span className={label}>Tipo</span><select value={item.kind} onChange={event => update({ kind: event.target.value as Kind })} className={select}>{Object.entries(catalog.kinds).map(([key, text]) => <option key={key} value={key}>{text}</option>)}</select></div>
+        <div className={field}><span className={label}>Tipo</span><Select value={item.kind} onValueChange={value => { if (value) update({ kind: value as Kind, custom_kind: value === 'custom' ? item.custom_kind || 'Tipo propio' : '' }) }}><SelectTrigger aria-label="Tipo de componente" className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.kind]}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select></div>
         <div className={field}><span className={label}>Tecnología</span><Input value={item.technology ?? ''} maxLength={80} placeholder="p. ej. Django" onChange={event => update({ technology: event.target.value })} className="h-8 border-app-line bg-app-soft" /></div>
       </div>
-      <div className={field}><span className={label}>Código (repositorio)</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, path: event.target.value ? item.path : '' })} className={select}><option value="">Sin enlazar</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select></div>
+      {item.kind === 'custom' && <div className={field}><span className={label}>Nombre del tipo propio</span><Input value={item.custom_kind ?? ''} maxLength={80} onChange={event => update({ custom_kind: event.target.value })} placeholder="p. ej. Motor de reglas" className="h-8 border-app-line bg-app-soft" /></div>}
+      {item.kind === 'custom' && <div className={field}><span className={label}>Rol base para el análisis</span><Select value={item.custom_base || 'service'} onValueChange={value => { if (value) update({ custom_base: value as Exclude<Kind, 'custom'> }) }}><SelectTrigger aria-label="Rol base para el análisis" className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.custom_base || 'service']}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-[11px] text-app-subtle">El nombre es libre; este rol determina qué reglas STRIDE y LINDDUN se aplican.</p></div>}
+      <div className={field}><span className={label}>Descripción</span><textarea value={item.description ?? ''} maxLength={400} rows={2} onChange={event => update({ description: event.target.value })} placeholder="Qué hace y qué datos maneja" className="w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-fg" /></div>
+      <div className={field}><span className={label}>Código (repositorio)</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, asset_ref: event.target.value ? '' : item.asset_ref })} className={select}><option value="">Sin enlazar</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select>{item.asset_ref && !item.asset && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Referencia importada: {item.asset_ref} · pendiente de vincular</p>}</div>
       {item.asset && <div className={field}><span className={label}>Carpeta dentro del repositorio</span><Input value={item.path ?? ''} maxLength={200} placeholder="vacío = todo el repositorio · p. ej. frontend/" onChange={event => update({ path: event.target.value })} className="h-8 border-app-line bg-app-soft font-mono text-xs" />
         <p className="text-[11px] leading-4 text-app-subtle">Solo los hallazgos de esa carpeta cuentan como indicios de sus amenazas. En un monorepo evita que el backend «evidencie» amenazas del frontend.</p></div>}
       <div className={field}><span className={label}>Datos que guarda o maneja</span><Chips value={item.data} options={catalog.classifications} onChange={data => update({ data })} /></div>
       <div className="space-y-1.5"><Check checked={item.internet_facing} onChange={internet_facing => update({ internet_facing })}>Expuesto a Internet</Check><Check checked={item.authenticates} onChange={authenticates => update({ authenticates })}>Autentica</Check>
-        {STORES.includes(item.kind) && <Check checked={item.encrypted_at_rest} onChange={encrypted_at_rest => update({ encrypted_at_rest })}>Cifrado en reposo</Check>}</div>
+        {STORES.includes(item.kind === 'custom' ? item.custom_base ?? 'service' : item.kind) && <Check checked={item.encrypted_at_rest} onChange={encrypted_at_rest => update({ encrypted_at_rest })}>Cifrado en reposo</Check>}</div>
       <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 />Quitar componente</Button>
     </aside>
   }

@@ -1,0 +1,24 @@
+{
+  "format": "appsec-agent-threat-model",
+  "version": 1,
+  "model": {
+    "name": "Portal de clientes · LINDDUN",
+    "description": "Ejemplo para revisar privacidad y tratamiento de datos personales.",
+    "methodology": "linddun",
+    "components": [
+      { "id": "cliente", "name": "Cliente", "kind": "actor", "position": { "x": 60, "y": 180 } },
+      { "id": "api", "name": "API de clientes", "kind": "api", "internet_facing": true, "data": ["pii"], "position": { "x": 410, "y": 100 } },
+      { "id": "datos", "name": "Base de datos", "kind": "database", "data": ["pii"], "encrypted_at_rest": true, "position": { "x": 710, "y": 280 } }
+    ],
+    "flows": [
+      { "id": "consulta", "source": "cliente", "target": "api", "protocol": "https", "data": ["pii"] },
+      { "id": "almacenamiento", "source": "api", "target": "datos", "protocol": "sql", "data": ["pii"], "authenticated": true, "encrypted": true }
+    ],
+    "boundaries": [
+      { "id": "interna", "name": "Zona interna", "components": ["api", "datos"], "box": { "x": 350, "y": 40, "width": 630, "height": 480 } }
+    ],
+    "manual_threats": [
+      { "id": "retencion", "title": "Conservación excesiva de datos", "category": "Nc", "element": "datos", "severity": "medium", "scenario": "El servicio conserva información personal después de que deja de ser necesaria.", "mitigation": "Definir plazos de retención y un proceso de borrado verificable." }
+    ]
+  }
+}

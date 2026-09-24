@@ -19,6 +19,7 @@ quiera seguir en esas herramientas.
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 import re
@@ -39,7 +40,7 @@ KINDS = {
     "actor": "Usuario o actor externo", "web_app": "Aplicación web (cliente)", "api": "API / backend",
     "service": "Servicio interno", "function": "Función o tarea", "database": "Base de datos", "cache": "Caché",
     "queue": "Cola o bus de mensajes", "storage": "Almacenamiento de ficheros", "external": "Servicio de terceros",
-    "identity": "Proveedor de identidad",
+    "identity": "Proveedor de identidad", "custom": "Tipo personalizado",
 }
 PROCESSES = {"web_app", "api", "service", "function"}
 STORES = {"database", "cache", "queue", "storage"}
@@ -121,6 +122,8 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
             raise ModelError("Cada componente necesita un identificador único (minúsculas, números y guiones)")
         if raw.get("kind") not in KINDS:
             raise ModelError(f"Tipo de componente inválido en {identifier}")
+        if raw.get("kind") == "custom" and raw.get("custom_base", "service") not in KINDS.keys() - {"custom"}:
+            raise ModelError(f"Categoría base inválida en {identifier}")
         data = raw.get("data") or []
         if not isinstance(data, list) or any(item not in CLASSIFICATIONS for item in data):
             raise ModelError(f"Clasificación de datos inválida en {identifier}")
@@ -129,9 +132,12 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
             raise ModelError(f"El componente {identifier} enlaza un activo que no existe")
         ids.add(identifier)
         components.append({"id": identifier, "name": _text(raw.get("name"), 80, "El nombre del componente", required=True),
-                           "kind": raw["kind"], "description": _text(raw.get("description"), 400, "La descripción"),
+                           "kind": raw["kind"], "custom_kind": _text(raw.get("custom_kind"), 80, "El tipo personalizado", required=raw["kind"] == "custom") if raw["kind"] == "custom" else "",
+                           "custom_base": raw.get("custom_base", "service") if raw["kind"] == "custom" else "",
+                           "description": _text(raw.get("description"), 400, "La descripción"),
                            "technology": _text(raw.get("technology"), 80, "La tecnología"),
-                           "asset": asset or None, "path": _folder(raw.get("path"), f"La carpeta de {identifier}") if asset else "",
+                           "asset": asset or None, "asset_ref": _text(raw.get("asset_ref"), 200, "La referencia del activo"),
+                           "path": _folder(raw.get("path"), f"La carpeta de {identifier}"),
                            "position": _position(raw.get("position")), "data": sorted(set(data)),
                            "internet_facing": bool(raw.get("internet_facing")),
                            "authenticates": bool(raw.get("authenticates")),
@@ -182,12 +188,95 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
         raise ModelError("Un repositorio del proyecto no existe o ya no hay acceso a él")
     # Los repositorios que usan los componentes forman parte del proyecto aunque no se hayan añadido a mano.
     model["repositories"] = list(dict.fromkeys([*repositories, *(item["asset"] for item in components if item.get("asset") and not item["asset"].startswith("domain:"))]))
+    references = payload.get("repository_refs") or []
+    if not isinstance(references, list) or len(references) > 50:
+        raise ModelError("Referencias de repositorios inválidas (como mucho 50)")
+    model["repository_refs"] = list(dict.fromkeys(_text(item, 200, "La referencia del repositorio", required=True) for item in references))
     try:
         # Lo propio del enfoque elegido: amenazas escritas a mano, árboles, técnicas ATT&CK, etapas PASTA.
         extras = threat_methods.validate(payload, elements=ids | flow_ids)
     except threat_methods.MethodError as exc:
         raise ModelError(str(exc)) from exc
     return {**model, "components": components, "flows": flows, "boundaries": boundaries, **extras}
+
+
+def to_portable(model: dict, assets: dict[str, dict] | None = None) -> dict:
+    """Formato editable: no contiene IDs locales, decisiones ni evidencia de escaneos."""
+    assets = assets or {}
+    def label(identifier: str) -> str:
+        return assets.get(identifier, {}).get("name") or identifier
+
+    fields = ("name", "description", "methodology", "components", "flows", "boundaries")
+    portable = {key: model[key] for key in fields if key in model}
+    if model.get("methodology") == "custom":
+        portable["custom_modules"] = model.get("custom_modules", ["manual", "elements"])
+    allowed = _portable_sections(model)
+    for section in ("manual_threats", "pasta", "attack_trees", "attack_mappings"):
+        if section in allowed:
+            portable[section] = model.get(section) or ({} if section == "pasta" else [])
+    portable["repository_refs"] = list(dict.fromkeys([*(model.get("repository_refs") or []),
+                                                        *(label(item) for item in model.get("repositories") or [])]))
+    portable["components"] = []
+    for component in model.get("components") or []:
+        entry = {key: value for key, value in component.items() if key != "asset"}
+        entry["asset_ref"] = label(component["asset"]) if component.get("asset") else component.get("asset_ref") or ""
+        portable["components"].append(entry)
+    return {"format": "appsec-agent-threat-model", "version": 1, "model": portable}
+
+
+def from_portable(document: dict) -> dict:
+    """Importa un modelo sin confiar en IDs de activos ni enlazarlos automáticamente."""
+    if not isinstance(document, dict):
+        raise ModelError("El archivo debe contener un objeto JSON")
+    if "format" in document or "version" in document:
+        if document.get("format") != "appsec-agent-threat-model" or document.get("version") != 1:
+            raise ModelError("Formato o versión de modelo no compatible")
+        raw = document.get("model")
+    else:
+        raw = document
+    if not isinstance(raw, dict):
+        raise ModelError("El campo model debe ser un objeto")
+    repositories = raw.get("repositories") or []
+    references = raw.get("repository_refs") or []
+    if not isinstance(repositories, list) or not isinstance(references, list):
+        raise ModelError("Las referencias de repositorios deben ser una lista")
+    components = raw.get("components") or []
+    if not isinstance(components, list):
+        raise ModelError("Los componentes deben ser una lista")
+    detached = []
+    for item in components:
+        if not isinstance(item, dict):
+            raise ModelError("Componente inválido")
+        reference = item.get("asset_ref") or item.get("asset") or ""
+        detached.append({**item, "asset": None, "asset_ref": reference})
+    clean = {**raw, "components": detached, "repositories": [], "repository_refs": [*references, *repositories]}
+    imported = validate(clean, known_assets=set())
+    allowed = _portable_sections(imported)
+    labels = {"manual_threats": "amenazas propias", "attack_trees": "árboles de ataque",
+              "attack_mappings": "técnicas ATT&CK", "pasta": "etapas PASTA"}
+    for section, label in labels.items():
+        if imported[section] and section not in allowed:
+            method = threat_methods.METHODOLOGIES[imported["methodology"]]
+            raise ModelError(f"El enfoque {method} no admite {label}. Cambia el JSON a un enfoque compatible o usa personalizado con ese módulo activo")
+    if imported["methodology"] != "custom" and raw.get("custom_modules") not in (None, [], ["manual", "elements"]):
+        raise ModelError("custom_modules solo se usa con el enfoque personalizado")
+    return imported
+
+
+def _portable_sections(model: dict) -> set[str]:
+    """Las secciones propias de un método; el diagrama es común a todos."""
+    method = model.get("methodology") or "stride"
+    if method == "custom":
+        modules = set(model.get("custom_modules", ["manual", "elements"]))
+        return {section for module, section in (("manual", "manual_threats"), ("trees", "attack_trees"),
+                                                ("attack", "attack_mappings"), ("pasta", "pasta")) if module in modules}
+    return {
+        "stride": {"manual_threats"},
+        "linddun": {"manual_threats"},
+        "pasta": {"manual_threats", "pasta", "attack_trees"},
+        "attack_trees": {"manual_threats", "attack_trees"},
+        "attack": {"manual_threats", "attack_mappings"},
+    }.get(method, set())
 
 
 # ------------------------------------------------------------ almacén
@@ -565,6 +654,11 @@ def _index(model: dict) -> tuple[dict, dict]:
     return components, boundary_of
 
 
+def _kind(component: dict) -> str:
+    """Los tipos propios conservan un rol base para las reglas y los formatos externos."""
+    return (component.get("custom_base") or "service") if component["kind"] == "custom" else component["kind"]
+
+
 def _targets(model: dict, rules: list[dict] | None = None) -> list[tuple[dict, dict | None, dict | None]]:
     """(regla, componente, flujo) para cada regla que aplica. Las condiciones están aquí, a la vista."""
     components, boundary_of = _index(model)
@@ -580,12 +674,12 @@ def _targets(model: dict, rules: list[dict] | None = None) -> list[tuple[dict, d
                 sensitive = any(CLASSIFICATIONS[item] >= 3 for item in flow["data"])
                 target = components[flow["target"]]
                 if ((applies == "flow_unencrypted_boundary" and crosses and not flow["encrypted"] and set(flow["data"]) - {"public"})
-                        or (applies == "flow_to_external_sensitive" and target["kind"] == "external" and sensitive)
-                        or (applies == "flow_personal_to_external" and target["kind"] == "external" and "pii" in flow["data"])):
+                        or (applies == "flow_to_external_sensitive" and _kind(target) == "external" and sensitive)
+                        or (applies == "flow_personal_to_external" and _kind(target) == "external" and "pii" in flow["data"])):
                     result.append((rule, None, flow))
             continue
         for component in components.values():
-            kind = component["kind"]
+            kind = _kind(component)
             process = kind in PROCESSES
             sensitive = any(CLASSIFICATIONS[item] >= 3 for item in component["data"]) or any(
                 CLASSIFICATIONS[item] >= 3 for flow in inbound[component["id"]] + outbound[component["id"]] for item in flow["data"])
@@ -601,15 +695,15 @@ def _targets(model: dict, rules: list[dict] | None = None) -> list[tuple[dict, d
                 "internet_process_unauthenticated": process and component["internet_facing"] and not component["authenticates"],
                 "process_authenticated": process and component["authenticates"],
                 "process_sensitive": process and sensitive,
-                "process_calls_out": process and any(components[flow["target"]]["kind"] in ("external", "service", "api", "identity") for flow in outbound[component["id"]]),
-                "inbound_from_external": process and any(components[flow["source"]]["kind"] == "external" for flow in inbound[component["id"]]),
+                "process_calls_out": process and any(_kind(components[flow["target"]]) in ("external", "service", "api", "identity") for flow in outbound[component["id"]]),
+                "inbound_from_external": process and any(_kind(components[flow["source"]]) == "external" for flow in inbound[component["id"]]),
                 "store_written_unauthenticated": kind in STORES and any(not flow["authenticated"] for flow in inbound[component["id"]]),
                 "store_sensitive_unencrypted": kind in STORES and not component["encrypted_at_rest"] and any(CLASSIFICATIONS[item] >= 3 for item in component["data"]),
                 "store_credentials": kind in STORES and "credentials" in component["data"],
                 "store_personal": kind in STORES and "pii" in component["data"],
                 "store_personal_unencrypted": kind in STORES and "pii" in component["data"] and not component["encrypted_at_rest"],
                 "process_personal": process and personal,
-                "process_personal_facing_actor": process and personal and any(components[flow["source"]]["kind"] == "actor" for flow in inbound[component["id"]]),
+                "process_personal_facing_actor": process and personal and any(_kind(components[flow["source"]]) == "actor" for flow in inbound[component["id"]]),
             }.get(applies, False)
             if match:
                 result.append((rule, component, None))
@@ -621,11 +715,11 @@ def _severity(model: dict, rule: dict, component: dict | None, flow: dict | None
     components, _ = _index(model)
     if flow is not None:
         data = flow["data"]
-        exposure = 3 if any(components[end]["internet_facing"] or components[end]["kind"] in ("actor", "external") for end in (flow["source"], flow["target"])) else 2
+        exposure = 3 if any(components[end]["internet_facing"] or _kind(components[end]) in ("actor", "external") for end in (flow["source"], flow["target"])) else 2
     else:
         related = [f for f in model.get("flows", []) if component["id"] in (f["source"], f["target"])]
         data = component["data"] + [item for f in related for item in f["data"]]
-        exposure = 3 if component["internet_facing"] or component["kind"] in ("external", "identity") else 2 if related else 1
+        exposure = 3 if component["internet_facing"] or _kind(component) in ("external", "identity") else 2 if related else 1
     impact = max([CLASSIFICATIONS[item] for item in data] or [2])
     level = SEVERITY_ORDER.index(rule["base"])
     if exposure == 3 and impact >= 4:
@@ -638,7 +732,7 @@ def _severity(model: dict, rule: dict, component: dict | None, flow: dict | None
 def _scopes_near(model: dict, component: dict | None, flow: dict | None) -> set[tuple[str, str]]:
     """(repositorio, carpeta) cuyo código implementa o toca el elemento; carpeta vacía = repositorio entero."""
     components, _ = _index(model)
-    if component is not None and component["kind"] in PROCESSES:
+    if component is not None and _kind(component) in PROCESSES:
         return {(component["asset"], component.get("path") or "")} if component.get("asset") else set()
     if flow is not None:
         ends = [components[flow["source"]], components[flow["target"]]]
@@ -655,7 +749,7 @@ def _assets_near(model: dict, component: dict | None, flow: dict | None) -> set[
     Un almacén, un tercero o un flujo no tienen código propio: su evidencia está en los procesos que los usan.
     """
     components, _ = _index(model)
-    if component is not None and component["kind"] in PROCESSES:
+    if component is not None and _kind(component) in PROCESSES:
         return {component["asset"]} if component.get("asset") else set()
     if flow is not None:
         ends = [components[flow["source"]], components[flow["target"]]]
@@ -670,10 +764,12 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None)
     decisions = model.get("decisions", {})
     rows = []
     method = model.get("methodology") or "stride"
-    family = threat_methods.RULE_BASED.get(method)
-    rules = RULES if family == "stride" else threat_methods.LINDDUN_RULES if family == "linddun" else []
-    categories = STRIDE if family == "stride" else threat_methods.LINDDUN
-    for rule, component, flow in _targets(model, rules):
+    families = ([threat_methods.RULE_BASED[method]] if method in threat_methods.RULE_BASED else
+                [item for item in ("stride", "linddun") if item in model.get("custom_modules", [])] if method == "custom" else [])
+    for family in families:
+      rules = RULES if family == "stride" else threat_methods.LINDDUN_RULES
+      categories = STRIDE if family == "stride" else threat_methods.LINDDUN
+      for rule, component, flow in _targets(model, rules):
         element = flow["id"] if flow else component["id"]
         threat_id = hashlib.sha256(f"{rule['id']}|{element}".encode()).hexdigest()[:16]
         evidence = []
@@ -708,7 +804,8 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None)
                      "severity": severity, "status": status, "decision": decision,
                      "evidence": evidence[:20], "evidence_count": len(evidence),
                      "evidence_scope": [{"asset": asset, "path": folder or None} for asset, folder in scopes]})
-    rows += _manual_rows(model, decisions)
+    if method != "custom" or "manual" in model.get("custom_modules", ["manual", "elements"]):
+        rows += _manual_rows(model, decisions)
     order = {"evidenced": 0, "open": 1, "accepted": 2, "mitigated": 3, "not_applicable": 4}
     return sorted(rows, key=lambda row: (order[row["status"]], SEVERITY_ORDER.index(row["severity"]), row["stride"], row["element_name"]))
 
@@ -791,7 +888,7 @@ def to_threat_dragon(model: dict, rows: list[dict]) -> dict:
                           "attrs": {"label": {"text": boundary["name"]}},
                           "data": {"type": "tm.BoundaryBox", "name": boundary["name"], "isTrustBoundary": True, "hasOpenThreats": False}})
     for component in model.get("components", []):
-        shape, kind = shapes[component["kind"]]
+        shape, kind = shapes[_kind(component)]
         position = layout["nodes"][component["id"]]
         items = by_element.get(component["id"], [])
         cells.append({"id": component["id"], "shape": shape, "zIndex": 1,
@@ -800,8 +897,8 @@ def to_threat_dragon(model: dict, rows: list[dict]) -> dict:
                       "data": {"type": kind, "name": component["name"], "description": component.get("description", ""),
                                "outOfScope": False, "reasonOutOfScope": "", "threats": items,
                                "hasOpenThreats": any(item["status"] == "Open" for item in items),
-                               "isEncrypted": component.get("encrypted_at_rest", False), "isWebApplication": component["kind"] == "web_app",
-                               "providesAuthentication": component["kind"] == "identity"}})
+                               "isEncrypted": component.get("encrypted_at_rest", False), "isWebApplication": _kind(component) == "web_app",
+                               "providesAuthentication": _kind(component) == "identity"}})
     for flow in model.get("flows", []):
         items = by_element.get(flow["id"], [])
         cells.append({"id": flow["id"], "shape": "flow", "zIndex": 2, "source": {"cell": flow["source"]}, "target": {"cell": flow["target"]},
@@ -821,19 +918,15 @@ STRIDE_EN = {"S": "Spoofing", "T": "Tampering", "R": "Repudiation", "I": "Inform
 
 
 def _layout(model: dict) -> dict:
-    """Lo dibujado en el editor si lo hay; si no, columnas por frontera en el orden declarado."""
-    stored = _stored_layout(model)
-    if stored:
-        return stored
-    return _column_layout(model)
-
-
-def _stored_layout(model: dict) -> dict | None:
-    components = model.get("components", [])
-    if not components or not all(item.get("position") for item in components):
-        return None
-    return {"nodes": {item["id"]: dict(item["position"]) for item in components},
-            "boundaries": {item["id"]: dict(item["box"]) for item in model.get("boundaries", []) if item.get("box")}}
+    """Respeta cada posición dibujada; distribuye solo los elementos aún sin colocar."""
+    layout = _column_layout(model)
+    for component in model.get("components", []):
+        if component.get("position"):
+            layout["nodes"][component["id"]] = dict(component["position"])
+    for boundary in model.get("boundaries", []):
+        if boundary.get("box"):
+            layout["boundaries"][boundary["id"]] = dict(boundary["box"])
+    return layout
 
 
 def _column_layout(model: dict) -> dict:
@@ -844,12 +937,59 @@ def _column_layout(model: dict) -> dict:
         columns.append(loose)
     nodes, boundaries = {}, {}
     for index, column in enumerate(columns):
-        x = 40 + index * 260
+        x = 60 + index * 300
         for row, member in enumerate(column):
-            nodes[member] = {"x": x + 20, "y": 60 + row * 120}
+            nodes[member] = {"x": x, "y": 90 + row * 124}
         if index < len(model.get("boundaries", [])):
-            boundaries[model["boundaries"][index]["id"]] = {"x": x, "y": 20, "width": 200, "height": 60 + max(1, len(column)) * 120}
+            boundaries[model["boundaries"][index]["id"]] = {"x": x - 36, "y": 40, "width": 256, "height": 70 + max(1, len(column)) * 124}
     return {"nodes": nodes, "boundaries": boundaries}
+
+
+def to_svg(model: dict) -> str:
+    """Exporta solamente el diagrama actual como SVG autónomo, sin código ni scripts."""
+    layout = _layout(model)
+    positions = layout["nodes"]
+    boxes = layout["boundaries"]
+    nodes = {item["id"]: item for item in model.get("components", [])}
+    extents = [(point["x"], point["y"], point["x"] + 184, point["y"] + 72) for point in positions.values()]
+    extents += [(box["x"], box["y"], box["x"] + box["width"], box["y"] + box["height"]) for box in boxes.values()]
+    left = min((item[0] for item in extents), default=0) - 40
+    top = min((item[1] for item in extents), default=0) - 74
+    right = max((item[2] for item in extents), default=720) + 40
+    bottom = max((item[3] for item in extents), default=420) + 40
+    width, height = max(480, right - left), max(280, bottom - top)
+    escape = lambda value: html.escape(str(value), quote=True)
+    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{left:g} {top:g} {width:g} {height:g}" role="img" aria-label="Diagrama de {escape(model["name"])}">',
+             '<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#475569"/></marker></defs>',
+             f'<rect x="{left:g}" y="{top:g}" width="{width:g}" height="{height:g}" fill="#ffffff"/>',
+             f'<text x="{left + 24:g}" y="{top + 35:g}" font-family="sans-serif" font-size="20" font-weight="700" fill="#0f172a">{escape(model["name"])}</text>']
+    for boundary in model.get("boundaries", []):
+        box = boxes.get(boundary["id"])
+        if box:
+            parts += [f'<rect x="{box["x"]:g}" y="{box["y"]:g}" width="{box["width"]:g}" height="{box["height"]:g}" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>',
+                      f'<text x="{box["x"] + 12:g}" y="{box["y"] + 22:g}" font-family="sans-serif" font-size="13" fill="#475569">{escape(boundary["name"])}</text>']
+    for flow in model.get("flows", []):
+        source, target = positions.get(flow["source"]), positions.get(flow["target"])
+        if not source or not target:
+            continue
+        sx, sy = source["x"] + 92, source["y"] + 36
+        tx, ty = target["x"] + 92, target["y"] + 36
+        dx, dy = tx - sx, ty - sy
+        if not dx and not dy:
+            continue
+        scale = min(92 / abs(dx) if dx else float("inf"), 36 / abs(dy) if dy else float("inf"))
+        x1, y1 = sx + dx * scale, sy + dy * scale
+        x2, y2 = tx - dx * scale, ty - dy * scale
+        parts.append(f'<line x1="{x1:g}" y1="{y1:g}" x2="{x2:g}" y2="{y2:g}" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>')
+        parts.append(f'<text x="{(x1 + x2) / 2:g}" y="{(y1 + y2) / 2 - 8:g}" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#334155">{escape(flow.get("name") or flow["protocol"].upper())}</text>')
+    for identifier, point in positions.items():
+        item = nodes[identifier]
+        label = item.get("custom_kind") or KINDS[item["kind"]]
+        parts += [f'<rect x="{point["x"]:g}" y="{point["y"]:g}" width="184" height="72" rx="12" fill="#ffffff" stroke="#475569" stroke-width="2"/>',
+                  f'<text x="{point["x"] + 92:g}" y="{point["y"] + 30:g}" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="700" fill="#0f172a">{escape(item["name"])}</text>',
+                  f'<text x="{point["x"] + 92:g}" y="{point["y"] + 51:g}" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#64748b">{escape(item.get("technology") or label)}</text>']
+    parts.append('</svg>')
+    return "\n".join(parts)
 
 
 def to_pytm(model: dict) -> str:
@@ -871,12 +1011,12 @@ def to_pytm(model: dict) -> str:
     lines.append("")
     for component in model.get("components", []):
         variable = variables[component["id"]]
-        lines.append(f"{variable} = {classes[component['kind']]}({name(component['name'])})")
+        lines.append(f"{variable} = {classes[_kind(component)]}({name(component['name'])})")
         if component["id"] in member_of:
             lines.append(f"{variable}.inBoundary = {boundary_vars[member_of[component['id']]]}")
-        if component["kind"] in STORES:
+        if _kind(component) in STORES:
             lines.append(f"{variable}.isEncrypted = {component.get('encrypted_at_rest', False)}")
-        if component["kind"] in PROCESSES:
+        if _kind(component) in PROCESSES:
             lines.append(f"{variable}.authenticatesSource = {component.get('authenticates', False)}")
     lines.append("")
     for flow in model.get("flows", []):
@@ -904,7 +1044,7 @@ def to_markdown(model: dict, rows: list[dict]) -> str:
              f"{counts['by_status']['accepted']} aceptadas; {counts['by_status']['not_applicable']} no aplican.", "",
              "## Componentes", "", "| Componente | Tipo | Datos | Expuesto | Repositorio |", "|---|---|---|---|---|"]
     for item in model.get("components", []):
-        lines.append(f"| {item['name']} | {KINDS[item['kind']]} | {', '.join(CLASSIFICATION_LABELS[d] for d in item['data']) or '—'} | "
+        lines.append(f"| {item['name']} | {item.get('custom_kind') or KINDS[item['kind']]} | {', '.join(CLASSIFICATION_LABELS[d] for d in item['data']) or '—'} | "
                      f"{'sí' if item['internet_facing'] else 'no'} | {item.get('asset') or '—'} |")
     lines += ["", "## Amenazas", ""]
     labels = {"evidenced": "CON INDICIOS", "open": "abierta", "mitigated": "mitigada", "accepted": "aceptada", "not_applicable": "no aplica"}

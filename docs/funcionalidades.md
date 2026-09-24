@@ -100,13 +100,32 @@ El resultado queda en el panel como una ejecución más (con triage compartido c
   | PASTA | Riesgo para el negocio en siete etapas | Etapas con notas; la 3, la 4 y la 5 se alimentan del diagrama, de STRIDE y de los análisis |
   | Árboles de ataque | Rutas hacia un objetivo del atacante | Editor de árboles Y/O con dificultad, elemento y mitigación; calcula qué rutas siguen abiertas |
   | MITRE ATT&CK | Técnicas de atacantes reales | Selección de técnicas (web, API, contenedores, nube) para mapear a componentes, con sugerencias y enlace a attack.mitre.org |
-  | Personalizado | El método de tu equipo | Solo las amenazas que escribís |
+  | Personalizado | El método de tu equipo | Diagrama permanente y selección libre de reglas STRIDE/LINDDUN, amenazas propias, etapas PASTA, árboles, ATT&CK y tabla; se guarda con el modelo |
 
   En cualquier enfoque se pueden **añadir amenazas propias** (escenario, categoría, elemento, severidad, posibilidad, impacto, responsable y mitigación). Cada enfoque tiene una **guía de consulta** —qué significa cada letra, las etapas, cómo se construye un árbol— que se abre a demanda al lado del trabajo y recuerda si la dejaste abierta; las categorías muestran su pregunta al pasar el ratón.
-- **Editor de diagramas.** En **Diagrama** se arrastran los componentes, se crean flujos uniendo sus puntos y las fronteras de confianza son cajas que se mueven (llevándose sus componentes) y se redimensionan; un componente pertenece a la frontera en la que está su centro. Al pulsar un elemento se edita en el panel lateral. Las posiciones se guardan con el modelo y las usan las exportaciones. **Tabla** sigue disponible para editar muchos elementos a la vez.
+- **Editor de diagramas.** En **Diagrama** se arrastran los componentes, se crean flujos uniendo sus puntos y las fronteras de confianza son cajas que se mueven (llevándose sus componentes) y se redimensionan; un componente pertenece a la frontera en la que está su centro. Al pulsar un elemento se editan nombre, tipo, tecnología, descripción, datos y propiedades en el panel lateral. Además del catálogo, se puede crear un **tipo propio** con nombre libre y un rol base que determina qué reglas automáticas le corresponden. Las posiciones se guardan con el modelo y las usan las exportaciones. **Tabla** sigue disponible para editar muchos elementos a la vez.
 - **Indicios, no confirmaciones.** Si el código de un componente tiene hallazgos abiertos con uno de esos CWE, la amenaza aparece **con indicios** y enlaza a ellos: es una señal para revisar, no la prueba de que el escenario sea explotable. Indica la **carpeta** del componente dentro del repositorio (p. ej. `frontend/`) para que en un monorepo solo cuenten los hallazgos de su código; sin carpeta cuenta el repositorio entero y la amenaza lo dice. Lo que está en rutas excluidas tampoco cuenta. Los avisos de dependencias evidencian «dependencias vulnerables», no la inyección en tu código. Lo descartado en triage no cuenta.
 - **Decisiones** por amenaza (mitigada, aceptada, no aplica) con motivo, autor y fecha.
-- **Exportaciones**: JSON de OWASP Threat Dragon v2, script de OWASP pytm (`tm.py`, para quien siga modelando como código) e informe Markdown. La estructura del JSON sigue el formato v2, pero no se ha probado su importación en Threat Dragon.
+- **Importación y exportación propias**: desde la lista, **Importar JSON** abre un asistente con seis ejemplos completos (uno por enfoque), editor para pegar o modificar JSON, carga de archivo, descarga y copia del ejemplo, instrucciones para un LLM y validación previa que no crea ningún modelo. Solo se habilita **Importar modelo** tras una validación correcta del texto actual. Desde el editor se descarga **Modelo JSON** (`model.json`). Incluye el diagrama completo (posiciones, componentes, flujos y fronteras), enfoque, módulos personalizados, amenazas escritas por el equipo, etapas PASTA, árboles y técnicas ATT&CK. Sirve para editarlo a mano o pedir a un LLM que lo genere. Admite tanto el sobre `{"format":"appsec-agent-threat-model","version":1,"model":{...}}` que descarga la app como un objeto de modelo directamente. Los repositorios y dominios del archivo se guardan como `repository_refs` y `asset_ref`: **son referencias pendientes, nunca enlaces automáticos**. No hace falta que existan al importar; se pueden vincular después en el editor. Los IDs de la instancia, decisiones y hallazgos de escaneos no viajan en el formato portátil. Ejemplo mínimo:
+
+  ```json
+  {
+    "name": "Portal de clientes",
+    "methodology": "custom",
+    "custom_modules": ["stride", "trees", "manual"],
+    "repository_refs": ["equipo/portal"],
+    "components": [
+      {"id": "usuario", "name": "Cliente", "kind": "actor"},
+      {"id": "api", "name": "API", "kind": "api", "asset_ref": "equipo/portal", "data": ["pii"]}
+    ],
+    "flows": [{"id": "login", "source": "usuario", "target": "api", "protocol": "https", "authenticated": false}],
+    "boundaries": [{"id": "servidor", "name": "Servidor", "components": ["api"]}]
+  }
+  ```
+
+  El diagrama base es común a todos los enfoques. Las secciones específicas sí se validan: STRIDE y LINDDUN admiten amenazas propias; PASTA admite sus etapas y árboles; Árboles admite árboles; ATT&CK admite técnicas. **Personalizado** admite cualquier combinación, pero cada sección debe tener su módulo activado en `custom_modules`. Un JSON incompatible se rechaza con un mensaje que indica qué sección sobra y sugiere elegir otro enfoque o personalizado. Al exportar un enfoque fijo solo se incluyen sus secciones activas; los datos de otro enfoque que puedan quedar guardados tras cambiar de plantilla no se mezclan en ese archivo.
+
+- **Otras exportaciones**: el diagrama por separado en SVG (`diagram.svg`, con cambios pendientes guardados antes de descargar), JSON de OWASP Threat Dragon v2, script de OWASP pytm (`tm.py`, para quien siga modelando como código) e informe Markdown. La estructura del JSON de Threat Dragon sigue el formato v2, pero no se ha probado su importación en Threat Dragon.
 
 ## Jira
 

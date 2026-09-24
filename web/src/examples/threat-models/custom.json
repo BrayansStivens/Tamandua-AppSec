@@ -1,0 +1,36 @@
+{
+  "format": "appsec-agent-threat-model",
+  "version": 1,
+  "model": {
+    "name": "Portal de clientes · Personalizado",
+    "description": "Ejemplo que combina módulos sobre un único diagrama.",
+    "methodology": "custom",
+    "custom_modules": ["stride", "linddun", "manual", "pasta", "trees", "attack", "elements"],
+    "repository_refs": ["equipo/portal-clientes"],
+    "components": [
+      { "id": "cliente", "name": "Cliente", "kind": "actor", "position": { "x": 60, "y": 180 } },
+      { "id": "api", "name": "API de clientes", "kind": "api", "internet_facing": true, "asset_ref": "equipo/portal-clientes", "position": { "x": 410, "y": 100 } },
+      { "id": "datos", "name": "Base de datos", "kind": "database", "data": ["pii"], "position": { "x": 710, "y": 280 } }
+    ],
+    "flows": [
+      { "id": "solicitud", "source": "cliente", "target": "api", "protocol": "https", "data": ["credentials"] },
+      { "id": "consulta", "source": "api", "target": "datos", "protocol": "sql", "data": ["pii"] }
+    ],
+    "boundaries": [
+      { "id": "interna", "name": "Zona interna", "components": ["api", "datos"], "box": { "x": 350, "y": 40, "width": 630, "height": 480 } }
+    ],
+    "manual_threats": [
+      { "id": "acceso-ajeno", "title": "Acceso a datos de otra cuenta", "category": "Autorización", "element": "api", "severity": "high", "scenario": "Un cliente consulta una cuenta que no le pertenece.", "mitigation": "Comprobar autorización por objeto." }
+    ],
+    "pasta": { "objectives": "Evitar la exposición de datos personales.", "scope": "Portal y API de clientes." },
+    "attack_trees": [
+      { "id": "datos-ajenos", "goal": "Consultar los datos de otra cuenta", "nodes": [
+        { "id": "raiz", "parent": null, "text": "Obtener datos ajenos", "gate": "or" },
+        { "id": "id-ajeno", "parent": "raiz", "text": "Cambiar el ID de cuenta", "gate": "or", "element": "api", "difficulty": "low" }
+      ] }
+    ],
+    "attack_mappings": [
+      { "technique": "T1190", "element": "api", "status": "relevant", "note": "API pública: revisar controles de exposición." }
+    ]
+  }
+}
