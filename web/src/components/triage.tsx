@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { CheckCheck, CircleDot, Clock3, LoaderCircle, RotateCcw, ShieldX, ThumbsUp, Wrench } from 'lucide-react'
+import { CheckCheck, ChevronDown, CircleDot, Clock3, LoaderCircle, RotateCcw, ShieldX, ThumbsUp, Wrench } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/types'
 
@@ -29,13 +30,20 @@ export function TriageBadge({ state }: { state?: TriageState }) {
   return <Badge variant="outline" className={`w-fit text-[11px] ${triageClass[status]}`}>{state?.expired ? 'Aceptación caducada' : triageLabel[status]}</Badge>
 }
 
-// Botones de decisión. "Aceptar riesgo" solo aparece a administradores: es una decisión de negocio.
+// Decisión de triage. Ley de Hick: una acción principal (la más habitual) y el resto en un menú,
+// en lugar de cuatro o cinco botones iguales por hallazgo. "Aceptar riesgo" solo lo ve un
+// administrador: es una decisión de negocio.
 export function TriageActions({ current, canAccept, onPick, size = 'sm' }: { current?: TriageStatus; canAccept: boolean; onPick: (status: TriageStatus) => void; size?: 'sm' | 'xs' }) {
-  const options: TriageStatus[] = ['fixed', 'in_progress', 'false_positive', ...(canAccept ? ['accepted' as const] : []), 'open']
-  return <div className="flex flex-wrap gap-1.5">{options.filter(status => status !== current && !(status === 'open' && !current)).map(status => {
-    const Icon = icon[status]
-    return <Button key={status} type="button" size={size} variant="outline" onClick={() => onPick(status)} className="border-app-line bg-app-soft"><Icon />{verb[status]}</Button>
-  })}</div>
+  const options = (['fixed', 'in_progress', 'false_positive', ...(canAccept ? ['accepted' as const] : []), 'open'] as TriageStatus[])
+    .filter(status => status !== current && !(status === 'open' && !current))
+  const [primary, ...rest] = options
+  if (!primary) return null
+  const Primary = icon[primary]
+  return <div className="flex flex-wrap gap-1.5">
+    <Button type="button" size={size} variant="outline" onClick={() => onPick(primary)} className="border-app-line bg-app-soft"><Primary />{verb[primary]}</Button>
+    {rest.length > 0 && <Menu><MenuTrigger render={<Button type="button" size={size} variant="outline" className="border-app-line bg-app-soft" />}>Más estados<ChevronDown className="size-3.5" /></MenuTrigger>
+      <MenuContent align="start">{rest.map(status => { const Icon = icon[status]; return <MenuItem key={status} onClick={() => onPick(status)}><Icon />{verb[status]}</MenuItem> })}</MenuContent></Menu>}
+  </div>
 }
 
 // Diálogo común a la decisión individual y a la masiva: pide motivo cuando el hallazgo deja de contar.

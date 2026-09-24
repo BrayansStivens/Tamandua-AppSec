@@ -90,7 +90,7 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
     {run === CURRENT && asset && <ExclusionsCard key={asset.key} assetKey={asset.key} canEdit={user.role === 'admin'} onChanged={() => void load()} />}
     {run === CURRENT && <div className="flex flex-wrap gap-1.5">{([['open', 'Abiertos'], ['fixed', 'Remediados'], ['excluded', 'Excluidos'], ['all', 'Todos']] as const)
       .filter(([key]) => key !== 'excluded' || tab === 'excluded' || (counts?.excluded ?? 0) > 0)
-      .map(([key, text]) => <button key={key} onClick={() => setTab(key)} className={`rounded-lg border px-3 py-1.5 text-sm ${tab === key ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{text}{counts ? ` · ${key === 'open' ? counts.open + counts.suppressed : key === 'fixed' ? counts.fixed : key === 'excluded' ? (counts.excluded ?? 0) : counts.open + counts.suppressed + counts.fixed + (counts.excluded ?? 0)}` : ''}</button>)}</div>}
+      .map(([key, text]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)} className={`rounded-lg border px-3 py-1.5 text-sm ${tab === key ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{text}{counts ? ` · ${key === 'open' ? counts.open + counts.suppressed : key === 'fixed' ? counts.fixed : key === 'excluded' ? (counts.excluded ?? 0) : counts.open + counts.suppressed + counts.fixed + (counts.excluded ?? 0)}` : ''}</button>)}</div>}
     {loading && !detail ? <Skeleton tiles={6} rows={5} />
       : detail && (detail.status === 'queued' || detail.status === 'running' || detail.status === 'failed')
         ? <RunProgress run={detail as unknown as RunningRun} onFinished={() => void load()} />

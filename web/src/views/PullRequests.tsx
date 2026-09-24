@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ExternalLink, GitPullRequest, LoaderCircle, Play, RefreshCw, Search } from 'lucide-react'
+import { ChevronDown, ExternalLink, GitPullRequest, LoaderCircle, Play, RefreshCw, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import type { SessionUser } from '@/components/auth/session'
 import { Pager } from '@/components/source-search'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { SkeletonCard, SkeletonList } from '@/components/loading'
 import { fetchSource, type SourcePage } from '@/lib/sources'
 import { Badge } from '@/components/ui/badge'
@@ -108,8 +109,10 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
           <div className="min-w-0 flex-1"><a href={pull.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline"><GitPullRequest className="size-4 text-app-subtle" />#{pull.number} {pull.title}<ExternalLink className="size-3 text-app-subtle" /></a>
             <p className="mt-0.5 text-xs text-app-subtle">{pull.author} · {pull.head_ref} → {pull.base_ref} · <span className="font-mono">{pull.head_sha?.slice(0, 7)}</span>{pull.draft ? ' · borrador' : ''}{pull.review ? ` · revisado ${formatDate(pull.review.created_at)}` : ''}</p></div>
           {reviewBadge(pull)}
-          {pull.review && pull.review.status !== 'queued' && <Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => onOpenRun(pull.review!.run_id)}>Ver resultado</Button>}
-          <Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={!!busy || (!!pull.review && ['queued', 'running'].includes(pull.review.status))} onClick={() => void review(pull.number)}>{busy === `pr-${pull.number}` ? <LoaderCircle className="animate-spin" /> : <Play />}Revisar ahora</Button>
+          {/* Una acción según el estado: con revisión al día, verla; si no (o hay commits nuevos), revisar. */}
+          {pull.review && pull.review.current && pull.review.status !== 'queued' && pull.review.status !== 'running'
+            ? <Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => onOpenRun(pull.review!.run_id)}>Ver resultado</Button>
+            : <Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={!!busy || (!!pull.review && ['queued', 'running'].includes(pull.review.status))} onClick={() => void review(pull.number)}>{busy === `pr-${pull.number}` ? <LoaderCircle className="animate-spin" /> : <Play />}Revisar ahora</Button>}
         </div>)}</div>}
     </CardContent></Card>
     </div>
@@ -155,7 +158,8 @@ function WatchPanel({ admin, onChanged, onSelect, selected }: { admin: boolean; 
   const rows = data.repositories
   const allPicked = rows.length > 0 && rows.every(row => picked.has(row.id))
   return <Card className="border-app-line bg-panel"><CardHeader className="gap-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Repositorios vigilados · {data.enabled}</CardTitle><CardDescription className="mt-1">Los activados revisan solos cada PR nuevo o cada push, cada {Math.round(data.interval / 60)} min. {admin ? 'Actívalos uno a uno o en bloque.' : 'Solo un administrador cambia qué se vigila.'}</CardDescription></div>
-    {admin && <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy} onClick={enableAll}>Activar todos</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy || data.enabled === 0} onClick={() => void apply({ all: true }, false)}>Desactivar todos</Button></div>}</div>
+    {admin && <Menu><MenuTrigger render={<Button size="sm" variant="outline" disabled={busy} className="border-app-line bg-app-soft" />}>Acciones en bloque<ChevronDown className="size-3.5" /></MenuTrigger>
+      <MenuContent><MenuItem onClick={enableAll}>Vigilar todos los repositorios</MenuItem><MenuItem disabled={data.enabled === 0} onClick={() => void apply({ all: true }, false)}>Dejar de vigilar todos</MenuItem></MenuContent></Menu>}</div>
     <div className="flex flex-wrap items-center gap-2"><div className="relative"><Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar repositorio" value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }} placeholder="Buscar…" className="h-8 w-56 border-app-line bg-app-soft pl-8 text-xs" /></div>
       <label className="flex items-center gap-2 text-xs text-app-muted"><input type="checkbox" className="size-4 accent-brand" checked={onlyEnabled} onChange={event => { setOnlyEnabled(event.target.checked); setPage(1) }} />Solo vigilados</label>
       {admin && picked.size > 0 && <><span className="text-xs text-app-muted">{picked.size} seleccionados</span><Button size="sm" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, true)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy && <LoaderCircle className="animate-spin" />}Activar</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, false)}>Desactivar</Button><Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>Quitar selección</Button></>}</div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Check, Copy, KeyRound, LoaderCircle, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react'
+import { Check, Copy, KeyRound, LoaderCircle, MoreHorizontal, ShieldCheck, ShieldOff, UserPlus } from 'lucide-react'
 import type { SessionUser } from '@/components/auth/session'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/types'
 import { SkeletonTable } from '@/components/loading'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 
 type Listing = { users: SessionUser[]; totp_policy: 'admins' | 'all' | 'none' }
 type LinkResult = { user: SessionUser; link: string; expires_in_hours: number }
@@ -48,11 +49,12 @@ export function Users({ me }: { me: SessionUser }) {
                 <td className="px-4 py-3"><Select value={user.role} disabled={self || !!busy} onValueChange={value => { if (value && value !== user.role) void act(user, { action: 'role', role: value }) }}><SelectTrigger size="sm" aria-label={`Rol de ${user.username}`} className="min-w-36 border-app-line bg-app-soft">{roleLabel[user.role]}</SelectTrigger><SelectContent className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="member">Miembro</SelectItem><SelectItem value="admin">Administrador</SelectItem></SelectContent></Select></td>
                 <td className="px-4 py-3">{user.totp_enabled ? <Badge variant="outline" className="border-brand/30 text-brand"><ShieldCheck className="size-3" />Activo</Badge> : <Badge variant="outline" className="border-app-line text-app-muted"><ShieldOff className="size-3" />Sin activar</Badge>}</td>
                 <td className="px-4 py-3 text-xs text-app-muted">{user.last_login_at ? formatDate(user.last_login_at) : 'Nunca'}</td>
-                <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5">
-                  <Button size="xs" variant="outline" disabled={!!busy || user.disabled} onClick={() => void act(user, { action: 'reset' })} className="border-app-line bg-app-soft"><KeyRound />{user.has_password ? 'Enlace de contraseña' : 'Reenviar invitación'}</Button>
-                  {user.totp_enabled && !self && <Button size="xs" variant="outline" disabled={!!busy} onClick={() => void act(user, { action: 'reset_totp' })} className="border-app-line bg-app-soft">Quitar TOTP</Button>}
-                  {!self && <Button size="xs" variant="ghost" disabled={!!busy} onClick={() => void act(user, { action: user.disabled ? 'enable' : 'disable' })}>{busy === user.id ? <LoaderCircle className="animate-spin" /> : null}{user.disabled ? 'Reactivar' : 'Desactivar'}</Button>}
-                </div></td>
+                <td className="px-4 py-3"><Menu><MenuTrigger render={<Button size="icon-sm" variant="ghost" disabled={!!busy} aria-label={`Acciones para @${user.username}`} />}>{busy === user.id ? <LoaderCircle className="animate-spin" /> : <MoreHorizontal />}</MenuTrigger>
+                  <MenuContent>
+                    <MenuItem disabled={user.disabled} onClick={() => void act(user, { action: 'reset' })}><KeyRound />{user.has_password ? 'Enviar enlace de contraseña' : 'Reenviar invitación'}</MenuItem>
+                    {user.totp_enabled && !self && <MenuItem onClick={() => void act(user, { action: 'reset_totp' })}><ShieldOff />Quitar segundo factor</MenuItem>}
+                    {!self && <MenuItem onClick={() => void act(user, { action: user.disabled ? 'enable' : 'disable' })}>{user.disabled ? 'Reactivar cuenta' : 'Desactivar cuenta'}</MenuItem>}
+                  </MenuContent></Menu></td>
               </tr> })}</tbody></table>
         </div>}
         <p className="text-xs leading-5 text-app-subtle">Desactivar o quitar el TOTP cierra al momento las sesiones abiertas de esa persona. Siempre queda al menos un administrador activo.</p>

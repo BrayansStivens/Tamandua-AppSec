@@ -9,7 +9,6 @@ import { GitHubAppGuide, GitHubInstall, type GitHubStatus } from '@/components/g
 import { Pager } from '@/components/source-search'
 import { SkeletonCard, SkeletonList } from '@/components/loading'
 import { useSourcePage } from '@/lib/sources'
-import { ComingSoonCard } from '@/components/coming-soon'
 
 export type { Source, SourcePage } from '@/lib/sources'
 type Run = { created_at: string; source?: { id?: string; name: string } }
@@ -89,7 +88,9 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
           </div>}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">{pending.map(item => <ComingSoonCard key={item.id} title={item.name} icon={<GitBranch className="size-4" />} description={item.reason} />)}</div>
+        {/* Lo que aún no funciona no compite con lo que sí: una línea plegable en lugar de tres tarjetas. */}
+        <details className="rounded-xl border border-dashed border-app-line px-4 py-3 text-sm"><summary className="cursor-pointer text-app-muted">Próximamente: {pending.map(item => item.name).join(', ')}</summary>
+          <ul className="mt-2 space-y-1 text-xs leading-5 text-app-subtle">{pending.map(item => <li key={item.id}><strong className="font-medium text-app-secondary">{item.name}:</strong> {item.reason}</li>)}</ul></details>
       </CardContent>
     </Card>}
     {showRepositories && <p className="text-sm text-app-muted">{installations.length} {installations.length === 1 ? 'cuenta conectada' : 'cuentas conectadas'} · <a className="font-medium text-brand hover:underline" href="#/integraciones">Gestionar integración de GitHub</a></p>}

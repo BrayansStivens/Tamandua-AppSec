@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { ArrowDownToLine, ArrowRight, ChevronRight, ExternalLink, Flame, Search, ShieldCheck, Ticket, Wrench } from 'lucide-react'
+import { ArrowDownToLine, ArrowRight, ChevronDown, ChevronRight, ExternalLink, Flame, Search, ShieldCheck, SlidersHorizontal, Ticket, Wrench } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Menu, MenuContent, MenuGroup, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { Pagination } from '@/components/ui/pagination'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { JiraExportDialog, useJiraStatus, type TicketLink } from '@/components/jira'
@@ -24,6 +25,10 @@ const ACTION_ORDER: Record<string, number> = { act: 0, attend: 1, track: 2 }
 const severityLabel: Record<string, string> = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja', info: 'Info' }
 const actionLabel: Record<string, string> = { act: 'Actuar ya', attend: 'Atender', track: 'Seguimiento' }
 const scannerLabel: Record<string, string> = { sca: 'Dependencia', sast: 'Código', secrets: 'Secreto', iac: 'Infraestructura', cicd: 'CI/CD' }
+const RUN_EXPORTS: { label: string; items: [string, string][] }[] = [
+  { label: 'Evidencia para auditoría', items: [['SOC 2 Tipo II · PDF', 'report-soc2.pdf'], ['ISO/IEC 27001 · PDF', 'report-iso27001.pdf']] },
+  { label: 'Datos', items: [['Informe Markdown', 'report.md'], ['SARIF (code scanning)', 'findings.sarif'], ['JSON completo', 'run.json'], ['Tickets para Jira (JSON)', 'tickets.json']] },
+]
 const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', 'osv-scanner': 'OSV-Scanner', checkov: 'Checkov', zizmor: 'zizmor', 'appsec-agent': 'Reglas propias' }
 // Motor y, si otro lo confirmó, también ese: «Trivy + Grype».
 const toolsOf = (finding: { tool?: string; also_detected_by?: string[] }) => [finding.tool, ...(finding.also_detected_by ?? [])].filter(Boolean).map(tool => toolLabel[tool as string] ?? tool).join(' + ')
@@ -70,6 +75,9 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const [scanner, setScanner] = useState('all')
   const [open, setOpen] = useState<string | null>(null)
   const [triageView, setTriageView] = useState(initialView)
+  // Filtros secundarios plegados; se abren solos si alguno ya está en uso.
+  const hiddenActive = Number(triageView !== initialView) + Number(action !== 'all') + Number(scanner !== 'all')
+  const [moreFilters, setMoreFilters] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [decision, setDecision] = useState<{ status: TriageStatus; fingerprints: string[] } | null>(null)
   const [exporting, setExporting] = useState<string[] | null>(null)
@@ -133,11 +141,15 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
     <Card className="border-app-line bg-panel"><CardContent className="space-y-4 p-5">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative min-w-0 flex-1 lg:max-w-sm"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar hallazgos" placeholder="Paquete, CVE, archivo…" value={query} onChange={event => setQuery(event.target.value)} className="border-app-line bg-app-soft pl-9" /></div>
-        <Filter value={triageView} onChange={value => { setTriageView(value === 'all' ? 'all' : value); setOffset(0) }} all="Todos los estados" options={[['active', 'Pendientes'], ['open', 'Abiertos'], ['in_progress', 'En curso'], ['fixed', 'Remediados'], ['false_positive', 'Falsos positivos'], ['accepted', 'Riesgo aceptado']]} />
-        <Filter value={action} onChange={setAction} all="Toda prioridad" options={[['act', 'Actuar ya'], ['attend', 'Atender'], ['track', 'Seguimiento']]} />
-        <Filter value={severity} onChange={setSeverity} all="Toda severidad" options={[['critical', 'Crítica'], ['high', 'Alta'], ['medium', 'Media'], ['low', 'Baja']]} />
-        <Filter value={scanner} onChange={setScanner} all="Toda fuente" options={[['sca', 'Dependencias'], ['sast', 'Código'], ['iac', 'Infraestructura'], ['cicd', 'Pipelines CI/CD'], ['secrets', 'Secretos']]} />
+        <Filter label="Severidad" value={severity} onChange={setSeverity} all="Toda severidad" options={[['critical', 'Crítica'], ['high', 'Alta'], ['medium', 'Media'], ['low', 'Baja']]} />
+        {/* Ley de Hick: buscar y severidad a la vista; el resto, a demanda y con cuántos hay activos. */}
+        <Button type="button" size="sm" variant="outline" aria-expanded={moreFilters} aria-controls="more-filters" onClick={() => setMoreFilters(!moreFilters)} className="w-fit border-app-line bg-app-soft"><SlidersHorizontal />Más filtros{hiddenActive ? ` · ${hiddenActive}` : ''}</Button>
       </div>
+      {moreFilters && <div id="more-filters" className="flex flex-wrap gap-3">
+        <Filter label="Estado" value={triageView} onChange={value => { setTriageView(value === 'all' ? 'all' : value); setOffset(0) }} all="Todos los estados" options={[['active', 'Pendientes'], ['open', 'Abiertos'], ['in_progress', 'En curso'], ['fixed', 'Remediados'], ['false_positive', 'Falsos positivos'], ['accepted', 'Riesgo aceptado']]} />
+        <Filter label="Prioridad" value={action} onChange={setAction} all="Toda prioridad" options={[['act', 'Actuar ya'], ['attend', 'Atender'], ['track', 'Seguimiento']]} />
+        <Filter label="Fuente" value={scanner} onChange={setScanner} all="Toda fuente" options={[['sca', 'Dependencias'], ['sast', 'Código'], ['iac', 'Infraestructura'], ['cicd', 'Pipelines CI/CD'], ['secrets', 'Secretos']]} />
+      </div>}
       {selected.size > 0 && <div className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-panel px-4 py-2.5 shadow-lg">
         <span className="text-sm font-medium">{selected.size} {selected.size === 1 ? 'seleccionado' : 'seleccionados'}</span>
         <TriageActions canAccept={canAccept} onPick={status => setDecision({ status, fingerprints: [...selected] })} />
@@ -170,10 +182,10 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
         </div>}
     </CardContent></Card>
 
-    <div className="flex flex-wrap gap-2">{[
-      ['Informe PDF', 'report.pdf'], ['SOC 2 Tipo II · PDF', 'report-soc2.pdf'], ['ISO/IEC 27001 · PDF', 'report-iso27001.pdf'],
-      ['Markdown', 'report.md'], ['SARIF', 'findings.sarif'], ['JSON', 'run.json'], ['Tickets (Jira)', 'tickets.json'],
-    ].map(([label, artifact]) => <Button key={artifact} variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" onClick={() => void exportFile(artifact)}><ArrowDownToLine />{downloading === artifact ? 'Preparando…' : label}</Button>)}</div>
+    {/* Ley de Hick: el informe habitual a mano y los demás formatos agrupados en un menú. */}
+    <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" onClick={() => void exportFile('report.pdf')}><ArrowDownToLine />{downloading === 'report.pdf' ? 'Preparando…' : 'Informe PDF'}</Button>
+      <Menu><MenuTrigger render={<Button variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" />}>{downloading && downloading !== 'report.pdf' ? 'Preparando…' : 'Más formatos'}<ChevronDown className="size-3.5" /></MenuTrigger>
+        <MenuContent align="start">{RUN_EXPORTS.map(group => <MenuGroup key={group.label} label={group.label}>{group.items.map(([label, artifact]) => <MenuItem key={artifact} onClick={() => void exportFile(artifact)}>{label}</MenuItem>)}</MenuGroup>)}</MenuContent></Menu></div>
     {downloadError && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">No se pudo descargar el informe: {downloadError}</div>}
 
     <JiraExportDialog key={exporting?.join(',') ?? 'none'} runId={run.id} fingerprints={exporting} onClose={() => { setExporting(null); setSelected(new Set()) }} onDone={onChanged} />
@@ -219,6 +231,8 @@ function Tile({ label, value, tone, hint, icon: Icon }: { label: string; value: 
   const color = { rose: 'text-danger', amber: 'text-warning', orange: 'text-attention', teal: 'text-brand', muted: 'text-app-fg' }[tone]
   return <Card className="border-app-line bg-panel"><CardContent className="flex items-start justify-between p-4"><div><div className={`text-2xl font-semibold tabular-nums ${color}`}>{value}</div><div className="mt-0.5 text-xs text-app-muted">{label}</div>{hint && <div className="text-[11px] text-app-subtle">{hint}</div>}</div>{Icon && <Icon className="size-4 text-app-subtle" />}</CardContent></Card>
 }
-function Filter({ value, onChange, all, options }: { value: string; onChange: (value: string) => void; all: string; options: [string, string][] }) {
-  return <Select value={value} onValueChange={next => onChange(next ?? 'all')}><SelectTrigger size="sm" className="min-w-40 border-app-line bg-app-soft text-app-secondary">{value === 'all' ? all : options.find(([id]) => id === value)?.[1]}</SelectTrigger><SelectContent align="start" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="all">{all}</SelectItem>{options.map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}</SelectContent></Select>
+// El nombre accesible dice qué filtra y su valor («Severidad: Alta»), no solo el valor (1.3.1 / 2.5.3).
+function Filter({ label, value, onChange, all, options }: { label: string; value: string; onChange: (value: string) => void; all: string; options: [string, string][] }) {
+  const current = value === 'all' ? all : options.find(([id]) => id === value)?.[1] ?? all
+  return <Select value={value} onValueChange={next => onChange(next ?? 'all')}><SelectTrigger aria-label={`${label}: ${current}`} size="sm" className="min-w-40 border-app-line bg-app-soft text-app-secondary">{value === 'all' ? all : options.find(([id]) => id === value)?.[1]}</SelectTrigger><SelectContent align="start" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="all">{all}</SelectItem>{options.map(([id, label]) => <SelectItem key={id} value={id}>{label}</SelectItem>)}</SelectContent></Select>
 }
