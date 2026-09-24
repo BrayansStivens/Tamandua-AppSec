@@ -121,7 +121,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(state, ensure_ascii=False, indent=2))
             return 0 if state["configured"] else 3
         if args.command == "engines":
-            from .scanners import engine_status, pull_engines
+            from .scanners import engine_status, pull_engines, socket_problem
+            if socket_problem():
+                print(socket_problem())
             rows = pull_engines() if args.pull else engine_status()
             for row in rows:
                 print(f"{'listo' if row['ready'] else 'falta':6} {row['name']} {row['version']}  {row['image']}"

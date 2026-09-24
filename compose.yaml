@@ -47,8 +47,13 @@ services:
       # Secretos cifrados (GitHub App, claves de IA, Jira) y su clave maestra. Nunca en ./data.
       - ${APPSEC_CONFIG_DIR:-./config}:/config
       - /var/run/docker.sock:/var/run/docker.sock
+    # Acceso al socket de Docker para lanzar los motores. En Docker Desktop y OrbStack (macOS,
+    # Windows) el socket es del grupo 0; en Linux y en WSL con Docker nativo, del grupo `docker`,
+    # cuyo número varía: `make` lo detecta y lo pasa en DOCKER_SOCKET_GID. Si no hay otro grupo
+    # que añadir, la segunda entrada repite tu propio grupo (compose no admite dos iguales).
     group_add:
       - "0"
+      - "${DOCKER_SOCKET_GID:-${APPSEC_GID:-10001}}"
     # Endurecimiento: sistema de ficheros de solo lectura (solo se escribe en /data, /config y
     # temporales en memoria), sin capacidades de Linux y sin escalada de privilegios.
     read_only: true

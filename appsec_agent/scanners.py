@@ -170,15 +170,38 @@ def host_mount_problem() -> str | None:
 _last_image_error: dict[str, str] = {}
 
 
+DOCKER_SOCKET = Path("/var/run/docker.sock")
+
+
+def socket_problem() -> str | None:
+    """El caso típico en Linux y WSL: el socket es del grupo `docker`, no de root, y el contenedor no está en él."""
+    try:
+        if not DOCKER_SOCKET.exists() or os.access(DOCKER_SOCKET, os.R_OK | os.W_OK):
+            return None
+        gid = DOCKER_SOCKET.stat().st_gid
+    except OSError:
+        return None
+    return (f"Sin permiso sobre el socket de Docker (grupo {gid}): los motores no pueden arrancar. "
+            f"Reinicia con `make up`, que detecta ese grupo, o añade DOCKER_SOCKET_GID={gid} a .env y reinicia.")
+
+
 def docker_available() -> bool:
     if "ok" not in _docker_state:
         binary = shutil.which("docker")
         try:
-            _docker_state["ok"] = bool(binary) and subprocess.run(
-                [binary, "info", "--format", "{{.ServerVersion}}"], capture_output=True, text=True, timeout=8).returncode == 0
+            completed = subprocess.run([binary, "info", "--format", "{{.ServerVersion}}"], capture_output=True, text=True,
+                                       timeout=8) if binary else None
         except (OSError, subprocess.TimeoutExpired):
-            _docker_state["ok"] = False
+            completed = None
+        # Sin permiso sobre el socket, `docker info` puede salir con 0 y sin versión de servidor: eso no es Docker disponible.
+        _docker_state["ok"] = bool(completed) and completed.returncode == 0 and bool(completed.stdout.strip())
+        _docker_state["why"] = socket_problem() or cause(completed) if not _docker_state["ok"] else ""
     return _docker_state["ok"]
+
+
+def docker_problem() -> str:
+    """Por qué Docker no está disponible, en una frase; vacío si lo está."""
+    return "" if docker_available() else (_docker_state.get("why") or "Docker no responde.")
 
 
 def image_available(key: str) -> bool:
@@ -207,10 +230,11 @@ def pull_engines() -> list[dict]:
             results.append({**row, "action": "ninguna" if row["ready"] else "construir con make build" if row["built_locally"] else "docker no disponible"})
             continue
         try:
-            done = subprocess.run([binary, "pull", "--quiet", row["image"]], capture_output=True, text=True, timeout=900).returncode == 0
+            completed = subprocess.run([binary, "pull", "--quiet", row["image"]], capture_output=True, text=True, timeout=900)
         except (OSError, subprocess.TimeoutExpired):
-            done = False
-        results.append({**row, "ready": done, "action": "descargada" if done else "falló la descarga"})
+            completed = None
+        done = bool(completed) and completed.returncode == 0
+        results.append({**row, "ready": done, "action": "descargada" if done else with_cause("falló la descarga", completed)})
     return results
 
 
@@ -350,7 +374,7 @@ def minified_files(snapshot: Path, limit: int = 200) -> list[str]:
 def run_opengrep(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():
-        return _result("opengrep", "not_tested", "Docker no disponible: el SAST multi-lenguaje no se ejecutó.")
+        return _result("opengrep", "not_tested", f"Docker no disponible: el SAST multi-lenguaje no se ejecutó. {docker_problem()}".strip())
     if not image_available("opengrep"):
         reason = _last_image_error.get("opengrep", "")
         # «No such image» es que falta construirla; cualquier otra cosa es un problema con Docker.

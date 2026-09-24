@@ -17,7 +17,7 @@ from .advisories import MAX_DETAILS, dependency_finding, fetch_advisory, load_fe
 from .coverage import owasp_coverage
 from .engine import WEB_TOP_10_2025
 from .config_scanners import merge_repository, run_checkov, run_zizmor
-from .scanners import IMAGES, docker_available, host_mount_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from .scanners import IMAGES, docker_available, host_mount_problem, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
 
 
 SECRET_RULES = (
@@ -174,6 +174,10 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     engines = docker_available()
     feeds = load_feeds(data_dir or Path("data")) if (engines or allow_osv_upload) else {"kev": {}, "epss": {}}
     tools: list[dict] = []
+    misconfigured = None if engines else socket_problem()
+    if misconfigured:
+        # Docker está, pero este contenedor no puede usarlo: no es un análisis sin motores a propósito.
+        report("warn", misconfigured)
     if engines:
         # Cada motor corre en su contenedor pinneado por digest; el paso guarda versión, imagen y duración.
         mount_problem = host_mount_problem()
@@ -324,7 +328,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                   for action in ("act", "attend", "track")}
     truncated = bool(snapshot.get("truncated"))
     return {"type": "repository_scan",
-            "status": "incomplete" if sca_status == "inconclusive" or truncated or any(
+            "status": "incomplete" if sca_status == "inconclusive" or truncated or misconfigured or any(
                 tool["tool"] in ("opengrep", "gitleaks", "trivy") and tool["status"] == "inconclusive" for tool in tools) else "completed",
             "source": source, "fixture": source["name"], "variant": "code", "context": declared,
             "steps": steps, "findings": findings,

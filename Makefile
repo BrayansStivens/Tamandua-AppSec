@@ -11,6 +11,17 @@ URL := $(if $(PUBLIC_URL),$(PUBLIC_URL),http://127.0.0.1:$(HOST_PORT))
 PYTHON ?= python3
 VENV := .venv
 export APPSEC_VERSION := $(VERSION)
+# Grupo del socket de Docker en Linux y WSL con Docker nativo (en macOS, Docker Desktop usa el 0).
+# Un valor en el entorno o en .env manda sobre la detección.
+DOCKER_SOCKET_GID ?= $(shell sed -n 's/^DOCKER_SOCKET_GID=//p' .env 2>/dev/null | tail -n1)
+ifeq ($(strip $(DOCKER_SOCKET_GID)),)
+DOCKER_SOCKET_GID := $(shell [ "$$(uname -s)" = Linux ] && stat -Lc %g /var/run/docker.sock 2>/dev/null)
+endif
+# El 0 ya va siempre en compose; repetirlo es un error.
+ifeq ($(strip $(DOCKER_SOCKET_GID)),0)
+DOCKER_SOCKET_GID :=
+endif
+export DOCKER_SOCKET_GID
 
 .DEFAULT_GOAL := help
 .PHONY: help doctor setup build up down restart status logs ps setup-code engines update backup shell cli \

@@ -349,3 +349,34 @@ class EngineCauseTests(unittest.TestCase):
                 patch.object(scanners, "in_container", return_value=True):
             self.assertIsNone(scanners.host_mount_problem())
         scanners._own_mounts.update(at=None, mounts={})
+
+
+class DockerAccessTests(unittest.TestCase):
+    """Linux y WSL con Docker nativo: el socket es del grupo `docker` y el contenedor puede no estar en él."""
+
+    def tearDown(self):
+        from appsec_agent import scanners
+        scanners._docker_state.clear()
+
+    def test_a_socket_without_permission_is_explained_with_its_group(self):
+        from appsec_agent import scanners
+        with tempfile.TemporaryDirectory() as temporary:
+            socket = Path(temporary) / "docker.sock"
+            socket.write_text("")
+            with patch.object(scanners, "DOCKER_SOCKET", socket), patch.object(scanners.os, "access", return_value=False):
+                message = scanners.socket_problem()
+            self.assertIn(f"grupo {socket.stat().st_gid}", message)
+            self.assertIn("DOCKER_SOCKET_GID", message)
+            with patch.object(scanners, "DOCKER_SOCKET", socket), patch.object(scanners.os, "access", return_value=True):
+                self.assertIsNone(scanners.socket_problem())
+
+    def test_docker_info_without_server_version_is_not_available(self):
+        import subprocess
+        from appsec_agent import scanners
+        scanners._docker_state.clear()
+        answer = subprocess.CompletedProcess([], 0, "\n", "permission denied while trying to connect to the Docker daemon socket")
+        with patch.object(scanners.shutil, "which", return_value="/usr/bin/docker"), \
+                patch.object(scanners.subprocess, "run", return_value=answer), \
+                patch.object(scanners, "socket_problem", return_value=None):
+            self.assertFalse(scanners.docker_available())
+            self.assertIn("permission denied", scanners.docker_problem())
