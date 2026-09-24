@@ -9,7 +9,7 @@ export function SoonBadge({ className = '' }: { className?: string }) {
 }
 
 export function ComingSoonCard({ title, icon, description, plan, children }: { title: string; icon?: ReactNode; description: string; plan?: string[]; children?: ReactNode }) {
-  return <div className="rounded-xl border border-dashed border-app-line bg-inset/40 p-5 text-app-subtle" aria-disabled>
+  return <div className="rounded-xl border border-dashed border-app-line bg-inset/40 p-5 text-app-subtle">
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-center gap-3 opacity-70">{icon}<h3 className="font-semibold text-app-muted">{title}</h3></div>
       <SoonBadge />

@@ -98,6 +98,6 @@ function LinkDialog({ result, onClose }: { result: LinkResult | null; onClose: (
   return <Dialog open onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-w-lg">
     <DialogHeader><DialogTitle>Enlace para @{result.user.username}</DialogTitle><DialogDescription>Sirve una sola vez y caduca en {result.expires_in_hours} horas. No se volverá a mostrar: si se pierde, genera otro (el anterior deja de valer).</DialogDescription></DialogHeader>
     <code className="block rounded-lg bg-inset p-3 font-mono text-xs break-all text-app-secondary">{result.link}</code>
-    <DialogFooter><Button variant="outline" onClick={() => void copy()} className="border-app-line bg-app-soft">{copied ? <Check /> : <Copy />}{copied ? 'Copiado' : 'Copiar enlace'}</Button><Button onClick={onClose} className="bg-primary text-primary-foreground hover:bg-primary/90">Hecho</Button></DialogFooter>
+    <DialogFooter><Button variant="outline" onClick={() => void copy()} className="border-app-line bg-app-soft">{copied ? <Check /> : <Copy />}{copied ? 'Copiado' : 'Copiar enlace'}</Button><span role="status" className="sr-only">{copied ? 'Copiado al portapapeles' : ''}</span><Button onClick={onClose} className="bg-primary text-primary-foreground hover:bg-primary/90">Hecho</Button></DialogFooter>
   </DialogContent></Dialog>
 }

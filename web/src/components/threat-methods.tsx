@@ -123,7 +123,7 @@ export function PastaStages({ model, setModel, threats, catalog, onGo }: { model
   }
   return <div className="space-y-2">{catalog.methods.pasta_stages.map(stage => { const expanded = open === stage.key
     return <div key={stage.key} className="rounded-xl border border-app-line bg-panel">
-      <button onClick={() => setOpen(expanded ? '' : stage.key)} className="flex w-full items-center gap-2 px-4 py-3 text-left"><ChevronRight className={`size-4 text-app-subtle transition ${expanded ? 'rotate-90' : ''}`} /><span className="flex-1 text-sm font-medium">{stage.title}</span>{notes[stage.key] && <Badge variant="outline" className="border-brand/30 text-[11px] text-brand">con notas</Badge>}</button>
+      <button type="button" aria-expanded={expanded} onClick={() => setOpen(expanded ? '' : stage.key)} className="flex w-full items-center gap-2 px-4 py-3 text-left"><ChevronRight className={`size-4 text-app-subtle transition ${expanded ? 'rotate-90' : ''}`} /><span className="flex-1 text-sm font-medium">{stage.title}</span>{notes[stage.key] && <Badge variant="outline" className="border-brand/30 text-[11px] text-brand">con notas</Badge>}</button>
       {expanded && <div className="space-y-3 border-t border-app-line px-4 py-4">
         <p className="text-xs leading-5 text-app-subtle">{STAGE_HINTS[stage.key]}</p>
         {auto[stage.key]}

@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Check, CircleCheck, Copy, ExternalLink, FileKey2, LoaderCircle, RefreshCw, ShieldCheck, TriangleAlert, Upload } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { BRAND } from '@/lib/brand'
@@ -23,7 +23,8 @@ function CopyValue({ value }: { value: string }) {
   return <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-app-line bg-app-soft py-0.5 pr-0.5 pl-2 align-middle">
     <code className="truncate font-mono text-[11px]">{value}</code>
     <button type="button" aria-label={`Copiar ${value}`} onClick={() => { void navigator.clipboard.writeText(value).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1200) }) }}
-      className="rounded p-1 text-app-subtle hover:bg-accent hover:text-app-fg">{copied ? <Check className="size-3" /> : <Copy className="size-3" />}</button>
+      className="grid size-6 place-items-center rounded text-app-subtle hover:bg-accent hover:text-app-fg">{copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}</button>
+    <span role="status" className="sr-only">{copied ? 'Copiado al portapapeles' : ''}</span>
   </span>
 }
 
@@ -71,7 +72,7 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
       <Step number={1} title="Abre el formulario de nueva GitHub App">
         <p>En tu cuenta personal o en una organización que administres (escribe su nombre):</p>
         <div className="flex flex-wrap items-center gap-2"><Input aria-label="Organización (opcional)" value={org} onChange={event => setOrg(event.target.value.replace(/[^A-Za-z0-9-]/g, ''))} maxLength={39} placeholder="organización (opcional)" className="h-8 w-48 border-app-line bg-app-soft text-xs" />
-          <a href={createUrl} target="_blank" rel="noopener noreferrer"><Button type="button" size="sm" variant="outline" className="border-app-line bg-app-soft">Abrir en GitHub <ExternalLink /></Button></a></div>
+          <a href={createUrl} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: 'sm', variant: 'outline', className: 'border-app-line bg-app-soft' })}>Abrir en GitHub <ExternalLink /><span className="sr-only">(se abre en otra pestaña)</span></a></div>
       </Step>
       <Step number={2} title="Nombre y página de inicio">
         <p><strong className="font-medium text-app-secondary">GitHub App name:</strong> el que quieras, p. ej. <CopyValue value={`${BRAND.name} de mi equipo`} /> (debe ser único en GitHub; añade tu equipo si ya existe).</p>
@@ -150,7 +151,8 @@ export function GitHubInstall({ status, canManage, onChanged }: { status: GitHub
     </ol>
     {error && <div role="alert" className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">{error}</div>}
     <div className="flex flex-wrap gap-2">
-      <a href={`https://github.com/apps/${status.slug}/installations/new`} target="_blank" rel="noopener noreferrer"><Button disabled={!canManage} className="bg-primary text-primary-foreground hover:bg-primary/90">Instalar en GitHub <ExternalLink /></Button></a>
+      {canManage ? <a href={`https://github.com/apps/${status.slug}/installations/new`} target="_blank" rel="noopener noreferrer" className={buttonVariants({ className: 'bg-primary text-primary-foreground hover:bg-primary/90' })}>Instalar en GitHub <ExternalLink /><span className="sr-only">(se abre en otra pestaña)</span></a>
+        : <Button disabled className="bg-primary text-primary-foreground">Instalar en GitHub <ExternalLink /></Button>}
       <Button variant="outline" disabled={!canManage || busy} onClick={() => void detect()} className="border-app-line bg-app-soft">{busy ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}Buscar instalaciones</Button>
     </div>
     {available.length > 0 && <div className="space-y-2 rounded-lg border border-app-line bg-app-soft p-3">

@@ -111,6 +111,7 @@ export function VerifyDomainDialog({ domain, onOpenChange, onVerified }: { domai
     <div className="space-y-4 rounded-xl border border-app-line bg-inset p-4">
       <p className="text-sm text-app-muted">Añade este registro <strong className="font-medium text-app-secondary">TXT</strong> en tu proveedor DNS:</p>
       {([['Nombre del registro', domain.txt_name], ['Valor del registro', domain.txt_value]] as const).map(([label, value]) => <div key={label} className="space-y-1.5"><span className="text-xs text-app-subtle">{label}</span><div className="flex items-center gap-2 rounded-lg border border-app-line bg-app-soft px-3 py-2"><code className="min-w-0 flex-1 break-all font-mono text-xs text-app-secondary">{value}</code><Button type="button" aria-label={`Copiar ${label.toLowerCase()}`} variant="ghost" size="icon-sm" onClick={() => void copy(value)}>{copied === value ? <Check /> : <Copy />}</Button></div></div>)}
+      <span role="status" className="sr-only">{copied ? 'Copiado al portapapeles' : ''}</span>
       <p className="text-xs text-app-subtle">La propagación puede tardar entre 2 y 10 minutos.</p>
     </div>
     <p className="text-xs text-app-subtle">Verificar la propiedad no lanza ninguna prueba: habilita el dominio como objetivo elegible.</p>

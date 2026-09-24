@@ -3,9 +3,9 @@ import { BRAND } from '@/lib/brand'
 
 // Tamandúa (oso hormiguero de collar, nativo de Colombia) atrapando un bug con la lengua.
 // Los identificadores del degradado van por instancia: hay varias marcas en la misma página.
-export function BrandMark({ size = 40, className }: { size?: number; className?: string }) {
+export function BrandMark({ size = 40, className, decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
   const id = useId().replace(/:/g, '')
-  return <svg width={size} height={size} viewBox="0 0 64 64" role="img" aria-label={`Marca de ${BRAND.name}`} className={className}>
+  return <svg width={size} height={size} viewBox="0 0 64 64" {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': `Marca de ${BRAND.name}` })} className={className}>
     <defs>
       <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#8B5CF6" /><stop offset="1" stopColor="#5B21B6" /></linearGradient>
       <clipPath id={`${id}-clip`}><rect width="64" height="64" rx="16" /></clipPath>
@@ -35,7 +35,7 @@ export function BrandMark({ size = 40, className }: { size?: number; className?:
 // Marca con nombre: barra lateral, acceso y pantalla de carga.
 export function BrandLockup({ subtitle, size = 40 }: { subtitle?: string; size?: number }) {
   return <div className="flex items-center gap-3">
-    <BrandMark size={size} />
+    <BrandMark size={size} decorative />
     <div className="min-w-0"><div className="text-lg leading-5 font-semibold tracking-tight text-app-fg">{BRAND.name}</div>{subtitle && <div className="text-xs text-app-subtle">{subtitle}</div>}</div>
   </div>
 }

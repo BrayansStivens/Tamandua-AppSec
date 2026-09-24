@@ -33,7 +33,8 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 // Encabezado real (1.3.1): con h1 en la página, las tarjetas son h2; una tarjeta dentro de otra pasa level={3}.
-function CardTitle({ className, level = 2, ...props }: React.ComponentProps<"h2"> & { level?: 2 | 3 | 4 }) {
+// En pantallas sin h1 propio (acceso, configuración), la tarjeta principal es level={1}.
+function CardTitle({ className, level = 2, ...props }: React.ComponentProps<"h2"> & { level?: 1 | 2 | 3 | 4 }) {
   const Heading = `h${level}` as "h2"
   return (
     <Heading

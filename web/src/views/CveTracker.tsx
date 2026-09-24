@@ -159,7 +159,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
 }
 
 function Chip({ label, onClear }: { label: string; onClear: () => void }) {
-  return <span className="inline-flex items-center gap-1 rounded-full border border-app-line bg-app-soft py-0.5 pr-1 pl-2.5">{label}<button type="button" aria-label={`Quitar ${label}`} onClick={onClear} className="rounded-full p-0.5 text-app-subtle hover:bg-accent hover:text-app-fg"><X className="size-3" /></button></span>
+  return <span className="inline-flex items-center gap-1 rounded-full border border-app-line bg-app-soft py-0.5 pr-1 pl-2.5">{label}<button type="button" aria-label={`Quitar ${label}`} onClick={onClear} className="grid size-6 place-items-center rounded-full text-app-subtle hover:bg-accent hover:text-app-fg"><X className="size-3.5" /></button></span>
 }
 
 function SyncBanner({ overview }: { overview: CveOverview }) {
@@ -168,7 +168,7 @@ function SyncBanner({ overview }: { overview: CveOverview }) {
     <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2">{sync.error ? <ShieldAlert className="size-4 text-warning" /> : <LoaderCircle className="size-4 animate-spin text-app-muted" />}
       {sync.phase === 'pending' ? 'Preparando la copia local de NVD…' : `Descargando NVD: ${Math.round(sync.progress * 100)} %`}</span>
       <span className="text-xs text-app-subtle">{overview.count.toLocaleString('es-CO')}{sync.nvd_total ? ` de ${sync.nvd_total.toLocaleString('es-CO')}` : ''} CVE · lo más reciente primero</span></div>
-    <div className="mt-2 h-1 overflow-hidden rounded-full bg-app-soft"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(2, sync.progress * 100)}%` }} /></div>
+    <div role="progressbar" aria-label="Sincronización con NVD" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(sync.progress * 100)} className="mt-2 h-1 overflow-hidden rounded-full bg-app-soft"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(2, sync.progress * 100)}%` }} /></div>
     <p className="mt-2 text-xs text-app-subtle">{sync.error ? 'NVD no responde ahora; se reintenta solo.' : 'Ya puedes buscar en lo cargado. NVD limita la descarga sin API key; con APPSEC_AGENT_NVD_API_KEY va unas 8 veces más rápido.'}</p>
   </div>
 }

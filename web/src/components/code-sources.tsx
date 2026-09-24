@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { ExternalLink, GitBranch, LockKeyhole, RefreshCw, Search, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { GitHubAppGuide, GitHubInstall, type GitHubStatus } from '@/components/github-setup'
@@ -72,7 +72,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
                   <Field label="Conectó" value={installation.connected_by ?? 'sin identificar'} />
                   <Field label="Instalación" value={`#${installation.installation_id}`} />
                 </div>
-                <div className="flex flex-wrap gap-2"><a href={manageUrl} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="outline" className="border-app-line bg-panel">Cambiar repositorios <ExternalLink /></Button></a>
+                <div className="flex flex-wrap gap-2"><a href={manageUrl} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: 'sm', variant: 'outline', className: 'border-app-line bg-panel' })}>Cambiar repositorios <ExternalLink /><span className="sr-only">(se abre en otra pestaña)</span></a>
                   {canManage && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void act('disconnect', installation.installation_id)}>Desconectar cuenta</Button>}</div>
               </div>
             })}</div>
@@ -102,9 +102,9 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3"><div className="relative w-full max-w-sm"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar repositorios" placeholder="Buscar repositorios…" value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }} className="border-app-line bg-app-soft pl-9" /></div>
           {data && <span className="text-xs text-app-muted">{data.total} {data.total === 1 ? 'repositorio' : 'repositorios'}{data.partial ? ' · resultados parciales, se completan solos' : ''}</span>}</div>
-        {accounts.length > 1 && <div aria-label="Filtrar por organización" className="flex flex-wrap gap-2">
-          <Button size="sm" variant={accountFilter === '' ? 'default' : 'outline'} onClick={() => { setAccountFilter(''); setPage(1) }}>Todas</Button>
-          {accounts.map(account => <Button key={account} size="sm" variant={accountFilter === account ? 'default' : 'outline'} onClick={() => { setAccountFilter(account); setPage(1) }}>{account}</Button>)}
+        {accounts.length > 1 && <div role="group" aria-label="Filtrar por organización" className="flex flex-wrap gap-2">
+          <Button size="sm" aria-pressed={accountFilter === ''} variant={accountFilter === '' ? 'default' : 'outline'} onClick={() => { setAccountFilter(''); setPage(1) }}>Todas</Button>
+          {accounts.map(account => <Button key={account} size="sm" aria-pressed={accountFilter === account} variant={accountFilter === account ? 'default' : 'outline'} onClick={() => { setAccountFilter(account); setPage(1) }}>{account}</Button>)}
         </div>}
         <div className="overflow-hidden rounded-xl border border-app-line">
           <div className="hidden grid-cols-[minmax(0,1fr)_120px_130px_130px] gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid"><span>Repositorio</span><span>Origen</span><span>Último análisis</span><span>Acción</span></div>

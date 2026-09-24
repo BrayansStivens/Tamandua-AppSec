@@ -82,7 +82,7 @@ function LinkView({ token, onDone, onCancel }: { token: string; onDone: () => vo
     }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
-  return <Shell narrow><Card className="border-app-line bg-panel"><CardHeader><CardTitle className="flex items-center gap-2"><UserPlus className="size-4" />{info?.purpose === 'reset' ? 'Nueva contraseña' : 'Te damos la bienvenida'}</CardTitle>
+  return <Shell narrow><Card className="border-app-line bg-panel"><CardHeader><CardTitle level={1} className="flex items-center gap-2"><UserPlus className="size-4" />{info?.purpose === 'reset' ? 'Nueva contraseña' : 'Te damos la bienvenida'}</CardTitle>
     <CardDescription>{info ? <>Cuenta <strong>@{info.username}</strong>. Elige una contraseña de al menos 12 caracteres; una frase larga es lo mejor.</> : error ? 'No se pudo abrir el enlace.' : 'Comprobando el enlace…'}</CardDescription></CardHeader>
     <CardContent>{info && challenge ? <form className="space-y-4" onSubmit={submit}>
       <p className="text-sm text-app-muted">Contraseña guardada. Tu cuenta tiene segundo factor: escribe el código de tu app o un código de respaldo.</p>
@@ -129,7 +129,7 @@ function LoginView({ setupRequired, notice, onDone }: { setupRequired: boolean; 
     <div className="w-full max-w-sm space-y-6">
       <BrandLockup subtitle="Acceso al workspace" />
       {setupRequired ? <SetupCard onDone={onDone} />
-      : <Card className="border-app-line bg-panel"><CardHeader><CardTitle className="flex items-center gap-2">{challenge ? <><ShieldCheck className="size-4" />Segundo factor</> : <><LockKeyhole className="size-4" />Iniciar sesión</>}</CardTitle><CardDescription>{challenge ? 'Escribe el código de 6 dígitos de tu app de autenticación, o uno de tus códigos de respaldo.' : 'Usa las credenciales que te dio el administrador.'}</CardDescription></CardHeader>
+      : <Card className="border-app-line bg-panel"><CardHeader><CardTitle level={1} className="flex items-center gap-2">{challenge ? <><ShieldCheck className="size-4" />Segundo factor</> : <><LockKeyhole className="size-4" />Iniciar sesión</>}</CardTitle><CardDescription>{challenge ? 'Escribe el código de 6 dígitos de tu app de autenticación, o uno de tus códigos de respaldo.' : 'Usa las credenciales que te dio el administrador.'}</CardDescription></CardHeader>
         <CardContent><form className="space-y-4" onSubmit={submit}>
           {notice && !error && <div role="status" className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">{notice}</div>}
           {challenge ? <div className="space-y-1.5"><label htmlFor="login-code" className="text-xs text-app-muted">Código</label><Input id="login-code" autoFocus required autoComplete="one-time-code" inputMode="numeric" maxLength={11} value={code} onChange={event => setCode(event.target.value)} placeholder="123456" className="border-app-line bg-app-soft font-mono tracking-widest" /></div>
@@ -163,7 +163,7 @@ function SetupCard({ onDone }: { onDone: () => void }) {
       onDone()
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
-  return <Card className="border-app-line bg-panel"><CardHeader><CardTitle className="flex items-center gap-2"><TerminalSquare className="size-4" />Configura tu workspace</CardTitle>
+  return <Card className="border-app-line bg-panel"><CardHeader><CardTitle level={1} className="flex items-center gap-2"><TerminalSquare className="size-4" />Configura tu workspace</CardTitle>
     <CardDescription className="leading-6">Crea la cuenta de administrador. Para demostrar que controlas este servidor, escribe el código que aparece en su consola.</CardDescription></CardHeader>
     <CardContent><form className="space-y-4" onSubmit={submit}>
       <div className="space-y-1.5"><label htmlFor="setup-code" className="text-xs text-app-muted">Código de configuración</label>
