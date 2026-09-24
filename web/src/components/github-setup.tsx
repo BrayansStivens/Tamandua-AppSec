@@ -171,7 +171,7 @@ export function GitHubInstall({ status, canManage, onChanged }: { status: GitHub
 
 export function PermissionWarning({ review }: { review: PermissionReview }) {
   if (review.excess.length) return <div role="alert" className="flex gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs leading-5 text-rose-800 dark:text-rose-200"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-    <span><strong>La App pide más permisos de los necesarios:</strong> {review.excess.map(name => `${name}: ${review.declared[name]}`).join(' · ')}. Quítalos en la configuración de la App en GitHub: si la clave se filtrara, ese permiso extra afectaría a todos tus repositorios instalados.</span></div>
+    <div><strong>La App pide {review.excess.length} permisos adicionales.</strong> Revisa los permisos de la GitHub App; los repositorios instalados siguen teniendo el alcance que elegiste.<details className="mt-1"><summary className="cursor-pointer font-medium">Ver permisos</summary><p className="mt-1 break-words">{review.excess.map(name => `${name}: ${review.declared[name]}`).join(' · ')}</p></details></div></div>
   return <div className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-900 dark:text-amber-100"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
     <span>Faltan permisos: {review.missing.join(', ')}{review.pending_acceptance.length ? ' (hay una actualización de permisos pendiente de aceptar en la instalación)' : ''}. Sin ellos no se revisan pull requests.</span></div>
 }

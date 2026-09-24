@@ -14,11 +14,10 @@ from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
 from ..dashboard import compute as compute_dashboard
 from ..integrations import github_installations
-from ..repository_sources import available_sources
+from ..repository_sources import find_source
 from ..scanners import docker_available
 from ..scan_plan import plan as scan_plan
 from ..github_app import GitHubAppError
-from ..repository_sources import SourceError
 from ..pdf_reports import render_pdf
 from ..store import _run_dir, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
 from ..store import render_repository_sarif, render_tickets
@@ -262,16 +261,11 @@ def repository_plan(request: Request):
     source_id = request.arg("source_id")
     with request.state.code_lock:
         tokens = request.state.code_tokens.copy()
-    installations = github_installations(request.data_dir)
-    try:
-        listing = available_sources(tokens, installations)
-    except (SourceError, GitHubAppError) as exc:
-        return request.json(502, {"error": str(exc)})
-    source = next((item for item in listing["sources"] if item["id"] == source_id), None)
+    source = find_source(tokens, github_installations(request.data_dir), source_id)
     if source is None:
         return request.json(400, {"error": "Repositorio no disponible para la credencial configurada"})
     try:
-        return request.json(200, scan_plan(source_id, installation_id=source.get("installation_id")))
+        return request.json(200, scan_plan(source["id"], installation_id=source.get("installation_id")))
     except GitHubAppError as exc:
         return request.json(502, {"error": str(exc)})
 
@@ -289,11 +283,9 @@ def repository_scan(request: Request):
         return request.json(400, {"error": "Repositorio inválido"})
     with state.code_lock:
         tokens = state.code_tokens.copy()
-    installations = github_installations(request.data_dir)
     # Se valida que el repositorio exista para esta credencial antes de encolar nada.
-    listing = available_sources(tokens, installations)
-    source = next((item for item in listing["sources"] if item["id"] == payload["source_id"]), None)
-    if source is None:
+    source = find_source(tokens, github_installations(request.data_dir), payload["source_id"])
+    if source is None or source["id"] != payload["source_id"]:
         return request.json(400, {"error": "Repositorio no disponible para la credencial configurada"})
     if state.jobs.pending() >= 20:
         return request.json(429, {"error": "Demasiados escaneos en cola"})

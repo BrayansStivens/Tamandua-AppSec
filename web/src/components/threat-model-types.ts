@@ -18,7 +18,8 @@ export type MethodsCatalog = { methodologies: Record<string, string>; linddun: R
 export type Evidence = { asset: string; run_id: string; fingerprint: string; title: string; severity: string; location: string }
 export type Threat = { id: string; rule: string; stride: string; category: string; title: string; why: string; mitigations: string[]; cwe: number[]; element: string; element_name: string; severity: string; status: 'evidenced' | 'open' | 'mitigated' | 'accepted' | 'not_applicable'; decision?: { status: string; reason: string; by: string; at: string } | null; evidence: Evidence[]; evidence_count: number; framework?: 'stride' | 'linddun' | 'manual'; manual_id?: string; likelihood?: Level | null; impact?: Level | null; owner?: string; evidence_scope?: { asset: string; path: string | null }[] }
 export type Summary = { total: number; by_status: Record<string, number>; by_stride: Record<string, number>; by_severity: Record<string, number> }
-export type View = { model: Model; threats: Threat[]; summary: Summary }
+// `assets`: los repositorios que el modelo referencia, con su nombre, resueltos en el servidor.
+export type View = { model: Model; threats: Threat[]; summary: Summary; assets?: Asset[] }
 export type Asset = { id: string; name: string; kind: 'repository' | 'domain'; last_run?: string | null; scanned_at?: string }
 export type Catalog = { models: { id: string; name: string; description?: string; updated_at?: string; updated_by?: string; components: number; flows: number; methodology?: string; repositories?: number }[]; assets: Asset[]; kinds: Record<Kind, string>; protocols: string[]; classifications: Record<string, string>; methods: MethodsCatalog }
 

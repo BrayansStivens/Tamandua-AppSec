@@ -16,6 +16,7 @@ from appsec_agent.auth import Users
 from appsec_agent.github_app import GitHubAppError, PULLS_FORBIDDEN
 from appsec_agent.store import load_run, save_repository_scan, render_profile_report
 from appsec_agent.pdf_reports import render_pdf
+from fake_github import fake_github
 from test_auth import PASSWORD, HttpCase
 
 SHA = "c" * 40
@@ -286,21 +287,28 @@ class RouteTests(HttpCase):
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
             cookie = cookies[0].split("; ")[0]
             with patch("appsec_agent.api.routes_prs.github_installations", return_value=[7]), \
-                    patch("appsec_agent.api.routes_prs.installation_repositories", return_value=[{"id": "github:org/api", "uid": "github#1", "name": "org/api"}]), \
+                    fake_github({7: [(1, "org/api"), (2, "org/web")]}, {7: ("org", "selected")}), \
                     patch("appsec_agent.api.routes_prs.open_pull_requests", side_effect=GitHubAppError(PULLS_FORBIDDEN)):
                 status, body, _ = self.call("GET", "/api/pull-requests?source_id=github:org/api", headers={"Cookie": cookie})
                 self.assertEqual((status, body["pulls"], body["settings"]["gate"]), (200, [], "high"))
                 self.assertIn("Pull requests", body["pulls_error"])
                 # Varios repositorios a la vez, y la vista general los refleja.
-                with patch("appsec_agent.api.routes_prs.installation_repositories", return_value=[{"id": "github:org/api", "uid": "github#1", "name": "org/api"}, {"id": "github:org/web", "uid": "github#2", "name": "org/web"}]):
-                    status, body, _ = self.post("/api/pull-requests/settings", "pr-settings", {"source_ids": ["github:org/api", "github:org/web"], "enabled": True}, cookie)
-                    self.assertEqual((status, body["updated"]), (200, 2))
-                    _, overview, _ = self.call("GET", "/api/pull-requests/watch", headers={"Cookie": cookie})
-                    self.assertEqual((overview["enabled"], {row["name"]: row["enabled"] for row in overview["repositories"]}), (2, {"org/api": True, "org/web": True}))
-                    status, _, _ = self.post("/api/pull-requests/settings", "pr-settings", {"source_ids": ["github:org/api", "github:otra/x"], "enabled": False}, cookie)
-                    self.assertEqual(status, 400)
+                status, body, _ = self.post("/api/pull-requests/settings", "pr-settings", {"source_ids": ["github:org/api", "github:org/web"], "enabled": True}, cookie)
+                self.assertEqual((status, body["updated"]), (200, 2))
+                _, overview, _ = self.call("GET", "/api/pull-requests/watch", headers={"Cookie": cookie})
+                self.assertEqual((overview["enabled"], {row["name"]: row["enabled"] for row in overview["repositories"]}), (2, {"org/api": True, "org/web": True}))
+                _, active, _ = self.call("GET", "/api/pull-requests/watch?only=enabled&q=web", headers={"Cookie": cookie})
+                self.assertEqual(([row["name"] for row in active["repositories"]], active["total"]), (["org/web"], 1))
+                status, _, _ = self.post("/api/pull-requests/settings", "pr-settings", {"source_ids": ["github:org/api", "github:otra/x"], "enabled": False}, cookie)
+                self.assertEqual(status, 400)
+                # Desactivar todos no necesita recorrer el catálogo.
+                status, body, _ = self.post("/api/pull-requests/settings", "pr-settings", {"all": True, "enabled": False}, cookie)
+                self.assertEqual((status, body["updated"]), (200, 2))
+                self.assertEqual(self.call("GET", "/api/pull-requests/watch", headers={"Cookie": cookie})[1]["enabled"], 0)
                 # Un repositorio fuera de la instalación no se acepta.
                 status, _, _ = self.call("GET", "/api/pull-requests?source_id=github:otra/cosa", headers={"Cookie": cookie})
+                self.assertEqual(status, 400)
+                status, _, _ = self.call("GET", "/api/pull-requests?source_id=github:org/fantasma", headers={"Cookie": cookie})
                 self.assertEqual(status, 400)
 
 if __name__ == "__main__":

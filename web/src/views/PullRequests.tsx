@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { ExternalLink, GitPullRequest, LoaderCircle, Play, RefreshCw, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import type { SessionUser } from '@/components/auth/session'
-import type { SourceList } from '@/components/code-sources'
+import { Pager } from '@/components/source-search'
+import { fetchSource, type SourcePage } from '@/lib/sources'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
-import { api } from '@/lib/api'
+import { api, query as toQuery } from '@/lib/api'
 import { readRoute, setRouteParam } from '@/lib/route'
 import { formatDate } from '@/lib/types'
 
@@ -30,8 +31,10 @@ function reviewBadge(pull: Pull) {
 }
 
 export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun: (id: string) => void }) {
-  const [sources, setSources] = useState<SourceList['sources']>([])
-  const [sourceId, setSourceId] = useState<string | null>(null)
+  // Solo el repositorio elegido: el enlace directo lo trae por id y, si no, se toma el primero de GitHub.
+  const [selected, setSelected] = useState<{ id: string; name: string } | null>(null)
+  const [connected, setConnected] = useState<boolean | null>(null)
+  const sourceId = selected?.id ?? null
   const [listing, setListing] = useState<Listing | null>(null)
   const [permissions, setPermissions] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState('')
@@ -40,7 +43,13 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
   const admin = user.role === 'admin'
 
   useEffect(() => {
-    api.get<SourceList>('/api/sources').then(data => { const github = data.sources.filter(item => item.provider === 'github'); setSources(github); const wanted = readRoute().params.get('repo'); setSourceId(current => current ?? (github.some(item => item.id === wanted) ? wanted : github[0]?.id ?? null)) }).catch(caught => setError(caught instanceof Error ? caught.message : String(caught)))
+    const fail = (caught: unknown) => setError(caught instanceof Error ? caught.message : String(caught))
+    const wanted = readRoute().params.get('repo')
+    api.get<SourcePage>(`/api/sources?${toQuery({ provider: 'github', per_page: 1 })}`).then(async data => {
+      setConnected(data.providers.github?.configured && data.total > 0)
+      const chosen = (wanted ? await fetchSource(wanted) : null) ?? data.sources[0] ?? null
+      setSelected(current => current ?? chosen)
+    }).catch(fail)
     api.get<{ installation: Installation | null }>('/api/integrations/github').then(data => setPermissions(data.installation?.permissions ?? {})).catch(() => {})
   }, [])
   const load = useCallback(async () => {
@@ -70,11 +79,11 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
   const canWrite = permissions.pull_requests === 'write' && permissions.statuses === 'write'
   const settings = listing?.settings
 
-  if (!sources.length) return <Card className="border-app-line bg-panel"><CardContent className="flex flex-col items-center gap-2 py-14 text-center"><GitPullRequest className="size-7 text-app-subtle" /><p className="font-medium">Conecta GitHub para revisar pull requests</p><p className="max-w-md text-sm text-app-muted">La revisión usa la GitHub App instalada: elige los repositorios en Integraciones.</p></CardContent></Card>
+  if (connected === null) return error ? <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div> : <LoaderCircle className="size-5 animate-spin text-app-muted" />
+  if (!connected) return <Card className="border-app-line bg-panel"><CardContent className="flex flex-col items-center gap-2 py-14 text-center"><GitPullRequest className="size-7 text-app-subtle" /><p className="font-medium">Conecta GitHub para revisar pull requests</p><p className="max-w-md text-sm text-app-muted">La revisión usa la GitHub App instalada: elige los repositorios en Integraciones.</p></CardContent></Card>
 
-  const selected = sources.find(item => item.id === sourceId)
   return <div className="grid gap-5 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-    <WatchPanel key={version} admin={admin} onChanged={() => void load()} onSelect={setSourceId} selected={sourceId} />
+    <WatchPanel key={version} admin={admin} onChanged={() => void load()} onSelect={setSelected} selected={sourceId} />
     <div className="min-w-0 space-y-5">
     <Card className="border-app-line bg-panel"><CardHeader className="gap-3">
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="truncate">{selected?.name ?? 'Elige un repositorio'}</CardTitle><CardDescription className="mt-1 leading-6">Cada commit nuevo de un PR se escanea y se compara con la rama principal: solo cuenta lo que el PR introduce. Sus hallazgos entran en el estado del repositorio y se remedian solos cuando un commit posterior los quita o el PR se cierra sin merge.</CardDescription></div>
@@ -107,40 +116,57 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
 
 type WatchRow = { id: string; name: string; private?: boolean; enabled: boolean; post_comment: boolean; gate: Settings['gate']; reviewed: number; updated_by?: string }
 
-// Vigilancia de PRs por repositorio: interruptor individual y acciones sobre varios a la vez.
-function WatchPanel({ admin, onChanged, onSelect, selected }: { admin: boolean; onChanged: () => void; onSelect: (id: string) => void; selected: string | null }) {
-  const [rows, setRows] = useState<WatchRow[] | null>(null)
-  const [interval, setIntervalSeconds] = useState(300)
+type WatchPage = { repositories: WatchRow[]; interval: number; total: number; enabled: number; partial?: boolean }
+const WATCH_PAGE = 25
+
+// Vigilancia de PRs por repositorio, paginada en el servidor: interruptor individual y acciones en bloque.
+function WatchPanel({ admin, onChanged, onSelect, selected }: { admin: boolean; onChanged: () => void; onSelect: (row: { id: string; name: string }) => void; selected: string | null }) {
+  const [data, setData] = useState<WatchPage | null>(null)
   const [filter, setFilter] = useState('')
+  const [onlyEnabled, setOnlyEnabled] = useState(false)
+  const [page, setPage] = useState(1)
+  const [nonce, setNonce] = useState(0)
+  const [loading, setLoading] = useState(false)
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const load = useCallback(() => api.get<{ repositories: WatchRow[]; interval: number }>('/api/pull-requests/watch')
-    .then(data => { setRows(data.repositories); setIntervalSeconds(data.interval) }).catch(caught => setError(caught instanceof Error ? caught.message : String(caught))), [])
-  useEffect(() => { void load() }, [load])
-  const apply = async (ids: string[], enabled: boolean) => {
-    if (!ids.length || busy) return
+  useEffect(() => {
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      setLoading(true)
+      api.get<WatchPage>(`/api/pull-requests/watch?${toQuery({ q: filter.trim() || undefined, only: onlyEnabled ? 'enabled' : undefined, page, per_page: WATCH_PAGE })}`, { signal: controller.signal })
+        .then(result => { setData(result); setError('') })
+        .catch(caught => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : String(caught)) })
+        .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    }, filter ? 300 : 0)
+    return () => { controller.abort(); window.clearTimeout(timer) }
+  }, [filter, onlyEnabled, page, nonce])
+  useEffect(() => { if (!data?.partial) return; const timer = window.setTimeout(() => setNonce(value => value + 1), 2000); return () => window.clearTimeout(timer) }, [data])
+  const apply = async (body: { source_ids: string[] } | { all: true }, enabled: boolean) => {
+    if (busy) return
     setBusy(true); setError('')
-    try { await api.post('/api/pull-requests/settings', 'pr-settings', { source_ids: ids, enabled }); setPicked(new Set()); await load(); onChanged() }
+    try { await api.post('/api/pull-requests/settings', 'pr-settings', { ...body, enabled }); setPicked(new Set()); setNonce(value => value + 1); onChanged() }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
-  if (!rows) return error ? null : <Card className="border-app-line bg-panel"><CardContent className="p-5"><LoaderCircle className="size-5 animate-spin text-app-muted" /></CardContent></Card>
-  const visible = rows.filter(row => row.name.toLowerCase().includes(filter.trim().toLowerCase()))
-  const active = rows.filter(row => row.enabled).length
-  const allPicked = visible.length > 0 && visible.every(row => picked.has(row.id))
-  return <Card className="border-app-line bg-panel"><CardHeader className="gap-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Repositorios vigilados · {active} de {rows.length}</CardTitle><CardDescription className="mt-1">Los activados revisan solos cada PR nuevo o cada push, cada {Math.round(interval / 60)} min. {admin ? 'Actívalos uno a uno o en bloque.' : 'Solo un administrador cambia qué se vigila.'}</CardDescription></div>
-    {admin && <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy || active === rows.length} onClick={() => void apply(rows.map(row => row.id), true)}>Activar todos</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy || active === 0} onClick={() => void apply(rows.map(row => row.id), false)}>Desactivar todos</Button></div>}</div>
-    <div className="flex flex-wrap items-center gap-2"><div className="relative"><Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar repositorio" value={filter} onChange={event => setFilter(event.target.value)} placeholder="Buscar…" className="h-8 w-56 border-app-line bg-app-soft pl-8 text-xs" /></div>
-      {admin && picked.size > 0 && <><span className="text-xs text-app-muted">{picked.size} seleccionados</span><Button size="sm" disabled={busy} onClick={() => void apply([...picked], true)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy && <LoaderCircle className="animate-spin" />}Activar</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy} onClick={() => void apply([...picked], false)}>Desactivar</Button><Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>Quitar selección</Button></>}</div>
+  const enableAll = () => { if (data && window.confirm(`¿Vigilar todos los repositorios de la GitHub App? Cada push de cualquiera de ellos lanzará una revisión.`)) void apply({ all: true }, true) }
+  if (!data) return error ? <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div> : <Card className="border-app-line bg-panel"><CardContent className="p-5"><LoaderCircle className="size-5 animate-spin text-app-muted" /></CardContent></Card>
+  const rows = data.repositories
+  const allPicked = rows.length > 0 && rows.every(row => picked.has(row.id))
+  return <Card className="border-app-line bg-panel"><CardHeader className="gap-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Repositorios vigilados · {data.enabled}</CardTitle><CardDescription className="mt-1">Los activados revisan solos cada PR nuevo o cada push, cada {Math.round(data.interval / 60)} min. {admin ? 'Actívalos uno a uno o en bloque.' : 'Solo un administrador cambia qué se vigila.'}</CardDescription></div>
+    {admin && <div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy} onClick={enableAll}>Activar todos</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy || data.enabled === 0} onClick={() => void apply({ all: true }, false)}>Desactivar todos</Button></div>}</div>
+    <div className="flex flex-wrap items-center gap-2"><div className="relative"><Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar repositorio" value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }} placeholder="Buscar…" className="h-8 w-56 border-app-line bg-app-soft pl-8 text-xs" /></div>
+      <label className="flex items-center gap-2 text-xs text-app-muted"><input type="checkbox" className="size-4 accent-brand" checked={onlyEnabled} onChange={event => { setOnlyEnabled(event.target.checked); setPage(1) }} />Solo vigilados</label>
+      {admin && picked.size > 0 && <><span className="text-xs text-app-muted">{picked.size} seleccionados</span><Button size="sm" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, true)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy && <LoaderCircle className="animate-spin" />}Activar</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, false)}>Desactivar</Button><Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>Quitar selección</Button></>}</div>
     {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
-  </CardHeader><CardContent className="p-0"><div className="max-h-80 overflow-y-auto border-t border-app-line">
-    {admin && <label className="flex items-center gap-3 border-b border-app-line px-5 py-2 text-xs text-app-subtle"><input type="checkbox" className="size-4 accent-brand" checked={allPicked} onChange={event => setPicked(event.target.checked ? new Set(visible.map(row => row.id)) : new Set())} />Seleccionar {filter ? 'los filtrados' : 'todos'}</label>}
-    {visible.map(row => <div key={row.id} className={`flex items-center gap-3 border-b border-app-line px-5 py-2.5 last:border-b-0 ${selected === row.id ? 'bg-brand/5' : ''}`}>
+    {data.partial && <p role="status" className="text-xs text-app-muted">Resultados parciales: la lista de esta cuenta se está leyendo de GitHub.</p>}
+  </CardHeader><CardContent className="space-y-3 p-0 pb-4"><div className="max-h-96 overflow-y-auto border-t border-app-line">
+    {admin && rows.length > 0 && <label className="flex items-center gap-3 border-b border-app-line px-5 py-2 text-xs text-app-subtle"><input type="checkbox" className="size-4 accent-brand" checked={allPicked} onChange={event => setPicked(previous => { const next = new Set(previous); for (const row of rows) { if (event.target.checked) next.add(row.id); else next.delete(row.id) } return next })} />Seleccionar esta página</label>}
+    {rows.map(row => <div key={row.id} className={`flex items-center gap-3 border-b border-app-line px-5 py-2.5 last:border-b-0 ${selected === row.id ? 'bg-brand/5' : ''}`}>
       {admin && <input type="checkbox" aria-label={`Seleccionar ${row.name}`} className="size-4 accent-brand" checked={picked.has(row.id)} onChange={event => setPicked(previous => { const next = new Set(previous); if (event.target.checked) next.add(row.id); else next.delete(row.id); return next })} />}
-      <button onClick={() => onSelect(row.id)} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-medium hover:underline">{row.name}</span><span className="block text-xs text-app-subtle">{row.enabled ? `${row.post_comment ? 'comenta en GitHub' : 'solo en el panel'} · bloquea desde ${gateLabel[row.gate].toLowerCase()}` : 'sin vigilancia'}{row.reviewed ? ` · ${row.reviewed} PR revisados` : ''}</span></button>
+      <button onClick={() => onSelect(row)} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-medium hover:underline">{row.name}</span><span className="block text-xs text-app-subtle">{row.enabled ? `${row.post_comment ? 'comenta en GitHub' : 'solo en el panel'} · bloquea desde ${gateLabel[row.gate].toLowerCase()}` : 'sin vigilancia'}{row.reviewed ? ` · ${row.reviewed} PR revisados` : ''}</span></button>
       <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs text-app-muted"><span>{row.enabled ? 'Activa' : 'Inactiva'}</span>
-        <span className="relative inline-flex"><input type="checkbox" role="switch" aria-label={`Vigilar ${row.name}`} className="peer sr-only" checked={row.enabled} disabled={!admin || busy} onChange={event => void apply([row.id], event.target.checked)} /><span className="h-5 w-9 rounded-full bg-app-line transition peer-checked:bg-brand peer-disabled:opacity-50" /><span className="absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow transition peer-checked:translate-x-4" /></span></label>
+        <span className="relative inline-flex"><input type="checkbox" role="switch" aria-label={`Vigilar ${row.name}`} className="peer sr-only" checked={row.enabled} disabled={!admin || busy} onChange={event => void apply({ source_ids: [row.id] }, event.target.checked)} /><span className="h-5 w-9 rounded-full bg-app-line transition peer-checked:bg-brand peer-disabled:opacity-50" /><span className="absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow transition peer-checked:translate-x-4" /></span></label>
     </div>)}
-    {!visible.length && <p className="px-5 py-6 text-center text-sm text-app-subtle">Ningún repositorio coincide.</p>}
-  </div></CardContent></Card>
+    {!rows.length && !loading && <p className="px-5 py-6 text-center text-sm text-app-subtle">{onlyEnabled ? 'Ningún repositorio vigilado coincide.' : 'Ningún repositorio coincide.'}</p>}
+  </div><div className="px-5"><Pager page={page} perPage={WATCH_PAGE} total={data.total} onPage={setPage} loading={loading} /></div></CardContent></Card>
 }

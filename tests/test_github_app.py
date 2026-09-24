@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -176,6 +177,94 @@ class GitHubAppTests(unittest.TestCase):
             rows = github_app.app_installations()
         self.assertEqual((len(rows), rows[-1]["account"]), (101, "extra"))
         self.assertIn("page=2", fetch.call_args_list[-1].args[0])
+
+    def test_large_installation_loads_in_background_once_and_reports_progress(self):
+        gate = threading.Event()
+        calls = []
+
+        def fetch(url, _token):
+            page = int(url.rsplit("page=", 1)[1])
+            calls.append(page)
+            if page == 1:
+                gate.wait(2)
+            start = (page - 1) * 100
+            return {"total_count": 901, "repositories": [
+                {"id": index + 1, "full_name": f"org/repo-{index}", "private": True}
+                for index in range(start, min(start + 100, 901))]}
+
+        try:
+            with patch("appsec_agent.github_app.installation_token", return_value="token"), \
+                    patch("appsec_agent.github_app._get", side_effect=fetch):
+                started = time.monotonic()
+                first = github_app.installation_repositories_snapshot(12345)
+                second = github_app.installation_repositories_snapshot(12345)
+                self.assertLess(time.monotonic() - started, 0.5)
+                self.assertTrue(first[1] and second[1])
+                gate.set()
+                deadline = time.monotonic() + 3
+                while time.monotonic() < deadline:
+                    rows, loading, total, error = github_app.installation_repositories_snapshot(12345)
+                    if not loading:
+                        break
+                    time.sleep(0.01)
+                self.assertFalse(loading)
+                self.assertIsNone(error)
+                self.assertEqual((len(rows), total), (901, 901))
+                self.assertEqual(sorted(calls), list(range(1, 11)))
+        finally:
+            gate.set()
+            github_app.forget(12345)
+
+
+class CatalogPagingTests(unittest.TestCase):
+    """Una organización con 901 repositorios no debe recorrerse entera para enseñar 25."""
+    BIG = {7: [(index + 1, f"acme/repo-{index:03d}") for index in range(901)], 8: [(5000, "beta/web"), (5001, "beta/api")]}
+    ACCOUNTS = {7: ("acme", "all"), 8: ("beta", "selected")}
+
+    def test_a_page_costs_one_request_and_the_total_comes_from_github(self):
+        from fake_github import fake_github
+        from appsec_agent.repository_sources import source_page
+        with fake_github(self.BIG, self.ACCOUNTS) as calls:
+            listing = source_page(None, [7], page=3)
+            listed = [url for url in calls if "/installation/repositories" in url]
+        self.assertEqual((listing["total"], len(listing["sources"]), listing["sources"][0]["name"]), (901, 25, "acme/repo-050"))
+        self.assertEqual(len(listed), 2)  # la primera página da el total; la tercera, las filas
+        self.assertTrue(all("per_page=25" in url for url in listed))
+
+    def test_pages_continue_across_organizations_and_filter_by_account(self):
+        from fake_github import fake_github
+        from appsec_agent.repository_sources import source_page
+        with fake_github(self.BIG, self.ACCOUNTS):
+            last = source_page(None, [7, 8], page=37)
+            only_beta = source_page(None, [7, 8], account="beta")
+        self.assertEqual((last["total"], [row["name"] for row in last["sources"]]), (903, ["acme/repo-900", "beta/web", "beta/api"]))
+        self.assertEqual([row["installation_id"] for row in last["sources"]], [7, 8, 8])
+        self.assertEqual((only_beta["total"], only_beta["accounts"]), (2, ["acme", "beta"]))
+
+    def test_search_uses_github_when_the_whole_account_is_granted(self):
+        from fake_github import fake_github
+        from appsec_agent.repository_sources import source_page
+        with fake_github(self.BIG, self.ACCOUNTS) as calls:
+            found = source_page(None, [7], query="repo-12 org:otra")
+        self.assertIn("/search/repositories", calls[-1])
+        # El texto no puede añadir calificadores: `org:otra` se queda en palabras sueltas.
+        self.assertIn("org%3Aacme", calls[-1])
+        self.assertNotIn("org%3Aotra", calls[-1])
+        self.assertFalse(found["partial"])
+
+    def test_one_repository_is_validated_without_listing_the_catalog(self):
+        from fake_github import fake_github
+        from appsec_agent.repository_sources import find_source
+        with fake_github(self.BIG, self.ACCOUNTS) as calls:
+            found = find_source(None, [7, 8], "github:acme/repo-700")
+            by_uid = find_source(None, [7, 8], "github#5001")
+            foreign = find_source(None, [7, 8], "github:otra/repo-700")
+            missing = find_source(None, [7, 8], "github:acme/no-existe")
+        self.assertEqual((found["installation_id"], found["uid"]), (7, "github#701"))
+        self.assertEqual((by_uid["name"], by_uid["installation_id"]), ("beta/api", 8))
+        self.assertIsNone(foreign)
+        self.assertIsNone(missing)
+        self.assertFalse([url for url in calls if "/installation/repositories" in url])
 
 
 if __name__ == "__main__":

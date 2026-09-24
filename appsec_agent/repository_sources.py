@@ -168,15 +168,24 @@ def list_repositories(provider: str, token: str | None = None) -> list[dict]:
     return result
 
 
+def _include_workspace(include_workspace: bool | None) -> bool:
+    if include_workspace is None:
+        return os.environ.get("APPSEC_AGENT_SHOW_WORKSPACE", "").strip() == "1"
+    return include_workspace
+
+
+WORKSPACE_SOURCE = {"id": "local:appsec-agent", "name": "appsec-agent · código propio", "provider": "local",
+                    "private": True, "branch": "workspace"}
+
+
 def available_sources(tokens: dict[str, str] | None = None, installation_id: int | list[int] | None = None, *,
                       include_workspace: bool | None = None) -> dict:
-    """Repositorios analizables. El código de la propia herramienta solo aparece en la CLI (desarrollo y
-    dogfooding) o si se pide con APPSEC_AGENT_SHOW_WORKSPACE=1: a un usuario del panel no le sirve."""
+    """Todos los repositorios analizables (CLI). El panel usa `source_page`, que no lista organizaciones enteras.
+
+    El código de la propia herramienta solo aparece en la CLI (desarrollo y dogfooding) o si se pide
+    con APPSEC_AGENT_SHOW_WORKSPACE=1: a un usuario del panel no le sirve."""
     tokens = tokens or {}
-    if include_workspace is None:
-        include_workspace = os.environ.get("APPSEC_AGENT_SHOW_WORKSPACE", "").strip() == "1"
-    sources = ([{"id": "local:appsec-agent", "name": "appsec-agent · código propio", "provider": "local",
-                 "private": True, "branch": "workspace"}] if include_workspace else [])
+    sources = [dict(WORKSPACE_SOURCE)] if _include_workspace(include_workspace) else []
     statuses = {}
     installations = [installation_id] if isinstance(installation_id, int) else installation_id or []
     if installations:
@@ -207,6 +216,129 @@ def available_sources(tokens: dict[str, str] | None = None, installation_id: int
             except SourceError:
                 statuses[provider]["error"] = "No se pudo listar repositorios; revisa el token y sus permisos"
     return {"sources": sources, "providers": statuses}
+
+
+def _paged(first: list[dict], fetch, per_page: int, decorate):
+    """Filas [offset, offset+limit) de un origen paginado por GitHub: como mucho dos páginas."""
+    def rows(offset: int, limit: int) -> list[dict]:
+        result = []
+        for number in range(offset // per_page + 1, (offset + limit - 1) // per_page + 2):
+            chunk = first if number == 1 else fetch(number)
+            base = (number - 1) * per_page
+            result.extend(chunk[max(0, offset - base):offset + limit - base])
+        return decorate(result)
+    return rows
+
+
+def source_page(tokens: dict[str, str] | None = None, installations: list[int] | None = None, *, query: str = "",
+                account: str | None = None, provider: str | None = None, page: int = 1, per_page: int = 25,
+                include_workspace: bool | None = None) -> dict:
+    """Una página de repositorios analizables, con el total y búsqueda por nombre.
+
+    A GitHub solo se le pide la página visible (o su búsqueda): con miles de repositorios la
+    respuesta tarda lo mismo que con diez. Las cuentas de la App van en orden y se concatenan.
+    """
+    tokens = tokens or {}
+    needle = query.strip().casefold()
+    segments: list[tuple[int, object]] = []
+    statuses: dict[str, dict] = {}
+    accounts: list[str] = []
+    errors: list[str] = []
+    partial = False
+
+    def local(rows: list[dict]) -> None:
+        rows = [row for row in rows if not needle or needle in row["name"].casefold()]
+        segments.append((len(rows), lambda offset, limit: rows[offset:offset + limit]))
+
+    if _include_workspace(include_workspace) and provider in (None, "local") and not account:
+        local([dict(WORKSPACE_SOURCE)])
+    if installations:
+        from .github_app import GitHubAppError, installation_info, repositories_page, search_repositories
+        statuses["github"] = {"configured": True, "origin": "github_app"}
+        for current in installations:
+            try:
+                owner = installation_info(current).get("account")
+                if isinstance(owner, str):
+                    accounts.append(owner)
+                if provider not in (None, "github") or (account and account != owner):
+                    continue
+
+                def decorate(rows: list[dict], current=current) -> list[dict]:
+                    return [{**row, "installation_id": current, "account": row["name"].split("/", 1)[0]} for row in rows]
+
+                if needle:
+                    first, total, loading = search_repositories(current, query, 1, per_page)
+                    partial = partial or loading
+                    fetch = lambda number, current=current: search_repositories(current, query, number, per_page)[0]
+                else:
+                    first, total = repositories_page(current, 1, per_page)
+                    fetch = lambda number, current=current: repositories_page(current, number, per_page)[0]
+                segments.append((total, _paged(first, fetch, per_page, decorate)))
+            except GitHubAppError as exc:
+                errors.append(f"Instalación {current}: {exc}")
+    for name, env in (("github", "GITHUB_TOKEN"), ("gitlab", "GITLAB_TOKEN")):
+        if name in statuses:
+            continue
+        origin = "session" if tokens.get(name) else "environment" if os.environ.get(env) else None
+        statuses[name] = {"configured": bool(origin), "origin": origin}
+        if origin and provider in (None, name) and not account:
+            try:
+                local(list_repositories(name, tokens.get(name)))
+            except SourceError:
+                statuses[name]["error"] = "No se pudo listar repositorios; revisa el token y sus permisos"
+    # Solo se piden a cada origen las filas que caen en la página pedida.
+    total = sum(count for count, _ in segments)
+    offset, remaining, sources = (page - 1) * per_page, per_page, []
+    for count, rows in segments:
+        if remaining <= 0:
+            break
+        if offset >= count:
+            offset -= count
+            continue
+        take = min(remaining, count - offset)
+        try:
+            sources.extend(rows(offset, take))
+        except Exception as exc:  # GitHubAppError: una página que falla no tumba el resto
+            errors.append(str(exc))
+        remaining -= take
+        offset = 0
+    if errors:
+        statuses.setdefault("github", {"configured": True, "origin": "github_app"})["error"] = " · ".join(errors)
+    return {"sources": sources, "providers": statuses, "total": total, "page": page, "per_page": per_page,
+            "partial": partial, "accounts": sorted(set(accounts), key=str.casefold)}
+
+
+def find_source(tokens: dict[str, str] | None, installations: list[int] | None, source_id: str, *,
+                include_workspace: bool | None = None) -> dict | None:
+    """Un repositorio concreto, validado contra su credencial sin listar el catálogo entero.
+
+    Acepta el identificador por nombre (`github:owner/repo`) o la identidad estable (`github#123`)."""
+    if not isinstance(source_id, str):
+        return None
+    if source_id == WORKSPACE_SOURCE["id"]:
+        return dict(WORKSPACE_SOURCE) if _include_workspace(include_workspace) else None
+    if installations and (source_id.startswith("github:") or source_id.startswith("github#")):
+        from .github_app import GitHubAppError, installation_info, installation_repository, installation_repository_by_uid
+        owner = source_id.removeprefix("github:").split("/", 1)[0].casefold() if source_id.startswith("github:") else None
+        for current in installations:
+            try:
+                account = installation_info(current).get("account")
+                if owner and isinstance(account, str) and account.casefold() != owner:
+                    continue
+                entry = (installation_repository(current, source_id) if owner is not None
+                         else installation_repository_by_uid(current, source_id))
+            except GitHubAppError:
+                continue
+            if entry:
+                return {**entry, "installation_id": current, "account": entry["name"].split("/", 1)[0]}
+        return None
+    provider = source_id.partition(":")[0]
+    if provider not in ("github", "gitlab"):
+        return None
+    try:
+        return next((item for item in list_repositories(provider, (tokens or {}).get(provider)) if item["id"] == source_id), None)
+    except SourceError:
+        return None
 
 
 def _safe_name(name: str) -> Path | None:
@@ -338,16 +470,16 @@ def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | 
         raise SourceError("Repositorio inválido")
     provider = source_id.partition(":")[0]
     if provider == "github" and installation_id is not None:
-        from .github_app import GitHubAppError, installation_repositories, installation_token
+        from .github_app import GitHubAppError, installation_repository, installation_token
         try:
-            entries = installation_repositories(installation_id)
+            selected = installation_repository(installation_id, source_id)
             token = installation_token(installation_id)
         except GitHubAppError as exc:
             raise SourceError(str(exc)) from exc
     else:
         token = (tokens or {}).get(provider) or os.environ.get("GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN")
         entries = list_repositories(provider, token)
-    selected = next((entry for entry in entries if entry["id"] == source_id), None)
+        selected = next((entry for entry in entries if entry["id"] == source_id), None)
     if selected is None:
         raise SourceError("Repositorio no disponible para la credencial configurada")
     if not token:

@@ -5,10 +5,12 @@ from __future__ import annotations
 import re
 
 from .. import pr_watch
-from ..github_app import GitHubAppError, installation_repositories, open_pull_requests, pull_request
+from ..github_app import GitHubAppError, installation_repositories, installation_repository, open_pull_requests, pull_request
+from ..repository_sources import source_page
 from ..integrations import github_installations
 from ..store import list_runs
 from .core import Request, route
+from .routes_sources import paging
 
 
 def _repository(request: Request, source_id) -> tuple[int, str, str] | None:
@@ -17,7 +19,7 @@ def _repository(request: Request, source_id) -> tuple[int, str, str] | None:
         return None
     for installation in github_installations(request.data_dir):
         try:
-            entry = next((item for item in installation_repositories(installation) if item["id"] == source_id), None)
+            entry = installation_repository(installation, source_id)
         except GitHubAppError:
             continue
         if entry:
@@ -50,52 +52,84 @@ def pulls(request: Request):
     return request.json(200, {"settings": settings, "pulls": rows})
 
 
-def _installed(request: Request) -> list[dict] | None:
-    installations = github_installations(request.data_dir)
-    if not installations:
-        return None
-    repositories = []
-    for installation in installations:
-        try:
-            repositories.extend({**item, "installation_id": installation} for item in installation_repositories(installation))
-        except GitHubAppError:
-            continue
-    return repositories
+def _row(item: dict, state: dict) -> dict:
+    return {"id": item["id"], "uid": item["uid"], "name": item["name"], "private": item.get("private"),
+            **pr_watch.DEFAULTS, **state["repositories"].get(item["uid"], {}), "reviewed": len(state["reviewed"].get(item["uid"], {}))}
 
 
 @route("GET", "/api/pull-requests/watch")
 def watch_overview(request: Request):
-    """Todos los repositorios de la instalación con su configuración de vigilancia."""
-    target = _installed(request)
-    if target is None:
+    """Una página de repositorios de la instalación con su vigilancia (`q`, `page`, `per_page`, `only=enabled`)."""
+    installations = github_installations(request.data_dir)
+    if not installations:
         return request.json(400, {"error": "Conecta la GitHub App para vigilar pull requests"})
-    pr_watch.migrate(request.data_dir, target)
-    reviewed = pr_watch.load(request.data_dir)["reviewed"]
-    rows = [{"id": item["id"], "uid": item["uid"], "name": item["name"], "private": item.get("private"),
-             **pr_watch.settings(request.data_dir, item["uid"]), "reviewed": len(reviewed.get(item["uid"], {}))}
-            for item in target]
-    return request.json(200, {"repositories": rows, "interval": pr_watch.interval(),
-                              "enabled": sum(1 for row in rows if row["enabled"])})
+    paged = paging(request)
+    query, only = request.arg("q", ""), request.arg("only")
+    if paged is None or len(query) > 100 or only not in (None, "enabled"):
+        return request.json(400, {"error": "Parámetros de búsqueda inválidos"})
+    page, per_page = paged
+    state = pr_watch.load(request.data_dir)
+    enabled = sorted(key for key, value in state["repositories"].items() if value.get("enabled"))
+    partial = False
+    if only == "enabled":
+        # Los vigilados salen de la configuración guardada. Sus nombres se toman de la lista completa
+        # (en caché y la que mantiene fresca el vigilante): resolverlos uno a uno costaría una o dos
+        # llamadas a GitHub por repositorio y un miembro podría agotar el límite de la instalación.
+        wanted, items = set(enabled), []
+        for installation in installations if wanted else []:
+            try:
+                items.extend({**row, "installation_id": installation} for row in installation_repositories(installation) if row["uid"] in wanted)
+            except GitHubAppError:
+                continue
+        items = [item for item in items if query.strip().casefold() in item["name"].casefold()]
+        total, items = len(items), items[(page - 1) * per_page:page * per_page]
+    else:
+        listing = source_page(None, installations, query=query, provider="github", page=page, per_page=per_page)
+        items, total, partial = listing["sources"], listing["total"], listing["partial"]
+        pr_watch.migrate(request.data_dir, items)
+        state = pr_watch.load(request.data_dir)
+    return request.json(200, {"repositories": [_row(item, state) for item in items], "total": total, "page": page,
+                              "per_page": per_page, "partial": partial, "interval": pr_watch.interval(), "enabled": len(enabled)})
 
 
 @route("POST", "/api/pull-requests/settings", admin=True, action="pr-settings", body=16_000)
 def pr_settings(request: Request):
-    """Configura uno o varios repositorios a la vez (`source_id` o `source_ids`)."""
+    """Configura uno o varios repositorios (`source_id` o `source_ids`), o todos (`all`)."""
     payload = request.payload
-    fields = {"source_id", "source_ids", "enabled", "post_comment", "gate"}
-    if (not isinstance(payload, dict) or not set(payload) <= fields or ("source_id" in payload) == ("source_ids" in payload)
-            or any(key in payload and not isinstance(payload[key], bool) for key in ("enabled", "post_comment"))):
+    fields = {"source_id", "source_ids", "all", "enabled", "post_comment", "gate"}
+    if (not isinstance(payload, dict) or not set(payload) <= fields
+            or sum(key in payload for key in ("source_id", "source_ids", "all")) != 1
+            or any(key in payload and not isinstance(payload[key], bool) for key in ("all", "enabled", "post_comment"))):
         return request.json(400, {"error": "Configuración inválida"})
+    options = {"enabled": payload.get("enabled"), "post_comment": payload.get("post_comment"), "gate": payload.get("gate"),
+               "by": request.user["username"]}
+    if "all" in payload:
+        if payload["all"] is not True or set(payload) - {"all", "enabled"} or not isinstance(payload.get("enabled"), bool):
+            return request.json(400, {"error": "Configuración inválida"})
+        if payload["enabled"]:
+            # Activar todos sí necesita la lista completa; es una acción puntual de administración.
+            keys = []
+            for installation in github_installations(request.data_dir):
+                try:
+                    keys.extend(item["uid"] for item in installation_repositories(installation))
+                except GitHubAppError as exc:
+                    return request.json(502, {"error": str(exc)})
+        else:
+            keys = [key for key, value in pr_watch.load(request.data_dir)["repositories"].items() if value.get("enabled")]
+        results = pr_watch.configure_many(request.data_dir, keys, **options) if keys else []
+        return request.json(200, {"updated": len(results)})
     chosen = [payload["source_id"]] if "source_id" in payload else payload["source_ids"]
     if not isinstance(chosen, list) or not 1 <= len(chosen) <= 200 or not all(isinstance(item, str) for item in chosen):
         return request.json(400, {"error": "Indica entre 1 y 200 repositorios"})
-    target = _installed(request)
-    uid_of = {item["id"]: item["uid"] for item in target} if target else {}
-    if not set(chosen) <= set(uid_of):
-        return request.json(400, {"error": "Hay repositorios que no están en la GitHub App conectada"})
+    uid_of = {}
+    for item in dict.fromkeys(chosen):
+        # Cada selección se comprueba sola; las que la vista acaba de listar no cuestan otra llamada.
+        target = _repository(request, item)
+        if target is None:
+            return request.json(400, {"error": "Hay repositorios que no están en la GitHub App conectada"})
+        uid_of[item] = target[2]
     try:
-        results = [pr_watch.configure(request.data_dir, uid_of[item], enabled=payload.get("enabled"), post_comment=payload.get("post_comment"),
-                                      gate=payload.get("gate"), by=request.user["username"]) for item in dict.fromkeys(chosen)]
+        results = pr_watch.configure_many(request.data_dir, list(uid_of.values()), **options)
     except ValueError as exc:
         return request.json(400, {"error": str(exc)})
     return request.json(200, results[0] if "source_id" in payload else {"updated": len(results)})

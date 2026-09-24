@@ -281,7 +281,7 @@ class ModelTests(unittest.TestCase):
         files = [("pyproject.toml", b'[project]\ndependencies = ["fastapi>=0.110", "psycopg[binary]", "sqlalchemy", "stripe"]\n'),
                  ("crates/api/Cargo.toml", b'[dependencies]\naxum = "0.7"\nsqlx = { version = "0.8" }\n'),
                  ("../../escape/package.json", b'{"dependencies": {"express": "4"}}')]
-        with patch("appsec_agent.github_app.installation_repositories", return_value=[{"id": REPO, "name": "org/shop", "branch": "main"}]), \
+        with patch("appsec_agent.github_app.installation_repository", return_value={"id": REPO, "name": "org/shop", "branch": "main"}), \
                 patch("appsec_agent.github_app.repository_manifests", return_value=files) as fetch:
             found = inventory.live(REPO, installation_id=7)
         self.assertEqual(fetch.call_args.args[1:], ("org/shop", "main"))

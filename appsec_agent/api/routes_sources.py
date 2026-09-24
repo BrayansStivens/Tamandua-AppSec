@@ -9,10 +9,10 @@ from ..kinds import FINDING_RUNS
 from .. import jira, logging_setup, triage
 from ..domains import DomainError, check_reachability, list_domains, register_domain, verify_domain
 from ..github_app import REQUIRED_PERMISSIONS, GitHubAppError, app_installations, app_permissions, config as github_config, forget as forget_installation
-from ..github_app import forget_app, install_url, installation_details, permission_review, save_credentials, verify_app
+from ..github_app import forget_app, forget_catalog, install_url, installation_details, permission_review, save_credentials, verify_app
 from ..integrations import clear_github, github_connections, github_installations, save_github
 from ..providers import ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
-from ..repository_sources import SourceError, available_sources, list_repositories
+from ..repository_sources import SourceError, find_source, list_repositories, source_page
 from ..store import load_run, render_tickets
 from .core import Request, public_url, route
 
@@ -20,11 +20,33 @@ from .core import Request, public_url, route
 
 # ------------------------------------------------------------------ código
 
+def paging(request: Request, default: int = 25) -> tuple[int, int] | None:
+    """`page` (desde 1) y `per_page` (1-100) de la URL; None si no son válidos."""
+    try:
+        page, per_page = int(request.arg("page", "1")), int(request.arg("per_page", str(default)))
+    except ValueError:
+        return None
+    return (page, per_page) if 1 <= per_page <= 100 and 1 <= page and page * per_page <= 10_000 else None
+
+
 @route("GET", "/api/sources")
 def sources(request: Request):
+    """Una página de repositorios (`q`, `account`, `provider`, `page`, `per_page`) o uno concreto (`id`)."""
     with request.state.code_lock:
         tokens = request.state.code_tokens.copy()
-    return request.json(200, available_sources(tokens, github_installations(request.data_dir)))
+    installations = github_installations(request.data_dir)
+    if request.arg("id") is not None:
+        found = find_source(tokens, installations, request.arg("id") or "")
+        return request.json(200, {"sources": [found] if found else [], "total": 1 if found else 0})
+    paged = paging(request)
+    query, account, provider = request.arg("q", ""), request.arg("account"), request.arg("provider")
+    if paged is None or len(query) > 100 or (account is not None and len(account) > 100) or provider not in (None, "github", "gitlab", "local"):
+        return request.json(400, {"error": "Parámetros de búsqueda inválidos"})
+    if request.arg("refresh") == "1":
+        for installation in installations:
+            forget_catalog(installation)
+    return request.json(200, source_page(tokens, installations, query=query, account=account or None, provider=provider,
+                                         page=paged[0], per_page=paged[1]))
 
 
 @route("POST", "/api/integrations/code", admin=True, action="connect-code", body=1024)
@@ -169,7 +191,14 @@ def github_status(request: Request, *, live: bool = False) -> dict:
                     current.append(record)
             status["installations"] = current
             status["installation"] = current[0] if current else None
-            status["permissions"] = current[0].get("permission_review") if current else permission_review(declared, declared)
+            reviews = [row["permission_review"] for row in current if row.get("permission_review")]
+            if reviews:
+                summary = dict(reviews[0])
+                for field in ("excess", "missing", "pending_acceptance"):
+                    summary[field] = sorted({name for review in reviews for name in review[field]})
+                status["permissions"] = summary
+            else:
+                status["permissions"] = permission_review(declared, declared)
         except GitHubAppError:
             status["permissions"] = None
     return status

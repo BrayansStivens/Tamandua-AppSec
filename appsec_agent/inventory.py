@@ -137,9 +137,9 @@ def live(source_id: str, *, installation_id: int | None) -> dict | None:
         return collect(WORKSPACE)
     if not source_id.startswith("github:") or installation_id is None:
         return None
-    from .github_app import installation_repositories, repository_manifests
+    from .github_app import installation_repository, repository_manifests
     repository = source_id.removeprefix("github:")
-    entry = next((item for item in installation_repositories(installation_id) if item["id"] == source_id), None)
+    entry = installation_repository(installation_id, source_id)
     if entry is None:
         return None
     files = repository_manifests(installation_id, repository, entry.get("branch") or "main")

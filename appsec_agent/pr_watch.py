@@ -53,19 +53,29 @@ def settings(data_dir: Path, source_id: str) -> dict:
 
 
 def configure(data_dir: Path, source_id: str, *, enabled=None, post_comment=None, gate=None, by: str) -> dict:
+    return configure_many(data_dir, [source_id], enabled=enabled, post_comment=post_comment, gate=gate, by=by)[0]
+
+
+def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_comment=None, gate=None, by: str) -> list[dict]:
+    """Varios repositorios con una sola escritura: activar cientos no reescribe el archivo cientos de veces."""
     if gate is not None and gate not in GATES:
         raise ValueError("Umbral inválido")
+    results = []
     with _lock:
         payload = load(data_dir)
-        current = {**DEFAULTS, **payload["repositories"].get(source_id, {})}
-        for key, value in (("enabled", enabled), ("post_comment", post_comment), ("gate", gate)):
-            if value is not None:
-                current[key] = value
-        current.update(updated_by=by, updated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-        payload["repositories"][source_id] = current
+        when = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        for key in dict.fromkeys(keys):
+            current = {**DEFAULTS, **payload["repositories"].get(key, {})}
+            for field, value in (("enabled", enabled), ("post_comment", post_comment), ("gate", gate)):
+                if value is not None:
+                    current[field] = value
+            current.update(updated_by=by, updated_at=when)
+            payload["repositories"][key] = current
+            results.append(current)
         _save(data_dir, payload)
-    _log.info("pr_watch_configured", extra={"user": by, "reason": f"{source_id}: {current['enabled']}"})
-    return current
+    reason = f"{keys[0]}: {results[0]['enabled']}" if len(results) == 1 else f"{len(results)} repositorios: {enabled}"
+    _log.info("pr_watch_configured", extra={"user": by, "reason": reason})
+    return results
 
 
 def forget(data_dir: Path, key: str) -> None:

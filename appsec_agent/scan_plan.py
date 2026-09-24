@@ -62,8 +62,8 @@ def files_of(source_id: str, *, installation_id: int | None) -> list[str] | None
                 break
         return paths
     if source_id.startswith("github:") and installation_id is not None:
-        from .github_app import installation_repositories, repository_tree
-        entry = next((item for item in installation_repositories(installation_id) if item["id"] == source_id), None)
+        from .github_app import installation_repository, repository_tree
+        entry = installation_repository(installation_id, source_id)
         if entry is None:
             return None
         return [item["path"] for item in repository_tree(installation_id, source_id.removeprefix("github:"), entry.get("branch") or "main")

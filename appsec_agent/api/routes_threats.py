@@ -9,26 +9,29 @@ from ..domains import list_domains
 from ..github_app import GitHubAppError
 from ..integrations import github_installations
 from ..inventory import live as live_inventory
-from ..repository_sources import SourceError, available_sources
+from ..repository_sources import SourceError, find_source
 from ..assets import asset_key
 from ..store import list_runs, load_run
 from ..pdf_reports import render_pdf
 from .core import Request, route
 
 
-def _assets(request: Request) -> dict[str, dict]:
-    """Activos enlazables: todos los repositorios a los que hay acceso (escaneados o no) y los dominios."""
+def _model_keys(model) -> list[str]:
+    """Activos que un modelo (o un borrador sin validar) referencia: sus repositorios y los de sus componentes."""
+    if not isinstance(model, dict):
+        return []
+    repositories = model.get("repositories") if isinstance(model.get("repositories"), list) else []
+    components = model.get("components") if isinstance(model.get("components"), list) else []
+    keys = [*repositories, *(item.get("asset") for item in components if isinstance(item, dict))]
+    return list(dict.fromkeys(key for key in keys if isinstance(key, str) and key and not key.startswith("domain:")))[:120]
+
+
+def _assets(request: Request, keys: list[str] = ()) -> dict[str, dict]:
+    """Activos enlazables: repositorios analizados, dominios y los repositorios pedidos en `keys`.
+
+    Los pedidos se comprueban uno a uno contra su credencial: no se lista la organización entera
+    para validar un modelo que usa tres repositorios."""
     assets: dict[str, dict] = {}
-    with request.state.code_lock:
-        tokens = request.state.code_tokens.copy()
-    try:
-        for source in available_sources(tokens, github_installations(request.data_dir))["sources"]:
-            # Se enlaza por identidad estable: el modelo sobrevive a un renombrado del repositorio.
-            key = source.get("uid") or source["id"]
-            assets[key] = {"id": key, "source_id": source["id"], "name": source["name"], "kind": "repository",
-                           "installation_id": source.get("installation_id"), "last_run": None}
-    except (SourceError, GitHubAppError):
-        pass
     for row in list_runs(request.data_dir):
         source = row.get("source") or {}
         key = asset_key(row)
@@ -38,13 +41,30 @@ def _assets(request: Request) -> dict[str, dict]:
                 entry["last_run"], entry["scanned_at"] = row["id"], row["created_at"]
     for domain in list_domains(request.data_dir):
         assets[f"domain:{domain['id']}"] = {"id": f"domain:{domain['id']}", "name": domain["host"], "kind": "domain"}
+    if keys:
+        with request.state.code_lock:
+            tokens = request.state.code_tokens.copy()
+        installations = github_installations(request.data_dir)
+        for key in keys:
+            try:
+                source = find_source(tokens, installations, key)
+            except (SourceError, GitHubAppError):
+                source = None
+            # Se enlaza por identidad estable: el modelo sobrevive a un renombrado del repositorio.
+            if source is None or key not in (source.get("uid"), source["id"]):
+                continue
+            entry = assets.setdefault(key, {"id": key, "kind": "repository", "last_run": None})
+            entry.update(source_id=source["id"], name=source["name"], installation_id=source.get("installation_id"))
     return assets
 
 
 def _view(request: Request, model: dict) -> dict:
     linked = {item["asset"] for item in model.get("components", []) if item.get("asset")}
     rows = tm.threats(model, tm.evidence_index(request.data_dir, linked))
-    return {"model": model, "threats": rows, "summary": tm.summary(rows)}
+    keys = _model_keys(model)
+    assets = _assets(request, keys)
+    return {"model": model, "threats": rows, "summary": tm.summary(rows),
+            "assets": [assets[key] for key in keys if key in assets]}
 
 
 @route("GET", "/api/threat-models")
@@ -83,7 +103,7 @@ def model_detail(request: Request):
     if artifact == "diagram.svg":
         return request.send(200, tm.to_svg(view["model"]).encode("utf-8"), "image/svg+xml; charset=utf-8")
     if artifact == "model.json":
-        document = tm.to_portable(view["model"], _assets(request))
+        document = tm.to_portable(view["model"], _assets(request, _model_keys(view["model"])))
         return request.send(200, json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8"),
                             "application/json; charset=utf-8")
     return request.json(404, {"error": "Ruta no encontrada"})
@@ -94,7 +114,9 @@ def save_model(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or not set(payload) <= {"id", "model", "suggest", "name", "methodology", "custom_modules"}:
         return request.json(400, {"error": "Solicitud inválida"})
-    assets = _assets(request)
+    suggested = payload.get("suggest") if isinstance(payload.get("suggest"), list) else []
+    assets = _assets(request, list(dict.fromkeys([*_model_keys(payload.get("model")),
+                                                  *(item for item in suggested[:10] if isinstance(item, str))])))
     try:
         if "suggest" in payload:
             # Modelo nuevo propuesto desde el inventario del último escaneo de cada repositorio elegido.
@@ -175,7 +197,9 @@ def propose(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"model", "repositories"}:
         return request.json(400, {"error": "Solicitud inválida"})
-    assets = _assets(request)
+    chosen = payload["repositories"] if isinstance(payload["repositories"], list) else []
+    assets = _assets(request, list(dict.fromkeys([*_model_keys(payload["model"]),
+                                                  *(item for item in chosen[:10] if isinstance(item, str))])))
     try:
         current = tm.validate(payload["model"], known_assets=set(assets))
         repositories = _read_repositories(request, assets, payload["repositories"])

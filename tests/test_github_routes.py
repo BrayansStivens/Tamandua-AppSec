@@ -5,6 +5,7 @@ from appsec_agent.auth import Users
 from appsec_agent.github_app import GitHubAppError
 from appsec_agent.integrations import github_installation, github_installations
 
+from fake_github import fake_github
 from tests.test_auth import PASSWORD, HttpCase
 
 VERIFIED = {"app_id": "4242", "pem": "-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----\n", "slug": "appsec-de-acme",
@@ -61,13 +62,10 @@ class GitHubRoutesTests(HttpCase):
 
     def test_two_organizations_are_listed_and_each_scan_uses_its_installation(self):
         accounts = [{"installation_id": 77, "account": "acme"}, {"installation_id": 88, "account": "beta"}]
-        repos = {77: [{"id": "github:acme/api", "uid": "github#1", "name": "acme/api", "provider": "github", "private": True}],
-                 88: [{"id": "github:beta/web", "uid": "github#2", "name": "beta/web", "provider": "github", "private": True}]}
         with patch("appsec_agent.api.routes_sources.app_installations", return_value=accounts), \
                 patch("appsec_agent.api.routes_sources.installation_details", side_effect=lambda installation: {
                     "account": "acme" if installation == 77 else "beta", "permissions": {}}), \
-                patch("appsec_agent.github_app.installation_repositories", side_effect=lambda installation: repos[installation]), \
-                patch("appsec_agent.api.routes_prs.installation_repositories", side_effect=lambda installation: repos[installation]):
+                fake_github({77: [(1, "acme/api")], 88: [(2, "beta/web")]}, {77: ("acme", "selected"), 88: ("beta", "selected")}):
             status, body, _ = self.post("/api/integrations/github", "connect-github", {"action": "detect"}, self.admin)
             self.assertEqual((status, body["connected"]), (200, False))
             self.assertEqual([item["account"] for item in body["available_installations"]], ["acme", "beta"])

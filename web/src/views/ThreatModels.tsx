@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/loading'
+import { SourceSearch } from '@/components/source-search'
+import type { Source } from '@/lib/sources'
 import { api } from '@/lib/api'
 import { readRoute, setRouteParam } from '@/lib/route'
 import { formatDate } from '@/lib/types'
@@ -43,25 +45,30 @@ export function ThreatModels({ user, onOpenRun }: { user: SessionUser; onOpenRun
   </div>
 }
 
+// Los modelos enlazan por identidad estable (`github#123`), que sobrevive a un renombrado.
+const sourceKey = (source: Source) => source.uid ?? source.id
+
 function CreateDialog({ open, assets, onClose, onCreated }: { open: boolean; assets: Asset[]; onClose: () => void; onCreated: (id: string) => void }) {
   const [name, setName] = useState('')
   const [methodology, setMethodology] = useState<Methodology>('stride')
   const [customModules, setCustomModules] = useState<CustomModule[]>(['manual', 'elements'])
-  const [chosen, setChosen] = useState<string[]>([])
-  const [filter, setFilter] = useState('')
+  // Se guarda el nombre de cada elegido: la búsqueda cambia de página y el nombre sigue haciendo falta.
+  const [chosenNames, setChosenNames] = useState<Record<string, string>>({})
+  const chosen = Object.keys(chosenNames)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const repositories = assets.filter(item => item.kind === 'repository' && item.name.toLowerCase().includes(filter.trim().toLowerCase()))
+  const scanned = new Set(assets.filter(item => item.last_run).map(item => item.id))
+  const toggle = (source: Source, on: boolean) => setChosenNames(previous => { const next = { ...previous }; const key = sourceKey(source); if (on && Object.keys(next).length < 10) next[key] = source.name; else delete next[key]; return next })
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setBusy(true); setError('')
     try {
       // Sin nombre, el sistema se llama como sus repositorios: el nombre no debe bloquear la propuesta.
-      const fallback = assets.filter(item => chosen.includes(item.id)).map(item => item.name.split('/').pop()).join(' + ').slice(0, 80)
+      const fallback = Object.values(chosenNames).map(item => item.split('/').pop()).join(' + ').slice(0, 80)
       const finalName = name.trim() || fallback || 'Nuevo proyecto'
       const body = chosen.length ? { name: finalName, suggest: chosen, methodology, custom_modules: customModules } : { model: { name: finalName, methodology, custom_modules: customModules, components: [], flows: [], boundaries: [], repositories: [] } }
       onCreated((await api.post<View>('/api/threat-models', 'save-threat-model', body)).model.id)
-      setName(''); setChosen([])
+      setName(''); setChosenNames({})
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
   return <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
@@ -70,8 +77,7 @@ function CreateDialog({ open, assets, onClose, onCreated }: { open: boolean; ass
       <div className="space-y-1.5"><span className="text-xs text-app-muted">Enfoque</span><MethodPicker value={methodology} onChange={setMethodology} /><p className="text-[11px] leading-4 text-app-subtle">Se puede cambiar después sin perder el diagrama.</p></div>
       {methodology === 'custom' && <CustomModulesPicker value={customModules} onChange={setCustomModules} />}
       <div className="space-y-1.5"><label htmlFor="tm-name" className="text-xs text-app-muted">Nombre del proyecto</label><Input id="tm-name" autoFocus maxLength={80} value={name} onChange={event => setName(event.target.value)} placeholder="p. ej. Pagos, Portal de clientes, Login" className="border-app-line bg-app-soft" /></div>
-      <details className="rounded-lg border border-app-line px-3 py-2" open={chosen.length > 0}><summary className="cursor-pointer text-xs text-app-muted">Partir de repositorios (opcional){chosen.length ? ` · ${chosen.length} elegidos` : ''}</summary><div className="mt-2 space-y-1.5"><p className="text-[11px] leading-4 text-app-subtle">Se leen sus manifiestos (package.json, pyproject, go.mod, Cargo.toml, compose) y se propone cada componente citando de qué dependencia sale.</p><div className="flex items-center justify-end gap-2"><Input aria-label="Buscar repositorio" value={filter} onChange={event => setFilter(event.target.value)} placeholder="Buscar…" className="h-7 w-40 border-app-line bg-app-soft text-xs" /></div>
-        {repositories.length ? <div className="max-h-64 space-y-0.5 overflow-y-auto rounded-lg border border-app-line p-2">{repositories.map(item => <label key={item.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-app-soft"><input type="checkbox" className="size-4 accent-brand" checked={chosen.includes(item.id)} onChange={event => setChosen(previous => event.target.checked ? [...previous, item.id] : previous.filter(id => id !== item.id))} /><span className="min-w-0 flex-1 truncate">{item.name}</span>{item.last_run ? <span className="shrink-0 text-[10px] text-brand">escaneado</span> : <span className="shrink-0 text-[10px] text-app-subtle">sin escanear</span>}</label>)}</div> : <p className="text-xs text-app-subtle">{filter ? 'Ningún repositorio coincide.' : 'Conecta GitHub en Integraciones para elegir repositorios.'}</p>}
+      <details className="rounded-lg border border-app-line px-3 py-2" open={chosen.length > 0}><summary className="cursor-pointer text-xs text-app-muted">Partir de repositorios (opcional){chosen.length ? ` · ${chosen.length} elegidos` : ''}</summary><div className="mt-2 space-y-1.5"><p className="text-[11px] leading-4 text-app-subtle">Se leen sus manifiestos (package.json, pyproject, go.mod, Cargo.toml, compose) y se propone cada componente citando de qué dependencia sale.</p>{open && <SourceSearch perPage={8} empty="Ningún repositorio coincide. Conecta GitHub en Integraciones si no ves los tuyos." render={item => <label className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-app-soft"><input type="checkbox" className="size-4 accent-brand" checked={sourceKey(item) in chosenNames} disabled={!(sourceKey(item) in chosenNames) && chosen.length >= 10} onChange={event => toggle(item, event.target.checked)} /><span className="min-w-0 flex-1 truncate">{item.name}</span>{scanned.has(sourceKey(item)) ? <span className="shrink-0 text-[10px] text-brand">escaneado</span> : <span className="shrink-0 text-[10px] text-app-subtle">sin escanear</span>}</label>} />}
         <p className="text-[11px] leading-4 text-app-subtle">Los repositorios sin escanear se modelan igual, pero sus amenazas no tendrán indicios hasta que los analices.</p></div></details>
       {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
       <DialogFooter><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={busy} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : chosen.length ? <Sparkles /> : <Plus />}{busy && chosen.length ? 'Leyendo manifiestos…' : chosen.length ? 'Crear y proponer componentes' : 'Crear proyecto'}</Button></DialogFooter>
@@ -79,7 +85,7 @@ function CreateDialog({ open, assets, onClose, onCreated }: { open: boolean; ass
   </DialogContent></Dialog>
 }
 
-function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog: Catalog; user: SessionUser; onBack: () => void; onOpenRun: (id: string) => void }) {
+function Editor({ id, catalog: base, user, onBack, onOpenRun }: { id: string; catalog: Catalog; user: SessionUser; onBack: () => void; onOpenRun: (id: string) => void }) {
   const [view, setView] = useState<View | null>(null)
   const [draft, setDraft] = useState<Model | null>(null)
   const [tab, setTab] = useState<string>('')
@@ -89,7 +95,14 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
   const toggleGuide = (next: boolean) => { setGuide(next); try { localStorage.setItem('tm-guide', next ? 'open' : 'closed') } catch { /* sin almacenamiento */ } }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [picked, setPicked] = useState<Asset[]>([])
   const load = useCallback(async () => { const data = await api.get<View>(`/api/threat-models/${id}`); setView(data); setDraft(data.model) }, [id])
+  // El catálogo solo trae lo analizado y los dominios; los repositorios del modelo llegan con su detalle.
+  const catalog = useMemo<Catalog>(() => {
+    const assets = new Map(base.assets.map(item => [item.id, item]))
+    for (const item of [...(view?.assets ?? []), ...picked]) assets.set(item.id, { ...assets.get(item.id), ...item })
+    return { ...base, assets: [...assets.values()] }
+  }, [base, view, picked])
   useEffect(() => { load().catch(caught => setError(caught instanceof Error ? caught.message : String(caught))) }, [load])
   const dirty = useMemo(() => !!view && !!draft && JSON.stringify(view.model) !== JSON.stringify(draft), [view, draft])
   const save = async () => {
@@ -125,7 +138,7 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
     <div className="flex flex-col gap-4 rounded-2xl border border-app-line bg-panel p-5">
       <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><button onClick={onBack} className="mb-2 inline-flex items-center gap-1 text-xs text-app-subtle hover:text-app-fg"><ArrowLeft className="size-3" />Modelos</button><h2 className="text-xl font-semibold">{view.model.name}</h2><div className="mt-1.5 flex flex-wrap items-center gap-2"><button onClick={() => setPicking(true)} className="inline-flex items-center gap-1 rounded-lg border border-brand/30 bg-brand/[0.07] px-2 py-0.5 text-xs font-medium text-brand hover:bg-brand/10" title="Cambiar el enfoque">{GUIDES[methodology].name}<Pencil className="size-3" /></button><button onClick={() => toggleGuide(!guide)} aria-pressed={guide} className="inline-flex items-center gap-1 rounded-lg border border-app-line px-2 py-0.5 text-xs text-app-muted hover:text-app-fg"><BookOpen className="size-3" />{guide ? 'Ocultar guía' : 'Guía'}</button></div><p className="mt-1 text-xs text-app-subtle">{view.model.components.length} componentes · {view.model.flows.length} flujos · {view.model.boundaries.length} fronteras{view.model.updated_at ? ` · ${formatDate(view.model.updated_at)} por ${view.model.updated_by}` : ''}</p></div>
         <div className="flex flex-wrap gap-2">{[['Modelo JSON', 'model.json'], ['Diagrama SVG', 'diagram.svg'], ['Informe PDF', 'report.pdf'], ['SOC 2 Tipo II · PDF', 'report-soc2.pdf'], ['ISO/IEC 27001 · PDF', 'report-iso27001.pdf'], ['Threat Dragon', 'threat-dragon.json'], ['pytm', 'tm.py'], ['Markdown', 'report.md']].map(([label, file]) => <Button key={file} size="sm" variant="outline" disabled={busy} className="border-app-line bg-app-soft" onClick={() => void downloadFile(file)}><ArrowDownToLine />{label}</Button>)}{user.role === 'admin' && <Button size="sm" variant="ghost" onClick={() => void remove()} aria-label="Borrar modelo"><Trash2 /></Button>}</div></div>
-      <ProjectRepositories draft={draft} setDraft={setDraft} catalog={catalog} onError={setError} />
+      <ProjectRepositories draft={draft} setDraft={setDraft} catalog={catalog} onError={setError} onPicked={asset => setPicked(previous => [...previous, asset])} />
       {methodology === 'custom' && <CustomModulesPicker value={draft.custom_modules ?? ['manual', 'elements']} onChange={custom_modules => setDraft({ ...draft, custom_modules })} />}
       {tabs.some(([key]) => key === 'threats') && <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{(['evidenced', 'open', 'mitigated', 'accepted', 'not_applicable'] as const).map(status => <div key={status} className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.by_status[status] ?? 0}</div><div className="text-xs text-app-muted">{statusLabel[status]}</div></div>)}<div className="rounded-xl border border-app-line bg-inset px-3 py-2"><div className="text-xl font-semibold tabular-nums">{summary.total}</div><div className="text-xs text-app-muted">Total</div></div></div>}
     </div>
@@ -145,11 +158,16 @@ function Editor({ id, catalog, user, onBack, onOpenRun }: { id: string; catalog:
 }
 
 // Repositorios del proyecto: se asocian cuando se quiera y de ellos se pueden proponer componentes.
-function ProjectRepositories({ draft, setDraft, catalog, onError }: { draft: Model; setDraft: (model: Model) => void; catalog: Catalog; onError: (text: string) => void }) {
+function ProjectRepositories({ draft, setDraft, catalog, onError, onPicked }: { draft: Model; setDraft: (model: Model) => void; catalog: Catalog; onError: (text: string) => void; onPicked: (asset: Asset) => void }) {
   const [busy, setBusy] = useState('')
   const linked = draft.repositories ?? []
   const names = Object.fromEntries(catalog.assets.map(item => [item.id, item.name]))
-  const available = catalog.assets.filter(item => item.kind === 'repository' && !linked.includes(item.id))
+  const associate = (source: Source) => {
+    const key = sourceKey(source)
+    if (linked.includes(key)) return
+    onPicked({ id: key, name: source.name, kind: 'repository' })
+    setDraft({ ...draft, repositories: [...linked, key] })
+  }
   const inUse = new Set(draft.components.map(item => item.asset).filter(Boolean))
   const propose = async (repositories: string[]) => {
     setBusy(repositories.join(',')); onError('')
@@ -168,8 +186,7 @@ function ProjectRepositories({ draft, setDraft, catalog, onError }: { draft: Mod
       {!inUse.has(id) && <button onClick={() => setDraft({ ...draft, repositories: linked.filter(item => item !== id) })} className="rounded px-1 text-app-subtle hover:text-app-fg" aria-label={`Quitar ${names[id] ?? id}`}>×</button>}
     </span>)}
     {(draft.repository_refs ?? []).map(reference => <span key={reference} className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 py-0.5 pr-1 pl-2 text-xs text-amber-800 dark:text-amber-200" title="Referencia del archivo importado; no está conectada">{reference} · sin vincular <button onClick={() => setDraft({ ...draft, repository_refs: (draft.repository_refs ?? []).filter(item => item !== reference) })} className="rounded px-1" aria-label={`Quitar referencia ${reference}`}>×</button></span>)}
-    {available.length > 0 && <select aria-label="Asociar un repositorio" value="" onChange={event => { if (event.target.value) setDraft({ ...draft, repositories: [...linked, event.target.value] }) }} className={select}>
-      <option value="">+ Asociar repositorio…</option>{available.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>}
+    {linked.length < 50 && <details className="w-full rounded-lg border border-app-line bg-panel p-2"><summary className="cursor-pointer text-xs text-app-muted">+ Asociar repositorio…</summary><div className="mt-2"><SourceSearch perPage={8} render={item => <button type="button" disabled={linked.includes(sourceKey(item))} className="block w-full truncate rounded px-2 py-1 text-left text-xs hover:bg-app-soft disabled:opacity-50" onClick={() => associate(item)}>{item.name}{linked.includes(sourceKey(item)) ? ' · ya asociado' : ''}</button>} /></div></details>}
   </div>
 }
 

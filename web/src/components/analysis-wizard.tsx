@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { ArrowLeft, ArrowRight, Boxes, Check, CircleAlert, Code2, Globe2, KeyRound, LoaderCircle, LockKeyhole, Plus, Search, SearchCheck, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react'
 import { AddDomainDialog, VerifyDomainDialog, kindLabel, type Domain } from '@/components/domain-dialogs'
@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { SourceSearch } from '@/components/source-search'
+import { fetchSource, type Source, type SourcePage } from '@/lib/sources'
 
 type ScanPlan = { languages: { name: string; files: number; rules: number }[]; runs: string[]; skips: string[]; osv_needed: boolean; files: number | null; manifests: string[]; iac: string[]; pipelines?: string[] }
-type Source = { id: string; name: string; provider: 'local' | 'github' | 'gitlab'; private: boolean; branch: string | null }
-type SourceList = { sources: Source[]; providers: Record<'github' | 'gitlab', { configured: boolean; origin: string | null; error?: string }> }
 type Kind = 'code' | 'web' | 'image'
 type Registry = { registry: string; username: string; last4: string }
 
@@ -29,8 +29,8 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
   const [kind, setKind] = useState<Kind | null>(initialSourceId ? 'code' : null)
   const [choice, setChoice] = useState<Kind>('code')
   const [step, setStep] = useState(0)
-  const [sources, setSources] = useState<SourceList | null>(null)
-  const [source, setSource] = useState<string | null>(initialSourceId)
+  const [chosenSource, setChosenSource] = useState<Source | null>(null)
+  const source = chosenSource?.id ?? null
   const [domains, setDomains] = useState<Domain[]>([])
   const [targets, setTargets] = useState<string[]>([])
   const [context, setContext] = useState('')
@@ -44,7 +44,8 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
   const [reference, setReference] = useState('')
   const [registries, setRegistries] = useState<Registry[]>([])
 
-  useEffect(() => { api.get<SourceList>('/api/sources').then(setSources).catch(caught => setError(caught instanceof Error ? caught.message : String(caught))) }, [])
+  // Un enlace directo trae el id: se pide ese repositorio, no el catálogo.
+  useEffect(() => { if (initialSourceId) fetchSource(initialSourceId).then(setChosenSource).catch(caught => setError(caught instanceof Error ? caught.message : String(caught))) }, [initialSourceId])
   // El plan se calcula en el servidor con el árbol real del repositorio y los motores disponibles.
   useEffect(() => {
     setPlan(null); setPlanError('')
@@ -56,7 +57,6 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
   useEffect(() => { api.get<{ registries: Registry[] }>('/api/registries').then(data => setRegistries(data.registries)).catch(() => {}) }, [])
 
   const steps = kind ? STEPS[kind] : []
-  const chosenSource = sources?.sources.find(item => item.id === source) ?? null
   const chosenTargets = domains.filter(item => targets.includes(item.id))
   const imageRegistry = registryOf(reference)
   const imageCredentials = registries.find(item => item.registry === imageRegistry) ?? null
@@ -95,7 +95,7 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
       <div className="min-w-0 space-y-5">
         {current === 'source' && <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Código fuente</CardTitle><CardDescription>Elige el repositorio que quieres revisar. Se analiza un snapshot de solo lectura.</CardDescription></CardHeader><CardContent>
           {chosenSource
-            ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/40 bg-brand/[0.07] p-4"><span className="flex min-w-0 items-center gap-3"><Code2 className="size-4 shrink-0 text-brand" /><span className="min-w-0"><span className="block truncate text-sm font-medium">{chosenSource.name}</span><span className="text-xs text-app-subtle">{chosenSource.provider.toUpperCase()} · {chosenSource.branch ?? 'rama predeterminada'}</span></span></span><span className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setPickSource(true)} className="border-app-line bg-panel">Cambiar</Button><Button aria-label="Quitar repositorio" variant="ghost" size="icon-sm" onClick={() => setSource(null)}><Trash2 /></Button></span></div>
+            ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand/40 bg-brand/[0.07] p-4"><span className="flex min-w-0 items-center gap-3"><Code2 className="size-4 shrink-0 text-brand" /><span className="min-w-0"><span className="block truncate text-sm font-medium">{chosenSource.name}</span><span className="text-xs text-app-subtle">{chosenSource.provider.toUpperCase()} · {chosenSource.branch ?? 'rama predeterminada'}</span></span></span><span className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setPickSource(true)} className="border-app-line bg-panel">Cambiar</Button><Button aria-label="Quitar repositorio" variant="ghost" size="icon-sm" onClick={() => setChosenSource(null)}><Trash2 /></Button></span></div>
             : <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-app-line py-14 text-center"><Code2 className="size-6 text-app-faint" /><p className="text-sm font-medium">Todavía no hay repositorio</p><p className="max-w-sm text-sm text-app-muted">Elige uno de tus repositorios conectados de GitHub, GitLab o este workspace.</p><Button onClick={() => setPickSource(true)} className="mt-1 bg-primary text-primary-foreground hover:bg-primary/90"><Plus /> Añadir repositorio</Button></div>}
           <p className="mt-4 text-xs text-app-subtle">Una ejecución analiza un repositorio: el snapshot y su hash identifican exactamente qué se revisó.</p>
         </CardContent></Card>}
@@ -162,7 +162,7 @@ export function AnalysisWizard({ onComplete, onManageConnections, onCancel, init
       <ol className="order-first space-y-1 xl:order-none">{steps.map((item, index) => <li key={item.id}><button onClick={() => index <= step && setStep(index)} disabled={index > step} className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition ${index === step ? 'text-app-fg' : 'text-app-subtle'} ${index < step ? 'hover:bg-app-soft' : ''}`}><span className={`flex size-6 shrink-0 items-center justify-center rounded-full border font-mono text-xs ${index === step ? 'border-primary bg-primary/15 text-brand' : index < step ? 'border-brand/40 bg-brand/10 text-brand' : 'border-app-line'}`}>{index < step ? <Check className="size-3" /> : index + 1}</span>{item.label}</button></li>)}</ol>
     </div>
 
-    <SourceDialog open={pickSource} onOpenChange={setPickSource} sources={sources} selected={source} onSelect={id => { setSource(id); setPickSource(false) }} onManageConnections={onManageConnections} />
+    <SourceDialog open={pickSource} onOpenChange={setPickSource} selected={source} onSelect={item => { setChosenSource(item); setPickSource(false) }} onManageConnections={onManageConnections} />
     <TargetsDialog open={pickTargets} onOpenChange={setPickTargets} domains={domains} selected={targets} onConfirm={ids => { setTargets(ids); setPickTargets(false) }} onRegistered={domain => setDomains(previous => [...previous.filter(item => item.id !== domain.id), domain])} />
   </div>
 }
@@ -171,18 +171,12 @@ function Row({ label, value }: { label: string; value: string }) {
   return <div className="flex flex-col gap-1 border-b border-app-line pb-3 last:border-0 sm:flex-row sm:gap-4"><span className="w-28 shrink-0 text-xs text-app-subtle">{label}</span><span className="min-w-0 text-sm break-words text-app-secondary">{value}</span></div>
 }
 
-function SourceDialog({ open, onOpenChange, sources, selected, onSelect, onManageConnections }: { open: boolean; onOpenChange: (open: boolean) => void; sources: SourceList | null; selected: string | null; onSelect: (id: string) => void; onManageConnections: () => void }) {
-  const [filter, setFilter] = useState('')
-  const visible = sources?.sources.filter(item => item.name.toLowerCase().includes(filter.trim().toLowerCase())) ?? []
-  const connected = sources ? Object.values(sources.providers).some(item => item.configured) : false
+function SourceDialog({ open, onOpenChange, selected, onSelect, onManageConnections }: { open: boolean; onOpenChange: (open: boolean) => void; selected: string | null; onSelect: (source: Source) => void; onManageConnections: () => void }) {
+  const [connected, setConnected] = useState(true)
+  const loaded = useCallback((data: SourcePage) => setConnected(Object.values(data.providers).some(item => item.configured)), [])
   return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-w-xl">
     <DialogHeader><DialogTitle>Añadir repositorio</DialogTitle><DialogDescription>Elige uno de los repositorios que este workspace puede leer. Uno por ejecución.</DialogDescription></DialogHeader>
-    <div className="relative"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar repositorio" placeholder="Buscar por nombre…" value={filter} onChange={event => setFilter(event.target.value)} className="border-app-line bg-app-soft pl-9" /></div>
-    <div className="max-h-72 space-y-2 overflow-y-auto">
-      {!sources && <p className="py-6 text-center text-sm text-app-subtle">Cargando repositorios…</p>}
-      {visible.map(item => <button key={item.id} onClick={() => onSelect(item.id)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${selected === item.id ? 'border-brand/60 bg-brand/10' : 'border-app-line bg-inset hover:border-brand/30'}`}><Code2 className="size-4 shrink-0 text-app-muted" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.name}</span><span className="text-xs text-app-subtle">{item.provider.toUpperCase()} · {item.branch ?? 'rama predeterminada'}</span></span>{selected === item.id ? <Check className="size-4 text-brand" /> : item.private ? <LockKeyhole className="size-4 text-app-subtle" /> : null}</button>)}
-      {sources && !visible.length && <p className="py-6 text-center text-sm text-app-muted">No hay repositorios que coincidan.</p>}
-    </div>
+    {open && <div className="max-h-[60vh] overflow-y-auto pr-1"><SourceSearch autoFocus onLoaded={loaded} render={item => <button onClick={() => onSelect(item)} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition ${selected === item.id ? 'border-brand/60 bg-brand/10' : 'border-app-line bg-inset hover:border-brand/30'}`}><Code2 className="size-4 shrink-0 text-app-muted" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium">{item.name}</span><span className="text-xs text-app-subtle">{item.provider.toUpperCase()} · {item.branch ?? 'rama predeterminada'}</span></span>{selected === item.id ? <Check className="size-4 text-brand" /> : item.private ? <LockKeyhole className="size-4 text-app-subtle" /> : null}</button>} /></div>}
     {!connected && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-app-line bg-inset p-4 text-sm"><span className="text-app-muted">Ningún proveedor de código conectado</span><Button variant="outline" onClick={onManageConnections} className="border-app-line bg-panel">Conectar</Button></div>}
     <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button></DialogFooter>
   </DialogContent></Dialog>

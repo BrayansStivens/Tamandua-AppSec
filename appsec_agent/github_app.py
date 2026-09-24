@@ -17,9 +17,12 @@ ni ningún token personal.
 from __future__ import annotations
 
 import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
+import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -257,6 +260,21 @@ def installation_token(installation_id: int) -> str:
 
 def forget(installation_id: int | None = None) -> None:
     _tokens.clear() if installation_id is None else _tokens.pop(installation_id, None)
+    forget_catalog(installation_id)
+
+
+def forget_catalog(installation_id: int | None = None) -> None:
+    """Descarta lo cacheado del catálogo («Actualizar lista» o al desconectar)."""
+    with _repos_guard:
+        targets = set(_repos_cache) | set(_repos_loading) | set(_info) if installation_id is None else [installation_id]
+        for target in targets:
+            _repos_cache.pop(target, None)
+            _repos_errors.pop(target, None)
+            _info.pop(target, None)
+            _repos_generation[target] = _repos_generation.get(target, 0) + 1
+        for store in (_pages, _known):
+            for key in [key for key in store if installation_id is None or key[1 if store is _pages else 0] == installation_id]:
+                del store[key]
 
 
 def installation_details(installation_id: int) -> dict:
@@ -274,11 +292,79 @@ def installation_details(installation_id: int) -> dict:
 
 
 _repos_cache: dict[int, tuple[float, list[dict]]] = {}
-REPOS_TTL = 60
+_repos_guard = threading.Lock()
+_repos_fetch_locks: dict[int, threading.Lock] = {}
+_repos_loading: dict[int, dict] = {}
+_repos_errors: dict[int, tuple[float, str]] = {}
+_repos_generation: dict[int, int] = {}
+REPOS_TTL = 300
 MAX_REPO_PAGES = 100  # 10 000 repositorios
+REPOS_RETRY_AFTER = 30
 
 
-def installation_repositories(installation_id: int, *, fresh: bool = False) -> list[dict]:
+def _repo_rows(payload: dict | list) -> list[dict]:
+    rows = payload.get("repositories") if isinstance(payload, dict) else None
+    if not isinstance(rows, list) or len(rows) > 100:
+        raise GitHubAppError("GitHub devolvió una lista de repositorios inválida")
+    result = []
+    for item in rows:
+        if not isinstance(item, dict) or not isinstance(item.get("full_name"), str) or not isinstance(item.get("id"), int):
+            continue
+        result.append({"id": f"github:{item['full_name']}", "uid": f"github#{item['id']}", "name": item["full_name"],
+                       "provider": "github", "private": bool(item.get("private")), "branch": item.get("default_branch"),
+                       "archived": bool(item.get("archived"))})
+    return result
+
+
+def _fetch_repositories(installation_id: int, progress=None) -> list[dict]:
+    token = installation_token(installation_id)
+
+    def fetch(page: int) -> dict:
+        payload = _get(f"{API}/installation/repositories?per_page=100&page={page}", token)
+        if not isinstance(payload, dict):
+            raise GitHubAppError("GitHub devolvió una lista de repositorios inválida")
+        return payload
+
+    first = fetch(1)
+    result = _repo_rows(first)
+    expected = first.get("total_count")
+    if expected is not None and (not isinstance(expected, int) or isinstance(expected, bool) or expected < 0 or expected > MAX_REPO_PAGES * 100):
+        raise GitHubAppError("GitHub devolvió un total de repositorios inválido")
+    if progress:
+        progress(result, expected)
+    if expected is not None:
+        pages = max(1, (expected + 99) // 100)
+        if expected != len(result) and len(result) < 100:
+            raise GitHubAppError("GitHub devolvió una página incompleta de repositorios")
+        if pages > 1:
+            pending: dict[int, list[dict]] = {}
+            next_page = 2
+            with ThreadPoolExecutor(max_workers=4, thread_name_prefix="github-repos") as pool:
+                futures = {pool.submit(fetch, page): page for page in range(2, pages + 1)}
+                for future in as_completed(futures):
+                    pending[futures[future]] = _repo_rows(future.result())
+                    while next_page in pending:
+                        result.extend(pending.pop(next_page))
+                        next_page += 1
+                        if progress:
+                            progress(result, expected)
+        if len(result) != expected:
+            raise GitHubAppError("La lista de repositorios cambió durante la lectura; vuelve a actualizarla")
+        return result
+    # Compatibilidad con respuestas sin total_count: aquí no se puede anticipar el número de páginas.
+    for page in range(2, MAX_REPO_PAGES + 1):
+        if len(result) < (page - 1) * 100:
+            return result
+        rows = _repo_rows(fetch(page))
+        result.extend(rows)
+        if progress:
+            progress(result, None)
+        if len(rows) < 100:
+            return result
+    raise GitHubAppError("La instalación tiene más repositorios de los que se pueden listar")
+
+
+def installation_repositories(installation_id: int, *, fresh: bool = False, progress=None) -> list[dict]:
     """Todos los repositorios que la cuenta concedió a la App, paginados (GitHub da 100 por página).
 
     `uid` es el identificador numérico de GitHub: no cambia al renombrar ni al transferir
@@ -286,29 +372,264 @@ def installation_repositories(installation_id: int, *, fresh: bool = False) -> l
     Lanza error si no se pudo leer la lista entera: una lista a medias no debe tomarse
     como «esos repositorios ya no existen».
     """
-    cached = _repos_cache.get(installation_id)
-    if cached and not fresh and cached[0] + REPOS_TTL > time.time():
-        return cached[1]
-    token = installation_token(installation_id)
-    result, expected = [], None
-    for page in range(1, MAX_REPO_PAGES + 1):
-        payload = _get(f"{API}/installation/repositories?per_page=100&page={page}", token)
-        rows = payload.get("repositories") if isinstance(payload, dict) else None
-        if not isinstance(rows, list):
-            raise GitHubAppError("GitHub devolvió una lista de repositorios inválida")
-        expected = payload.get("total_count") if isinstance(payload.get("total_count"), int) else expected
-        for item in rows:
-            if not isinstance(item, dict) or not isinstance(item.get("full_name"), str) or not isinstance(item.get("id"), int):
-                continue
-            result.append({"id": f"github:{item['full_name']}", "uid": f"github#{item['id']}", "name": item["full_name"],
-                           "provider": "github", "private": bool(item.get("private")), "branch": item.get("default_branch"),
-                           "archived": bool(item.get("archived"))})
-        if len(rows) < 100 or (expected is not None and len(result) >= expected):
-            break
-    else:
-        raise GitHubAppError("La instalación tiene más repositorios de los que se pueden listar")
-    _repos_cache[installation_id] = (time.time(), result)
+    with _repos_guard:
+        lock = _repos_fetch_locks.setdefault(installation_id, threading.Lock())
+        generation = _repos_generation.get(installation_id, 0)
+    with lock:
+        with _repos_guard:
+            cached = _repos_cache.get(installation_id)
+            if cached and not fresh and cached[0] + REPOS_TTL > time.time():
+                return cached[1]
+        result = _fetch_repositories(installation_id, progress)
+        with _repos_guard:
+            if _repos_generation.get(installation_id, 0) == generation:
+                _repos_cache[installation_id] = (time.time(), result)
+                _repos_errors.pop(installation_id, None)
+        return result
+
+
+def installation_repositories_snapshot(installation_id: int, *, fresh: bool = False) -> tuple[list[dict], bool, int | None, str | None]:
+    """Devuelve lo disponible ya y sincroniza el resto fuera del hilo HTTP."""
+    start = False
+    with _repos_guard:
+        cached = _repos_cache.get(installation_id)
+        loading = _repos_loading.get(installation_id)
+        if cached and not fresh and cached[0] + REPOS_TTL > time.time() and not loading:
+            return cached[1], False, len(cached[1]), None
+        if fresh:
+            _repos_errors.pop(installation_id, None)
+        failure = _repos_errors.get(installation_id)
+        if failure and failure[0] + REPOS_RETRY_AFTER > time.time() and not loading:
+            return cached[1] if cached else [], False, len(cached[1]) if cached else None, failure[1]
+        if not loading:
+            loading = {"repos": [], "total": None}
+            _repos_loading[installation_id] = loading
+            start = True
+        rows = cached[1] if cached else loading["repos"]
+        total = len(rows) if cached else loading["total"]
+    if start:
+        def update(rows: list[dict], total: int | None) -> None:
+            with _repos_guard:
+                loading["repos"] = rows.copy()
+                loading["total"] = total
+
+        def run() -> None:
+            try:
+                installation_repositories(installation_id, fresh=True, progress=update)
+            except GitHubAppError as exc:
+                with _repos_guard:
+                    _repos_errors[installation_id] = (time.time(), str(exc))
+            except Exception:
+                logging.getLogger("appsec.github").exception("repository_catalog_sync_failed")
+                with _repos_guard:
+                    _repos_errors[installation_id] = (time.time(), "No se pudo sincronizar el catálogo de repositorios")
+            finally:
+                with _repos_guard:
+                    _repos_loading.pop(installation_id, None)
+
+        threading.Thread(target=run, name=f"github-repos-{installation_id}", daemon=True).start()
+    return rows, True, total, None
+
+
+# ------------------------------------------------------------ catálogo por páginas
+# Listar una organización grande entera cuesta decenas de llamadas. Las vistas piden solo la
+# página que enseñan, la búsqueda la hace GitHub y comprobar un repositorio concreto no exige
+# listar los demás. La lista completa queda para el vigilante de PRs, que la necesita para
+# detectar repositorios retirados, y su caché se aprovecha aquí cuando está fresca.
+
+PAGE_TTL = 60
+SEARCH_LIMIT = 1000  # GitHub no devuelve más resultados por búsqueda
+_pages: dict[tuple, tuple[float, object]] = {}
+_known: dict[tuple[int, str], tuple[float, dict | None]] = {}
+_info: dict[int, tuple[float, dict]] = {}
+_MISSING = object()
+UID = re.compile(r"github#([1-9][0-9]{0,15})")
+NOT_FOUND = "Repositorio no disponible para la instalación"
+
+
+def _cached(store: dict, key, ttl: int):
+    with _repos_guard:
+        entry = store.get(key)
+    return entry[1] if entry and entry[0] + ttl > time.time() else _MISSING
+
+
+def _store(store: dict, key, value) -> None:
+    with _repos_guard:
+        if len(store) > 20_000:
+            store.clear()
+        store[key] = (time.time(), value)
+
+
+def _remember(installation_id: int, rows: list[dict]) -> None:
+    """Lo que GitHub acaba de listar para la instalación sirve para validar esa selección sin otra llamada."""
+    for row in rows:
+        _store(_known, (installation_id, row["id"]), row)
+        _store(_known, (installation_id, row["uid"]), row)
+
+
+def _complete(installation_id: int) -> list[dict] | None:
+    with _repos_guard:
+        cached = _repos_cache.get(installation_id)
+    return cached[1] if cached and cached[0] + REPOS_TTL > time.time() else None
+
+
+def installation_info(installation_id: int) -> dict:
+    """`installation_details` cacheado: cuenta y alcance cambian poco y se consultan en cada página."""
+    cached = _cached(_info, installation_id, REPOS_TTL)
+    if cached is _MISSING:
+        cached = installation_details(installation_id)
+        _store(_info, installation_id, cached)
+    return cached
+
+
+def _check_page(page: int, per_page: int) -> None:
+    if not 1 <= per_page <= 100 or not 1 <= page or page * per_page > MAX_REPO_PAGES * 100:
+        raise GitHubAppError("Página de repositorios inválida")
+
+
+def _total(payload: dict, fallback: int) -> int:
+    total = payload.get("total_count")
+    return total if isinstance(total, int) and not isinstance(total, bool) and total >= 0 else fallback
+
+
+def repositories_page(installation_id: int, page: int, per_page: int) -> tuple[list[dict], int]:
+    """Una página del catálogo con el total: una sola llamada a GitHub, sin recorrer las demás."""
+    _check_page(page, per_page)
+    start = (page - 1) * per_page
+    full = _complete(installation_id)
+    if full is not None:
+        return full[start:start + per_page], len(full)
+    key = ("page", installation_id, page, per_page)
+    cached = _cached(_pages, key, PAGE_TTL)
+    if cached is not _MISSING:
+        return cached
+    payload = _get(f"{API}/installation/repositories?per_page={per_page}&page={page}", installation_token(installation_id))
+    rows = _repo_rows(payload)
+    result = (rows, _total(payload, start + len(rows)))
+    _remember(installation_id, rows)
+    _store(_pages, key, result)
     return result
+
+
+def search_repositories(installation_id: int, text: str, page: int, per_page: int) -> tuple[list[dict], int, bool]:
+    """Busca por nombre. Devuelve (filas, total, parcial).
+
+    Con acceso a todos los repositorios de la cuenta busca GitHub (`/search/repositories`
+    acotado a esa cuenta). Con repositorios seleccionados la búsqueda de GitHub también
+    devolvería públicos no concedidos, así que se filtra la lista de la instalación; si aún
+    se está leyendo, el resultado es parcial.
+    """
+    _check_page(page, per_page)
+    needle = text.strip().casefold()
+    start = (page - 1) * per_page
+    full = _complete(installation_id)
+    if full is None:
+        info = installation_info(installation_id)
+        account = info.get("account")
+        # Solo letras, números y separadores: el texto no puede añadir calificadores (`org:`, `user:`…).
+        term = " ".join(re.sub(r"[^A-Za-z0-9._-]+", " ", text).split())[:100]
+        if (term and info.get("repository_selection") == "all" and isinstance(account, str)
+                and OWNER.fullmatch(account) and page * per_page <= SEARCH_LIMIT):
+            key = ("search", installation_id, term.casefold(), page, per_page)
+            cached = _cached(_pages, key, PAGE_TTL)
+            if cached is not _MISSING:
+                return cached
+            qualifier = "org" if info.get("account_type") == "Organization" else "user"
+            query = quote(f"{term} in:name {qualifier}:{account} fork:true")
+            try:
+                payload = _get(f"{API}/search/repositories?q={query}&per_page={per_page}&page={page}",
+                               installation_token(installation_id))
+                rows = _repo_rows({"repositories": payload.get("items") if isinstance(payload, dict) else None})
+            except GitHubAppError:
+                # La búsqueda tiene su propio límite (30/min); se sigue con la lista de la instalación.
+                pass
+            else:
+                rows = [row for row in rows if row["name"].split("/", 1)[0].casefold() == account.casefold()]
+                result = (rows, min(_total(payload, start + len(rows)), SEARCH_LIMIT), False)
+                _remember(installation_id, rows)
+                _store(_pages, key, result)
+                return result
+        rows, partial, _, error = installation_repositories_snapshot(installation_id)
+        if error and not rows:
+            raise GitHubAppError(error)
+    else:
+        rows, partial = full, False
+    matches = [row for row in rows if needle in row["name"].casefold()]
+    return matches[start:start + per_page], len(matches), partial
+
+
+def _scoped_repository(installation_id: int, name: str) -> dict | None:
+    """GitHub solo acuña un token para repositorios concedidos a la instalación: es la prueba de pertenencia.
+
+    El token se pide con el mínimo (metadatos de lectura de ese repositorio) y se descarta.
+    """
+    body = json.dumps({"repositories": [name], "permissions": {"metadata": "read"}}).encode()
+    request = Request(f"{API}/app/installations/{installation_id}/access_tokens", data=body, method="POST", headers={
+        "Accept": "application/vnd.github+json", "Authorization": f"Bearer {_app_jwt()}", "Content-Type": "application/json",
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "AppSecAgent/0.4"})
+    try:
+        with build_opener(_NoRedirect).open(request, timeout=15) as response:
+            payload = json.loads(response.read(2_000_000))
+    except HTTPError as exc:
+        if exc.code in (404, 422):
+            return None
+        raise GitHubAppError(f"GitHub no pudo comprobar el repositorio (HTTP {exc.code})") from exc
+    except (URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError) as exc:
+        raise GitHubAppError("No se pudo contactar con GitHub") from exc
+    rows = _repo_rows({"repositories": payload.get("repositories") if isinstance(payload, dict) else None})
+    return rows[0] if len(rows) == 1 else None
+
+
+def installation_repository(installation_id: int, source_id: str) -> dict | None:
+    """Un repositorio concreto de la instalación (`github:owner/repo`), sin listar el resto."""
+    if not isinstance(source_id, str) or not source_id.startswith("github:"):
+        return None
+    cached = _cached(_known, (installation_id, source_id), REPOS_TTL)
+    if cached is not _MISSING:
+        return cached
+    full = _complete(installation_id)
+    if full is not None:
+        return next((row for row in full if row["id"] == source_id), None)
+    repository = source_id.removeprefix("github:")
+    if not REPO_PATTERN.fullmatch(repository) or ".." in repository:
+        return None
+    owner, name = repository.split("/", 1)
+    account = installation_info(installation_id).get("account")
+    if isinstance(account, str) and owner.casefold() != account.casefold():
+        return None
+    found = _scoped_repository(installation_id, name)
+    if found is not None and found["id"] != source_id:
+        found = None
+    _store(_known, (installation_id, source_id), found)
+    if found is not None:
+        _remember(installation_id, [found])
+    return found
+
+
+def installation_repository_by_uid(installation_id: int, uid: str) -> dict | None:
+    """Igual que `installation_repository`, por identidad estable (`github#123`), que sobrevive a renombrados."""
+    match = UID.fullmatch(uid) if isinstance(uid, str) else None
+    if match is None:
+        return None
+    cached = _cached(_known, (installation_id, uid), REPOS_TTL)
+    if cached is not _MISSING:
+        return cached
+    full = _complete(installation_id)
+    if full is not None:
+        return next((row for row in full if row["uid"] == uid), None)
+    try:
+        payload = _get(f"{API}/repositories/{match.group(1)}", installation_token(installation_id), forbidden=NOT_FOUND)
+    except GitHubAppError as exc:
+        if str(exc) != NOT_FOUND:
+            raise
+        payload = None
+    name = payload.get("full_name") if isinstance(payload, dict) else None
+    # Un repositorio público se lee aunque no esté concedido: la pertenencia se confirma aparte.
+    found = installation_repository(installation_id, f"github:{name}") if isinstance(name, str) else None
+    if found is not None and found["uid"] != uid:
+        found = None
+    _store(_known, (installation_id, uid), found)
+    return found
 
 
 # ------------------------------------------------------------ pull requests
