@@ -68,9 +68,10 @@ export function SeveritySkyline({ cells, days = 30, height = 260 }: { cells: Sky
 
     const draw = (time: number) => {
       const styles = getComputedStyle(element)
-      const colors = Object.fromEntries(ROWS.map(row => [row, styles.getPropertyValue(TOKEN[row]).trim() || '#888888']))
-      const grid_line = styles.getPropertyValue('--grid-line').trim() || '#444444'
-      const ink = styles.getPropertyValue('--muted-foreground').trim() || '#999999'
+      // Todo sale de los tokens; si faltara alguno, el color del texto (también un token) antes que un gris inventado.
+      const ink = styles.getPropertyValue('--muted-foreground').trim() || styles.color
+      const colors = Object.fromEntries(ROWS.map(row => [row, styles.getPropertyValue(TOKEN[row]).trim() || ink]))
+      const grid_line = styles.getPropertyValue('--grid-line').trim() || ink
       const ratio = window.devicePixelRatio || 1
       const width = element.clientWidth, tall = element.clientHeight
       if (element.width !== Math.round(width * ratio) || element.height !== Math.round(tall * ratio)) {
@@ -137,7 +138,7 @@ export function SeveritySkyline({ cells, days = 30, height = 260 }: { cells: Sky
 
       // Rótulos de fila al principio del eje y extremos de fecha.
       context.fillStyle = ink
-      context.font = '10px Geist Variable, system-ui, sans-serif'
+      context.font = '11px Geist Variable, system-ui, sans-serif'
       context.textAlign = 'right'
       ROWS.forEach((row, index) => { const [px, py] = project(-0.5, 0, index * GAP + GAP / 2); context.fillText(ROW_NAME[row], px, py + 3) })
       context.textAlign = 'center'

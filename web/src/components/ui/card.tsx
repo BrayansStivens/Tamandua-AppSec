@@ -32,9 +32,11 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+// Encabezado real (1.3.1): con h1 en la página, las tarjetas son h2; una tarjeta dentro de otra pasa level={3}.
+function CardTitle({ className, level = 2, ...props }: React.ComponentProps<"h2"> & { level?: 2 | 3 | 4 }) {
+  const Heading = `h${level}` as "h2"
   return (
-    <div
+    <Heading
       data-slot="card-title"
       className={cn(
         "font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",

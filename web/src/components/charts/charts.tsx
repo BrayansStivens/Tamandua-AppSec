@@ -26,13 +26,13 @@ export function StackedSeverityBars({ data, height = 180 }: { data: { day: strin
   const total = data.reduce((sum, item) => sum + item.critical + item.high + item.medium + item.low, 0)
   return <div className="relative">
     <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label={`Hallazgos nuevos por día: ${total} en total`}>
-      {ticks.map(tick => { const y = padTop + innerH - (tick / max) * innerH; return <g key={tick}><line x1={padLeft} x2={width - 8} y1={y} y2={y} stroke="var(--grid-line)" strokeWidth={1} /><text x={padLeft - 6} y={y + 3} textAnchor="end" className="fill-app-subtle" fontSize={9}>{tick}</text></g> })}
+      {ticks.map(tick => { const y = padTop + innerH - (tick / max) * innerH; return <g key={tick}><line x1={padLeft} x2={width - 8} y1={y} y2={y} stroke="var(--grid-line)" strokeWidth={1} /><text x={padLeft - 6} y={y + 3} textAnchor="end" className="fill-app-subtle" fontSize={10.5}>{tick}</text></g> })}
       {data.map((item, index) => { const x = padLeft + index * slot + (slot - bar) / 2; let y = padTop + innerH
         return <g key={item.day} onMouseEnter={event => setHover({ index, x: (event.nativeEvent as MouseEvent).offsetX, y: (event.nativeEvent as MouseEvent).offsetY })} onMouseLeave={() => setHover(null)}>
           <rect x={padLeft + index * slot} y={padTop} width={slot} height={innerH} fill="transparent" />
           {SEV.map(level => { const value = item[level]; if (!value) return null; const h = (value / max) * innerH; y -= h
             return <rect key={level} x={x} y={y + 1} width={bar} height={Math.max(0, h - 2)} rx={level === 'critical' || y + 1 <= padTop + 2 ? 2 : 0} fill={sevColor[level]} /> })}
-          {(index % Math.ceil(data.length / 8) === 0 || index === data.length - 1) && <text x={padLeft + index * slot + slot / 2} y={height - 6} textAnchor="middle" className="fill-app-subtle" fontSize={9}>{shortDay(item.day)}</text>}
+          {(index % Math.ceil(data.length / 8) === 0 || index === data.length - 1) && <text x={padLeft + index * slot + slot / 2} y={height - 6} textAnchor="middle" className="fill-app-subtle" fontSize={10.5}>{shortDay(item.day)}</text>}
         </g> })}
       <line x1={padLeft} x2={width - 8} y1={padTop + innerH} y2={padTop + innerH} stroke="var(--axis-line)" strokeWidth={1} />
     </svg>
@@ -64,13 +64,13 @@ export function FoundVsFixed({ data, height = 160 }: { data: { day: string; foun
   const last = data[data.length - 1]
   return <div className="relative">
     <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full" role="img" aria-label="Hallados frente a corregidos, acumulado">
-      {[0, Math.ceil(max / 2), max].map(tick => <g key={tick}><line x1={padLeft} x2={width - 8} y1={y(tick)} y2={y(tick)} stroke="var(--grid-line)" strokeWidth={1} /><text x={padLeft - 6} y={y(tick) + 3} textAnchor="end" className="fill-app-subtle" fontSize={9}>{tick}</text></g>)}
+      {[0, Math.ceil(max / 2), max].map(tick => <g key={tick}><line x1={padLeft} x2={width - 8} y1={y(tick)} y2={y(tick)} stroke="var(--grid-line)" strokeWidth={1} /><text x={padLeft - 6} y={y(tick) + 3} textAnchor="end" className="fill-app-subtle" fontSize={10.5}>{tick}</text></g>)}
       <path d={path('found')} fill="none" stroke="var(--series-found)" strokeWidth={2} strokeLinejoin="round" />
       <path d={path('fixed')} fill="none" stroke="var(--series-fixed)" strokeWidth={2} strokeLinejoin="round" />
       {last && <><text x={width - 10} y={y(last.found) - 4} textAnchor="end" className="fill-app-secondary" fontSize={10}>{last.found} hallados</text><text x={width - 10} y={y(last.fixed) + (Math.abs(y(last.fixed) - y(last.found)) < 12 ? 12 : -4)} textAnchor="end" className="fill-app-secondary" fontSize={10}>{last.fixed} corregidos</text></>}
       {hover && <><line x1={x(hover.index)} x2={x(hover.index)} y1={padTop} y2={padTop + innerH} stroke="var(--axis-line)" strokeDasharray="3 3" /><circle cx={x(hover.index)} cy={y(data[hover.index].found)} r={4} fill="var(--series-found)" stroke="var(--app-panel)" strokeWidth={2} /><circle cx={x(hover.index)} cy={y(data[hover.index].fixed)} r={4} fill="var(--series-fixed)" stroke="var(--app-panel)" strokeWidth={2} /></>}
       <rect x={padLeft} y={padTop} width={innerW} height={innerH} fill="transparent" onMouseMove={event => { const rect = (event.currentTarget as SVGRectElement).getBoundingClientRect(); const ratio = (event.clientX - rect.left) / rect.width; setHover({ index: Math.round(ratio * (data.length - 1)), x: (event.nativeEvent as MouseEvent).offsetX, y: (event.nativeEvent as MouseEvent).offsetY }) }} onMouseLeave={() => setHover(null)} />
-      {data.map((item, index) => (index % Math.ceil(data.length / 6) === 0 || index === data.length - 1) && <text key={item.day} x={x(index)} y={height - 6} textAnchor="middle" className="fill-app-subtle" fontSize={9}>{shortDay(item.day)}</text>)}
+      {data.map((item, index) => (index % Math.ceil(data.length / 6) === 0 || index === data.length - 1) && <text key={item.day} x={x(index)} y={height - 6} textAnchor="middle" className="fill-app-subtle" fontSize={10.5}>{shortDay(item.day)}</text>)}
       <line x1={padLeft} x2={width - 8} y1={padTop + innerH} y2={padTop + innerH} stroke="var(--axis-line)" strokeWidth={1} />
     </svg>
     {hover && <Tooltip x={hover.x} y={hover.y}><div className="font-medium">{data[hover.index].day}</div><div className="flex justify-between gap-3"><span>Hallados</span><span className="tabular-nums">{data[hover.index].found}</span></div><div className="flex justify-between gap-3"><span>Corregidos</span><span className="tabular-nums">{data[hover.index].fixed}</span></div></Tooltip>}
@@ -97,12 +97,12 @@ export function ActivityHeatmap({ days }: { days: { day: string; runs: number }[
   days.forEach((item, index) => { if (item.day.endsWith('-01') || index === 0) { const col = Math.floor((index + startPad) / 7); months.push({ x: 28 + col * (cell + gap), label: new Date(item.day).toLocaleDateString('es-CO', { month: 'short', timeZone: 'UTC' }) }) } })
   return <div className="relative overflow-x-auto">
     <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} role="img" aria-label="Ejecuciones por día en el último año">
-      {['L', '', 'X', '', 'V', '', ''].map((label, row) => <text key={row} x={0} y={18 + row * (cell + gap) + 9} className="fill-app-subtle" fontSize={9}>{label}</text>)}
-      {months.map(month => <text key={month.x + month.label} x={month.x} y={9} className="fill-app-subtle" fontSize={9}>{month.label}</text>)}
+      {['L', '', 'X', '', 'V', '', ''].map((label, row) => <text key={row} x={0} y={18 + row * (cell + gap) + 9} className="fill-app-subtle" fontSize={10.5}>{label}</text>)}
+      {months.map(month => <text key={month.x + month.label} x={month.x} y={9} className="fill-app-subtle" fontSize={10.5}>{month.label}</text>)}
       {days.map((item, index) => { const position = index + startPad; const col = Math.floor(position / 7), row = position % 7
         return <rect key={item.day} x={28 + col * (cell + gap)} y={18 + row * (cell + gap)} width={cell} height={cell} rx={2} fill={level(item.runs)} onMouseEnter={event => setHover({ ...item, x: (event.nativeEvent as MouseEvent).offsetX, y: (event.nativeEvent as MouseEvent).offsetY })} onMouseLeave={() => setHover(null)} /> })}
     </svg>
     {hover && <Tooltip x={hover.x} y={hover.y}><div className="font-medium">{hover.day}</div><div>{hover.runs} {hover.runs === 1 ? 'ejecución' : 'ejecuciones'}</div></Tooltip>}
-    <div className="mt-1 flex items-center gap-1 text-[10px] text-app-subtle">Menos {[1, 2, 3, 4, 5].map(step => <span key={step} className="inline-block size-2.5 rounded-sm" style={{ background: `var(--seq-${step})` }} />)} Más</div>
+    <div className="mt-1 flex items-center gap-1 text-[11px] text-app-subtle">Menos {[1, 2, 3, 4, 5].map(step => <span key={step} className="inline-block size-2.5 rounded-sm" style={{ background: `var(--seq-${step})` }} />)} Más</div>
   </div>
 }

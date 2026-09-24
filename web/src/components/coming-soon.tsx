@@ -3,7 +3,7 @@ import { Hammer } from 'lucide-react'
 
 // Una función que se verá pronto pero que hoy no da resultados: siempre con la misma marca y en gris.
 export function SoonBadge({ className = '' }: { className?: string }) {
-  return <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-app-faint/60 px-2 py-0.5 text-[10px] font-medium tracking-wide text-app-subtle uppercase ${className}`}>
+  return <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-app-faint/60 px-2 py-0.5 text-[11px] font-medium tracking-wide text-app-subtle uppercase ${className}`}>
     <Hammer className="size-3" />En desarrollo
   </span>
 }

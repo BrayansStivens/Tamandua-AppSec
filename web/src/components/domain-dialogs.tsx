@@ -73,10 +73,10 @@ export function AddDomainDialog({ open, onOpenChange, onAdded }: { open: boolean
         <label htmlFor="domain-url" className="text-sm text-app-secondary">Dominio</label>
         <div className="relative">
           <Input id="domain-url" required autoFocus value={url} onChange={event => setUrl(event.target.value)} placeholder="app.tudominio.com" className="border-app-line bg-app-soft pr-10" />
-          <span className="absolute top-1/2 right-3 -translate-y-1/2">{checking ? <LoaderCircle className="size-4 animate-spin text-app-subtle" /> : reach?.reachable ? <CircleCheck className="size-4 text-brand" /> : reach ? <CircleAlert className="size-4 text-amber-600 dark:text-amber-400" /> : null}</span>
+          <span className="absolute top-1/2 right-3 -translate-y-1/2">{checking ? <LoaderCircle className="size-4 animate-spin text-app-subtle" /> : reach?.reachable ? <CircleCheck className="size-4 text-brand" /> : reach ? <CircleAlert className="size-4 text-warning" /> : null}</span>
         </div>
         {checking && <p className="text-xs text-app-subtle">Comprobando si responde por HTTPS…</p>}
-        {reach && <p className={`text-xs ${reach.reachable ? 'text-brand' : 'text-amber-700 dark:text-amber-400'}`}>{reach.reachable ? 'Dominio alcanzable' : reach.detail}{reach.reachable && reach.http_status ? ` · HTTPS ${reach.http_status}` : ''}</p>}
+        {reach && <p className={`text-xs ${reach.reachable ? 'text-brand' : 'text-warning'}`}>{reach.reachable ? 'Dominio alcanzable' : reach.detail}{reach.reachable && reach.http_status ? ` · HTTPS ${reach.http_status}` : ''}</p>}
       </div>
       <details className="group">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm text-app-muted"><ChevronRight className="size-4 transition group-open:rotate-90" />Más detalles</summary>
@@ -85,7 +85,7 @@ export function AddDomainDialog({ open, onOpenChange, onAdded }: { open: boolean
           <div className="space-y-2"><label htmlFor="domain-context" className="text-sm text-app-secondary">Contexto <span className="text-app-subtle">(opcional)</span></label><textarea id="domain-context" rows={3} maxLength={400} value={context} onChange={event => setContext(event.target.value)} placeholder="¿Qué hace esta app? Stack, autenticación, datos sensibles que maneja…" className="w-full rounded-xl border border-app-line bg-app-soft p-3 text-sm outline-none focus-visible:border-brand/60" /><p className="text-xs text-app-subtle">{context.length}/400 · queda junto al activo como nota del equipo; no la verifica el sistema.</p></div>
         </div>
       </details>
-      {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">{error}</p>}
+      {error && <p role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">{error}</p>}
       <DialogFooter><Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="submit" disabled={busy || !url.trim()} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy && <LoaderCircle className="animate-spin" />}Añadir dominio</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>
@@ -107,14 +107,14 @@ export function VerifyDomainDialog({ domain, onOpenChange, onVerified }: { domai
   }
   return <Dialog open onOpenChange={onOpenChange}><DialogContent className="max-w-xl">
     <DialogHeader><DialogTitle>Dominio añadido</DialogTitle><DialogDescription>Demuestra la propiedad con un registro DNS TXT antes de cualquier prueba activa.</DialogDescription></DialogHeader>
-    <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100/90"><TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" /><span><strong className="font-medium">{domain.host}</strong> añadido — verificación pendiente</span></div>
+    <div className="flex items-start gap-3 rounded-xl border border-warning-line bg-warning-soft p-4 text-sm text-warning"><TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" /><span><strong className="font-medium">{domain.host}</strong> añadido — verificación pendiente</span></div>
     <div className="space-y-4 rounded-xl border border-app-line bg-inset p-4">
       <p className="text-sm text-app-muted">Añade este registro <strong className="font-medium text-app-secondary">TXT</strong> en tu proveedor DNS:</p>
       {([['Nombre del registro', domain.txt_name], ['Valor del registro', domain.txt_value]] as const).map(([label, value]) => <div key={label} className="space-y-1.5"><span className="text-xs text-app-subtle">{label}</span><div className="flex items-center gap-2 rounded-lg border border-app-line bg-app-soft px-3 py-2"><code className="min-w-0 flex-1 break-all font-mono text-xs text-app-secondary">{value}</code><Button type="button" aria-label={`Copiar ${label.toLowerCase()}`} variant="ghost" size="icon-sm" onClick={() => void copy(value)}>{copied === value ? <Check /> : <Copy />}</Button></div></div>)}
       <p className="text-xs text-app-subtle">La propagación puede tardar entre 2 y 10 minutos.</p>
     </div>
     <p className="text-xs text-app-subtle">Verificar la propiedad no lanza ninguna prueba: habilita el dominio como objetivo elegible.</p>
-    {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-300">{error}</p>}
+    {error && <p role="alert" className="rounded-lg border border-danger-line bg-danger-soft p-3 text-sm text-danger">{error}</p>}
     <DialogFooter><Button variant="ghost" onClick={() => onOpenChange(false)}>Omitir</Button><Button disabled={busy} onClick={() => void verify()} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <ShieldCheck />}Verificar ahora</Button></DialogFooter>
   </DialogContent></Dialog>
 }

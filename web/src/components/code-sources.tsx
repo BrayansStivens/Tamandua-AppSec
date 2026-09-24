@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { GitHubAppGuide, GitHubInstall, type GitHubStatus } from '@/components/github-setup'
 import { Pager } from '@/components/source-search'
+import { SkeletonList } from '@/components/loading'
 import { useSourcePage } from '@/lib/sources'
 import { ComingSoonCard } from '@/components/coming-soon'
 
@@ -91,8 +92,8 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
       </CardContent>
     </Card>}
     {showRepositories && <p className="text-sm text-app-muted">{installations.length} {installations.length === 1 ? 'cuenta conectada' : 'cuentas conectadas'} · <a className="font-medium text-brand hover:underline" href="#/integraciones">Gestionar integración de GitHub</a></p>}
-    {(error || sourcesError) && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-200">{error || sourcesError}</div>}
-    {data?.providers.github?.error && <div role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200">{data.providers.github.error}</div>}
+    {(error || sourcesError) && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft p-3 text-sm text-danger">{error || sourcesError}</div>}
+    {data?.providers.github?.error && <div role="alert" className="rounded-xl border border-warning-line bg-warning-soft p-3 text-sm text-warning">{data.providers.github.error}</div>}
 
     {showRepositories && <Card className="border-app-line bg-panel">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3"><div><CardTitle>Repositorios</CardTitle><CardDescription>Repositorios concedidos en todas las organizaciones conectadas.</CardDescription></div><Button variant="outline" disabled={loading} onClick={() => reload(true)} className="border-app-line bg-app-soft"><RefreshCw className={loading ? 'animate-spin' : ''} /> Actualizar lista</Button></CardHeader>
@@ -105,7 +106,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
         </div>}
         <div className="overflow-hidden rounded-xl border border-app-line">
           <div className="hidden grid-cols-[minmax(0,1fr)_120px_130px_130px] gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid"><span>Repositorio</span><span>Origen</span><span>Último análisis</span><span>Acción</span></div>
-          {!data && <p className="p-6 text-center text-sm text-app-subtle">Cargando repositorios…</p>}
+          {!data && <SkeletonList rows={8} action label="Cargando repositorios" />}
           {data?.sources.map(source => {
             const last = runs.find(run => run.source?.name === source.name)
             return <div key={source.id} className="grid gap-2 border-b border-app-line px-4 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_120px_130px_130px] md:items-center">

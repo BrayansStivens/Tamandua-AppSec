@@ -14,8 +14,8 @@ export type TriageState = { status: TriageStatus; reason?: string | null; note?:
 export const triageLabel: Record<TriageStatus, string> = { open: 'Abierto', in_progress: 'En curso', false_positive: 'Falso positivo', accepted: 'Riesgo aceptado', fixed: 'Remediado' }
 export const SUPPRESSED: TriageStatus[] = ['false_positive', 'accepted', 'fixed']
 export const triageClass: Record<TriageStatus, string> = {
-  open: 'border-app-line text-app-muted', in_progress: 'border-sky-500/30 text-sky-800 dark:text-sky-300',
-  false_positive: 'border-app-line bg-app-soft text-app-subtle line-through decoration-app-faint', accepted: 'border-violet-500/30 text-violet-800 dark:text-violet-300',
+  open: 'border-app-line text-app-muted', in_progress: 'border-info-line text-info',
+  false_positive: 'border-app-line bg-app-soft text-app-subtle line-through decoration-app-faint', accepted: 'border-brand/30 text-brand',
   fixed: 'border-brand/30 text-brand',
 }
 const icon: Record<TriageStatus, typeof CircleDot> = { open: RotateCcw, in_progress: Wrench, false_positive: ShieldX, accepted: ThumbsUp, fixed: CheckCheck }
@@ -26,7 +26,7 @@ const inDays = (days: number) => new Date(Date.now() + days * 86400000).toISOStr
 export function TriageBadge({ state }: { state?: TriageState }) {
   const status = state?.status ?? 'open'
   if (status === 'open' && !state?.expired) return null
-  return <Badge variant="outline" className={`w-fit text-[10px] ${triageClass[status]}`}>{state?.expired ? 'Aceptación caducada' : triageLabel[status]}</Badge>
+  return <Badge variant="outline" className={`w-fit text-[11px] ${triageClass[status]}`}>{state?.expired ? 'Aceptación caducada' : triageLabel[status]}</Badge>
 }
 
 // Botones de decisión. "Aceptar riesgo" solo aparece a administradores: es una decisión de negocio.
@@ -72,7 +72,7 @@ export function TriageDialog({ runId, status, fingerprints, onClose, onDone }: {
           className="w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand/40" /></div>
       {status === 'accepted' && <div className="space-y-1.5"><label htmlFor="triage-expires" className="text-xs text-app-muted">Caduca el</label><Input id="triage-expires" type="date" required min={inDays(1)} max={inDays(365)} value={expires} onChange={event => setExpires(event.target.value)} className="w-48 border-app-line bg-app-soft" /></div>}
       <div className="space-y-1.5"><label htmlFor="triage-note" className="text-xs text-app-muted">Nota (opcional: ticket, PR, responsable)</label><Input id="triage-note" maxLength={1000} value={note} onChange={event => setNote(event.target.value)} className="border-app-line bg-app-soft" /></div>
-      {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
+      {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
       <DialogFooter><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={busy || (needsReason(status) && reason.trim().length < 10)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy && <LoaderCircle className="animate-spin" />}Guardar</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>
@@ -83,7 +83,7 @@ export function TriageHistory({ state }: { state?: TriageState }) {
   if (!history.length) return null
   return <details className="mt-3"><summary className="cursor-pointer text-xs text-app-muted">Historial de triage · {history.length}</summary>
     <ol className="mt-2 space-y-1.5 border-l border-app-line pl-3 text-xs">{[...history].reverse().map((event, index) => <li key={index} className="text-app-muted">
-      <span className="flex items-center gap-1.5"><Clock3 className="size-3 text-app-faint" /><span className="font-medium text-app-secondary">{triageLabel[event.status]}</span> · {event.by} · {formatDate(event.at)}{event.expires_at ? ` · caduca ${event.expires_at}` : ''}</span>
+      <span className="flex items-center gap-1.5"><Clock3 className="size-3 text-app-subtle" /><span className="font-medium text-app-secondary">{triageLabel[event.status]}</span> · {event.by} · {formatDate(event.at)}{event.expires_at ? ` · caduca ${event.expires_at}` : ''}</span>
       {event.reason && <span className="block pl-4.5">{event.reason}</span>}{event.note && <span className="block pl-4.5 text-app-subtle">{event.note}</span>}
     </li>)}</ol></details>
 }

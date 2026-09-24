@@ -31,8 +31,8 @@ const day = (stamp: string | null) => stamp ? new Date(stamp).toLocaleDateString
 const percent = (value: number | null) => value === null ? '—' : `${(value * 100).toFixed(value >= 0.1 ? 0 : 1)} %`
 
 export function SeverityPill({ severity, score }: { severity: string | null; score?: number | null }) {
-  if (!severity) return <Badge variant="outline" className="border-app-line text-[10px] text-app-subtle">Sin puntuar</Badge>
-  return <Badge variant="outline" className="gap-1.5 border-app-line text-[10px] text-app-secondary"><span className="size-2 rounded-full" style={{ background: sevColor[severity] ?? 'var(--axis-line)' }} />{sevLabel[severity] ?? severity}{score !== undefined && score !== null ? <span className="font-mono text-app-muted">{score.toFixed(1)}</span> : null}</Badge>
+  if (!severity) return <Badge variant="outline" className="border-app-line text-[11px] text-app-subtle">Sin puntuar</Badge>
+  return <Badge variant="outline" className="gap-1.5 border-app-line text-[11px] text-app-secondary"><span className="size-2 rounded-full" style={{ background: sevColor[severity] ?? 'var(--axis-line)' }} />{sevLabel[severity] ?? severity}{score !== undefined && score !== null ? <span className="font-mono text-app-muted">{score.toFixed(1)}</span> : null}</Badge>
 }
 
 type Filters = { q: string; severity: string; kev: boolean; year: string; sort: string; page: number; size: number }
@@ -106,7 +106,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
       </CardContent></Card>
 
       <Card className="gap-0 overflow-hidden border-app-line bg-panel py-0">
-        {error ? <div role="alert" className="m-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-200">{error}</div>
+        {error ? <div role="alert" className="m-4 rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">{error}</div>
           : !page ? <div className="p-4"><Skeleton rows={6} /></div>
           : <div className={`overflow-x-auto transition-opacity ${loading ? 'opacity-60' : ''}`}>
             <table className="w-full min-w-[720px] table-fixed text-sm">
@@ -115,7 +115,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
                 <th className="w-16 px-3 py-2.5 text-right font-normal">EPSS</th><th className="w-28 px-3 py-2.5 font-normal">Publicado</th><th className="px-4 py-2.5 font-normal">Descripción</th></tr></thead>
               <tbody>{page.items.map(item => <tr key={item.id} onClick={() => show(item.id)} className="cursor-pointer border-b border-app-line align-top last:border-0 hover:bg-app-soft">
                 <td className="px-4 py-3 whitespace-nowrap"><button type="button" className="font-mono text-xs font-medium hover:underline" onClick={event => { event.stopPropagation(); show(item.id) }}>{item.id}</button>
-                  {item.kev && <span className="ml-2 inline-flex items-center gap-0.5 rounded bg-rose-600 px-1 py-0.5 align-middle text-[9px] font-semibold text-white" title="En el catálogo CISA KEV: explotación activa"><Flame className="size-2.5" />KEV</span>}</td>
+                  {item.kev && <span className="ml-2 inline-flex items-center gap-0.5 rounded bg-danger-solid px-1 py-0.5 align-middle text-[11px] font-semibold text-on-solid" title="En el catálogo CISA KEV: explotación activa"><Flame className="size-2.5" />KEV</span>}</td>
                 <td className="px-3 py-3"><SeverityPill severity={item.severity} /></td>
                 <td className="px-3 py-3 text-right font-mono text-xs tabular-nums">{item.score?.toFixed(1) ?? '—'}</td>
                 <td className="px-3 py-3 text-right font-mono text-xs tabular-nums">{percent(item.epss)}</td>
@@ -123,7 +123,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
                 <td className="px-4 py-3 text-xs leading-5 text-app-muted"><span className="line-clamp-2">{item.description}</span></td>
               </tr>)}</tbody>
             </table>
-            {!page.items.length && <div className="flex flex-col items-center gap-2 py-12 text-center"><Search className="size-6 text-app-faint" /><p className="font-medium">Nada coincide</p><p className="max-w-sm text-sm text-app-muted">{overview?.count ? 'Prueba con menos palabras o quita algún filtro.' : 'La base local aún está vacía: se está descargando de NVD.'}</p></div>}
+            {!page.items.length && <div className="flex flex-col items-center gap-2 py-12 text-center"><Search className="size-6 text-app-subtle" /><p className="font-medium">Nada coincide</p><p className="max-w-sm text-sm text-app-muted">{overview?.count ? 'Prueba con menos palabras o quita algún filtro.' : 'La base local aún está vacía: se está descargando de NVD.'}</p></div>}
           </div>}
         {page && page.total > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-app-line px-4 py-2.5 text-xs text-app-subtle">
           <span className="tabular-nums">Mostrando {(page.offset + 1).toLocaleString('es-CO')}–{Math.min(page.offset + page.limit, page.total).toLocaleString('es-CO')} de {page.total.toLocaleString('es-CO')} CVE</span>
@@ -145,10 +145,10 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
         <CardContent>{overview?.years.length ? <div className="grid grid-cols-3 gap-1.5">{overview.years.map(item => <button key={item.year} type="button" onClick={() => apply({ year: filters.year === String(item.year) ? '' : String(item.year) })} title={`${item.count.toLocaleString('es-CO')} CVE`}
           className={`rounded-md border px-2 py-1.5 text-center font-mono text-xs transition ${filters.year === String(item.year) ? 'border-primary bg-primary text-primary-foreground' : 'border-app-line bg-app-soft hover:border-app-faint'}`}>{item.year}</button>)}</div>
           : <p className="text-xs text-app-subtle">Aparecen según se cargan.</p>}</CardContent></Card>
-      <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Flame className="size-4 text-rose-600 dark:text-rose-400" />Explotación activa</CardTitle><CardDescription className="text-xs">Últimas altas en CISA KEV{overview?.kev_total ? ` · ${overview.kev_total.toLocaleString('es-CO')} en el catálogo` : ''}</CardDescription></CardHeader>
+      <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Flame className="size-4 text-danger" />Explotación activa</CardTitle><CardDescription className="text-xs">Últimas altas en CISA KEV{overview?.kev_total ? ` · ${overview.kev_total.toLocaleString('es-CO')} en el catálogo` : ''}</CardDescription></CardHeader>
         <CardContent className="space-y-0.5">{overview?.latest_kev.length ? overview.latest_kev.map(item => <button key={item.id} type="button" onClick={() => show(item.id)} className="flex w-full items-start justify-between gap-2 rounded-md px-1.5 py-1.5 text-left hover:bg-app-soft">
           <span className="min-w-0"><span className="block font-mono text-xs font-medium">{item.id}</span><span className="block truncate text-[11px] text-app-muted" title={item.name ?? ''}>{item.name}</span></span>
-          <span className="flex shrink-0 flex-col items-end gap-0.5 text-[10px] text-app-subtle">{item.date_added}{item.ransomware && <span className="text-rose-700 dark:text-rose-300">ransomware</span>}</span></button>)
+          <span className="flex shrink-0 flex-col items-end gap-0.5 text-[11px] text-app-subtle">{item.date_added}{item.ransomware && <span className="text-danger">ransomware</span>}</span></button>)
           : <p className="text-xs text-app-subtle">Sin catálogo KEV descargado todavía.</p>}
           <button type="button" onClick={() => apply({ kev: true, sort: 'published' })} className="mt-2 flex items-center gap-1 px-1.5 text-xs text-app-muted hover:text-app-fg">Ver todos los KEV <ArrowRight className="size-3" /></button></CardContent></Card>
     </aside>
@@ -163,7 +163,7 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
 function SyncBanner({ overview }: { overview: CveOverview }) {
   const { sync } = overview
   return <div className="rounded-xl border border-app-line bg-panel px-4 py-3 text-sm">
-    <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2">{sync.error ? <ShieldAlert className="size-4 text-amber-600" /> : <LoaderCircle className="size-4 animate-spin text-app-muted" />}
+    <div className="flex flex-wrap items-center justify-between gap-2"><span className="flex items-center gap-2">{sync.error ? <ShieldAlert className="size-4 text-warning" /> : <LoaderCircle className="size-4 animate-spin text-app-muted" />}
       {sync.phase === 'pending' ? 'Preparando la copia local de NVD…' : `Descargando NVD: ${Math.round(sync.progress * 100)} %`}</span>
       <span className="text-xs text-app-subtle">{overview.count.toLocaleString('es-CO')}{sync.nvd_total ? ` de ${sync.nvd_total.toLocaleString('es-CO')}` : ''} CVE · lo más reciente primero</span></div>
     <div className="mt-2 h-1 overflow-hidden rounded-full bg-app-soft"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(2, sync.progress * 100)}%` }} /></div>
@@ -184,7 +184,7 @@ function CveSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
       <SheetHeader className="border-b border-app-line pb-4"><SheetTitle className="font-mono text-lg">{id}</SheetTitle>
         <SheetDescription>{item ? `Publicado ${day(item.published)}${item.modified ? ` · modificado ${day(item.modified)}` : ''}` : 'Cargando…'}</SheetDescription></SheetHeader>
       <div className="space-y-5 px-4 pb-6">
-        {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
+        {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">{error}</div>}
         {!item && !error && <Skeleton rows={4} />}
         {item && <>
           <div className="grid grid-cols-3 gap-2">
@@ -192,16 +192,16 @@ function CveSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
             <Metric label="EPSS" value={percent(item.epss)} extra={item.epss_percentile !== null ? <span className="text-[11px] text-app-subtle">percentil {Math.round(item.epss_percentile * 100)}</span> : null} />
             <Metric label="CISA KEV" value={item.kev ? 'Sí' : 'No'} extra={item.kev_detail ? <span className="text-[11px] text-app-subtle">desde {item.kev_detail.date_added}</span> : null} />
           </div>
-          {item.kev_detail && <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-800 dark:text-rose-200"><p className="flex items-center gap-2 font-medium"><Flame className="size-4" />Explotación activa conocida{item.kev_detail.ransomware ? ' · usada por ransomware' : ''}</p>
+          {item.kev_detail && <div className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2.5 text-sm text-danger"><p className="flex items-center gap-2 font-medium"><Flame className="size-4" />Explotación activa conocida{item.kev_detail.ransomware ? ' · usada por ransomware' : ''}</p>
             <p className="mt-1 text-xs">{item.kev_detail.name}{item.kev_detail.due_date ? ` · fecha límite federal ${item.kev_detail.due_date}` : ''}</p></div>}
           <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Descripción</h3><p className="text-sm leading-6">{item.description}</p></section>
           {item.vector && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Vector</h3><code className="block rounded-md bg-inset px-2.5 py-1.5 font-mono text-xs break-all">{item.vector}</code></section>}
           {item.cwe.length > 0 && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Debilidad</h3><div className="flex flex-wrap gap-1.5">{item.cwe.map(cwe => <a key={cwe} href={`https://cwe.mitre.org/data/definitions/${cwe.slice(4)}.html`} target="_blank" rel="noreferrer" className="rounded-md border border-app-line px-2 py-0.5 font-mono text-xs hover:bg-app-soft">{cwe}</a>)}</div></section>}
           <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">En tus repositorios</h3>
             {item.affected.length ? <div className="space-y-1.5">{item.affected.map(asset => <div key={asset.asset} className="flex items-center justify-between gap-2 rounded-lg border border-app-line px-3 py-2 text-sm"><span className="min-w-0"><span className="block truncate font-medium">{asset.name}</span><span className="text-xs text-app-subtle">{asset.packages.join(', ')}</span></span>
-              {asset.open ? <Badge variant="outline" className="border-transparent bg-rose-600 text-[10px] text-white">{asset.open} abierto{asset.open === 1 ? '' : 's'}</Badge> : <Badge variant="outline" className="border-app-line text-[10px] text-app-muted"><ShieldCheck className="size-3" />remediado</Badge>}</div>)}</div>
+              {asset.open ? <Badge variant="outline" className="border-transparent bg-danger-solid text-[11px] text-on-solid">{asset.open} abierto{asset.open === 1 ? '' : 's'}</Badge> : <Badge variant="outline" className="border-app-line text-[11px] text-app-muted"><ShieldCheck className="size-3" />remediado</Badge>}</div>)}</div>
               : <p className="text-sm text-app-muted">Ningún repositorio analizado tiene este CVE entre sus hallazgos.</p>}</section>
-          {item.references.length > 0 && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Referencias</h3><ul className="space-y-1">{item.references.map(reference => <li key={reference.url} className="flex items-start gap-1.5 text-xs"><ExternalLink className="mt-0.5 size-3 shrink-0 text-app-subtle" /><a href={reference.url} target="_blank" rel="noreferrer noopener" className="min-w-0 break-all text-app-secondary hover:underline">{reference.url}</a>{reference.tags[0] && <span className="shrink-0 text-app-faint">{reference.tags[0]}</span>}</li>)}</ul></section>}
+          {item.references.length > 0 && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Referencias</h3><ul className="space-y-1">{item.references.map(reference => <li key={reference.url} className="flex items-start gap-1.5 text-xs"><ExternalLink className="mt-0.5 size-3 shrink-0 text-app-subtle" /><a href={reference.url} target="_blank" rel="noreferrer noopener" className="min-w-0 break-all text-app-secondary hover:underline">{reference.url}</a>{reference.tags[0] && <span className="shrink-0 text-app-subtle">{reference.tags[0]}</span>}</li>)}</ul></section>}
           <div className="flex flex-wrap gap-2 border-t border-app-line pt-4"><a href={`https://nvd.nist.gov/vuln/detail/${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">NVD <ExternalLink className="size-3" /></a><a href={`https://www.cve.org/CVERecord?id=${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">CVE.org <ExternalLink className="size-3" /></a></div>
         </>}
       </div>

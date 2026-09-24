@@ -87,15 +87,15 @@ function LinkView({ token, onDone, onCancel }: { token: string; onDone: () => vo
     <CardContent>{info && challenge ? <form className="space-y-4" onSubmit={submit}>
       <p className="text-sm text-app-muted">Contraseña guardada. Tu cuenta tiene segundo factor: escribe el código de tu app o un código de respaldo.</p>
       <div className="space-y-1.5"><label htmlFor="link-code" className="text-xs text-app-muted">Código</label><Input id="link-code" autoFocus required autoComplete="one-time-code" inputMode="numeric" maxLength={11} value={code} onChange={event => setCode(event.target.value)} className="border-app-line bg-app-soft font-mono tracking-widest" /></div>
-      {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
+      {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
       <Button type="submit" disabled={busy} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <ShieldCheck />}Verificar y entrar</Button>
     </form> : info ? <form className="space-y-4" onSubmit={submit}>
       <input type="text" autoComplete="username" value={info.username} readOnly hidden />
       <div className="space-y-1.5"><label htmlFor="link-password" className="text-xs text-app-muted">Contraseña</label><Input id="link-password" type="password" autoFocus required minLength={12} maxLength={256} autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} className="border-app-line bg-app-soft" /></div>
       <div className="space-y-1.5"><label htmlFor="link-confirm" className="text-xs text-app-muted">Repite la contraseña</label><Input id="link-confirm" type="password" required minLength={12} maxLength={256} autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} className="border-app-line bg-app-soft" /></div>
-      {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
+      {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
       <Button type="submit" disabled={busy} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <KeyRound />}Guardar y entrar</Button>
-    </form> : error ? <div className="space-y-3"><div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div><Button variant="outline" className="w-full border-app-line bg-app-soft" onClick={onCancel}>Ir al inicio de sesión</Button></div>
+    </form> : error ? <div className="space-y-3"><div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div><Button variant="outline" className="w-full border-app-line bg-app-soft" onClick={onCancel}>Ir al inicio de sesión</Button></div>
       : <LoaderCircle className="size-5 animate-spin text-app-muted" />}</CardContent></Card></Shell>
 }
 
@@ -131,15 +131,15 @@ function LoginView({ setupRequired, notice, onDone }: { setupRequired: boolean; 
       {setupRequired ? <SetupCard onDone={onDone} />
       : <Card className="border-app-line bg-panel"><CardHeader><CardTitle className="flex items-center gap-2">{challenge ? <><ShieldCheck className="size-4" />Segundo factor</> : <><LockKeyhole className="size-4" />Iniciar sesión</>}</CardTitle><CardDescription>{challenge ? 'Escribe el código de 6 dígitos de tu app de autenticación, o uno de tus códigos de respaldo.' : 'Usa las credenciales que te dio el administrador.'}</CardDescription></CardHeader>
         <CardContent><form className="space-y-4" onSubmit={submit}>
-          {notice && !error && <div role="status" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">{notice}</div>}
+          {notice && !error && <div role="status" className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">{notice}</div>}
           {challenge ? <div className="space-y-1.5"><label htmlFor="login-code" className="text-xs text-app-muted">Código</label><Input id="login-code" autoFocus required autoComplete="one-time-code" inputMode="numeric" maxLength={11} value={code} onChange={event => setCode(event.target.value)} placeholder="123456" className="border-app-line bg-app-soft font-mono tracking-widest" /></div>
           : <><div className="space-y-1.5"><label htmlFor="login-user" className="text-xs text-app-muted">Usuario</label><Input id="login-user" autoFocus required autoComplete="username" maxLength={40} value={username} onChange={event => setUsername(event.target.value)} className="border-app-line bg-app-soft" /></div>
             <div className="space-y-1.5"><label htmlFor="login-password" className="text-xs text-app-muted">Contraseña</label><Input id="login-password" type="password" required autoComplete="current-password" maxLength={256} value={password} onChange={event => setPassword(event.target.value)} className="border-app-line bg-app-soft" /></div></>}
-          {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
+          {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
           <Button type="submit" disabled={busy} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <KeyRound />}{challenge ? 'Verificar' : 'Entrar'}</Button>
           {challenge && <button type="button" onClick={() => { setChallenge(null); setCode(''); setError('') }} className="w-full text-center text-xs text-app-subtle hover:text-app-fg">Volver a la contraseña</button>}
         </form></CardContent></Card>}
-      <p className="text-center text-xs text-app-faint">¿Olvidaste la contraseña o perdiste el dispositivo? Un administrador la restablece desde el servidor.</p>
+      <p className="text-center text-xs text-app-subtle">¿Olvidaste la contraseña o perdiste el dispositivo? Un administrador la restablece desde el servidor.</p>
     </div>
   </div>
 }
@@ -175,7 +175,7 @@ function SetupCard({ onDone }: { onDone: () => void }) {
       </div>
       <div className="space-y-1.5"><label htmlFor="setup-password" className="text-xs text-app-muted">Contraseña (mínimo 12 caracteres)</label><Input id="setup-password" type="password" required minLength={12} maxLength={256} autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} className="border-app-line bg-app-soft" /></div>
       <div className="space-y-1.5"><label htmlFor="setup-confirm" className="text-xs text-app-muted">Repite la contraseña</label><Input id="setup-confirm" type="password" required minLength={12} maxLength={256} autoComplete="new-password" value={confirm} onChange={event => setConfirm(event.target.value)} className="border-app-line bg-app-soft" /></div>
-      {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
+      {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
       <Button type="submit" disabled={busy} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <KeyRound />}Crear administrador</Button>
       <p className="text-[11px] leading-4 text-app-subtle">Después te pedirá activar el segundo factor (TOTP) con tu app de autenticación.</p>
     </form></CardContent></Card>

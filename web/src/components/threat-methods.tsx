@@ -21,7 +21,7 @@ export function MethodPicker({ value, onChange }: { value: Methodology; onChange
   return <div role="radiogroup" aria-label="Enfoque de modelado" className="grid gap-2 sm:grid-cols-2">
     {METHOD_ORDER.map(key => <button key={key} type="button" role="radio" aria-checked={value === key} onClick={() => onChange(key)}
       className={`rounded-xl border p-3 text-left transition ${value === key ? 'border-brand/60 bg-brand/[0.07]' : 'border-app-line bg-app-soft hover:border-app-faint'}`}>
-      <span className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{GUIDES[key].name}</span>{key === 'stride' && <Badge variant="outline" className="border-app-line text-[10px] text-app-subtle">Recomendado para empezar</Badge>}</span>
+      <span className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{GUIDES[key].name}</span>{key === 'stride' && <Badge variant="outline" className="border-app-line text-[11px] text-app-subtle">Recomendado para empezar</Badge>}</span>
       <span className="mt-1 block text-xs leading-5 text-app-muted">{GUIDES[key].purpose}</span>
     </button>)}
   </div>
@@ -123,7 +123,7 @@ export function PastaStages({ model, setModel, threats, catalog, onGo }: { model
   }
   return <div className="space-y-2">{catalog.methods.pasta_stages.map(stage => { const expanded = open === stage.key
     return <div key={stage.key} className="rounded-xl border border-app-line bg-panel">
-      <button onClick={() => setOpen(expanded ? '' : stage.key)} className="flex w-full items-center gap-2 px-4 py-3 text-left"><ChevronRight className={`size-4 text-app-subtle transition ${expanded ? 'rotate-90' : ''}`} /><span className="flex-1 text-sm font-medium">{stage.title}</span>{notes[stage.key] && <Badge variant="outline" className="border-brand/30 text-[10px] text-brand">con notas</Badge>}</button>
+      <button onClick={() => setOpen(expanded ? '' : stage.key)} className="flex w-full items-center gap-2 px-4 py-3 text-left"><ChevronRight className={`size-4 text-app-subtle transition ${expanded ? 'rotate-90' : ''}`} /><span className="flex-1 text-sm font-medium">{stage.title}</span>{notes[stage.key] && <Badge variant="outline" className="border-brand/30 text-[11px] text-brand">con notas</Badge>}</button>
       {expanded && <div className="space-y-3 border-t border-app-line px-4 py-4">
         <p className="text-xs leading-5 text-app-subtle">{STAGE_HINTS[stage.key]}</p>
         {auto[stage.key]}

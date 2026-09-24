@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { LoaderCircle, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { SkeletonList } from '@/components/loading'
 import { useSourcePage, type Source, type SourceFilters, type SourcePage } from '@/lib/sources'
 
 export function Pager({ page, perPage, total, onPage, loading = false }: { page: number; perPage: number; total: number; onPage: (page: number) => void; loading?: boolean }) {
@@ -25,9 +26,9 @@ export function SourceSearch({ provider, perPage = 10, render, empty = 'No hay r
   return <div className="space-y-2">
     <div className="relative"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input autoFocus={autoFocus} aria-label={label} placeholder="Buscar por nombre…" value={text} onChange={event => { setText(event.target.value); setPage(1) }} className="border-app-line bg-app-soft pl-9" /></div>
     {data?.partial && <p role="status" className="text-xs text-app-muted">Resultados parciales: la lista de esta cuenta se está leyendo de GitHub.</p>}
-    {error && <p role="alert" className="text-xs text-rose-700 dark:text-rose-300">{error}</p>}
+    {error && <p role="alert" className="text-xs text-danger">{error}</p>}
     <div className="space-y-1">
-      {!data && <p className="flex items-center justify-center gap-2 py-6 text-sm text-app-subtle"><LoaderCircle className="size-4 animate-spin" />Cargando repositorios…</p>}
+      {!data && <SkeletonList rows={Math.min(perPage, 6)} dense label="Cargando repositorios" />}
       {data?.sources.map(source => <div key={source.id}>{render(source)}</div>)}
       {data && !data.sources.length && !loading && <p className="py-6 text-center text-sm text-app-muted">{empty}</p>}
     </div>

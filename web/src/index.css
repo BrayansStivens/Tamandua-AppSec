@@ -20,6 +20,29 @@
     --color-app-subtle: var(--app-subtle);
     --color-app-faint: var(--app-faint);
     --color-brand: var(--brand);
+    /* Estados: texto, fondo suave, borde y sólido (con su texto encima). Únicos colores de estado del panel. */
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+    --color-danger-line: var(--danger-line);
+    --color-danger-solid: var(--danger-solid);
+    --color-on-danger: var(--on-solid);
+    --color-attention: var(--attention);
+    --color-attention-soft: var(--attention-soft);
+    --color-attention-line: var(--attention-line);
+    --color-warning: var(--warning);
+    --color-warning-soft: var(--warning-soft);
+    --color-warning-line: var(--warning-line);
+    --color-info: var(--info);
+    --color-info-soft: var(--info-soft);
+    --color-info-line: var(--info-line);
+    --color-success: var(--success);
+    --color-success-soft: var(--success-soft);
+    --color-success-line: var(--success-line);
+    --color-on-brand: var(--on-solid);
+    --color-on-solid: var(--on-solid);
+    --color-overlay: var(--overlay);
+    --color-knob: var(--knob);
+    --color-skeleton: var(--skeleton);
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
@@ -75,9 +98,29 @@
     --app-primary: oklch(0.205 0 0);
     --app-secondary: oklch(0.32 0 0);
     --app-muted: var(--muted-foreground);
-    --app-subtle: oklch(0.6 0 0);
-    --app-faint: oklch(0.72 0 0);
+    --app-subtle: oklch(0.54 0 0);   /* ≥ 4,6:1 en todos los fondos claros (antes 3,6:1) */
+    --app-faint: oklch(0.62 0 0);    /* solo para bordes y adornos, nunca texto: ≥ 3:1 */
     --brand: oklch(0.52 0.21 293);
+    --danger: oklch(0.5 0.19 25);
+    --danger-soft: color-mix(in oklch, oklch(0.58 0.22 25) 10%, transparent);
+    --danger-line: color-mix(in oklch, oklch(0.58 0.22 25) 32%, transparent);
+    --danger-solid: oklch(0.52 0.2 25);
+    --attention: oklch(0.5 0.15 50);
+    --attention-soft: color-mix(in oklch, oklch(0.68 0.19 50) 12%, transparent);
+    --attention-line: color-mix(in oklch, oklch(0.68 0.19 50) 35%, transparent);
+    --warning: oklch(0.48 0.12 65);
+    --warning-soft: color-mix(in oklch, oklch(0.75 0.16 75) 12%, transparent);
+    --warning-line: color-mix(in oklch, oklch(0.75 0.16 75) 40%, transparent);
+    --info: oklch(0.48 0.13 240);
+    --info-soft: color-mix(in oklch, oklch(0.62 0.15 240) 10%, transparent);
+    --info-line: color-mix(in oklch, oklch(0.62 0.15 240) 32%, transparent);
+    --success: oklch(0.47 0.12 160);
+    --success-soft: color-mix(in oklch, oklch(0.6 0.14 160) 10%, transparent);
+    --success-line: color-mix(in oklch, oklch(0.6 0.14 160) 32%, transparent);
+    --on-solid: oklch(1 0 0);
+    --overlay: oklch(0 0 0 / 40%);
+    --knob: oklch(1 0 0);
+    --skeleton: oklch(0.93 0 0);
     --background: oklch(1 0 0);
     --foreground: oklch(0.145 0 0);
     --card: oklch(1 0 0);
@@ -89,7 +132,7 @@
     --secondary: oklch(0.97 0 0);
     --secondary-foreground: oklch(0.205 0 0);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    --muted-foreground: oklch(0.5 0 0);   /* ≥ 5,5:1 también sobre el fondo suave (antes 4,3:1) */
     --accent: oklch(0.97 0 0);
     --accent-foreground: oklch(0.205 0 0);
     --destructive: oklch(0.577 0.245 27.325);
@@ -124,9 +167,29 @@
     --app-primary: oklch(0.93 0 0);
     --app-secondary: oklch(0.85 0 0);
     --app-muted: var(--muted-foreground);
-    --app-subtle: oklch(0.6 0 0);
-    --app-faint: oklch(0.45 0 0);
+    --app-subtle: oklch(0.66 0 0);   /* ≥ 5:1 en todos los fondos oscuros */
+    --app-faint: oklch(0.56 0 0);    /* solo bordes y adornos: ≥ 3:1 */
     --brand: oklch(0.78 0.14 293);
+    --danger: oklch(0.8 0.1 25);
+    --danger-soft: color-mix(in oklch, oklch(0.64 0.21 25) 14%, transparent);
+    --danger-line: color-mix(in oklch, oklch(0.64 0.21 25) 38%, transparent);
+    --danger-solid: oklch(0.55 0.2 25);
+    --attention: oklch(0.82 0.11 55);
+    --attention-soft: color-mix(in oklch, oklch(0.7 0.18 50) 16%, transparent);
+    --attention-line: color-mix(in oklch, oklch(0.7 0.18 50) 40%, transparent);
+    --warning: oklch(0.85 0.12 85);
+    --warning-soft: color-mix(in oklch, oklch(0.75 0.16 75) 14%, transparent);
+    --warning-line: color-mix(in oklch, oklch(0.75 0.16 75) 40%, transparent);
+    --info: oklch(0.82 0.1 235);
+    --info-soft: color-mix(in oklch, oklch(0.66 0.14 240) 14%, transparent);
+    --info-line: color-mix(in oklch, oklch(0.66 0.14 240) 38%, transparent);
+    --success: oklch(0.82 0.12 160);
+    --success-soft: color-mix(in oklch, oklch(0.66 0.14 160) 14%, transparent);
+    --success-line: color-mix(in oklch, oklch(0.66 0.14 160) 38%, transparent);
+    --on-solid: oklch(1 0 0);
+    --overlay: oklch(0 0 0 / 60%);
+    --knob: oklch(0.97 0 0);
+    --skeleton: oklch(1 0 0 / 9%);
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);
@@ -195,7 +258,18 @@ body { min-width: 320px; }
 
 @keyframes appsec-breathe { 0%, 100% { opacity: .45; transform: scale(.985) } 50% { opacity: .95; transform: scale(1) } }
 @keyframes appsec-progress { 0% { transform: translateX(-100%) } 100% { transform: translateX(300%) } }
-@media (prefers-reduced-motion: reduce) { [class*="animate-[appsec"] { animation: none !important } }
+/* Accesibilidad (WCAG 2.2 AA). Fuera de las capas de Tailwind a propósito: así ninguna utilidad
+   (`outline-none`, anillos al 50 %) puede dejar un control sin foco visible. */
+
+/* 2.4.7 / 2.4.13: foco visible y con contraste ≥ 3:1 en ambos temas (marca: 5,6:1 claro, 8,5:1 oscuro). */
+:focus-visible { outline: 2px solid var(--brand) !important; outline-offset: 2px !important; }
+/* Interruptores hechos con un checkbox oculto: el foco se dibuja en la pista visible. */
+.peer:focus-visible + .switch-track { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* 2.3.3: quien pide menos movimiento no ve pulsos, giros ni transiciones (los indicadores siguen, quietos). */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
 
 /* Editor de diagramas de amenazas (React Flow): colores del tema, fronteras que no tapan lo de dentro. */
 .tm-canvas .react-flow {
@@ -221,7 +295,7 @@ body { min-width: 320px; }
 .tm-canvas .react-flow__node:hover .tm-handle, .tm-canvas .react-flow__node.selected .tm-handle, .tm-canvas .react-flow.connecting .tm-handle { opacity: 1; }
 .tm-canvas .tm-flow { stroke: var(--app-muted); stroke-width: 1.5; }
 .tm-canvas .tm-flow--plain { stroke-dasharray: 5 4; }
-.tm-canvas .tm-flow--flagged { stroke: var(--color-amber-500); stroke-width: 2; }
+.tm-canvas .tm-flow--flagged { stroke: var(--attention); stroke-width: 2; }
 .tm-canvas .tm-flow--selected { stroke: var(--brand); stroke-width: 2.25; }
 .tm-canvas .tm-flow-label { position: absolute; pointer-events: all; cursor: pointer; }
 .tm-canvas .react-flow__edge-textbg { fill: var(--app-panel); }

@@ -58,7 +58,7 @@ export function ExclusionsCard({ assetKey, canEdit, onChanged }: { assetKey: str
       <textarea id="exclusion-patterns" value={text} onChange={event => setText(event.target.value)} rows={4} spellCheck={false}
         className="w-full rounded-lg border border-app-line bg-app px-3 py-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-brand/40" placeholder="fixtures/**" />
       <Input value={reason} onChange={event => setReason(event.target.value)} maxLength={300} placeholder="Por qué (queda en el historial), p. ej. «Ejemplos vulnerables para probar las reglas»" aria-label="Motivo" />
-      {error && <p role="alert" className="text-xs text-rose-600 dark:text-rose-300">{error}</p>}
+      {error && <p role="alert" className="text-xs text-danger">{error}</p>}
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={busy}>{busy && <LoaderCircle className="animate-spin" />}Guardar</Button>
         <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)} disabled={busy}>Cancelar</Button>

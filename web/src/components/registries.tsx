@@ -60,7 +60,7 @@ export function RegistriesCard({ canManage }: { canManage: boolean }) {
         <table className="mt-2 w-full text-left"><tbody>{HINTS.map(([host, user, secret]) => <tr key={host} className="border-t border-app-line"><td className="py-1.5 pr-3 font-mono">{host}</td><td className="py-1.5 pr-3">{user}</td><td className="py-1.5">{secret}</td></tr>)}</tbody></table>
         {!allowPrivate && <p className="mt-2">Los registros de tu red interna (IP privada) están bloqueados para que nadie use el panel para llegar a servicios internos. Para permitirlos, arranca con <span className="font-mono">APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES=1</span>.</p>}
       </details>
-      {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
+      {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
     </CardContent>
   </Card>
 }

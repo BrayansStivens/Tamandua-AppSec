@@ -98,7 +98,7 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
     <form onSubmit={submit} className="space-y-4 self-start rounded-xl border border-app-line bg-panel p-4">
       <div><p className="text-sm font-medium">7 · Conéctala aquí</p><p className="mt-1 text-xs leading-5 text-app-muted">El panel comprueba con GitHub que la clave es de esa App antes de guardar nada.</p></div>
       {!canManage && <p className="rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-muted">Solo un administrador puede conectar la GitHub App.</p>}
-      {status.source === 'entorno' && <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">El servidor tiene <code className="font-mono">GITHUB_APP_ID</code> en su entorno, pero le falta: {status.missing.join(', ')}.</p>}
+      {status.source === 'entorno' && <p className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">El servidor tiene <code className="font-mono">GITHUB_APP_ID</code> en su entorno, pero le falta: {status.missing.join(', ')}.</p>}
       <div className="space-y-1.5"><label htmlFor="github-app-id" className="text-xs text-app-muted">App ID</label>
         <Input id="github-app-id" required inputMode="numeric" pattern="[1-9][0-9]{0,11}" maxLength={12} disabled={!canManage} value={appId} onChange={event => setAppId(event.target.value.replace(/\D/g, ''))} placeholder="123456" className="border-app-line bg-app-soft font-mono" /></div>
       <div className="space-y-1.5"><span className="text-xs text-app-muted">Clave privada (.pem)</span>
@@ -111,7 +111,7 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
           <textarea aria-label="Clave privada en texto" rows={4} spellCheck={false} autoComplete="off" disabled={!canManage} value={pemName ? '' : pem} onChange={event => { setPem(event.target.value); setPemName('') }}
             placeholder="-----BEGIN RSA PRIVATE KEY-----" className="mt-2 w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 font-mono text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50" /></details>
       </div>
-      {error && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-700 dark:text-rose-200">{error}</div>}
+      {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
       <Button type="submit" disabled={!canManage || busy || !appId || !pem} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <ShieldCheck />}Verificar y guardar</Button>
       <p className="flex items-start gap-2 text-[11px] leading-4 text-app-subtle"><ShieldCheck className="mt-0.5 size-3 shrink-0" />La clave se guarda cifrada (AES-256-GCM) en el servidor, nunca vuelve al navegador ni aparece en los logs. Después, borra el .pem de tu carpeta de descargas.</p>
     </form>
@@ -148,7 +148,7 @@ export function GitHubInstall({ status, canManage, onChanged }: { status: GitHub
       <li>Pulsa <strong className="font-medium text-app-secondary">Instalar en GitHub</strong> y elige <strong className="font-medium text-app-secondary">Only select repositories</strong> con los que quieras analizar.</li>
       <li>Vuelve y pulsa <strong className="font-medium text-app-secondary">Buscar instalaciones</strong>; selecciona las organizaciones que quieres usar en este workspace.</li>
     </ol>
-    {error && <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100">{error}</div>}
+    {error && <div role="alert" className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">{error}</div>}
     <div className="flex flex-wrap gap-2">
       <a href={`https://github.com/apps/${status.slug}/installations/new`} target="_blank" rel="noopener noreferrer"><Button disabled={!canManage} className="bg-primary text-primary-foreground hover:bg-primary/90">Instalar en GitHub <ExternalLink /></Button></a>
       <Button variant="outline" disabled={!canManage || busy} onClick={() => void detect()} className="border-app-line bg-app-soft">{busy ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}Buscar instalaciones</Button>
@@ -170,8 +170,8 @@ export function GitHubInstall({ status, canManage, onChanged }: { status: GitHub
 }
 
 export function PermissionWarning({ review }: { review: PermissionReview }) {
-  if (review.excess.length) return <div role="alert" className="flex gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-xs leading-5 text-rose-800 dark:text-rose-200"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+  if (review.excess.length) return <div role="alert" className="flex gap-2 rounded-lg border border-danger-line bg-danger-soft p-3 text-xs leading-5 text-danger"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
     <div><strong>La App pide {review.excess.length} permisos adicionales.</strong> Revisa los permisos de la GitHub App; los repositorios instalados siguen teniendo el alcance que elegiste.<details className="mt-1"><summary className="cursor-pointer font-medium">Ver permisos</summary><p className="mt-1 break-words">{review.excess.map(name => `${name}: ${review.declared[name]}`).join(' · ')}</p></details></div></div>
-  return <div className="flex gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-900 dark:text-amber-100"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+  return <div className="flex gap-2 rounded-lg border border-warning-line bg-warning-soft p-3 text-xs leading-5 text-warning"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
     <span>Faltan permisos: {review.missing.join(', ')}{review.pending_acceptance.length ? ' (hay una actualización de permisos pendiente de aceptar en la instalación)' : ''}. Sin ellos no se revisan pull requests.</span></div>
 }

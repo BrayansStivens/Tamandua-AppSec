@@ -96,7 +96,7 @@ function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'compon
   const shape = PROCESSES.includes(base) ? 'rounded-full px-5' : STORES.includes(base) ? 'rounded-none border-x-0 border-y-2' : 'rounded-lg'
   const sensitive = component.data.some(item => SENSITIVE.includes(item))
   return <div title={component.name} className={`tm-node flex h-full min-h-[64px] w-full flex-col items-center justify-center border bg-panel px-3 py-2 text-center shadow-sm ${shape}
-    ${flagged ? 'border-amber-500 ring-2 ring-amber-500/40' : 'border-app-line'} ${selected ? 'outline-2 outline-offset-2 outline-brand' : ''}`}>
+    ${flagged ? 'border-warning-line ring-2 ring-warning-line' : 'border-app-line'} ${selected ? 'outline-2 outline-offset-2 outline-brand' : ''}`}>
     <NodeResizer isVisible minWidth={140} minHeight={64} maxWidth={520} maxHeight={320} keepAspectRatio={keepRatio} color="var(--brand)" lineClassName="tm-resize-line" handleClassName="tm-resize-handle" />
     {(['t', 'r', 'b', 'l'] as const).map(side => <Handle key={side} id={side} type="source" position={{ t: Position.Top, r: Position.Right, b: Position.Bottom, l: Position.Left }[side]} className="tm-handle" />)}
     <span className="line-clamp-2 text-[13px] leading-4 font-semibold text-app-fg">{component.name}</span>
@@ -104,7 +104,7 @@ function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'compon
     {(component.internet_facing || sensitive || component.encrypted_at_rest) && <span className="mt-1 flex items-center gap-1.5 text-app-subtle">
       {component.internet_facing && <Globe2 className="size-3" aria-label="Expuesto a Internet" />}
       {component.encrypted_at_rest && <Lock className="size-3" aria-label="Cifrado en reposo" />}
-      {sensitive && <span className="rounded bg-app-soft px-1 text-[9px] font-medium tracking-wide uppercase">datos sensibles</span>}
+      {sensitive && <span className="rounded bg-app-soft px-1 text-[11px] font-medium tracking-wide uppercase">datos sensibles</span>}
     </span>}
   </div>
 }
@@ -129,7 +129,7 @@ function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targ
     {flow && label && <EdgeLabelRenderer>
       <div className="tm-flow-label nodrag nopan" data-x={labelX} data-y={labelY} ref={element => { if (element) element.style.transform = `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}>
         {/* Acotada al hueco entre columnas para no tapar componentes; completa en el título y al seleccionarla. */}
-        <span title={label} className={`inline-block truncate rounded-md border px-1.5 py-0.5 align-middle text-[10px] font-medium ${selected ? 'max-w-[260px] border-brand/60 text-brand' : 'max-w-[132px] border-app-line text-app-muted'} bg-panel`}>
+        <span title={label} className={`inline-block truncate rounded-md border px-1.5 py-0.5 align-middle text-[11px] font-medium ${selected ? 'max-w-[260px] border-brand/60 text-brand' : 'max-w-[132px] border-app-line text-app-muted'} bg-panel`}>
           {label}
         </span>
       </div>
@@ -308,7 +308,7 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
 
 function Chips({ value, options, onChange }: { value: string[]; options: Record<string, string>; onChange: (next: string[]) => void }) {
   return <div className="flex flex-wrap gap-1">{Object.entries(options).map(([key, label]) => <button key={key} type="button" onClick={() => onChange(value.includes(key) ? value.filter(item => item !== key) : [...value, key])}
-    className={`rounded border px-1.5 py-0.5 text-[10px] ${value.includes(key) ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line text-app-subtle'}`}>{label}</button>)}</div>
+    className={`rounded border px-1.5 py-0.5 text-[11px] ${value.includes(key) ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line text-app-subtle'}`}>{label}</button>)}</div>
 }
 
 function Check({ checked, onChange, children }: { checked: boolean; onChange: (value: boolean) => void; children: string }) {
@@ -356,7 +356,7 @@ function Inspector({ model, setModel, catalog, node, flowId: selected, onRemove 
       {item.kind === 'custom' && <div className={field}><span className={label}>Nombre del tipo propio</span><Input value={item.custom_kind ?? ''} maxLength={80} onChange={event => update({ custom_kind: event.target.value })} placeholder="p. ej. Motor de reglas" className="h-8 border-app-line bg-app-soft" /></div>}
       {item.kind === 'custom' && <div className={field}><span className={label}>Rol base para el análisis</span><Select value={item.custom_base || 'service'} onValueChange={value => { if (value) update({ custom_base: value as Exclude<Kind, 'custom'> }) }}><SelectTrigger aria-label="Rol base para el análisis" className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.custom_base || 'service']}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-[11px] text-app-subtle">El nombre es libre; este rol determina qué reglas STRIDE y LINDDUN se aplican.</p></div>}
       <div className={field}><span className={label}>Descripción</span><textarea value={item.description ?? ''} maxLength={400} rows={2} onChange={event => update({ description: event.target.value })} placeholder="Qué hace y qué datos maneja" className="w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-fg" /></div>
-      <div className={field}><span className={label}>Código (repositorio)</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, asset_ref: event.target.value ? '' : item.asset_ref })} className={select}><option value="">Sin enlazar</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select>{item.asset_ref && !item.asset && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Referencia importada: {item.asset_ref} · pendiente de vincular</p>}</div>
+      <div className={field}><span className={label}>Código (repositorio)</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, asset_ref: event.target.value ? '' : item.asset_ref })} className={select}><option value="">Sin enlazar</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select>{item.asset_ref && !item.asset && <p className="mt-1 text-xs text-warning">Referencia importada: {item.asset_ref} · pendiente de vincular</p>}</div>
       {item.asset && <div className={field}><span className={label}>Carpeta dentro del repositorio</span><Input value={item.path ?? ''} maxLength={200} placeholder="vacío = todo el repositorio · p. ej. frontend/" onChange={event => update({ path: event.target.value })} className="h-8 border-app-line bg-app-soft font-mono text-xs" />
         <p className="text-[11px] leading-4 text-app-subtle">Solo los hallazgos de esa carpeta cuentan como indicios de sus amenazas. En un monorepo evita que el backend «evidencie» amenazas del frontend.</p></div>}
       <div className={field}><span className={label}>Datos que guarda o maneja</span><Chips value={item.data} options={catalog.classifications} onChange={data => update({ data })} /></div>

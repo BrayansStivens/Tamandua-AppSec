@@ -29,7 +29,7 @@ export function Integrations({ user }: { user: SessionUser }) {
   }
 
   return <div className="space-y-5">
-      {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>}
       {user.role !== 'admin' && <div className="rounded-xl border border-app-line bg-app-soft px-4 py-3 text-sm text-app-muted">Conectar proveedores y guardar claves es cosa de un administrador; aquí ves su estado.</div>}
       <CodeSources canManage={user.role === 'admin'} />
       <RegistriesCard canManage={user.role === 'admin'} />

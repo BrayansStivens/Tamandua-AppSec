@@ -36,7 +36,7 @@ export function DomainAssets({ onConfigure }: { onConfigure: () => void }) {
             <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_150px_150px_130px] md:items-center">
               <div className="flex min-w-0 items-center gap-2"><Globe2 className="size-4 shrink-0 text-app-muted" /><span className="truncate font-mono text-sm">{domain.host}</span></div>
               <span className="text-xs text-app-muted">{kindLabel[domain.kind ?? 'web']}</span>
-              <Badge variant="outline" className={`w-fit ${domain.verified ? 'border-brand/30 text-brand' : 'border-amber-500/30 text-amber-700 dark:text-amber-300'}`}>{domain.verified ? 'Verificado' : 'Sin verificar'}</Badge>
+              <Badge variant="outline" className={`w-fit ${domain.verified ? 'border-brand/30 text-brand' : 'border-warning-line text-warning'}`}>{domain.verified ? 'Verificado' : 'Sin verificar'}</Badge>
               <span className="text-xs text-app-muted">No probado</span>
             </div>
             {domain.context && <p className="mt-3 text-xs leading-5 text-app-subtle">{domain.context}</p>}
@@ -48,7 +48,7 @@ export function DomainAssets({ onConfigure }: { onConfigure: () => void }) {
         <Button variant="outline" onClick={onConfigure} className="border-app-line bg-app-soft">Configurar pruebas dinámicas</Button>
       </CardContent>
     </Card>
-    {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
+    {error && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft p-3 text-sm text-danger">{error}</div>}
     <AddDomainDialog open={adding} onOpenChange={setAdding} onAdded={domain => { upsert(domain); setPending(domain) }} />
     <VerifyDomainDialog domain={pending} onOpenChange={() => setPending(null)} onVerified={domain => { upsert(domain); setPending(null) }} />
   </div>

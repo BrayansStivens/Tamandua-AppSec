@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   ChevronRight, Clock3, GitPullRequest, LayoutDashboard, Network,
-  LogOut, Menu, Monitor, Moon, Play, PlugZap, Radar, SearchCheck, Shield, ShieldAlert, Sun, Globe2, Layers3, UserRound, UsersRound,
+  LogOut, Menu, Monitor, Moon, Play, PlugZap, Radar, SearchCheck, Shield, ShieldAlert, Sun, Layers3, UserRound, UsersRound,
   Bug,
 } from 'lucide-react'
 import { BrandLockup } from '@/components/brand-mark'
@@ -30,24 +30,29 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type View = 'overview' | 'analyses' | 'new' | 'findings' | 'coverage' | 'repositories' | 'domains' | 'integrations' | 'account' | 'users' | 'pulls' | 'threats' | 'cves'
 type Theme = 'system' | 'light' | 'dark'
 
-const navigation: { id: View; label: string; icon: typeof Shield; soon?: boolean }[] = [
-  { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
-  { id: 'analyses', label: 'Análisis', icon: SearchCheck },
-  { id: 'findings', label: 'Hallazgos', icon: ShieldAlert },
-  { id: 'coverage', label: 'Cobertura', icon: Radar },
-  { id: 'threats', label: 'Amenazas', icon: Network },
-  { id: 'repositories', label: 'Repositorios', icon: Layers3 },
-  { id: 'pulls', label: 'Pull requests', icon: GitPullRequest },
-  { id: 'cves', label: 'CVE tracker', icon: Bug },
-  { id: 'integrations', label: 'Integraciones', icon: PlugZap },
-  { id: 'users', label: 'Usuarios', icon: UsersRound },
-  // En desarrollo: se ve, en gris, para que se sepa que viene, pero no ofrece nada que aún no funcione.
-  { id: 'domains', label: 'Pruebas web', icon: Globe2, soon: true },
+// Ley de Hick: tres grupos con nombre en vez de once opciones seguidas. Lo que aún no funciona
+// (Pruebas web) no ocupa sitio en el menú; su página sigue existiendo para quien llegue por enlace.
+const navigation: { label: string; items: { id: View; label: string; icon: typeof Shield }[] }[] = [
+  { label: 'Riesgo', items: [
+    { id: 'overview', label: 'Resumen', icon: LayoutDashboard },
+    { id: 'findings', label: 'Hallazgos', icon: ShieldAlert },
+    { id: 'threats', label: 'Amenazas', icon: Network },
+    { id: 'coverage', label: 'Cobertura', icon: Radar },
+    { id: 'cves', label: 'CVE tracker', icon: Bug },
+  ] },
+  { label: 'Escaneo', items: [
+    { id: 'analyses', label: 'Análisis', icon: SearchCheck },
+    { id: 'repositories', label: 'Repositorios', icon: Layers3 },
+    { id: 'pulls', label: 'Pull requests', icon: GitPullRequest },
+  ] },
+  { label: 'Ajustes', items: [
+    { id: 'integrations', label: 'Integraciones', icon: PlugZap },
+    { id: 'users', label: 'Usuarios', icon: UsersRound },
+  ] },
 ]
 const isoDate = (date: string) => new Date(date).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -112,7 +117,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     refresh().catch(caught => setError(caught instanceof Error ? caught.message : String(caught)))
   }, [refresh])
   const latest = rows.find(row => row.type === 'repository_scan' || row.type === 'image_scan')
-  const currentTitle = view === 'new' ? 'Nuevo análisis' : view === 'account' ? 'Cuenta' : navigation.find(item => item.id === view)?.label ?? 'Resumen'
+  const currentTitle = view === 'new' ? 'Nuevo análisis' : view === 'account' ? 'Cuenta' : navigation.flatMap(group => group.items).find(item => item.id === view)?.label ?? (view === 'domains' ? 'Pruebas web' : 'Resumen')
 
   const openRun = useCallback(async (id: string, nextView: View = 'findings') => {
     setSelectedId(id)
@@ -133,13 +138,20 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
   // El asistente vive dentro de Análisis: la sección sigue marcada mientras se crea una ejecución.
   const activeNav: View = view === 'new' ? 'analyses' : view
   // Usuarios es solo para administradores; el servidor lo impone igualmente.
-  const nav = <div className="space-y-1">{navigation.filter(item => item.id !== 'users' || user.role === 'admin').map(item => <button key={item.id} onClick={() => selectView(item.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${activeNav === item.id ? 'bg-accent font-medium text-accent-foreground' : item.soon ? 'text-app-faint hover:bg-app-soft' : 'text-app-muted hover:bg-app-soft hover:text-app-fg'}`}><item.icon className="size-4" />{item.label}{item.soon && <span className="ml-auto rounded-full border border-dashed border-app-faint/60 px-1.5 text-[9px] tracking-wide uppercase">Pronto</span>}</button>)}</div>
+  const nav = <nav aria-label="Principal" className="space-y-5">{navigation.map(group => {
+    const items = group.items.filter(item => item.id !== 'users' || user.role === 'admin')
+    const id = `nav-${group.label.toLowerCase()}`
+    return <div key={group.label} role="group" aria-labelledby={id} className="space-y-1">
+      <p id={id} className="px-3 pb-1 text-xs font-medium text-app-subtle">{group.label}</p>
+      {items.map(item => <button key={item.id} onClick={() => selectView(item.id)} aria-current={activeNav === item.id ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${activeNav === item.id ? 'bg-accent font-medium text-accent-foreground' : 'text-app-muted hover:bg-app-soft hover:text-app-fg'}`}><item.icon aria-hidden className="size-4" />{item.label}</button>)}
+    </div>
+  })}</nav>
 
   const userCard = <div className="space-y-3 rounded-xl border border-app-line bg-app-soft p-3">
     <button onClick={() => selectView('account')} className={`flex w-full items-center gap-3 rounded-lg p-1 text-left transition hover:bg-app-soft ${view === 'account' ? 'text-brand' : ''}`}>
       <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand/15 text-brand"><UserRound className="size-4" /></span>
       <span className="min-w-0"><span className="block truncate text-sm font-medium">{user.display_name}</span><span className="block truncate text-xs text-app-subtle">{user.role === 'admin' ? 'Administrador' : 'Miembro'}{user.totp_enabled ? '' : ' · sin 2FA'}</span></span>
-      {!user.totp_enabled && <span aria-label="Segundo factor sin activar" className="ml-auto size-2 shrink-0 rounded-full bg-amber-400" />}
+      {!user.totp_enabled && <span role="img" aria-label="Segundo factor sin activar" className="ml-auto size-2 shrink-0 rounded-full bg-warning" />}
     </button>
     <Button variant="ghost" size="sm" onClick={() => void session.logout()} className="w-full justify-start text-app-muted"><LogOut />Cerrar sesión</Button>
   </div>
@@ -163,12 +175,11 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
 
   return <div className="min-h-screen bg-app text-app-fg"><TopProgress /><div className="flex min-h-screen">
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-app-line bg-inset px-4 py-6 lg:flex"><div className="mb-9 px-2"><BrandLockup subtitle={BRAND.tagline} /></div>{nav}<div className="mt-auto">{userCard}</div></aside>
-    <div className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-app-line bg-app px-4 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetTrigger render={<Button aria-label="Abrir navegación" variant="ghost" size="icon" className="lg:hidden" />}><Menu /></SheetTrigger><SheetContent side="left" className="w-72 border-app-line bg-inset"><SheetHeader><SheetTitle className="text-left"><BrandLockup size={32} subtitle={BRAND.tagline} /></SheetTitle></SheetHeader><div className="space-y-6 px-3">{nav}{userCard}</div></SheetContent></Sheet><span className="hidden text-sm text-app-muted sm:inline">Workspace</span><ChevronRight className="hidden size-3 text-app-faint sm:block" /><span className="text-sm font-medium">{currentTitle}</span></div><div className="flex items-center gap-3"><Select value={theme} onValueChange={value => setTheme(value as Theme)}><SelectTrigger aria-label="Apariencia" size="sm" className="min-w-28 border-app-line bg-app-soft text-app-secondary sm:min-w-32">{theme === 'dark' ? <Moon className="size-3.5" /> : theme === 'light' ? <Sun className="size-3.5" /> : <Monitor className="size-3.5" />}<span className="min-w-0 flex-1 text-left">{theme === 'system' ? 'Sistema' : theme === 'light' ? 'Claro' : 'Oscuro'}</span></SelectTrigger><SelectContent align="end" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="system">Sistema</SelectItem><SelectItem value="light">Claro</SelectItem><SelectItem value="dark">Oscuro</SelectItem></SelectContent></Select><Badge variant="outline" className="hidden border-app-line text-app-muted sm:inline-flex">Local · v0.9</Badge><Button aria-label="Nuevo análisis" onClick={() => selectView('new')} className="bg-primary text-primary-foreground hover:bg-primary/90"><Play /><span className="hidden sm:inline">Nuevo análisis</span></Button></div></header>
+    <div className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-app-line bg-app px-4 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetTrigger render={<Button aria-label="Abrir navegación" variant="ghost" size="icon" className="lg:hidden" />}><Menu /></SheetTrigger><SheetContent side="left" className="w-72 border-app-line bg-inset"><SheetHeader><SheetTitle className="text-left"><BrandLockup size={32} subtitle={BRAND.tagline} /></SheetTitle></SheetHeader><div className="space-y-6 px-3">{nav}{userCard}</div></SheetContent></Sheet><span className="hidden text-sm text-app-muted sm:inline">Workspace</span><ChevronRight className="hidden size-3 text-app-subtle sm:block" /><span className="text-sm font-medium">{currentTitle}</span></div><div className="flex items-center gap-3"><Select value={theme} onValueChange={value => setTheme(value as Theme)}><SelectTrigger aria-label="Apariencia" size="sm" className="min-w-28 border-app-line bg-app-soft text-app-secondary sm:min-w-32">{theme === 'dark' ? <Moon className="size-3.5" /> : theme === 'light' ? <Sun className="size-3.5" /> : <Monitor className="size-3.5" />}<span className="min-w-0 flex-1 text-left">{theme === 'system' ? 'Sistema' : theme === 'light' ? 'Claro' : 'Oscuro'}</span></SelectTrigger><SelectContent align="end" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="system">Sistema</SelectItem><SelectItem value="light">Claro</SelectItem><SelectItem value="dark">Oscuro</SelectItem></SelectContent></Select><Badge variant="outline" className="hidden border-app-line text-app-muted sm:inline-flex">Local · v0.9</Badge><Button aria-label="Nuevo análisis" onClick={() => selectView('new')} className="bg-primary text-primary-foreground hover:bg-primary/90"><Play /><span className="hidden sm:inline">Nuevo análisis</span></Button></div></header>
     <main className="mx-auto max-w-[1520px] space-y-7 px-4 py-7 sm:px-8 sm:py-9"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-brand"><span className="size-1.5 rounded-full bg-brand" />Security workspace / 01</div><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{currentTitle}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-app-muted">{view === 'overview' ? 'Qué riesgos tiene tu código, sus dependencias y tus imágenes, por qué importan y cómo se corrigen.' : view === 'analyses' ? 'Historial de análisis de este workspace, con su tipo, estado y resultados.' : view === 'new' ? 'Define el objetivo, declara el alcance y revisa qué se ejecuta antes de lanzar.' : view === 'repositories' ? 'Conecta tus repositorios y elige el código que quieres analizar.' : view === 'domains' ? 'Esta parte todavía no da resultados reales: la verás aquí cuando esté lista.' : view === 'integrations' ? 'Administra los proveedores de código y consulta el estado de la IA.' : view === 'account' ? 'Tu acceso: contraseña y segundo factor.' : view === 'users' ? 'Invita a tu equipo, asigna roles y retira accesos.' : view === 'pulls' ? 'Cada PR se revisa por lo que introduce, no por lo que ya había.' : view === 'cves' ? 'Todas las vulnerabilidades publicadas en NVD, con explotación activa (KEV) y probabilidad de explotación (EPSS), buscables en local.' : view === 'threats' ? 'Modela el sistema con el enfoque que prefieras (STRIDE, LINDDUN, PASTA, árboles de ataque, ATT&CK) y contrasta las amenazas con los análisis.' : 'Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles.'}</p></div>{latest && <div className="flex items-center gap-2 text-xs text-app-subtle"><Clock3 className="size-3.5" />Última ejecución {isoDate(latest.created_at)}</div>}</div>
-      {error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200">{error}</div>}
-      <div className="lg:hidden"><Tabs value={activeNav} onValueChange={value => selectView(value as View)}><TabsList className="w-full overflow-x-auto bg-app-soft">{navigation.slice(0, 4).map(item => <TabsTrigger key={item.id} value={item.id} className="min-w-fit px-3">{item.label}</TabsTrigger>)}</TabsList></Tabs></div>
+      {error && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>}
       {renderMain()}
-      <footer className="border-t border-app-line pt-5 text-xs text-app-faint">{BRAND.name} · software libre bajo <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">AGPL-3.0</a> · <a href={BRAND.repo} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">código fuente</a> · los resultados negativos no prueban ausencia de vulnerabilidades.</footer>
+      <footer className="border-t border-app-line pt-5 text-xs text-app-subtle">{BRAND.name} · software libre bajo <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">AGPL-3.0</a> · <a href={BRAND.repo} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">código fuente</a> · los resultados negativos no prueban ausencia de vulnerabilidades.</footer>
     </main></div>
   </div>{toasts.view}<UpdateNotice /></div>
 }

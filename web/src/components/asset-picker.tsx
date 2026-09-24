@@ -9,7 +9,7 @@ export type Asset = { key: string; name: string; provider: string; scans: number
 export const assetOption = (asset: Asset): ComboOption => ({
   id: asset.key, label: asset.name,
   hint: `${asset.open ? `${plural(asset.open.total, 'pendiente', 'pendientes')}${asset.open.critical ? ` · ${plural(asset.open.critical, 'crítico', 'críticos')}` : ''}` : 'sin hallazgos'} · ${plural(asset.scans, 'escaneo', 'escaneos')} · ${plural(asset.pr_reviews, 'PR', 'PR')}`,
-  badge: asset.removed_at ? <span className="shrink-0 rounded border border-rose-500/30 px-1.5 text-[10px] text-rose-700 dark:text-rose-300">retirado</span> : undefined,
+  badge: asset.removed_at ? <span className="shrink-0 rounded border border-danger-line px-1.5 text-[11px] text-danger">retirado</span> : undefined,
 })
 
 // Selector de repositorio con búsqueda en el servidor; arranca con el de actividad más reciente o el pedido.

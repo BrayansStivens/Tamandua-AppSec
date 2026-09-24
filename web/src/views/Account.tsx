@@ -62,9 +62,9 @@ export function Account({ user, onChanged, only }: { user: SessionUser; onChange
   return <div className={only ? 'space-y-5' : 'grid gap-5 xl:grid-cols-2'}>
     {!only && <Card className="border-app-line bg-panel xl:col-span-2"><CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
       <div><div className="text-lg font-semibold">{user.display_name}</div><div className="text-sm text-app-muted">@{user.username} · {user.role === 'admin' ? 'Administrador' : 'Miembro'}{user.last_login_at ? ` · último acceso ${formatDate(user.last_login_at)}` : ''}</div></div>
-      <Badge variant="outline" className={user.totp_enabled ? 'border-brand/30 text-brand' : 'border-amber-500/30 text-amber-700 dark:text-amber-300'}>{user.totp_enabled ? <><ShieldCheck className="size-3" />Segundo factor activo</> : <><ShieldOff className="size-3" />Sin segundo factor</>}</Badge>
+      <Badge variant="outline" className={user.totp_enabled ? 'border-brand/30 text-brand' : 'border-warning-line text-warning'}>{user.totp_enabled ? <><ShieldCheck className="size-3" />Segundo factor activo</> : <><ShieldOff className="size-3" />Sin segundo factor</>}</Badge>
     </CardContent></Card>}
-    {message && <div role={message.tone === 'error' ? 'alert' : 'status'} className={`xl:col-span-2 rounded-xl border px-4 py-3 text-sm ${message.tone === 'error' ? 'border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-200' : 'border-brand/30 bg-brand/10 text-brand'}`}>{message.text}</div>}
+    {message && <div role={message.tone === 'error' ? 'alert' : 'status'} className={`xl:col-span-2 rounded-xl border px-4 py-3 text-sm ${message.tone === 'error' ? 'border-danger-line bg-danger-soft text-danger' : 'border-brand/30 bg-brand/10 text-brand'}`}>{message.text}</div>}
 
     <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Segundo factor (TOTP)</CardTitle><CardDescription>Un código de 6 dígitos de una app como 1Password, Google Authenticator o Authy, además de la contraseña.</CardDescription></CardHeader><CardContent className="space-y-4">
       {backupCodes ? <div className="space-y-3"><p className="text-sm text-app-secondary">Guarda estos códigos de respaldo en tu gestor de contraseñas. Cada uno sirve <strong>una sola vez</strong> si pierdes el dispositivo, y no se volverán a mostrar.</p>
