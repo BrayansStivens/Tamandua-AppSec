@@ -110,6 +110,7 @@ def save_model(request: Request):
 def import_model(request: Request):
     try:
         model = tm.from_portable(request.payload)
+        model.pop("relayout", None)
         return request.json(200, _view(request, tm.save(request.data_dir, model, by=request.user["username"])))
     except tm.ModelError as exc:
         return request.json(400, {"error": str(exc)})
@@ -133,6 +134,7 @@ def validate_import(request: Request):
         "attack_trees": len(model["attack_trees"]),
         "attack_mappings": len(model["attack_mappings"]),
         "pasta_stages": len(model["pasta"]),
+        "relayout": bool(model.get("relayout")),
     })
 
 

@@ -97,6 +97,14 @@ def _position(raw) -> dict | None:
     return {"x": x, "y": y} if x is not None and y is not None else None
 
 
+def _size(raw) -> dict | None:
+    """Tamaño de un componente redimensionado en el editor; sin él, el panel usa el tamaño estándar."""
+    if not isinstance(raw, dict):
+        return None
+    width, height = _number(raw.get("width"), 120, 800), _number(raw.get("height"), 50, 600)
+    return {"width": width, "height": height} if width and height else None
+
+
 def _box(raw) -> dict | None:
     if not isinstance(raw, dict):
         return None
@@ -138,7 +146,7 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
                            "technology": _text(raw.get("technology"), 80, "La tecnología"),
                            "asset": asset or None, "asset_ref": _text(raw.get("asset_ref"), 200, "La referencia del activo"),
                            "path": _folder(raw.get("path"), f"La carpeta de {identifier}"),
-                           "position": _position(raw.get("position")), "data": sorted(set(data)),
+                           "position": _position(raw.get("position")), "size": _size(raw.get("size")), "data": sorted(set(data)),
                            "internet_facing": bool(raw.get("internet_facing")),
                            "authenticates": bool(raw.get("authenticates")),
                            "encrypted_at_rest": bool(raw.get("encrypted_at_rest")),
@@ -251,6 +259,11 @@ def from_portable(document: dict) -> dict:
         detached.append({**item, "asset": None, "asset_ref": reference})
     clean = {**raw, "components": detached, "repositories": [], "repository_refs": [*references, *repositories]}
     imported = validate(clean, known_assets=set())
+    # Posiciones que no encajan con sus fronteras (cajas pequeñas o solapadas): mejor recolocar que dibujarlas mal.
+    if not geometry_fits(imported):
+        imported = {**imported, "components": [{**item, "position": None} for item in imported["components"]],
+                    "boundaries": [{**item, "box": None} for item in imported["boundaries"]]}
+        imported["relayout"] = True
     allowed = _portable_sections(imported)
     labels = {"manual_threats": "amenazas propias", "attack_trees": "árboles de ataque",
               "attack_mappings": "técnicas ATT&CK", "pasta": "etapas PASTA"}
@@ -261,6 +274,36 @@ def from_portable(document: dict) -> dict:
     if imported["methodology"] != "custom" and raw.get("custom_modules") not in (None, [], ["manual", "elements"]):
         raise ModelError("custom_modules solo se usa con el enfoque personalizado")
     return imported
+
+
+def geometry_fits(model: dict) -> bool:
+    """¿Las posiciones y cajas de un modelo son coherentes? Cada componente colocado dentro de la caja de su
+    frontera y ninguna caja pisa a otra (salvo si la contiene entera). Sin posiciones, no hay nada que comprobar."""
+    components = {item["id"]: item for item in model.get("components", [])}
+    if not any(item.get("position") for item in components.values()):
+        return True
+    if not all(item.get("position") for item in components.values()):
+        return False
+    boxes = {item["id"]: item["box"] for item in model.get("boundaries", []) if item.get("box")}
+    for boundary in model.get("boundaries", []):
+        box = boxes.get(boundary["id"])
+        if box is None and boundary["components"]:
+            return False
+        for member in boundary["components"]:
+            point, (width, height) = components[member]["position"], _node_size(components[member])
+            if not (box["x"] <= point["x"] and point["x"] + width <= box["x"] + box["width"]
+                    and box["y"] <= point["y"] and point["y"] + height - 16 <= box["y"] + box["height"]):
+                return False
+    ids = list(boxes)
+    for index, first in enumerate(ids):
+        for second in ids[index + 1:]:
+            a, b = boxes[first], boxes[second]
+            overlap = a["x"] < b["x"] + b["width"] and b["x"] < a["x"] + a["width"] and a["y"] < b["y"] + b["height"] and b["y"] < a["y"] + a["height"]
+            inside = lambda outer, inner: (outer["x"] <= inner["x"] and outer["y"] <= inner["y"] and inner["x"] + inner["width"] <= outer["x"] + outer["width"]
+                                           and inner["y"] + inner["height"] <= outer["y"] + outer["height"])
+            if overlap and not inside(a, b) and not inside(b, a):
+                return False
+    return True
 
 
 def _portable_sections(model: dict) -> set[str]:
@@ -918,31 +961,125 @@ STRIDE_EN = {"S": "Spoofing", "T": "Tampering", "R": "Repudiation", "I": "Inform
 
 
 def _layout(model: dict) -> dict:
-    """Respeta cada posición dibujada; distribuye solo los elementos aún sin colocar."""
-    layout = _column_layout(model)
+    """Respeta cada posición dibujada, coloca solo lo que no la tiene y ajusta cada caja a sus componentes."""
+    layout = _auto_layout(model)
     for component in model.get("components", []):
         if component.get("position"):
             layout["nodes"][component["id"]] = dict(component["position"])
+    sizes = {item["id"]: _node_size(item) for item in model.get("components", [])}
     for boundary in model.get("boundaries", []):
-        if boundary.get("box"):
-            layout["boundaries"][boundary["id"]] = dict(boundary["box"])
+        box = dict(boundary.get("box") or layout["boundaries"].get(boundary["id"]) or {"x": 40, "y": 40, "width": 320, "height": 220})
+        members = [(layout["nodes"][member], sizes[member]) for member in boundary["components"] if member in layout["nodes"] and member in sizes]
+        if members:  # una caja siempre contiene a sus componentes, aunque llegue pequeña de un JSON
+            left = min([box["x"]] + [point["x"] - LAYOUT_PAD for point, _ in members])
+            top = min([box["y"]] + [point["y"] - LAYOUT_HEADER for point, _ in members])
+            right = max([box["x"] + box["width"]] + [point["x"] + size[0] + LAYOUT_PAD for point, size in members])
+            bottom = max([box["y"] + box["height"]] + [point["y"] + size[1] + LAYOUT_PAD for point, size in members])
+            box = {"x": left, "y": top, "width": right - left, "height": bottom - top}
+        layout["boundaries"][boundary["id"]] = box
     return layout
 
 
-def _column_layout(model: dict) -> dict:
-    columns = [boundary["components"] for boundary in model.get("boundaries", [])]
-    placed = {member for column in columns for member in column}
-    loose = [item["id"] for item in model.get("components", []) if item["id"] not in placed]
-    if loose:
-        columns.append(loose)
-    nodes, boundaries = {}, {}
-    for index, column in enumerate(columns):
-        x = 60 + index * 300
-        for row, member in enumerate(column):
-            nodes[member] = {"x": x, "y": 90 + row * 124}
-        if index < len(model.get("boundaries", [])):
-            boundaries[model["boundaries"][index]["id"]] = {"x": x - 36, "y": 40, "width": 256, "height": 70 + max(1, len(column)) * 124}
-    return {"nodes": nodes, "boundaries": boundaries}
+# Mismo algoritmo que el editor del panel (threat-layout.ts): capas por tipo empujadas por los flujos,
+# cada frontera como un bloque que contiene a sus componentes.
+LAYOUT_NODE_H, LAYOUT_GAP_X, LAYOUT_GAP_INNER, LAYOUT_GAP_Y, LAYOUT_PAD, LAYOUT_HEADER = 88, 120, 72, 44, 32, 44
+LAYERS = {"actor": 0, "web_app": 1, "identity": 1, "api": 2, "service": 2, "function": 2, "cache": 3, "queue": 3,
+          "database": 3, "storage": 3, "external": 4}
+
+
+def _node_size(component: dict) -> tuple[float, float]:
+    size = component.get("size") or {}
+    return size.get("width") or NODE_W, size.get("height") or LAYOUT_NODE_H
+
+
+def _layer(component: dict) -> int:
+    kind = (component.get("custom_base") or "service") if component["kind"] == "custom" else component["kind"]
+    return LAYERS.get(kind, 2)
+
+
+def _ranks(ids: list[str], edges: list[tuple[str, str]], seed, start=None) -> dict[str, int]:
+    rank = {item: (start or seed)(item) for item in ids}
+    known = set(ids)
+    forward = [(a, b) for a, b in edges if a != b and a in known and b in known and seed(a) <= seed(b)]
+    for _ in ids:
+        changed = False
+        for a, b in forward:
+            if rank[b] < rank[a] + 1:
+                rank[b], changed = rank[a] + 1, True
+        if not changed:
+            break
+    levels = sorted(set(rank.values()))
+    return {item: levels.index(rank[item]) for item in ids}
+
+
+def _auto_layout(model: dict) -> dict:
+    components = {item["id"]: item for item in model.get("components", [])}
+    flows = model.get("flows", [])
+    nodes: dict = {}
+    boxes: dict = {}
+    groups, group_of, placed = [], {}, set()
+    for boundary in model.get("boundaries", []):
+        members = [components[member] for member in boundary["components"] if member in components and member not in placed]
+        if not members:
+            continue
+        placed.update(item["id"] for item in members)
+        ids = [item["id"] for item in members]
+        inner = _ranks(ids, [(f["source"], f["target"]) for f in flows if f["source"] in ids and f["target"] in ids], lambda i: _layer(components[i]))
+        columns: dict[int, list] = {}
+        for item in members:
+            columns.setdefault(inner[item["id"]], []).append(item)
+        solid = [sorted(columns[key], key=_layer) for key in sorted(columns)]
+        widths = [max(_node_size(item)[0] for item in column) for column in solid]
+        heights = [sum(_node_size(item)[1] for item in column) + LAYOUT_GAP_Y * (len(column) - 1) for column in solid]
+        inner_w = sum(widths) + LAYOUT_GAP_INNER * (len(solid) - 1)
+        inner_h = max(heights + [LAYOUT_NODE_H])
+        group = {"id": f"b:{boundary['id']}", "boundary": boundary["id"], "members": members, "solid": solid, "widths": widths,
+                 "heights": heights, "inner_w": inner_w, "inner_h": inner_h,
+                 "width": inner_w + LAYOUT_PAD * 2, "height": LAYOUT_HEADER + inner_h + LAYOUT_PAD}
+        groups.append(group)
+        for item in members:
+            group_of[item["id"]] = group["id"]
+    for item in model.get("components", []):
+        if item["id"] in placed:
+            continue
+        width, height = _node_size(item)
+        groups.append({"id": f"c:{item['id']}", "boundary": None, "members": [item], "width": width, "height": height})
+        group_of[item["id"]] = f"c:{item['id']}"
+    seed = {group["id"]: min(_layer(item) for item in group["members"]) for group in groups}
+    between = [(group_of[f["source"]], group_of[f["target"]]) for f in flows
+               if f["source"] in group_of and f["target"] in group_of and group_of[f["source"]] != group_of[f["target"]]]
+    rank = _ranks([group["id"] for group in groups], between, lambda i: seed[i], lambda i: 0 if seed[i] == 0 else 1)
+    columns: dict[int, list] = {}
+    for group in groups:
+        columns.setdefault(rank[group["id"]], []).append(group)
+    solid = [sorted(columns[key], key=lambda g: seed[g["id"]]) for key in sorted(columns)]
+    heights = [sum(g["height"] for g in column) + LAYOUT_GAP_Y * 1.5 * (len(column) - 1) for column in solid]
+    tallest = max(heights + [0])
+    x = 40.0
+    for column, column_h in zip(solid, heights):
+        y = 40 + (tallest - column_h) / 2
+        width = max(g["width"] for g in column)
+        for group in column:
+            gx = x + (width - group["width"]) / 2
+            if group["boundary"] is None:
+                nodes[group["members"][0]["id"]] = {"x": round(gx), "y": round(y)}
+            else:
+                boxes[group["boundary"]] = {"x": gx, "y": y, "width": group["width"], "height": group["height"]}
+                cx = gx + LAYOUT_PAD
+                for members, col_w, col_h in zip(group["solid"], group["widths"], group["heights"]):
+                    cy = y + LAYOUT_HEADER + (group["inner_h"] - col_h) / 2
+                    for item in members:
+                        nodes[item["id"]] = {"x": round(cx + (col_w - _node_size(item)[0]) / 2), "y": round(cy)}
+                        cy += _node_size(item)[1] + LAYOUT_GAP_Y
+                    cx += col_w + LAYOUT_GAP_INNER
+            y += group["height"] + LAYOUT_GAP_Y * 1.5
+        x += width + LAYOUT_GAP_X
+    empty_y = 40
+    for boundary in model.get("boundaries", []):
+        if boundary["id"] not in boxes:
+            boxes[boundary["id"]] = {"x": x, "y": empty_y, "width": NODE_W + LAYOUT_PAD * 2, "height": LAYOUT_HEADER + LAYOUT_NODE_H + LAYOUT_PAD}
+            empty_y += LAYOUT_NODE_H + LAYOUT_HEADER + LAYOUT_PAD + LAYOUT_GAP_Y
+    return {"nodes": nodes, "boundaries": boxes}
 
 
 def to_svg(model: dict) -> str:
@@ -951,7 +1088,8 @@ def to_svg(model: dict) -> str:
     positions = layout["nodes"]
     boxes = layout["boundaries"]
     nodes = {item["id"]: item for item in model.get("components", [])}
-    extents = [(point["x"], point["y"], point["x"] + 184, point["y"] + 72) for point in positions.values()]
+    extents = [(point["x"], point["y"], point["x"] + _node_size(nodes[key])[0], point["y"] + _node_size(nodes[key])[1])
+               for key, point in positions.items() if key in nodes]
     extents += [(box["x"], box["y"], box["x"] + box["width"], box["y"] + box["height"]) for box in boxes.values()]
     left = min((item[0] for item in extents), default=0) - 40
     top = min((item[1] for item in extents), default=0) - 74

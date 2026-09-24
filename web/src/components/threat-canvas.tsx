@@ -9,13 +9,13 @@ import { Globe2, LayoutGrid, Lock, Plus, Square, Trash2, Undo2 } from 'lucide-re
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { assetGroups, newId, PROCESSES, STORES, type Box, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/components/threat-model-types'
+import { autoLayout, baseKind, fitBox, NODE_H, NODE_W, sizeOf } from '@/components/threat-layout'
+import { assetGroups, newId, PROCESSES, STORES, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/components/threat-model-types'
 
 // Editor visual del modelo: los componentes se arrastran, los flujos se crean uniendo sus puntos y las
 // fronteras son cajas que se mueven y redimensionan. La pertenencia a una frontera sale de dónde está
 // cada componente: se dibuja, no se elige en un desplegable. Todo se guarda en el mismo modelo.
 
-const NODE_W = 184, NODE_H = 72, COLUMN = 300, ROW = 124, PAD = 36
 const SENSITIVE = ['pii', 'credentials', 'payment']
 const select = 'h-8 w-full rounded-lg border border-app-line bg-app-soft px-2 text-xs text-app-fg'
 
@@ -29,38 +29,25 @@ const boundaryId = (id: string) => `b:${id}`
 const flowId = (id: string) => `f:${id}`
 const plain = (id: string) => id.slice(2)
 
-// Columnas por frontera, como en las exportaciones, para lo que aún no se ha colocado a mano.
-function defaultLayout(model: Model): { positions: Record<string, Point>; boxes: Record<string, Box> } {
-  const columns = model.boundaries.map(item => item.components)
-  const placed = new Set(columns.flat())
-  const loose = model.components.map(item => item.id).filter(id => !placed.has(id))
-  if (loose.length) columns.push(loose)
-  const positions: Record<string, Point> = {}
-  const boxes: Record<string, Box> = {}
-  columns.forEach((column, index) => {
-    const x = 60 + index * COLUMN
-    column.forEach((member, row) => { positions[member] = { x, y: 90 + row * ROW } })
-    const boundary = model.boundaries[index]
-    if (boundary) boxes[boundary.id] = { x: x - PAD, y: 40, width: NODE_W + PAD * 2, height: 70 + Math.max(1, column.length) * ROW }
-  })
-  return { positions, boxes }
-}
-
-function build(model: Model, threats: Threat[], kinds: Record<Kind, string>, previous: CanvasNode[]): CanvasNode[] {
-  const fallback = defaultLayout(model)
+function build(model: Model, threats: Threat[], kinds: Record<Kind, string>, previous: CanvasNode[], select: string | null = null): CanvasNode[] {
+  // Lo que no tiene posición (p. ej. un JSON importado) se coloca solo; lo dibujado se respeta.
+  const layout = autoLayout(model)
   const before = Object.fromEntries(previous.map(node => [node.id, node]))
   const flagged = new Set(threats.filter(row => row.status === 'evidenced').map(row => row.element))
-  const boundaries: CanvasNode[] = model.boundaries.map(item => {
-    const box = item.box ?? fallback.boxes[item.id] ?? { x: 40, y: 40, width: 320, height: 220 }
-    const old = before[boundaryId(item.id)]
-    return { id: boundaryId(item.id), type: 'boundary', position: { x: box.x, y: box.y }, width: box.width, height: box.height,
-             data: { name: item.name }, zIndex: 0, dragHandle: '.tm-drag', selected: old?.selected ?? false }
-  })
+  const where: Record<string, Point> = Object.fromEntries(model.components.map(item => [item.id, item.position ?? layout.positions[item.id] ?? { x: 60, y: 60 }]))
   const components: CanvasNode[] = model.components.map(item => {
     const old = before[componentId(item.id)]
-    return { id: componentId(item.id), type: 'component', position: item.position ?? old?.position ?? fallback.positions[item.id] ?? { x: 60, y: 60 },
+    return { id: componentId(item.id), type: 'component', position: where[item.id], width: sizeOf(item).width, height: item.size?.height,
              data: { component: item, kindLabel: item.custom_kind || kinds[item.kind] || item.kind, flagged: flagged.has(item.id) }, zIndex: 1,
-             selected: old?.selected ?? false, measured: old?.measured }
+             selected: select ? componentId(item.id) === select : old?.selected ?? false, measured: item.size ? undefined : old?.measured }
+  })
+  const boundaries: CanvasNode[] = model.boundaries.map(item => {
+    const members = item.components.map(id => model.components.find(entry => entry.id === id)).filter((entry): entry is Component => !!entry)
+      .map(entry => ({ position: where[entry.id], width: sizeOf(entry).width, height: entry.size?.height ?? before[componentId(entry.id)]?.measured?.height ?? NODE_H }))
+    const box = fitBox(item.box ?? layout.boxes[item.id] ?? { x: 40, y: 40, width: 320, height: 220 }, members)
+    const old = before[boundaryId(item.id)]
+    return { id: boundaryId(item.id), type: 'boundary', position: { x: box.x, y: box.y }, width: box.width, height: box.height,
+             data: { name: item.name }, zIndex: 0, dragHandle: '.tm-drag', selected: select ? false : old?.selected ?? false }
   })
   return [...boundaries, ...components]
 }
@@ -89,11 +76,12 @@ function membership(nodes: CanvasNode[]): Record<string, string[]> {
 
 function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'component'>>) {
   const { component, kindLabel, flagged } = data
-  const base = component.kind === 'custom' ? component.custom_base ?? 'service' : component.kind
+  const base = baseKind(component)
   const shape = PROCESSES.includes(base) ? 'rounded-full px-5' : STORES.includes(base) ? 'rounded-none border-x-0 border-y-2' : 'rounded-lg'
   const sensitive = component.data.some(item => SENSITIVE.includes(item))
-  return <div title={component.name} className={`tm-node flex min-h-[72px] w-[184px] flex-col items-center justify-center border bg-panel px-3 py-2 text-center shadow-sm ${shape}
+  return <div title={component.name} className={`tm-node flex h-full min-h-[64px] w-full flex-col items-center justify-center border bg-panel px-3 py-2 text-center shadow-sm ${shape}
     ${flagged ? 'border-amber-500 ring-2 ring-amber-500/40' : 'border-app-line'} ${selected ? 'outline-2 outline-offset-2 outline-brand' : ''}`}>
+    <NodeResizer isVisible={selected} minWidth={140} minHeight={64} maxWidth={520} maxHeight={320} color="var(--brand)" />
     {(['t', 'r', 'b', 'l'] as const).map(side => <Handle key={side} id={side} type="source" position={{ t: Position.Top, r: Position.Right, b: Position.Bottom, l: Position.Left }[side]} className="tm-handle" />)}
     <span className="line-clamp-2 text-[13px] leading-4 font-semibold text-app-fg">{component.name}</span>
     <span className="mt-0.5 line-clamp-1 text-[11px] text-app-subtle">{component.technology || kindLabel}</span>
@@ -107,7 +95,7 @@ function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'compon
 
 function BoundaryNode({ data, selected }: NodeProps<Node<BoundaryData, 'boundary'>>) {
   return <div className={`tm-boundary relative h-full w-full rounded-2xl border-2 border-dashed ${selected ? 'border-brand/70' : 'border-app-faint/70'}`}>
-    <NodeResizer isVisible={selected} minWidth={220} minHeight={140} color="var(--brand)" />
+    <NodeResizer isVisible minWidth={220} minHeight={140} color="var(--brand)" lineClassName="tm-resize-line" handleClassName="tm-resize-handle" />
     <span className="tm-drag absolute top-2 left-3 cursor-move rounded-md bg-app px-1.5 py-0.5 text-xs font-semibold text-app-muted">{data.name}</span>
   </div>
 }
@@ -156,7 +144,9 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
   const modelRef = useRef(model)
   useLayoutEffect(() => { modelRef.current = model }, [model])
   // El modelo es la fuente de verdad; aquí solo se conserva lo que es del lienzo (medidas y selección).
-  useEffect(() => { setNodes(previous => build(model, threats, catalog.kinds, previous)) }, [model, threats, catalog.kinds])
+  // Un componente recién añadido queda seleccionado para editarlo en el panel lateral.
+  const pendingSelect = useRef<string | null>(null)
+  useEffect(() => { const select = pendingSelect.current; pendingSelect.current = null; setNodes(previous => build(model, threats, catalog.kinds, previous, select)) }, [model, threats, catalog.kinds])
 
   const onNodesChange = useCallback((changes: NodeChange<CanvasNode>[]) => {
     setNodes(previous => {
@@ -186,7 +176,10 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
     const byId = Object.fromEntries(nodes.map(node => [node.id, node]))
     const round = (value: number) => Math.round(value * 10) / 10
     setModel({ ...current,
-      components: current.components.map(item => { const node = byId[componentId(item.id)]; return node ? { ...item, position: { x: round(node.position.x), y: round(node.position.y) } } : item }),
+      components: current.components.map(item => { const node = byId[componentId(item.id)]; if (!node) return item
+        // Tamaño propio solo si se redimensionó (el alto lo fija el redimensionado; si no, se ajusta al texto).
+        const size = node.height ? { width: round(node.width ?? NODE_W), height: round(node.height) } : item.size ?? null
+        return { ...item, position: { x: round(node.position.x), y: round(node.position.y) }, size } }),
       boundaries: current.boundaries.map(item => { const node = byId[boundaryId(item.id)]; if (!node) return item
         return { ...item, components: members[item.id] ?? [], box: { x: round(node.position.x), y: round(node.position.y),
           width: round(node.width ?? node.measured?.width ?? 320), height: round(node.height ?? node.measured?.height ?? 220) } } }) })
@@ -236,9 +229,10 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
   const addComponent = (kind: Kind) => {
     const current = modelRef.current
     const at = center()
-    const id = newId(catalog.kinds[kind] ?? 'componente', current.components.map(item => item.id))
+    const id = newId(kind === 'custom' ? 'componente' : catalog.kinds[kind] ?? 'componente', current.components.map(item => item.id))
+    pendingSelect.current = componentId(id)
     setModel({ ...current, components: [...current.components, { id, name: kind === 'custom' ? 'Nuevo componente' : catalog.kinds[kind] ?? 'Componente', kind, custom_kind: kind === 'custom' ? 'Tipo propio' : '', custom_base: kind === 'custom' ? 'service' : undefined, data: [], internet_facing: kind === 'actor',
-      authenticates: PROCESSES.includes(kind), encrypted_at_rest: false, position: { x: Math.round(at.x - NODE_W / 2), y: Math.round(at.y - NODE_H / 2) } }] })
+      authenticates: PROCESSES.includes(kind), encrypted_at_rest: false, position: { x: Math.round(at.x - NODE_W / 2), y: Math.round(at.y - NODE_H / 2) }, size: null }] })
   }
   const addBoundary = () => {
     const current = modelRef.current
@@ -246,10 +240,13 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
     const id = newId('frontera', current.boundaries.map(item => item.id))
     setModel({ ...current, boundaries: [...current.boundaries, { id, name: 'Nueva frontera', components: [], box: { x: Math.round(at.x - 170), y: Math.round(at.y - 120), width: 340, height: 240 } }] })
   }
+  // Ordenar: todo se recoloca de una vez (componentes y cajas con la misma geometría) y queda guardable.
   const tidy = () => {
     const current = modelRef.current
-    setModel({ ...current, components: current.components.map(item => ({ ...item, position: null })), boundaries: current.boundaries.map(item => ({ ...item, box: null })) })
-    setTimeout(() => flow.fitView({ padding: 0.15 }), 50)
+    const layout = autoLayout({ ...current, components: current.components.map(item => ({ ...item, position: null })) })
+    setModel({ ...current, components: current.components.map(item => ({ ...item, position: layout.positions[item.id] ?? item.position ?? null })),
+      boundaries: current.boundaries.map(item => ({ ...item, box: layout.boxes[item.id] ?? item.box ?? null })) })
+    setTimeout(() => flow.fitView({ padding: 0.15, duration: 300 }), 60)
   }
 
   const selectedNode = nodes.find(node => node.selected)
@@ -264,7 +261,7 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
         <Controls showInteractive={false} />
         <Panel position="top-left" className="flex flex-wrap gap-1.5">
-          <Select value={null} onValueChange={value => { if (value) addComponent(value as Kind) }}><SelectTrigger aria-label="Añadir componente" className="h-8 border-app-line bg-panel text-xs shadow-sm"><Plus className="size-3.5" /><SelectValue placeholder="Componente…" /></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent></Select>
+          <Select value={null} onValueChange={value => { if (value) addComponent(value as Kind) }}><SelectTrigger aria-label="Añadir componente" className="h-8 border-app-line bg-panel text-xs shadow-sm"><Plus className="size-3.5" /><SelectValue placeholder="Componente…" /></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}<SelectItem value="custom">Otro tipo (lo nombras tú)…</SelectItem></SelectContent></Select>
           <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={addBoundary}><Square />Frontera</Button>
           <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={tidy} title="Colocar en columnas por frontera"><LayoutGrid />Ordenar</Button>
         </Panel>

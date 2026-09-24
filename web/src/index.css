@@ -226,3 +226,11 @@ body { min-width: 320px; }
 .tm-canvas .tm-flow-label { position: absolute; pointer-events: all; cursor: pointer; }
 .tm-canvas .react-flow__edge-textbg { fill: var(--app-panel); }
 
+/* Fronteras redimensionables desde cualquier borde o esquina, sin seleccionarlas antes: el borde se
+   puede agarrar (10 px de zona útil) y los tiradores aparecen al pasar el ratón. */
+.tm-canvas .react-flow__node-boundary .tm-resize-line { border-color: transparent !important; }
+.tm-canvas .react-flow__node-boundary .tm-resize-line.left, .tm-canvas .react-flow__node-boundary .tm-resize-line.right { width: 10px; }
+.tm-canvas .react-flow__node-boundary .tm-resize-line.top, .tm-canvas .react-flow__node-boundary .tm-resize-line.bottom { height: 10px; }
+.tm-canvas .react-flow__node-boundary .tm-resize-handle { opacity: 0; width: 9px; height: 9px; border-radius: 2px; transition: opacity .15s; }
+.tm-canvas .react-flow__node-boundary:hover .tm-resize-handle, .tm-canvas .react-flow__node-boundary.selected .tm-resize-handle { opacity: 1; }
+

@@ -3,22 +3,313 @@
   "version": 1,
   "model": {
     "name": "Portal de clientes · STRIDE",
-    "description": "Ejemplo de inicio de sesión y consulta de datos personales.",
+    "description": "Ejemplo de inicio de sesión y consulta de datos personales. Incluye todos los tipos de componente (y uno personalizado); sin posiciones: el editor lo coloca solo.",
     "methodology": "stride",
     "components": [
-      { "id": "cliente", "name": "Cliente", "kind": "actor", "position": { "x": 60, "y": 180 } },
-      { "id": "api", "name": "API de clientes", "kind": "api", "internet_facing": true, "authenticates": true, "position": { "x": 410, "y": 100 } },
-      { "id": "datos", "name": "Base de datos", "kind": "database", "data": ["pii"], "encrypted_at_rest": true, "position": { "x": 710, "y": 280 } }
+      {
+        "id": "cliente",
+        "name": "Cliente",
+        "kind": "actor",
+        "internet_facing": true
+      },
+      {
+        "id": "soporte",
+        "name": "Equipo de soporte",
+        "kind": "actor"
+      },
+      {
+        "id": "web",
+        "name": "Portal web",
+        "kind": "web_app",
+        "technology": "React",
+        "internet_facing": true,
+        "authenticates": true
+      },
+      {
+        "id": "api",
+        "name": "API de clientes",
+        "kind": "api",
+        "technology": "Spring Boot",
+        "internet_facing": true,
+        "authenticates": true,
+        "data": [
+          "pii"
+        ]
+      },
+      {
+        "id": "facturacion",
+        "name": "Servicio de facturación",
+        "kind": "service",
+        "technology": "Go",
+        "authenticates": true,
+        "data": [
+          "payment"
+        ]
+      },
+      {
+        "id": "notificaciones",
+        "name": "Envío de notificaciones",
+        "kind": "function",
+        "technology": "Cloud Function"
+      },
+      {
+        "id": "motor",
+        "name": "Motor de reglas de precios",
+        "kind": "custom",
+        "custom_kind": "Motor de reglas",
+        "custom_base": "service",
+        "technology": "Drools",
+        "authenticates": true
+      },
+      {
+        "id": "sesiones",
+        "name": "Caché de sesiones",
+        "kind": "cache",
+        "technology": "Redis",
+        "data": [
+          "credentials"
+        ]
+      },
+      {
+        "id": "eventos",
+        "name": "Cola de eventos",
+        "kind": "queue",
+        "technology": "RabbitMQ",
+        "data": [
+          "internal"
+        ]
+      },
+      {
+        "id": "datos",
+        "name": "Base de datos de clientes",
+        "kind": "database",
+        "technology": "PostgreSQL",
+        "data": [
+          "pii",
+          "credentials"
+        ],
+        "encrypted_at_rest": true
+      },
+      {
+        "id": "documentos",
+        "name": "Documentos subidos",
+        "kind": "storage",
+        "technology": "S3",
+        "data": [
+          "pii"
+        ]
+      },
+      {
+        "id": "identidad",
+        "name": "Proveedor de identidad",
+        "kind": "identity",
+        "technology": "Keycloak",
+        "internet_facing": true,
+        "data": [
+          "credentials"
+        ]
+      },
+      {
+        "id": "pagos",
+        "name": "Pasarela de pagos",
+        "kind": "external",
+        "technology": "Stripe",
+        "data": [
+          "payment"
+        ]
+      }
     ],
     "flows": [
-      { "id": "solicitud", "source": "cliente", "target": "api", "protocol": "https", "data": ["credentials"] },
-      { "id": "consulta", "source": "api", "target": "datos", "protocol": "sql", "data": ["pii"], "authenticated": true, "encrypted": true }
+      {
+        "id": "solicitud",
+        "source": "cliente",
+        "target": "web",
+        "protocol": "https",
+        "data": [
+          "credentials",
+          "pii"
+        ],
+        "authenticated": false,
+        "name": "navegación y login"
+      },
+      {
+        "id": "peticiones",
+        "source": "web",
+        "target": "api",
+        "protocol": "https",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "name": "llamadas a la API"
+      },
+      {
+        "id": "login",
+        "source": "web",
+        "target": "identidad",
+        "protocol": "https",
+        "data": [
+          "credentials"
+        ],
+        "authenticated": false,
+        "name": "inicio de sesión"
+      },
+      {
+        "id": "tokens",
+        "source": "api",
+        "target": "identidad",
+        "protocol": "https",
+        "data": [
+          "credentials"
+        ],
+        "authenticated": true,
+        "name": "validación de tokens"
+      },
+      {
+        "id": "gestion",
+        "source": "soporte",
+        "target": "api",
+        "protocol": "https",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "name": "gestión de clientes"
+      },
+      {
+        "id": "consulta",
+        "source": "api",
+        "target": "datos",
+        "protocol": "sql",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "encrypted": true
+      },
+      {
+        "id": "sesion",
+        "source": "api",
+        "target": "sesiones",
+        "protocol": "redis",
+        "data": [
+          "credentials"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "publicar",
+        "source": "api",
+        "target": "eventos",
+        "protocol": "amqp",
+        "data": [
+          "internal"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "consumir",
+        "source": "eventos",
+        "target": "notificaciones",
+        "protocol": "amqp",
+        "data": [
+          "internal"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "precios",
+        "source": "api",
+        "target": "motor",
+        "protocol": "grpc",
+        "data": [
+          "internal"
+        ],
+        "authenticated": true,
+        "encrypted": true
+      },
+      {
+        "id": "factura",
+        "source": "api",
+        "target": "facturacion",
+        "protocol": "https",
+        "data": [
+          "payment"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "cobro",
+        "source": "facturacion",
+        "target": "pagos",
+        "protocol": "https",
+        "data": [
+          "payment"
+        ],
+        "authenticated": true,
+        "encrypted": true
+      },
+      {
+        "id": "almacenamiento",
+        "source": "api",
+        "target": "documentos",
+        "protocol": "https",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "name": "subida de documentos"
+      }
     ],
     "boundaries": [
-      { "id": "interna", "name": "Zona interna", "components": ["api", "datos"], "box": { "x": 350, "y": 40, "width": 630, "height": 480 } }
+      {
+        "id": "internet",
+        "name": "Internet",
+        "components": [
+          "cliente",
+          "soporte"
+        ]
+      },
+      {
+        "id": "aplicacion",
+        "name": "Aplicación",
+        "components": [
+          "web",
+          "api",
+          "facturacion",
+          "notificaciones",
+          "motor"
+        ]
+      },
+      {
+        "id": "datos-internos",
+        "name": "Datos",
+        "components": [
+          "sesiones",
+          "eventos",
+          "datos",
+          "documentos"
+        ]
+      },
+      {
+        "id": "terceros",
+        "name": "Terceros",
+        "components": [
+          "identidad",
+          "pagos"
+        ]
+      }
     ],
     "manual_threats": [
-      { "id": "acceso-ajeno", "title": "Acceso a datos de otra cuenta", "category": "E", "element": "api", "severity": "high", "scenario": "Un cliente cambia el identificador de la cuenta en la solicitud y consulta datos ajenos.", "mitigation": "Comprobar autorización por objeto en cada operación." }
+      {
+        "id": "acceso-ajeno",
+        "title": "Acceso a datos de otra cuenta",
+        "category": "E",
+        "element": "api",
+        "severity": "high",
+        "scenario": "Un cliente cambia el identificador de la cuenta en la solicitud y consulta datos ajenos.",
+        "mitigation": "Comprobar autorización por objeto en cada operación."
+      }
     ]
   }
 }

@@ -45,8 +45,11 @@ class ModelTests(unittest.TestCase):
                 document = json.loads((examples / f"{method}.json").read_text(encoding="utf-8"))
                 imported = tm.from_portable(document)
                 self.assertEqual(imported["methodology"], method)
-                self.assertEqual(len(imported["components"]), 3)
-                self.assertEqual(len(imported["flows"]), 2)
+                # Los ejemplos muestran todos los tipos de componente, incluido uno personalizado, y sin posiciones.
+                self.assertEqual(len(imported["components"]), 13)
+                self.assertEqual(len(imported["flows"]), 13)
+                self.assertIn("custom", {item["kind"] for item in imported["components"]})
+                self.assertTrue(all(item["position"] is None for item in imported["components"]))
 
     def test_validation_rejects_dangling_and_unknown(self):
         good = model()
@@ -206,6 +209,48 @@ class ModelTests(unittest.TestCase):
         self.assertTrue(box["y"] <= new["position"]["y"] <= box["y"] + box["height"])     # dentro de su frontera dibujada
         self.assertIn(("usuario", new["id"]), {(flow["source"], flow["target"]) for flow in merged["flows"]})
         self.assertEqual(tm.validate(merged, known_assets={REPO, other})["repositories"], [REPO, other])
+
+    def test_imported_positions_that_do_not_fit_their_boundaries_are_relaid(self):
+        base = {"name": "CRM", "components": [
+            {"id": "front", "name": "Frontend", "kind": "actor", "position": {"x": 60, "y": 180}},
+            {"id": "api", "name": "API", "kind": "api", "position": {"x": 410, "y": 180}},
+            {"id": "db", "name": "PostgreSQL", "kind": "database", "position": {"x": 710, "y": 280}},
+            {"id": "gcp", "name": "GCP", "kind": "service", "position": {"x": 710, "y": 60}}],
+            "flows": [{"id": "a", "source": "front", "target": "api", "protocol": "https"},
+                      {"id": "b", "source": "api", "target": "db", "protocol": "sql"},
+                      {"id": "c", "source": "api", "target": "gcp", "protocol": "https"}],
+            # Cajas que no caben (la base de datos se sale) y que se pisan entre sí.
+            "boundaries": [{"id": "backend", "name": "Backend", "components": ["api", "db"], "box": {"x": 350, "y": 120, "width": 450, "height": 380}},
+                           {"id": "nube", "name": "Nube", "components": ["gcp"], "box": {"x": 660, "y": 20, "width": 200, "height": 120}}]}
+        imported = tm.from_portable({"format": "appsec-agent-threat-model", "version": 1, "model": base})
+        self.assertTrue(imported.get("relayout"))
+        self.assertTrue(all(item["position"] is None for item in imported["components"]))
+        coherent = {**base, "components": [{**item, "position": None} for item in base["components"]],
+                    "boundaries": [{**item, "box": None} for item in base["boundaries"]]}
+        self.assertFalse(tm.from_portable({"format": "appsec-agent-threat-model", "version": 1, "model": coherent}).get("relayout"))
+
+    def test_automatic_layout_keeps_members_inside_and_boxes_apart(self):
+        import glob
+        for path in sorted(glob.glob(str(Path(__file__).parents[1] / "web/src/examples/threat-models/*.json"))):
+            current = tm.from_portable(json.loads(Path(path).read_text(encoding="utf-8")))
+            layout = tm._layout(current)
+            nodes, boxes = layout["nodes"], layout["boundaries"]
+            sizes = {item["id"]: tm._node_size(item) for item in current["components"]}
+            self.assertEqual(len({item["kind"] for item in current["components"]}), 12, path)   # los ejemplos cubren todos los tipos
+            for boundary in current["boundaries"]:
+                box = boxes[boundary["id"]]
+                for member in boundary["components"]:
+                    point, (width, height) = nodes[member], sizes[member]
+                    self.assertTrue(box["x"] <= point["x"] and point["x"] + width <= box["x"] + box["width"], (path, member))
+                    self.assertTrue(box["y"] <= point["y"] and point["y"] + height <= box["y"] + box["height"], (path, member))
+            ids = list(boxes)
+            for index, first in enumerate(ids):
+                for second in ids[index + 1:]:
+                    a, b = boxes[first], boxes[second]
+                    self.assertFalse(a["x"] < b["x"] + b["width"] and b["x"] < a["x"] + a["width"]
+                                     and a["y"] < b["y"] + b["height"] and b["y"] < a["y"] + a["height"], (path, first, second))
+            self.assertTrue(tm.geometry_fits({**current, "components": [{**item, "position": nodes[item["id"]]} for item in current["components"]],
+                                              "boundaries": [{**item, "box": boxes[item["id"]]} for item in current["boundaries"]]}), path)
 
     def test_several_repositories_name_their_processes(self):
         inventory = {"packages": {"pypi": ["fastapi"]}}
