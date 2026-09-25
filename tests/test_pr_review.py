@@ -280,6 +280,49 @@ class WatcherTests(unittest.TestCase):
             self.assertEqual({call.args[1] for call in listing.call_args_list}, {"org/api"})
 
 
+class BranchWatchTests(unittest.TestCase):
+    def test_the_default_branch_is_rescanned_when_it_changes(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"APPSEC_AGENT_BRANCH_MIN_MINUTES": "60"}):
+            data_dir = Path(directory)
+            for index in range(1, 6):
+                pr_watch.configure(data_dir, f"github#{index}", enabled=True, by="operadora")
+            pr_watch.configure(data_dir, "github#5", branch=False, by="operadora")  # solo PRs
+            queued = []
+
+            class Jobs:
+                pending_count = 0
+
+                def pending(self):
+                    return self.pending_count
+
+                def enqueue_repository_scan(self, **kwargs):
+                    queued.append((kwargs["source_id"], kwargs["trigger"]["head_sha"], kwargs["requested_by"]))
+                    return {"id": f"{len(queued):032d}"}
+
+            installed = [{"id": f"github:org/r{index}", "uid": f"github#{index}", "name": f"org/r{index}", "branch": "main"} for index in range(1, 6)]
+            heads = {f"org/r{index}": "a" * 40 for index in range(1, 6)}
+            jobs = Jobs()
+            watcher = pr_watch.Watcher(data_dir, jobs, lambda: 7)
+            with patch("appsec_agent.github_app.installation_repositories", return_value=installed), \
+                    patch("appsec_agent.github_app.open_pull_requests", return_value=[]), \
+                    patch("appsec_agent.github_app.branch_head", side_effect=lambda installation, name, branch: heads[name]):
+                self.assertEqual(watcher.poll(), 3)            # como mucho tres por vuelta
+                self.assertEqual(watcher.poll(), 1)            # el cuarto; el quinto solo vigila PRs
+                self.assertEqual(watcher.poll(), 0)            # sin commits nuevos no se repite
+                heads["org/r1"] = "b" * 40                     # un merge, pero dentro de la pausa mínima
+                self.assertEqual(watcher.poll(), 0)
+                state = pr_watch.load(data_dir)
+                state["branches"]["github#1"]["at"] = "2020-01-01T00:00:00+00:00"
+                pr_watch._save(data_dir, state)
+                jobs.pending_count = 5                         # cola llena: espera
+                self.assertEqual(watcher.poll(), 0)
+                jobs.pending_count = 0
+                self.assertEqual(watcher.poll(), 1)
+            self.assertEqual(queued[-1], ("github:org/r1", "b" * 40, "vigilante"))
+            self.assertNotIn("github:org/r5", {item[0] for item in queued})
+            self.assertEqual(pr_watch.branch_state(data_dir, "github#1")["head_sha"], "b" * 40)
+
+
 class RouteTests(HttpCase):
     def test_settings_survive_when_github_denies_reading_pulls(self):
         with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):

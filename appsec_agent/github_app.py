@@ -673,6 +673,18 @@ def open_pull_requests(installation_id: int, repository: str) -> list[dict]:
     return [_pull(item) for item in rows if isinstance(item, dict)]
 
 
+def branch_head(installation_id: int, repository: str, branch: str) -> str:
+    """Último commit de una rama (la predeterminada, para saber si hay cambios que reanalizar)."""
+    from urllib.parse import quote
+    if not isinstance(branch, str) or not branch or len(branch) > 255 or ".." in branch:
+        raise GitHubAppError("Rama inválida")
+    payload = _get(f"{API}/repos/{_repo(repository)}/branches/{quote(branch, safe='')}", installation_token(installation_id))
+    sha = ((payload.get("commit") or {}).get("sha") if isinstance(payload, dict) else None)
+    if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise GitHubAppError("GitHub no devolvió el último commit de la rama")
+    return sha
+
+
 def pull_request(installation_id: int, repository: str, number: int) -> dict:
     if not isinstance(number, int) or not 0 < number < 10**9:
         raise GitHubAppError("Número de pull request inválido")

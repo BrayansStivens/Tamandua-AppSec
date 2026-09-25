@@ -67,7 +67,8 @@ class ScanJobs:
     # --- API pública ---------------------------------------------------------------
 
     def enqueue_repository_scan(self, *, source_id: str, source_name: str, allow_osv_upload: bool,
-                                context: str, tokens: dict[str, str], installation_id: int | None, uid: str | None = None) -> dict:
+                                context: str, tokens: dict[str, str], installation_id: int | None, uid: str | None = None,
+                                requested_by: str | None = None, trigger: dict | None = None) -> dict:
         run_id = uuid.uuid4().hex
         record = {"schema_version": "0.3.0", "id": run_id, "type": "repository_scan", "status": "queued",
                   "created_at": _now(), "fixture": source_name, "variant": "code",
@@ -75,6 +76,11 @@ class ScanJobs:
                   "context": " ".join(context.split())[:400], "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
                   "progress": [{"at": _now(), "level": "info", "message": "En cola: esperando al trabajador de escaneos."}]}
+        if requested_by:
+            record["requested_by"] = requested_by
+        if trigger:
+            # Qué lo lanzó (p. ej. la vigilancia de la rama principal, con el commit que vio cambiar).
+            record["trigger"] = trigger
         self._save(record)
         with self._lock:
             self._records[run_id] = record

@@ -1,4 +1,4 @@
-"""Qué repositorios vigilan sus PRs, qué commits ya se revisaron y el vigilante que sondea.
+"""Qué repositorios se vigilan (sus PRs y su rama principal), qué commits ya se revisaron y el vigilante que sondea.
 
 La configuración se guarda por identidad estable (`github#<id>`): renombrar un
 repositorio no apaga su vigilancia.
@@ -7,6 +7,11 @@ Sin webhooks (el MVP local no tiene URL pública) se sondea: cada
 ``APPSEC_AGENT_PR_POLL_SECONDS`` (300 por defecto, mínimo 60) se listan los PRs
 abiertos de los repositorios activados y se encola una revisión por cada commit
 de cabeza que aún no se haya revisado. Los borradores se saltan.
+
+La rama principal también: si su último commit cambió, se reanaliza el repositorio entero para que el
+estado no se quede viejo tras un merge. Como mucho una vez cada ``APPSEC_AGENT_BRANCH_MIN_MINUTES``
+(60 por defecto) por repositorio, unos pocos por vuelta y solo con la cola casi vacía: los análisis
+manuales y las revisiones de PR no esperan detrás de la vigilancia.
 """
 
 from __future__ import annotations
@@ -22,7 +27,9 @@ from .pr_review import GATES
 
 _log = logging_setup.get("pr_watch")
 _lock = threading.Lock()
-DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high"}
+DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": True}
+BRANCH_PER_POLL = 3     # reanálisis de rama principal encolados por vuelta, como mucho
+BRANCH_QUEUE_LIMIT = 2  # solo si en la cola hay menos que esto
 
 
 def _path(data_dir: Path) -> Path:
@@ -33,11 +40,12 @@ def load(data_dir: Path) -> dict:
     try:
         payload = json.loads(_path(data_dir).read_text(encoding="utf-8"))
     except (FileNotFoundError, ValueError, OSError):
-        return {"repositories": {}, "reviewed": {}}
+        return {"repositories": {}, "reviewed": {}, "branches": {}}
     if not isinstance(payload, dict):
-        return {"repositories": {}, "reviewed": {}}
+        return {"repositories": {}, "reviewed": {}, "branches": {}}
     payload.setdefault("repositories", {})
     payload.setdefault("reviewed", {})
+    payload.setdefault("branches", {})
     return payload
 
 
@@ -52,11 +60,11 @@ def settings(data_dir: Path, source_id: str) -> dict:
     return {**DEFAULTS, **load(data_dir)["repositories"].get(source_id, {})}
 
 
-def configure(data_dir: Path, source_id: str, *, enabled=None, post_comment=None, gate=None, by: str) -> dict:
-    return configure_many(data_dir, [source_id], enabled=enabled, post_comment=post_comment, gate=gate, by=by)[0]
+def configure(data_dir: Path, source_id: str, *, enabled=None, post_comment=None, gate=None, branch=None, by: str) -> dict:
+    return configure_many(data_dir, [source_id], enabled=enabled, post_comment=post_comment, gate=gate, branch=branch, by=by)[0]
 
 
-def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_comment=None, gate=None, by: str) -> list[dict]:
+def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_comment=None, gate=None, branch=None, by: str) -> list[dict]:
     """Varios repositorios con una sola escritura: activar cientos no reescribe el archivo cientos de veces."""
     if gate is not None and gate not in GATES:
         raise ValueError("Umbral inválido")
@@ -66,7 +74,7 @@ def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_commen
         when = datetime.now(timezone.utc).isoformat(timespec="seconds")
         for key in dict.fromkeys(keys):
             current = {**DEFAULTS, **payload["repositories"].get(key, {})}
-            for field, value in (("enabled", enabled), ("post_comment", post_comment), ("gate", gate)):
+            for field, value in (("enabled", enabled), ("post_comment", post_comment), ("gate", gate), ("branch", branch)):
                 if value is not None:
                     current[field] = value
             current.update(updated_by=by, updated_at=when)
@@ -83,6 +91,7 @@ def forget(data_dir: Path, key: str) -> None:
         payload = load(data_dir)
         changed = payload["repositories"].pop(key, None) is not None
         changed = payload["reviewed"].pop(key, None) is not None or changed
+        changed = payload["branches"].pop(key, None) is not None or changed
         if changed:
             _save(data_dir, payload)
 
@@ -111,6 +120,22 @@ def mark(data_dir: Path, source_id: str, number: int, head_sha: str, run_id: str
         payload = load(data_dir)
         payload["reviewed"].setdefault(source_id, {})[str(number)] = {"head_sha": head_sha, "run_id": run_id}
         _save(data_dir, payload)
+
+
+def branch_state(data_dir: Path, key: str) -> dict | None:
+    return load(data_dir)["branches"].get(key)
+
+
+def mark_branch(data_dir: Path, key: str, head_sha: str, run_id: str) -> None:
+    with _lock:
+        payload = load(data_dir)
+        payload["branches"][key] = {"head_sha": head_sha, "run_id": run_id,
+                                    "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        _save(data_dir, payload)
+
+
+def branch_min_seconds() -> int:
+    return 60 * max(10, int(os.environ.get("APPSEC_AGENT_BRANCH_MIN_MINUTES", "60") or 60))
 
 
 def interval() -> int:
@@ -215,6 +240,43 @@ class Watcher:
                     return queued
                 self.jobs.enqueue_pr_review(source_id=source_id, uid=key, pull=pull, installation_id=installation, requested_by="vigilante")
                 queued += 1
+        rescans = self._branches(by_uid)
         watched = sum(1 for config in load(self.data_dir)["repositories"].values() if config.get("enabled"))
-        _log.info("pr_watch_poll", extra={"reason": f"{watched} repositorios vigilados, {queued} revisiones encoladas"})
+        _log.info("pr_watch_poll", extra={"reason": f"{watched} repositorios vigilados, {queued} revisiones de PR y {rescans} "
+                                                    "reanálisis de rama principal encolados"})
+        return queued + rescans
+
+    def _branches(self, by_uid: dict) -> int:
+        """Reanaliza la rama principal de los vigilados cuyo último commit cambió (con pausa mínima entre análisis)."""
+        from .github_app import GitHubAppError, branch_head
+        queued = 0
+        now = datetime.now(timezone.utc)
+        for key, config in load(self.data_dir)["repositories"].items():
+            if not config.get("enabled") or not {**DEFAULTS, **config}.get("branch") or key not in by_uid:
+                continue
+            if queued >= BRANCH_PER_POLL or self.jobs.pending() >= BRANCH_QUEUE_LIMIT:
+                break
+            item = by_uid[key]
+            if item.get("archived") or not item.get("branch"):
+                continue
+            last = branch_state(self.data_dir, key) or {}
+            try:
+                if last.get("at") and (now - datetime.fromisoformat(last["at"])).total_seconds() < branch_min_seconds():
+                    continue
+            except ValueError:
+                pass
+            try:
+                head = branch_head(item["installation_id"], item["name"], item["branch"])
+            except GitHubAppError as exc:
+                _log.warning("branch_head_failed", extra={"reason": f"{item['name']}: {exc}"})
+                continue
+            if head == last.get("head_sha"):
+                continue
+            run = self.jobs.enqueue_repository_scan(
+                source_id=item["id"], source_name=item["name"], allow_osv_upload=False, context="", tokens={},
+                installation_id=item["installation_id"], uid=key, requested_by="vigilante",
+                trigger={"kind": "branch", "branch": item["branch"], "head_sha": head, "previous_sha": last.get("head_sha")})
+            mark_branch(self.data_dir, key, head, run["id"])
+            queued += 1
+            _log.info("branch_rescan", extra={"reason": f"{item['name']}@{item['branch']} {head[:7]}"})
         return queued

@@ -40,7 +40,7 @@ def _persist(data_dir: Path, record: dict, report: str, sarif: dict | None = Non
 
 def _row(record: dict) -> dict:
     item = {key: record.get(key) for key in ("id", "type", "status", "created_at", "fixture", "summary")}
-    for key in ("variant", "source", "context", "started_at", "finished_at", "pull_request"):
+    for key in ("variant", "source", "context", "started_at", "finished_at", "pull_request", "trigger"):
         if key in record and record[key] is not None:
             item[key] = record[key]
     # La lista no lleva hallazgos: solo lo necesario para una fila.

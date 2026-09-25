@@ -34,7 +34,8 @@ def pulls(request: Request):
     if target is None:
         return request.json(400, {"error": "Elige un repositorio de la GitHub App conectada"})
     installation, repository, uid = target
-    settings = pr_watch.settings(request.data_dir, uid)
+    settings = {**pr_watch.settings(request.data_dir, uid), "branch_scan": pr_watch.branch_state(request.data_dir, uid),
+                "branch_min_minutes": pr_watch.branch_min_seconds() // 60}
     try:
         rows = open_pull_requests(installation, repository)
     except GitHubAppError as exc:
@@ -54,7 +55,8 @@ def pulls(request: Request):
 
 def _row(item: dict, state: dict) -> dict:
     return {"id": item["id"], "uid": item["uid"], "name": item["name"], "private": item.get("private"),
-            **pr_watch.DEFAULTS, **state["repositories"].get(item["uid"], {}), "reviewed": len(state["reviewed"].get(item["uid"], {}))}
+            **pr_watch.DEFAULTS, **state["repositories"].get(item["uid"], {}), "reviewed": len(state["reviewed"].get(item["uid"], {})),
+            "branch_scan": state["branches"].get(item["uid"])}
 
 
 @route("GET", "/api/pull-requests/watch")
@@ -89,20 +91,21 @@ def watch_overview(request: Request):
         pr_watch.migrate(request.data_dir, items)
         state = pr_watch.load(request.data_dir)
     return request.json(200, {"repositories": [_row(item, state) for item in items], "total": total, "page": page,
-                              "per_page": per_page, "partial": partial, "interval": pr_watch.interval(), "enabled": len(enabled)})
+                              "per_page": per_page, "partial": partial, "interval": pr_watch.interval(), "enabled": len(enabled),
+                              "branch_min_minutes": pr_watch.branch_min_seconds() // 60})
 
 
 @route("POST", "/api/pull-requests/settings", admin=True, action="pr-settings", body=16_000)
 def pr_settings(request: Request):
     """Configura uno o varios repositorios (`source_id` o `source_ids`), o todos (`all`)."""
     payload = request.payload
-    fields = {"source_id", "source_ids", "all", "enabled", "post_comment", "gate"}
+    fields = {"source_id", "source_ids", "all", "enabled", "post_comment", "gate", "branch"}
     if (not isinstance(payload, dict) or not set(payload) <= fields
             or sum(key in payload for key in ("source_id", "source_ids", "all")) != 1
-            or any(key in payload and not isinstance(payload[key], bool) for key in ("all", "enabled", "post_comment"))):
+            or any(key in payload and not isinstance(payload[key], bool) for key in ("all", "enabled", "post_comment", "branch"))):
         return request.json(400, {"error": "Configuración inválida"})
     options = {"enabled": payload.get("enabled"), "post_comment": payload.get("post_comment"), "gate": payload.get("gate"),
-               "by": request.user["username"]}
+               "branch": payload.get("branch"), "by": request.user["username"]}
     if "all" in payload:
         if payload["all"] is not True or set(payload) - {"all", "enabled"} or not isinstance(payload.get("enabled"), bool):
             return request.json(400, {"error": "Configuración inválida"})
