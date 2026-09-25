@@ -29,7 +29,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import logging_setup
+from . import data_sources, logging_setup
 from .advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
 from .coverage import owasp_coverage
 from .config_scanners import merge_image, run_checkov_image
@@ -224,6 +224,7 @@ def _grype_finding(match: dict, feeds: dict) -> dict:
             "advisory": {"id": identifier, "aliases": sorted(aliases), "summary": summary[:300], "details": summary[:2000],
                          "cvss_vector": vector, "cvss_score": score, "published": None, "modified": None, "references": references},
             "kev": kev, "epss": {"score": epss[0], "percentile": epss[1]} if epss else None,
+            "source": data_sources.from_grype(vulnerability),
             "priority": prioritize(severity, score, kev, epss, fixed), "reason": summary[:300], "remediation": ""}
 
 
@@ -363,6 +364,8 @@ def merge_packages(trivy: list[dict], grype: list[dict]) -> tuple[list[dict], di
                 twin["also_detected_by"].append("grype")
                 twin["confidence"] = min(10, twin["confidence"] + 1)
                 agreed += 1
+            if not twin.get("source") and finding.get("source"):
+                twin["source"] = finding["source"]
             if not (twin.get("package") or {}).get("fixed_version") and package.get("fixed_version"):
                 twin["package"]["fixed_version"] = package["fixed_version"]
         else:

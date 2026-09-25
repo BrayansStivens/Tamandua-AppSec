@@ -17,9 +17,10 @@ from datetime import date, datetime, timezone
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table
 
+from .data_sources import attribution
 from .remediation import action, counts_text, fix_groups
 from .report_design import (BRAND, BRAND_BG, DANGER_BG, DISCLAIMER, INK, ORDER, SEVERITY, SOFT, STYLE, SUCCESS, SUCCESS_BG, WIDTH,
-                            build, chip as _chip, coverage_gaps, day as _day, grid as _grid, h2, header, hexval, kpis as _kpis, listing, meta,
+                            build, bullets, chip as _chip, coverage_gaps, day as _day, grid as _grid, h2, header, hexval, kpis as _kpis, listing, meta,
                             n as _n, signoff, t as _t)
 
 STATUS_LABEL = {"open": "Abierto", "in_progress": "En curso", "fixed": "Remediado", "false_positive": "Falso positivo",
@@ -219,6 +220,9 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
     elif engines and all(step.get("status") == "completed" for step in engines):
         method.append("Todos los motores del análisis se completaron.")
     story += [h2("Método y cobertura"), *[Paragraph("•&nbsp;&nbsp;" + _t(item, 500), STYLE["body"]) for item in method]]
+    sources = attribution(findings)
+    if sources:
+        story += [Paragraph("Fuentes de los avisos", STYLE["h3"]), *bullets([_t(line, 300) for line in sources], "note")]
     # Hallazgos: una fila por acción (una dependencia con todos sus avisos, o un hallazgo de código).
     story.append(h2(f"Hallazgos ({len(findings)})"))
     if findings:
@@ -326,11 +330,14 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
     story += [Paragraph("•&nbsp;&nbsp;" + _t(line, 1200), STYLE["body"]) for line in lines]
     if controls:
         story += _controls(framework_label, controls)
+    sources = attribution([finding for item in items for finding in item["findings"]])
     story += [h2("Método"),
               Paragraph("•&nbsp;&nbsp;Análisis estático de cada repositorio (código, dependencias, secretos, infraestructura y pipelines), "
                         "sin ejecutar el código ni enviarlo a servicios externos.", STYLE["body"]),
               Paragraph("•&nbsp;&nbsp;El estado de cada repositorio reúne sus análisis completos y las revisiones de pull requests: un hallazgo "
                         "queda remediado cuando deja de aparecer en un análisis completo, nunca por uno incompleto.", STYLE["body"])]
+    if sources:
+        story += [Paragraph("Fuentes de los avisos", STYLE["h3"]), *bullets([_t(line, 300) for line in sources], "note")]
     # Por repositorio
     story.append(h2(f"Por repositorio ({len(rows)})"))
     table = [[Paragraph(label, STYLE["head"]) for label in ("Repositorio", "Crít.", "Altas", "Medias", "Bajas", "Abiertos", "Remed.", "Excep.", "Último completo")]]

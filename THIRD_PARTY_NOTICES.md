@@ -89,8 +89,10 @@ gratuita con límites compartidos, y Aqua recomienda a los usos empresariales al
    Minimus, o conseguir licencia de esas empresas. Mientras tanto, las imágenes basadas en esas distribuciones
    no se analizan en el servicio de pago.
 2. Decidir las fuentes ambiguas (Amazon en primer lugar) pidiendo permiso o excluyéndolas.
-3. Mostrar en los informes y en el panel la fuente de cada aviso (Trivy la da en `DataSource`, Grype en
-   `dataSource`) y publicar una página de atribuciones de datos.
+3. ~~Mostrar la fuente de cada aviso~~ Hecho: cada hallazgo de dependencias guarda su fuente y su licencia
+   (`appsec_agent/data_sources.py`); el panel la muestra en el detalle y los informes técnico, de auditoría y
+   Markdown incluyen «Fuentes de los avisos» con la atribución de cada base y el aviso del NVD. Los análisis
+   anteriores a este cambio no tienen fuente registrada hasta que se vuelven a analizar.
 
 En la edición community autoalojada, cada organización ejecuta Trivy y Grype con sus bases como cualquier otro
 usuario de esas herramientas, y los términos de cada fuente le aplican directamente. Esto es un análisis

@@ -25,6 +25,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from . import data_sources
+
 OSV_VULN = "https://api.osv.dev/v1/vulns/"
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
 EPSS_URL = "https://epss.empiricalsecurity.com/epss_scores-current.csv.gz"
@@ -401,6 +403,7 @@ def dependency_finding(dependency: dict, advisory: dict, feeds: dict) -> dict:
             "advisory": {key: summary[key] for key in ("id", "aliases", "summary", "details", "cvss_vector",
                                                         "cvss_score", "published", "modified", "references")},
             "kev": kev, "epss": {"score": epss[0], "percentile": epss[1]} if epss else None,
+            "source": data_sources.from_osv(summary["id"]),
             "priority": priority,
             "reason": summary["summary"] or f"OSV asocia {summary['id']} a {name} {installed}.",
             "remediation": remediation}

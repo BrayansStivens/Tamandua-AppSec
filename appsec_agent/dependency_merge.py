@@ -98,6 +98,8 @@ def merge_dependencies(primary: list[dict], *others: tuple[str, list[dict]]) -> 
             advisory = twin.get("advisory")
             if isinstance(advisory, dict):
                 advisory["aliases"] = sorted((set(advisory.get("aliases") or []) | names) - {advisory.get("id")})
+            if not twin.get("source") and finding.get("source"):
+                twin["source"] = finding["source"]
             package, other = twin.get("package") or {}, finding.get("package") or {}
             if not package.get("fixed_version") and other.get("fixed_version"):
                 package["fixed_version"] = other["fixed_version"]

@@ -15,6 +15,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table
 
 from .audit_report import STATUS_LABEL, status_of
+from .data_sources import attribution
 from .remediation import action, counts_text, fix_groups
 from .report_design import (ATTENTION, ATTENTION_BG, BRAND, BRAND_BG, DANGER, DANGER_BG, INK, MUTED, ORDER, SEVERITY, SEVERITY_LABEL, SOFT,
                             STEP_STATUS, STYLE, SUCCESS, SUCCESS_BG, WIDTH, GAP_STATES, build, bullets, chip, coverage_gaps, day, h2, header,
@@ -140,6 +141,9 @@ def render_technical_pdf(record: dict, *, version: str) -> bytes:
     story += bullets(lines or ["Sin detalle de motores en este registro."])
     if record.get("limitations"):
         story += [Paragraph("Límites", STYLE["h3"]), *bullets([t(item, 300) for item in record["limitations"]], "note")]
+    sources = attribution(active)
+    if sources:
+        story += [Paragraph("Fuentes de los avisos", STYLE["h3"]), *bullets([t(line, 300) for line in sources], "note")]
     # Anexo: una fila por aviso de dependencia, para trazar cada identificador sin volcar su descripción.
     advisories = sorted([item for item in active if item.get("scanner") == "sca"],
                         key=lambda item: (ORDER.get(item.get("severity"), 9), str((item.get("package") or {}).get("name")), str(item.get("rule_id"))))
@@ -154,9 +158,10 @@ def render_technical_pdf(record: dict, *, version: str) -> bytes:
                          t(f"{package.get('name', '')} {package.get('version', '')}", 70), SEVERITY_LABEL.get(item.get("severity"), "—"),
                          f"{advisory['cvss_score']:.1f}" if isinstance(advisory.get("cvss_score"), (int, float)) else "—",
                          f"{epss * 100:.1f} %" if isinstance(epss, (int, float)) else "—",
-                         '<font color="#b71824"><b>sí</b></font>' if item.get("kev") else "—", t(package.get("fixed_version") or "—", 40)])
-        story.append(table(["Identificador", "Paquete", "Severidad", "CVSS", "EPSS", "KEV", "Corregida en"], body,
-                           [36 * mm, WIDTH - 144 * mm, 18 * mm, 14 * mm, 16 * mm, 12 * mm, 48 * mm]))
+                         '<font color="#b71824"><b>sí</b></font>' if item.get("kev") else "—", t(package.get("fixed_version") or "—", 40),
+                         t((item.get("source") or {}).get("short") or (item.get("source") or {}).get("name") or "—", 20)])
+        story.append(table(["Identificador", "Paquete", "Severidad", "CVSS", "EPSS", "KEV", "Corregida en", "Fuente"], body,
+                           [32 * mm, WIDTH - 140 * mm, 16 * mm, 11 * mm, 14 * mm, 10 * mm, 36 * mm, 21 * mm]))
         if len(advisories) > ANNEX_LIMIT:
             story.append(Paragraph(f"Se muestran {ANNEX_LIMIT} de {len(advisories)}; el resto está en el JSON y el SARIF del análisis.", STYLE["note"]))
     story += [Spacer(1, 8), Paragraph("Evidencia técnica generada con herramientas automatizadas: revísala antes de actuar. Los avisos de "

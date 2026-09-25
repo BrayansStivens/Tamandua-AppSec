@@ -31,6 +31,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from . import data_sources
 from .advisories import compare_versions, cvss3_base_score, prioritize, severity_from_score
 from .advisories import fingerprint as sca_fingerprint
 
@@ -488,6 +489,7 @@ def _trivy_vulnerability(entry: dict, target: str, ecosystem: str, feeds: dict, 
                          "cvss_score": score, "published": entry.get("PublishedDate"),
                          "modified": entry.get("LastModifiedDate"), "references": references},
             "kev": kev, "epss": {"score": epss[0], "percentile": epss[1]} if epss else None,
+            "source": data_sources.from_trivy(entry),
             "priority": priority, "reason": summary, "remediation": remediation}
 
 

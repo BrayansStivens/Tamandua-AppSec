@@ -173,6 +173,11 @@ def _finding_block(finding: dict) -> list[str]:
                      + (f"**corregido en {fixed}**" if fixed else "**sin versión corregida**") + f" · declarado en `{finding['path']}`")
     else:
         lines.append(f"Ubicación: `{finding['path']}:{finding['line']}`")
+    source = finding.get("source") or {}
+    if source.get("name"):
+        name = source["name"].replace("[", "(").replace("]", ")")
+        label = f"[{name}]({source['url']})" if str(source.get("url") or "").startswith("https://") else name
+        lines.append(f"Fuente del aviso: {label} · {source.get('license') or 'licencia sin revisar'}")
     if advisory.get("cvss_score") is not None:
         lines.append(f"CVSS {advisory['cvss_score']} · `{advisory.get('cvss_vector')}`")
     if finding.get("kev"):
@@ -247,7 +252,14 @@ def render_repository_report(record: dict) -> str:
     for item in record["owasp_coverage"]:
         lines.append(f"- {item['id']} · {item['title']}: `{item['status']}` · {item['reason']}")
     lines += ["", "### Límites", "", *[f"- {item}" for item in record["limitations"]], ""]
-    return "\n".join(lines)
+    return "\n".join(lines + _sources_section(record.get("findings") or []))
+
+
+def _sources_section(findings: list[dict]) -> list[str]:
+    """Atribución de las bases de avisos usadas (licencias en THIRD_PARTY_NOTICES.md)."""
+    from .data_sources import attribution
+    lines = attribution(findings)
+    return ["## Fuentes de los avisos", "", *[f"- {line}" for line in lines], ""] if lines else []
 
 
 def render_asset_report(record: dict) -> str:
@@ -274,7 +286,7 @@ def render_asset_report(record: dict) -> str:
                   f"última observación `{state.get('last_seen') or '—'}`.", ""]
     lines += ["## Límites", "", "- El registro refleja solo las herramientas, rutas y repositorios analizados.",
               "- Consulta cada ejecución original para sus pasos, versiones y cobertura específica.", ""]
-    return "\n".join(lines)
+    return "\n".join(lines + _sources_section(findings))
 
 
 def render_tickets(record: dict) -> list[dict]:
