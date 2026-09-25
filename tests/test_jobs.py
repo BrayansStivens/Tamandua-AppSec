@@ -46,7 +46,7 @@ class JobsTests(unittest.TestCase):
             # Antes de terminar, el registro ya existe y es legible por el panel.
             self.assertIn(load_run(self.data_dir, queued["id"])["status"], ("queued", "running", "completed"))
             record = _wait(self.data_dir, queued["id"])
-        self.assertEqual(record["status"], "completed")
+        self.assertEqual(record["status"], "incomplete")  # sin Docker en las pruebas no corre ningún motor: nunca «completed»
         self.assertEqual(record["context"], "prueba")
         self.assertGreaterEqual(record["summary"]["sast"], 1)
         levels = [event["level"] for event in record["progress"]]

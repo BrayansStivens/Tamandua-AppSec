@@ -183,7 +183,7 @@ class ServerTests(unittest.TestCase):
             queued = json.loads(payload)["run"]
             self.assertEqual(queued["status"], "queued")
             record = self._wait_for_run(queued["id"])
-        self.assertEqual(record["status"], "completed")
+        self.assertEqual(record["status"], "incomplete")  # sin Docker en las pruebas no corre ningún motor: nunca «completed»
         self.assertEqual(record["summary"]["sast"], 1)
         # El progreso es para el usuario: sin rutas del servidor ni salidas crudas.
         messages = [event["message"] for event in record["progress"]]

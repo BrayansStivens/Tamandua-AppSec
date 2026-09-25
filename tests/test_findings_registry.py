@@ -23,9 +23,9 @@ class RegistryTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
-    def run_(self, findings, *, pr=None, head="1" * 40):
+    def run_(self, findings, *, pr=None, head="1" * 40, status="completed"):
         self.clock += timedelta(hours=1)
-        record = _scan("org/api", findings, self.clock.isoformat())
+        record = {**_scan("org/api", findings, self.clock.isoformat()), "status": status}
         record["source"]["uid"] = KEY
         record["finished_at"] = self.clock.isoformat()
         if pr:
@@ -44,6 +44,40 @@ class RegistryTests(unittest.TestCase):
         self.run_([_finding(A), _finding(B)])
         self.assertEqual(self.status(), {A: "open", B: "open"})
         self.assertEqual(registry.summarize(self.data_dir, KEY)["open"], 2)
+
+    def test_an_incomplete_scan_never_fixes_anything(self):
+        """Si un motor no corrió (Docker, imágenes, red), no aparecer no prueba que se corrigió."""
+        self.run_([_finding(A), _finding(B)])
+        self.run_([], status="incomplete")
+        self.assertEqual(self.status(), {A: "open", B: "open"})
+        # Lo que sí ve un escaneo incompleto se abre igual.
+        C = "c" * 64
+        self.run_([_finding(C)], status="incomplete")
+        self.assertEqual(self.status(), {A: "open", B: "open", C: "open"})
+        # El siguiente escaneo completo sí remedia lo que ya no está.
+        self.run_([_finding(A)])
+        self.assertEqual(self.status(), {A: "open", B: "fixed", C: "fixed"})
+
+    def test_old_fixes_made_by_incomplete_scans_are_repaired_once(self):
+        """Datos de antes del arreglo: una remediación automática hecha por un escaneo incompleto se deshace."""
+        import json
+        self.run_([_finding(A), _finding(B)])
+        broken = self.run_([], status="incomplete")
+        path = next((self.data_dir / "findings").glob("*.json"))
+        state = json.loads(path.read_text())
+        state["findings"][B].update(status="fixed", fixed={"at": "x", "run_id": broken["id"], "how": "viejo", "auto": True})
+        path.write_text(json.dumps(state))
+        self.assertEqual(registry.repair_incomplete_fixes(self.data_dir), 1)
+        self.assertEqual(self.status(), {A: "open", B: "open"})
+        self.assertEqual(registry.repair_incomplete_fixes(self.data_dir), 0)  # una sola vez
+
+    def test_the_dashboard_ignores_incomplete_scans(self):
+        from appsec_agent import dashboard
+        self.run_([_finding(A), _finding(B)])
+        self.run_([], status="incomplete")
+        data = dashboard.compute(self.data_dir)
+        asset = next(row for row in data["top_assets"] if row["name"] == "org/api")
+        self.assertEqual(asset["open"], 2)
 
     def test_pull_request_findings_live_and_die_with_the_pr(self):
         self.run_([_finding(A)])

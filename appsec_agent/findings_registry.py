@@ -6,7 +6,9 @@ sigue abierto. Se actualiza solo al terminar cada ejecución:
 
 * **Escaneo completo** (rama principal): lo que aparece queda abierto (y se reabre si
   estaba remediado); lo que estaba abierto desde la rama principal y ya no aparece
-  queda **remediado automáticamente**.
+  queda **remediado automáticamente**. Solo si el escaneo terminó entero: en uno
+  **incompleto** (un motor no corrió, snapshot truncado) no aparecer no prueba nada, así
+  que abre y actualiza pero nunca remedia.
 * **Rutas excluidas** (`exclusions`): lo que cae en ellas queda **excluido**, ni abierto ni
   remediado. Si la ruta deja de estar excluida, el siguiente escaneo lo vuelve a abrir.
 * **Revisión de PR**: lo que introduce el PR queda abierto con origen «PR #n»; lo que
@@ -109,8 +111,10 @@ def apply(data_dir: Path, record: dict) -> dict:
                 entry = entries.setdefault(digest, {"first_seen": stamp, "first_run": record["id"], "origin": {"kind": "scan"}})
                 entry.update(status="excluded", finding=_clean({k: v for k, v in finding.items() if k != "excluded_by"}),
                              excluded={"pattern": finding.get("excluded_by"), "at": stamp}, last_seen=stamp, last_run=record["id"])
+        # Un escaneo incompleto no puede demostrar que algo desapareció: no remedia nada.
+        complete = record.get("status") == "completed"
         for digest, entry in entries.items():
-            if entry["status"] != "open" or digest in present:
+            if entry["status"] != "open" or digest in present or not complete:
                 continue
             origin = entry.get("origin") or {}
             if record["type"] in FULL_SCANS and (origin.get("kind") == "scan" or origin.get("merged")):
@@ -183,6 +187,42 @@ def rebuild(data_dir: Path) -> int:
         except (ValueError, OSError):
             continue
     return applied
+
+
+def repair_incomplete_fixes(data_dir: Path) -> int:
+    """Una vez: reabre lo que un escaneo incompleto dio por remediado antes de que eso dejara de ocurrir.
+
+    Solo toca remediaciones automáticas hechas por una ejecución que no terminó entera; el triage
+    manual, las exclusiones y los cierres de PR quedan como están. Devuelve cuántos hallazgos reabrió."""
+    from .store import list_runs
+    folder = data_dir / "findings"
+    marker = folder / ".repaired-incomplete-fixes"
+    if not folder.is_dir() or marker.exists():
+        return 0
+    status = {row["id"]: row.get("status") for row in list_runs(data_dir)}
+    reopened = 0
+    with _lock:
+        for path in folder.glob("*.json"):
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            changed = False
+            for entry in (state.get("findings") or {}).values():
+                fixed = entry.get("fixed") or {}
+                if entry.get("status") == "fixed" and fixed.get("auto") and status.get(fixed.get("run_id")) not in (None, "completed"):
+                    entry["status"] = "open"
+                    entry.pop("fixed", None)
+                    changed = True
+                    reopened += 1
+            if changed:
+                temporary = path.with_suffix(".tmp")
+                temporary.write_text(json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+                os.replace(temporary, path)
+        marker.write_text("1\n", encoding="utf-8")
+    if reopened:
+        _log.warning("registry_repaired", extra={"reason": f"{reopened} hallazgos reabiertos: los había remediado un escaneo incompleto"})
+    return reopened
 
 
 def view(data_dir: Path, key: str, *, status: str = "open") -> dict:

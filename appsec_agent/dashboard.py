@@ -74,6 +74,9 @@ def compute(data_dir: Path, days: int = 30) -> dict:
     top_assets = []
     for key, runs in by_asset.items():
         asset = runs[-1]["source"]["name"]  # el nombre más reciente
+        # Un escaneo incompleto no demuestra que algo se corrigió ni representa el estado del repositorio:
+        # cuentan los completos (y solo si no hay ninguno, el más reciente, para no esconder el activo).
+        runs = [record for record in runs if record["status"] == "completed"] or runs[-1:]
         seen_before: set[str] = set()
         for index, record in enumerate(runs):
             current = {item["fingerprint"]: item for item in record.get("findings", [])}

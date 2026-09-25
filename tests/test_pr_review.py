@@ -167,7 +167,7 @@ class JobTests(unittest.TestCase):
 
     def test_without_write_permission_the_review_still_happens(self):
         record = self.run_review({"contents": "read", "metadata": "read"})
-        self.assertEqual(record["status"], "completed")
+        self.assertEqual(record["status"], "incomplete")  # sin Docker en las pruebas no corre ningún motor: nunca «completed»
         self.assertEqual(self.posted, [])
         self.assertIn("sin permiso", record["review"]["delivery"]["comment"])
 
