@@ -136,9 +136,12 @@ class ScanJobs:
         batch, index = taken
         item = batch["items"][index]
         try:
-            queued = self.enqueue_repository_scan(source_id=item["source_id"], source_name=item["name"],
-                                                  allow_osv_upload=batch["allow_osv_upload"], context=batch["context"],
-                                                  tokens={}, installation_id=item.get("installation_id"), uid=item.get("uid"))
+            if item.get("kind") == "image":
+                queued = self.enqueue_image_scan(image=item["image"], context=batch["context"], requested_by=batch.get("by") or "lote")
+            else:
+                queued = self.enqueue_repository_scan(source_id=item["source_id"], source_name=item["name"],
+                                                      allow_osv_upload=batch["allow_osv_upload"], context=batch["context"],
+                                                      tokens={}, installation_id=item.get("installation_id"), uid=item.get("uid"))
             batches.attach(self.data_dir, batch["id"], index, run_id=queued["id"])
         except Exception as exc:  # noqa: BLE001 — un repositorio que falla no detiene el lote
             batches.attach(self.data_dir, batch["id"], index, error=str(exc))

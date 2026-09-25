@@ -68,6 +68,24 @@ class BatchLogicTests(unittest.TestCase):
         self.assertEqual(state["eta_seconds"], 60)  # un pendiente × la duración media real (60 s)
 
 
+class ImageBatchTests(unittest.TestCase):
+    def test_images_are_batched_by_full_reference_and_fed_to_the_image_scanner(self):
+        from appsec_agent.image_scan import parse_reference
+        from appsec_agent.jobs import ScanJobs
+        with tempfile.TemporaryDirectory() as folder:
+            data = Path(folder)
+            items = [{"kind": "image", "image": parse_reference(reference)} for reference in ("nginx:1.21", "nginx:1.27-alpine", "nginx:1.21")]
+            batch = batches.create(data, items, by="ana", label="imágenes")
+            self.assertEqual([item["name"] for item in batch["items"]], ["docker.io/library/nginx:1.21", "docker.io/library/nginx:1.27-alpine"])  # dos etiquetas, dos análisis
+            with patch.object(ScanJobs, "__init__", lambda self, data_dir: setattr(self, "data_dir", data_dir)), \
+                    patch.object(ScanJobs, "enqueue_image_scan", return_value={"id": "3" * 32}) as enqueue:
+                jobs = ScanJobs(data)
+                jobs._feed_batch()
+            self.assertEqual(enqueue.call_args.kwargs["image"]["reference"], "docker.io/library/nginx:1.21")
+            self.assertEqual(enqueue.call_args.kwargs["requested_by"], "ana")
+            self.assertEqual(batches.load(data, batch["id"])["items"][0]["run_id"], "3" * 32)
+
+
 class WorkerTests(unittest.TestCase):
     def test_the_real_worker_goes_through_the_whole_batch(self):
         """El trabajador toma los repositorios del lote uno a uno cuando no tiene otra cosa, hasta terminarlo."""
@@ -128,6 +146,17 @@ class BatchRouteTests(HttpCase):
     def test_an_admin_scans_a_whole_organization(self):
         status, body, _ = self.create({"account": "ACME"}, self.admin)
         self.assertEqual((status, body["total"]), (202, 12))
+
+    def test_a_member_scans_several_images_in_one_batch(self):
+        def create(body):
+            with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+                return self.post("/api/images/batches", "scan-image-batch", body, self.member)
+        for body in ({"references": []}, {"references": ["NGINX:Mayúsculas"]}, {"references": [7]},
+                     {"references": [f"nginx:{index}" for index in range(101)]}, {"references": ["nginx"], "extra": 1}):
+            self.assertEqual(create(body)[0], 400, body)
+        status, body, _ = create({"references": ["nginx:1.21", " nginx:1.21 ", "ghcr.io/acme/api:2.0"], "context": "producción"})
+        self.assertEqual((status, body["total"], body["label"]), (202, 2, "2 imágenes"))
+        self.assertEqual(create({"references": ["nginx:1.27"]})[0], 409)  # un lote a la vez
 
     def test_invalid_requests(self):
         for body, expected in (({"source_ids": ["github:otra/cosa"]}, 400), ({"source_ids": []}, 400),

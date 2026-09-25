@@ -19,7 +19,8 @@ export function useBatches() {
   return { active: state?.active ?? null, last: state?.recent[0] ?? null, reload }
 }
 
-export function BatchPanel({ active, last, onChanged }: { active: BatchSummary | null; last: BatchSummary | null; onChanged: () => void }) {
+// `viewer`: quién mira. Cancelar es cosa de quien lanzó el lote o de un administrador; sin `viewer`, se muestra siempre.
+export function BatchPanel({ active, last, onChanged, viewer }: { active: BatchSummary | null; last: BatchSummary | null; onChanged: () => void; viewer?: { username: string; admin: boolean } }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   if (!active && !last) return null
@@ -36,9 +37,9 @@ export function BatchPanel({ active, last, onChanged }: { active: BatchSummary |
   return <div className="space-y-2 rounded-xl border border-brand/30 bg-brand/[0.06] p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="flex items-center gap-2 text-sm font-medium"><Layers3 className="size-4 text-brand" />Lote en curso · {batch.label}</p>
-      <Button size="sm" variant="ghost" disabled={busy} onClick={() => void cancel()}>{busy && <LoaderCircle className="animate-spin" />}Cancelar lote</Button>
+      {(!viewer || viewer.admin || viewer.username === batch.by) && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void cancel()}>{busy && <LoaderCircle className="animate-spin" />}Cancelar lote</Button>}
     </div>
-    <div role="progressbar" aria-label={`Lote: ${finished} de ${batch.total} repositorios`} aria-valuemin={0} aria-valuemax={batch.total} aria-valuenow={finished}
+    <div role="progressbar" aria-label={`Lote: ${finished} de ${batch.total} analizados`} aria-valuemin={0} aria-valuemax={batch.total} aria-valuenow={finished}
       className="h-1.5 overflow-hidden rounded-full bg-app-soft"><div className="h-full rounded-full bg-brand transition-all" style={{ width: `${Math.max(2, percent)}%` }} /></div>
     <p role="status" className="text-xs text-app-muted">{finished} de {batch.total} analizados{batch.failed ? ` (${batch.failed} fallidos)` : ''} · {batch.critical} críticos y {batch.high} altos hasta ahora · quedan {duration(batch.eta_seconds)}. Avanza cuando no hay otros análisis: puedes seguir usando el panel.</p>
     {batch.failed_items.length > 0 && <details className="text-xs text-app-muted"><summary className="cursor-pointer">Ver fallidos</summary><ul className="mt-1 space-y-0.5">{batch.failed_items.map(item => <li key={item.name}><span className="font-medium">{item.name}</span>: {item.error}</li>)}</ul></details>}

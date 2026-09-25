@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { SkeletonTable } from '@/components/loading'
+import { BatchPanel, useBatches } from '@/components/batches'
 
 export type AnalysisRow = { id: string; type: string; status: string; created_at: string; variant?: string; fixture?: string; source?: { name: string }; summary: { candidates?: number; confirmed?: number; executed?: number; planned?: number; severities?: Record<string, number>; kev?: number } }
 
@@ -22,15 +23,18 @@ const rowIssues = (row: AnalysisRow) => row.type === 'pr_review'
   ? { value: row.summary.candidates ?? 0, hint: 'candidatos' }
   : { value: row.summary.confirmed ?? 0, hint: 'reproducidos' }
 
-export function AnalysisList({ refreshKey, onOpen, onNew }: { refreshKey: number; onOpen: (id: string) => void; onNew: () => void }) {
+export function AnalysisList({ refreshKey, onOpen, onNew, viewer }: { refreshKey: number; onOpen: (id: string) => void; onNew: () => void; viewer: { username: string; admin: boolean } }) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [type, setType] = useState('all')
   // La lista se pide paginada al servidor: con mil ejecuciones no se cargan mil filas.
   const page = usePaged<AnalysisRow>('/api/runs/page', { q: query.trim() || undefined, status: status === 'all' ? undefined : status, type: type === 'all' ? undefined : type }, 25, refreshKey)
   const visible = page.items
+  // Lotes (varios repositorios, una organización o varias imágenes): su progreso, arriba de la lista.
+  const { active: batch, last: lastBatch, reload: reloadBatches } = useBatches()
 
   return <Card className="border-app-line bg-panel"><CardContent className="space-y-5 p-5">
+    <BatchPanel active={batch} last={lastBatch} viewer={viewer} onChanged={() => void reloadBatches()} />
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div className="relative min-w-0 flex-1 sm:max-w-xs"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar análisis" placeholder="Buscar análisis…" value={query} onChange={event => setQuery(event.target.value)} className="border-app-line bg-app-soft pl-9" /></div>
       <Select value={status} onValueChange={value => setStatus(value ?? 'all')}><SelectTrigger aria-label="Filtrar por estado" size="sm" className="min-w-40 border-app-line bg-app-soft text-app-secondary">{status === 'all' ? 'Todos los estados' : statusLabel(status)}</SelectTrigger><SelectContent align="start" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="all">Todos los estados</SelectItem><SelectItem value="running">Analizando</SelectItem><SelectItem value="completed">Completada</SelectItem><SelectItem value="incomplete">Incompleta</SelectItem><SelectItem value="failed">Fallida</SelectItem></SelectContent></Select>

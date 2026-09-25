@@ -6,8 +6,9 @@ así un análisis manual o la revisión de un PR nunca esperan detrás de 900 re
 servidor se reinicia, el lote sigue donde iba. El progreso sale de las ejecuciones reales (el
 índice), no de un contador aparte que pueda desincronizarse.
 
-Solo repositorios de la GitHub App: su acceso se renueva solo. Los tokens personales viven en
-memoria de la sesión y no sirven para un trabajo de horas.
+Repositorios de la GitHub App (su acceso se renueva solo; los tokens personales viven en memoria de la
+sesión y no sirven para un trabajo de horas) o imágenes de contenedor (con las credenciales de registro
+guardadas, si las hay).
 """
 
 from __future__ import annotations
@@ -74,18 +75,22 @@ def active(data_dir: Path) -> dict | None:
 
 
 def create(data_dir: Path, items: list[dict], *, by: str, label: str, allow_osv_upload: bool = False, context: str = "") -> dict:
-    """`items`: repositorios ya validados ({source_id, name, uid, installation_id}). Uno activo a la vez."""
+    """`items`: repositorios ya validados ({source_id, name, uid, installation_id}) o imágenes ya validadas
+    ({kind: "image", image, name}). Uno activo a la vez."""
     if not items:
-        raise BatchError("No hay repositorios que analizar")
+        raise BatchError("No hay nada que analizar")
     if len(items) > MAX_ITEMS:
-        raise BatchError(f"Como mucho {MAX_ITEMS} repositorios por lote")
+        raise BatchError(f"Como mucho {MAX_ITEMS} elementos por lote")
     with _lock:
         if active(data_dir):
             raise BatchError("Ya hay un lote en curso: espera a que termine o cancélalo")
-        unique = list({item["source_id"]: item for item in items}.values())
+        # Una imagen se identifica por su referencia completa (dos etiquetas del mismo repositorio son dos análisis).
+        unique = list({(item["image"]["reference"] if item.get("kind") == "image" else item["source_id"]): item for item in items}.values())
         batch = {"id": uuid.uuid4().hex, "created_at": _now(), "by": by, "label": label[:120], "status": "running",
                  "allow_osv_upload": bool(allow_osv_upload), "context": " ".join(context.split())[:400],
-                 "items": [{"source_id": item["source_id"], "name": item["name"], "uid": item.get("uid"),
+                 "items": [{"kind": "image", "image": item["image"], "name": item["image"]["reference"], "run_id": None}
+                           if item.get("kind") == "image" else
+                           {"source_id": item["source_id"], "name": item["name"], "uid": item.get("uid"),
                             "installation_id": item.get("installation_id"), "run_id": None} for item in unique]}
         _write(data_dir, batch)
     return batch

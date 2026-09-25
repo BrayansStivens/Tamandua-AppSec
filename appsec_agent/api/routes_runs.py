@@ -495,6 +495,36 @@ def image_scan(request: Request):
     return request.json(202, {"run": queued, "image": image})
 
 
+@route("POST", "/api/images/batches", action="scan-image-batch", body=64_000)
+def image_batch(request: Request):
+    """Varias imágenes de una vez (hasta 100), en un lote que avanza cuando el servidor está libre."""
+    from ..image_scan import ImageError, check_registry_address, parse_reference
+    payload = request.payload
+    if (not isinstance(payload, dict) or not set(payload) <= {"references", "context"} or not isinstance(payload.get("references"), list)
+            or not isinstance(payload.get("context", ""), str)):
+        return request.json(400, {"error": "Indica las imágenes, una referencia por elemento"})
+    if any(not isinstance(item, str) for item in payload["references"]):
+        return request.json(400, {"error": "Referencia de imagen inválida"})
+    references = list(dict.fromkeys(item.strip() for item in payload["references"] if item.strip()))
+    if not 1 <= len(references) <= batches.MAX_SELECTED:
+        return request.json(400, {"error": f"Indica entre 1 y {batches.MAX_SELECTED} imágenes"})
+    items = []
+    for reference in references:
+        try:
+            image = parse_reference(reference)
+            check_registry_address(image["registry"])
+        except ImageError as exc:
+            return request.json(400, {"error": f"{reference[:120]}: {exc}"})
+        items.append({"kind": "image", "image": image})
+    label = f"{len(items)} {'imagen' if len(items) == 1 else 'imágenes'}"
+    try:
+        batch = batches.create(request.data_dir, items, by=request.user["username"], label=label, context=payload.get("context", ""))
+    except batches.BatchError as exc:
+        return request.json(409, {"error": str(exc)})
+    request.log.info("scan_image_batch", extra={"user": request.user["username"], "reason": label})
+    return request.json(202, batches.summary(request.data_dir, batch))
+
+
 @route("GET", "/api/registries")
 def registry_list(request: Request):
     from ..image_scan import registries
