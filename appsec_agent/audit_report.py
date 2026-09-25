@@ -12,31 +12,20 @@ repositorio o del formulario se trata como dato: se escapa antes de dibujarse.
 from __future__ import annotations
 
 import html
-import io
-import re
 from datetime import date, datetime, timezone
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import CondPageBreak, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table
 
-# Los mismos tokens del panel (web/src/index.css), en hexadecimal para el PDF.
-BRAND, BRAND_BG = colors.HexColor("#7342d3"), colors.HexColor("#f4f1ff")
-INK, MUTED, LINE, SOFT = colors.HexColor("#171717"), colors.HexColor("#636363"), colors.HexColor("#e5e5e5"), colors.HexColor("#f5f5f5")
-SEVERITY = {  # texto, fondo
-    "critical": (colors.HexColor("#ffffff"), colors.HexColor("#c21725")),
-    "high": (colors.HexColor("#a34100"), colors.HexColor("#fff0e4")),
-    "medium": (colors.HexColor("#8a4c00"), colors.HexColor("#fef4df")),
-    "low": (colors.HexColor("#00649e"), colors.HexColor("#ebf5fd")),
-    "info": (MUTED, SOFT),
-}
-SUCCESS, SUCCESS_BG = colors.HexColor("#006e42"), colors.HexColor("#e9f8ef")
-SEVERITY_LABEL = {"critical": "Crítica", "high": "Alta", "medium": "Media", "low": "Baja", "info": "Info"}
-ORDER = {level: index for index, level in enumerate(("critical", "high", "medium", "low", "info"))}
+from .remediation import action, counts_text, fix_groups
+from .report_design import (BRAND, BRAND_BG, DANGER_BG, DISCLAIMER, INK, ORDER, SEVERITY, SOFT, STYLE, SUCCESS, SUCCESS_BG, WIDTH,
+                            build, chip as _chip, coverage_gaps, day as _day, grid as _grid, h2, header, hexval, kpis as _kpis, listing, meta,
+                            n as _n, signoff, t as _t)
+
 STATUS_LABEL = {"open": "Abierto", "in_progress": "En curso", "fixed": "Remediado", "false_positive": "Falso positivo",
                 "accepted": "Riesgo aceptado", "excluded": "Fuera de alcance"}
+STATUS_PLURAL = {"open": "abiertos", "in_progress": "en curso", "fixed": "remediados", "false_positive": "falsos positivos",
+                 "accepted": "aceptados", "excluded": "fuera de alcance"}
 FRAMEWORKS = {
     "soc2": ("SOC 2 Tipo II", [
         ("CC3.2", "Identificación y análisis de riesgos", "Hallazgos priorizados por severidad, explotación activa (CISA KEV) y probabilidad (EPSS)."),
@@ -52,6 +41,7 @@ FRAMEWORKS = {
     "general": ("Gestión de vulnerabilidades", []),
 }
 DETAIL = ("none", "high", "all")
+DETAIL_LIMIT = 40  # bloques de detalle: la tabla de hallazgos ya es la evidencia completa
 TEXT_LIMITS = {"title": 120, "organization": 120, "prepared_by": 80, "prepared_for": 120, "scope": 300}
 
 
@@ -89,19 +79,6 @@ def validate_options(raw: dict | None, *, default_by: str) -> dict:
     return options
 
 
-def _t(value, limit: int = 400) -> str:
-    """Texto sin confianza → marcado seguro de ReportLab (escapado, una línea, acotado)."""
-    text = " ".join(str(value or "").split())
-    if len(text) > limit:
-        text = text[:limit].rsplit(" ", 1)[0] + "…"
-    return html.escape(text, quote=False)
-
-
-def _day(value) -> str:
-    text = str(value or "")
-    return text[:10] if re.match(r"\d{4}-\d{2}-\d{2}", text) else "—"
-
-
 def status_of(finding: dict) -> str:
     lifecycle = finding.get("lifecycle") or {}
     if lifecycle.get("status") == "excluded":
@@ -109,65 +86,6 @@ def status_of(finding: dict) -> str:
     if lifecycle.get("status") == "fixed":
         return "fixed"
     return (finding.get("triage") or {}).get("status") or "open"
-
-
-STYLE = {
-    "eyebrow": ParagraphStyle("eyebrow", fontName="Helvetica-Bold", fontSize=8, leading=11, textColor=BRAND, spaceAfter=6),
-    "title": ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=INK, spaceAfter=4),
-    "subtitle": ParagraphStyle("subtitle", fontName="Helvetica", fontSize=9.5, leading=14, textColor=MUTED, spaceAfter=10),
-    # Sin keepWithNext: ataría el título a la tabla entera y la mandaría completa a la página siguiente.
-    # Antes de cada título hay un salto condicional (CondPageBreak) que evita títulos huérfanos.
-    "h2": ParagraphStyle("h2", fontName="Helvetica-Bold", fontSize=11.5, leading=15, textColor=INK, spaceBefore=12, spaceAfter=6),
-    "body": ParagraphStyle("body", fontName="Helvetica", fontSize=8.8, leading=13, textColor=INK, spaceAfter=4),
-    "note": ParagraphStyle("note", fontName="Helvetica", fontSize=7.8, leading=11, textColor=MUTED, spaceAfter=4),
-    "cell": ParagraphStyle("cell", fontName="Helvetica", fontSize=7.8, leading=10.5, textColor=INK),
-    "cellmuted": ParagraphStyle("cellmuted", fontName="Helvetica", fontSize=7.3, leading=10, textColor=MUTED),
-    "head": ParagraphStyle("head", fontName="Helvetica-Bold", fontSize=7.3, leading=10, textColor=MUTED),
-    "label": ParagraphStyle("label", fontName="Helvetica", fontSize=7, leading=9, textColor=MUTED),
-    "value": ParagraphStyle("value", fontName="Helvetica-Bold", fontSize=8.8, leading=11.5, textColor=INK),
-    "kpi": ParagraphStyle("kpi", fontName="Helvetica-Bold", fontSize=17, leading=20),
-    "kpilabel": ParagraphStyle("kpilabel", fontName="Helvetica", fontSize=7.3, leading=9.5, textColor=MUTED),
-    "chip": ParagraphStyle("chip", fontName="Helvetica-Bold", fontSize=7, leading=9, alignment=1),
-}
-WIDTH = A4[0] - 36 * mm
-
-
-def _grid(rows, widths, *, header=True, zebra=False) -> Table:
-    table = Table(rows, colWidths=widths, hAlign="LEFT", repeatRows=1 if header else 0)
-    style = [("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4), ("LINEBELOW", (0, 0), (-1, -1), 0.3, LINE)]
-    if header:
-        style += [("BACKGROUND", (0, 0), (-1, 0), SOFT), ("LINEBELOW", (0, 0), (-1, 0), 0.8, BRAND)]
-    if zebra:
-        style += [("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fafafa")])]
-    table.setStyle(TableStyle(style))
-    return table
-
-
-def _chip(severity: str) -> Table:
-    ink, fill = SEVERITY.get(severity, SEVERITY["info"])
-    chip = Table([[Paragraph(f'<font color="{ink.hexval().replace("0x", "#")}">{SEVERITY_LABEL.get(severity, severity)}</font>', STYLE["chip"])]],
-                 colWidths=[15 * mm], rowHeights=[4.6 * mm])
-    chip.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fill), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                              ("LEFTPADDING", (0, 0), (-1, -1), 1), ("RIGHTPADDING", (0, 0), (-1, -1), 1),
-                              ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0)]))
-    return chip
-
-
-def _kpis(items: list[tuple[str, int, colors.Color, colors.Color]]) -> Table:
-    cells = [[Paragraph(f'<font color="{ink.hexval().replace("0x", "#")}">{value}</font>', STYLE["kpi"]), Paragraph(label, STYLE["kpilabel"])]
-             for label, value, ink, _ in items]
-    table = Table([[cell for cell in cells]], colWidths=[WIDTH / len(items)] * len(items), hAlign="LEFT")
-    style = [("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-             ("LEFTPADDING", (0, 0), (-1, -1), 8)]
-    for index, (_, _, _, fill) in enumerate(items):
-        style += [("BACKGROUND", (index, 0), (index, 0), fill), ("LINEAFTER", (index, 0), (index, 0), 2, colors.white)]
-    table.setStyle(TableStyle(style))
-    return table
-
-
-def _n(count: int, one: str, many: str) -> str:
-    return f"{count} {one if count == 1 else many}"
 
 
 def _risk(finding: dict) -> str:
@@ -178,11 +96,72 @@ def _risk(finding: dict) -> str:
     return finding.get("reason") or advisory.get("summary") or ""
 
 
-def _fix(finding: dict) -> str:
-    package = finding.get("package") or {}
-    if package.get("fixed_version"):
-        return f"Actualizar {package.get('name')} a {package['fixed_version']}"
-    return finding.get("remediation") or "Revisar y corregir según la guía del hallazgo"
+def _short_title(finding: dict) -> str:
+    """«pillow 10.3.0: Pillow: DoS via …» → «DoS via …»: el paquete ya está en la cabecera del grupo."""
+    title = str(finding.get("title") or "")
+    parts = [part.strip() for part in title.split(": ")]
+    return parts[-1] if finding.get("scanner") == "sca" and len(parts) > 1 else title
+
+
+def _status_text(items: list[dict]) -> str:
+    states = [status_of(item) for item in items]
+    if len(set(states)) == 1:
+        return STATUS_LABEL.get(states[0], states[0])
+    return ", ".join(f"{states.count(state)} {STATUS_PLURAL.get(state, state)}" for state in dict.fromkeys(states))
+
+
+def _first_seen(items: list[dict], fallback) -> str:
+    seen = sorted(_day((item.get("lifecycle") or {}).get("first_seen") or fallback) for item in items)
+    return seen[0] if seen else "—"
+
+
+def _group_cells(entry: dict, fallback_date) -> tuple[str, str]:
+    """Texto del hallazgo (o del paquete con todos sus avisos) y su ubicación."""
+    items = entry["items"]
+    if entry["kind"] == "package" and len(items) > 1:
+        text = (f"<b>{_t(entry['name'], 60)} {_t(entry['version'], 30)}</b> · {len(items)} vulnerabilidades ({counts_text(entry['counts'])})"
+                f'<br/><font color="#636363">{_t(listing(entry["ids"], 4), 140)}</font>')
+        return text, _t(entry["path"], 90)
+    item = items[0]
+    ids = ", ".join((item.get("cve") or [])[:2] or (item.get("ghsa") or [])[:1])
+    text = _t(item.get("title"), 140) + (f'<br/><font color="#636363">{_t(ids, 60)}</font>' if ids else "")
+    where = item.get("path") if item.get("scanner") == "sca" else f"{item.get('path')}:{item.get('line')}"
+    return text, _t(where, 90)
+
+
+KEV_MARK = '<br/><font color="#b71824"><b>Explotación activa conocida (CISA KEV)</b></font>'
+
+
+def _controls(framework_label: str, controls: list) -> list:
+    return [h2(f"Controles relacionados · {framework_label}"),
+            _grid([[Paragraph("Control", STYLE["head"]), Paragraph("Qué aporta esta evidencia", STYLE["head"])]]
+                  + [[Paragraph(f"<b>{html.escape(code)}</b><br/>{html.escape(name)}", STYLE["cell"]), Paragraph(html.escape(text), STYLE["cell"])]
+                     for code, name, text in controls], [42 * mm, WIDTH - 42 * mm]),
+            Paragraph("La relación con cada control es orientativa: la eficacia del control la evalúa el auditor con el resto de la "
+                      "documentación del equipo (política, responsables, frecuencia y muestras del periodo).", STYLE["note"])]
+
+
+def _detail_block(entry: dict) -> list:
+    items = entry["items"]
+    item = items[0]
+    if entry["kind"] == "package" and len(items) > 1:
+        heading = f"<b>{_t(entry['name'], 60)} {_t(entry['version'], 30)} · {len(items)} vulnerabilidades</b>"
+        where = f"{entry['path']} · {_status_text(items)} · {listing(entry['ids'], 5)}"
+        risks = "; ".join(dict.fromkeys(_short_title(finding) for finding in sorted(items, key=lambda f: ORDER.get(f.get("severity"), 9))[:3]))
+        risk = risks + (f"; y {len(items) - 3} avisos más" if len(items) > 3 else "")
+    else:
+        heading = f"<b>{_t(item.get('title'), 160)}</b>"
+        where = f"{item.get('path')}:{item.get('line')} · {STATUS_LABEL.get(status_of(item))} · {', '.join((item.get('cve') or [])[:3]) or item.get('rule_id')}"
+        risk = _risk(item)
+    block = [Table([[_chip(entry["severity"]), Paragraph(heading, STYLE["body"])]], colWidths=[18 * mm, WIDTH - 18 * mm],
+                   style=[("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]),
+             Paragraph(_t(where, 240), STYLE["note"]),
+             Paragraph("<b>Riesgo:</b> " + _t(risk, 450), STYLE["body"]),
+             Paragraph("<b>Corrección:</b> " + _t(action(entry), 450), STYLE["body"])]
+    references = [url for url in ((item.get("advisory") or {}).get("references") or [])[:2] if str(url).startswith("https://")]
+    if references and len(items) == 1:
+        block.append(Paragraph("Referencias: " + " · ".join(_t(url, 90) for url in references), STYLE["note"]))
+    return [KeepTogether(block), Spacer(1, 6)]
 
 
 def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, version: str) -> bytes:
@@ -202,19 +181,15 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
     excepted = sum(1 for status in statuses if status in ("accepted", "false_positive"))
     active = sum(1 for status in statuses if status in ("open", "in_progress"))
     kev = sum(1 for item in findings if item.get("kev"))
+    groups = fix_groups(findings)
 
-    eyebrow = "EVIDENCIA DE GESTIÓN DE VULNERABILIDADES" + (f"  ·  {framework_label.upper()}" if controls else "")
-    story = [Paragraph(html.escape(eyebrow), STYLE["eyebrow"]),
-             Paragraph(_t(options["title"] or "Evidencia de gestión de vulnerabilidades", 120), STYLE["title"]),
-             Paragraph(_t(system, 200), STYLE["subtitle"])]
-    meta = [("Organización", options["organization"] or "—"), ("Sistema / alcance", system), ("Periodo", period),
-            ("Preparado por", options["prepared_by"] or "—"), ("Preparado para", options["prepared_for"] or "—"),
-            ("Emitido", f"{issued} · ref. {str(record.get('id', ''))[:24]}")]
-    story.append(_grid([[Paragraph(_t(label), STYLE["label"]) for label, _ in meta[:3]], [Paragraph(_t(value, 160), STYLE["value"]) for _, value in meta[:3]],
-                        [Paragraph(_t(label), STYLE["label"]) for label, _ in meta[3:]], [Paragraph(_t(value, 160), STYLE["value"]) for _, value in meta[3:]]],
-                       [WIDTH / 3] * 3, header=False))
-    story += [Spacer(1, 10), Paragraph("Resumen", STYLE["h2"]),
-              _kpis([("en el alcance", len(findings), INK, SOFT), ("críticas", counts["critical"], SEVERITY["critical"][1], colors.HexColor("#ffefed")),
+    story = header("Evidencia de gestión de vulnerabilidades" + (f"  ·  {framework_label}" if controls else ""),
+                   options["title"] or "Evidencia de gestión de vulnerabilidades", system)
+    story.append(meta([("Organización", options["organization"] or "—"), ("Sistema / alcance", system), ("Periodo", period),
+                       ("Preparado por", options["prepared_by"] or "—"), ("Preparado para", options["prepared_for"] or "—"),
+                       ("Emitido", f"{issued} · ref. {str(record.get('id', ''))[:24]}")]))
+    story += [Spacer(1, 10), h2("Resumen"),
+              _kpis([("en el alcance", len(findings), INK, SOFT), ("críticas", counts["critical"], SEVERITY["critical"][1], DANGER_BG),
                      ("altas", counts["high"], SEVERITY["high"][0], SEVERITY["high"][1]),
                      ("abiertas o en curso", active, INK, SOFT), ("remediadas", fixed, SUCCESS, SUCCESS_BG),
                      ("excepciones aprobadas", excepted, BRAND, BRAND_BG)]),
@@ -223,14 +198,11 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
                            f"{_n(counts['high'], 'alto', 'altos')}, {_n(counts['medium'], 'medio', 'medios')} y "
                            f"{_n(counts['low'] + counts['info'], 'bajo o informativo', 'bajos o informativos')}. "
                            f"Abiertos o en curso: {active}; remediados: {fixed}; con excepción aprobada: {excepted}."
-                           + (f" {_n(kev, 'corresponde', 'corresponden')} a vulnerabilidades con explotación activa conocida (CISA KEV)." if kev else ""), 700), STYLE["body"])]
+                           + (f" {_n(kev, 'corresponde', 'corresponden')} a vulnerabilidades con explotación activa conocida (CISA KEV)." if kev else "")
+                           + (f" Se agrupan en {_n(len(groups), 'acción', 'acciones')}: los avisos de una misma dependencia se cierran con una sola actualización."
+                              if len(groups) < len(findings) else ""), 900), STYLE["body"])]
     if controls:
-        story += [Paragraph(f"Controles relacionados · {html.escape(framework_label)}", STYLE["h2"]),
-                  _grid([[Paragraph("Control", STYLE["head"]), Paragraph("Qué aporta esta evidencia", STYLE["head"])]]
-                        + [[Paragraph(f"<b>{html.escape(code)}</b><br/>{html.escape(name)}", STYLE["cell"]), Paragraph(html.escape(text), STYLE["cell"])]
-                           for code, name, text in controls], [42 * mm, WIDTH - 42 * mm]),
-                  Paragraph("La relación con cada control es orientativa: la eficacia del control la evalúa el auditor con el resto de la "
-                            "documentación del equipo (política, responsables, frecuencia y muestras del periodo).", STYLE["note"])]
+        story += _controls(framework_label, controls)
     # Método y cobertura: qué se ejecutó y qué no, sin el volcado técnico.
     engines = [step for step in record.get("steps") or [] if (step.get("tool") or {}).get("version")]
     method = [f"Análisis estático del {analysed}, sin ejecutar el código ni enviarlo a servicios externos."]
@@ -238,34 +210,33 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
         method.append("Motores: " + ", ".join(f"{step['name']}" for step in engines) + ".")
     if source.get("sha256"):
         method.append(f"Instantánea analizada: SHA-256 {source['sha256'][:16]}…")
-    gaps = [step["name"] for step in record.get("steps") or [] if step.get("status") in ("not_tested", "inconclusive")]
-    if gaps:
-        method.append("No se pudo completar: " + ", ".join(gaps) + ". Esas áreas no equivalen a «sin hallazgos».")
-    elif engines:
-        method.append("Todos los motores del análisis se completaron.")
+    gaps = coverage_gaps(record.get("steps") or [])
     if record.get("type") == "asset_state":
         method = [f"Estado acumulado del repositorio a {analysed}: reúne los análisis completos y las revisiones de pull requests, "
                   "con la fecha en que cada hallazgo se detectó y, si aplica, se remedió."]
-    story += [Paragraph("Método y cobertura", STYLE["h2"]), *[Paragraph("•&nbsp;&nbsp;" + _t(item, 500), STYLE["body"]) for item in method]]
-    # Hallazgos
-    story.append(Paragraph(f"Hallazgos ({len(findings)})", STYLE["h2"]))
+    if gaps:
+        method.append("No se completó del todo: " + ", ".join(gaps) + ". Esas áreas no equivalen a «sin hallazgos».")
+    elif engines and all(step.get("status") == "completed" for step in engines):
+        method.append("Todos los motores del análisis se completaron.")
+    story += [h2("Método y cobertura"), *[Paragraph("•&nbsp;&nbsp;" + _t(item, 500), STYLE["body"]) for item in method]]
+    # Hallazgos: una fila por acción (una dependencia con todos sus avisos, o un hallazgo de código).
+    story.append(h2(f"Hallazgos ({len(findings)})"))
     if findings:
         rows = [[Paragraph(label, STYLE["head"]) for label in ("Severidad", "Hallazgo", "Ubicación", "Estado", "Detectado", "Acción recomendada")]]
-        for item in findings:
-            ids = ", ".join((item.get("cve") or [])[:2] or (item.get("ghsa") or [])[:1])
-            rows.append([_chip(item.get("severity", "info")),
-                         Paragraph(_t(item.get("title"), 140) + (f'<br/><font color="#636363">{_t(ids, 60)}</font>' if ids else ""), STYLE["cell"]),
-                         Paragraph(_t(f"{item.get('path')}:{item.get('line')}" if item.get("scanner") != "sca" else item.get("path"), 90), STYLE["cellmuted"]),
-                         Paragraph(STATUS_LABEL.get(status_of(item), status_of(item)), STYLE["cell"]),
-                         Paragraph(_day((item.get("lifecycle") or {}).get("first_seen") or record.get("created_at")), STYLE["cellmuted"]),
-                         Paragraph(_t(_fix(item), 160), STYLE["cell"])])
+        for entry in groups:
+            text, where = _group_cells(entry, record.get("created_at"))
+            text += KEV_MARK if entry["kev"] else ""
+            rows.append([_chip(entry["severity"]), Paragraph(text, STYLE["cell"]), Paragraph(where, STYLE["cellmuted"]),
+                         Paragraph(_t(_status_text(entry["items"]), 60), STYLE["cell"]),
+                         Paragraph(_first_seen(entry["items"], record.get("created_at")), STYLE["cellmuted"]),
+                         Paragraph(_t(action(entry, short=True), 180), STYLE["cell"])])
         story.append(_grid(rows, [19 * mm, 52 * mm, 34 * mm, 19 * mm, 17 * mm, WIDTH - 141 * mm], zebra=True))
     else:
         story.append(Paragraph("Ningún hallazgo en el alcance elegido.", STYLE["body"]))
-    # Excepciones: lo primero que pregunta un auditor.
+    # Excepciones: lo primero que pregunta un auditor. Van una a una: cada decisión tiene su motivo.
     exceptions = [item for item in findings if status_of(item) in ("accepted", "false_positive")]
     if options["include_exceptions"]:
-        story.append(Paragraph(f"Excepciones y decisiones ({len(exceptions)})", STYLE["h2"]))
+        story.append(h2(f"Excepciones y decisiones ({len(exceptions)})"))
         if exceptions:
             rows = [[Paragraph(label, STYLE["head"]) for label in ("Hallazgo", "Decisión", "Motivo", "Decidido por", "Fecha", "Vence")]]
             for item in exceptions:
@@ -276,54 +247,20 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
             story.append(_grid(rows, [48 * mm, 22 * mm, WIDTH - 126 * mm, 22 * mm, 17 * mm, 17 * mm]))
         else:
             story.append(Paragraph("No hay riesgos aceptados ni falsos positivos declarados en el alcance.", STYLE["body"]))
-    # Detalle: solo lo pedido (por defecto, críticos y altos).
-    detailed = [] if options["detail"] == "none" else findings if options["detail"] == "all" else \
-               [item for item in findings if item.get("severity") in ("critical", "high")]
+    # Detalle: solo lo pedido (por defecto, críticos y altos), también agrupado.
+    detailed = [] if options["detail"] == "none" else groups if options["detail"] == "all" else \
+               [entry for entry in groups if entry["severity"] in ("critical", "high")]
     if detailed:
-        story.append(Paragraph("Detalle" + (" de críticos y altos" if options["detail"] == "high" else ""), STYLE["h2"]))
-        for item in detailed:
-            references = [url for url in ((item.get("advisory") or {}).get("references") or [])[:2] if str(url).startswith("https://")]
-            block = [Table([[_chip(item.get("severity", "info")), Paragraph(f"<b>{_t(item.get('title'), 160)}</b>", STYLE["body"])]],
-                           colWidths=[18 * mm, WIDTH - 18 * mm], style=[("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 0)]),
-                     Paragraph(_t(f"{item.get('path')}:{item.get('line')} · {STATUS_LABEL.get(status_of(item))} · {', '.join((item.get('cve') or [])[:3]) or item.get('rule_id')}", 200), STYLE["note"]),
-                     Paragraph("<b>Riesgo:</b> " + _t(_risk(item), 450), STYLE["body"]),
-                     Paragraph("<b>Corrección:</b> " + _t(_fix(item) if (item.get("package") or {}).get("fixed_version") else item.get("remediation"), 450), STYLE["body"])]
-            if references:
-                block.append(Paragraph("Referencias: " + " · ".join(_t(url, 90) for url in references), STYLE["note"]))
-            story += [KeepTogether(block), Spacer(1, 6)]
-    # Firmas
-    story += [Spacer(1, 8), Paragraph("Revisión y aprobación", STYLE["h2"]),
-              _grid([[Paragraph(label, STYLE["head"]) for label in ("Rol", "Nombre", "Firma", "Fecha")]]
-                    + [[Paragraph(role, STYLE["cell"]), Paragraph(_t(name, 60), STYLE["cell"]), Paragraph("", STYLE["cell"]), Paragraph("", STYLE["cell"])]
-                       for role, name in (("Preparado por", options["prepared_by"]), ("Revisado por", ""), ("Aprobado por", ""))],
-                    [32 * mm, 50 * mm, WIDTH - 112 * mm, 30 * mm]),
-              Spacer(1, 6),
-              Paragraph("Evidencia técnica generada con herramientas automatizadas y revisada por el equipo. No constituye una opinión de "
-                        "auditoría, una certificación ni una declaración de cumplimiento.", STYLE["note"])]
-
-    # Un título de sección nunca queda solo al pie: si no caben unas filas debajo, pasa a la página siguiente.
-    story = [part for flowable in story for part in ((CondPageBreak(32 * mm), flowable)
-                                                     if isinstance(flowable, Paragraph) and flowable.style.name == "h2" else (flowable,))]
-    output = io.BytesIO()
+        story.append(h2("Detalle" + (" de críticos y altos" if options["detail"] == "high" else "")))
+        for entry in detailed[:DETAIL_LIMIT]:
+            story += _detail_block(entry)
+        if len(detailed) > DETAIL_LIMIT:
+            story.append(Paragraph(f"Se detallan las {DETAIL_LIMIT} primeras de {len(detailed)} acciones (explotación activa y severidad primero); "
+                                   "todas están en la tabla de hallazgos y el detalle completo en el informe técnico.", STYLE["note"]))
+    story += signoff(options["prepared_by"]) + [Spacer(1, 6), Paragraph(DISCLAIMER, STYLE["note"])]
     title = options["title"] or f"Evidencia de gestión de vulnerabilidades · {system}"
-
-    def frame(canvas, document):
-        canvas.saveState()
-        width, height = A4
-        canvas.setFillColor(BRAND)
-        canvas.rect(0, height - 4, width, 4, stroke=0, fill=1)
-        canvas.setStrokeColor(LINE)
-        canvas.line(18 * mm, 13 * mm, width - 18 * mm, 13 * mm)
-        canvas.setFont("Helvetica", 7)
-        canvas.setFillColor(MUTED)
-        canvas.drawString(18 * mm, 8.5 * mm, f"{title[:90]}  ·  {options['organization'][:40] or 'Tamandua'}")
-        canvas.drawRightString(width - 18 * mm, 8.5 * mm, f"Tamandua {version}  ·  página {document.page}")
-        canvas.restoreState()
-
-    SimpleDocTemplate(output, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=18 * mm,
-                      title=title[:120], author=options["prepared_by"][:80] or "Tamandua", subject=framework_label,
-                      creator=f"Tamandua {version}").build(story, onFirstPage=frame, onLaterPages=frame)
-    return output.getvalue()
+    return build(story, title=title, footer=f"{title[:90]}  ·  {options['organization'][:40] or 'Tamandua'}", version=version,
+                 author=options["prepared_by"] or "Tamandua", subject=framework_label)
 
 
 # --- informe consolidado (organización o varios repositorios) -----------------------------
@@ -348,27 +285,23 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
         counts = {level: sum(1 for finding in pending if finding.get("severity") == level) for level in ORDER}
         fixed, excepted = states.count("fixed"), sum(1 for state in states if state in ("accepted", "false_positive"))
         rows.append((item["name"], counts, len(pending), fixed, excepted, item.get("last_complete"), item.get("last_status")))
-        open_items += [(item["name"], finding) for finding in pending if finding.get("severity") in ("critical", "high")]
+        # Lo que hay que atender primero, agrupado por corrección dentro de cada repositorio.
+        open_items += [(item["name"], entry) for entry in fix_groups([finding for finding in pending if finding.get("severity") in ("critical", "high")])]
         exceptions += [(item["name"], finding) for finding, state in zip(findings, states) if state in ("accepted", "false_positive")]
         totals["critical"] += counts["critical"]; totals["high"] += counts["high"]; totals["open"] += len(pending)
         totals["fixed"] += fixed; totals["excepted"] += excepted
     rows.sort(key=lambda row: (-row[1]["critical"], -row[1]["high"], -row[2], row[0]))
-    open_items.sort(key=lambda pair: (ORDER.get(pair[1].get("severity"), 9), pair[0]))
+    open_items.sort(key=lambda pair: (not pair[1]["kev"], ORDER.get(pair[1]["severity"], 9), -len(pair[1]["items"]), pair[0]))
     analysed = sum(1 for row in rows if row[5])
     known_total = coverage.get("total")
 
-    eyebrow = "EVIDENCIA DE GESTIÓN DE VULNERABILIDADES · CONSOLIDADO" + (f"  ·  {framework_label.upper()}" if controls else "")
-    story = [Paragraph(html.escape(eyebrow), STYLE["eyebrow"]),
-             Paragraph(_t(options["title"] or "Evidencia de gestión de vulnerabilidades", 120), STYLE["title"]),
-             Paragraph(_t(options["scope"] or scope_label, 200), STYLE["subtitle"])]
-    meta = [("Organización", options["organization"] or "—"), ("Alcance", options["scope"] or scope_label), ("Periodo", period),
-            ("Preparado por", options["prepared_by"] or "—"), ("Preparado para", options["prepared_for"] or "—"), ("Emitido", issued)]
-    story.append(_grid([[Paragraph(_t(label), STYLE["label"]) for label, _ in meta[:3]], [Paragraph(_t(value, 160), STYLE["value"]) for _, value in meta[:3]],
-                        [Paragraph(_t(label), STYLE["label"]) for label, _ in meta[3:]], [Paragraph(_t(value, 160), STYLE["value"]) for _, value in meta[3:]]],
-                       [WIDTH / 3] * 3, header=False))
-    story += [Spacer(1, 10), Paragraph("Resumen", STYLE["h2"]),
+    story = header("Evidencia de gestión de vulnerabilidades · consolidado" + (f"  ·  {framework_label}" if controls else ""),
+                   options["title"] or "Evidencia de gestión de vulnerabilidades", options["scope"] or scope_label)
+    story.append(meta([("Organización", options["organization"] or "—"), ("Alcance", options["scope"] or scope_label), ("Periodo", period),
+                       ("Preparado por", options["prepared_by"] or "—"), ("Preparado para", options["prepared_for"] or "—"), ("Emitido", issued)]))
+    story += [Spacer(1, 10), h2("Resumen"),
               _kpis([("repositorios con análisis completo", f"{analysed} de {known_total}" if known_total else analysed, INK, SOFT),
-                     ("críticas abiertas", totals["critical"], SEVERITY["critical"][1], colors.HexColor("#ffefed")),
+                     ("críticas abiertas", totals["critical"], SEVERITY["critical"][1], DANGER_BG),
                      ("altas abiertas", totals["high"], SEVERITY["high"][0], SEVERITY["high"][1]),
                      ("abiertas o en curso", totals["open"], INK, SOFT), ("remediadas", totals["fixed"], SUCCESS, SUCCESS_BG),
                      ("excepciones aprobadas", totals["excepted"], BRAND, BRAND_BG)]),
@@ -377,7 +310,7 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
                            f"de los que {_n(totals['critical'], 'es crítico', 'son críticos')} y {totals['high']} altos. "
                            f"{_n(totals['fixed'], 'hallazgo remediado', 'hallazgos remediados')} y {_n(totals['excepted'], 'excepción aprobada', 'excepciones aprobadas')}.", 700), STYLE["body"])]
     # Cobertura: ¿se analiza todo? Es lo primero que se pregunta a nivel de organización.
-    story.append(Paragraph("Cobertura", STYLE["h2"]))
+    story.append(h2("Cobertura"))
     incomplete = [row[0] for row in rows if not row[5] and row[6]]
     lines = []
     if known_total:
@@ -386,49 +319,45 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
     else:
         lines.append(f"{analysed} de {len(rows)} repositorios del informe tienen al menos un análisis completo.")
     if incomplete:
-        lines.append(f"Con análisis, pero ninguno completo (un motor no se ejecutó): {', '.join(incomplete[:30])}{'…' if len(incomplete) > 30 else ''}.")
+        lines.append(f"Con análisis, pero ninguno completo (un motor no se ejecutó): {listing(incomplete, 30)}.")
     missing = coverage.get("missing") or []
     if missing:
-        lines.append(f"Sin ningún análisis ({len(missing)}): {', '.join(missing[:40])}{f' y {len(missing) - 40} más' if len(missing) > 40 else ''}.")
+        lines.append(f"Sin ningún análisis ({len(missing)}): {listing(missing, 40)}.")
     story += [Paragraph("•&nbsp;&nbsp;" + _t(line, 1200), STYLE["body"]) for line in lines]
     if controls:
-        story += [Paragraph(f"Controles relacionados · {html.escape(framework_label)}", STYLE["h2"]),
-                  _grid([[Paragraph("Control", STYLE["head"]), Paragraph("Qué aporta esta evidencia", STYLE["head"])]]
-                        + [[Paragraph(f"<b>{html.escape(code)}</b><br/>{html.escape(name)}", STYLE["cell"]), Paragraph(html.escape(text), STYLE["cell"])]
-                           for code, name, text in controls], [42 * mm, WIDTH - 42 * mm]),
-                  Paragraph("La relación con cada control es orientativa: la eficacia la evalúa el auditor con la documentación del equipo.", STYLE["note"])]
-    story += [Paragraph("Método", STYLE["h2"]),
+        story += _controls(framework_label, controls)
+    story += [h2("Método"),
               Paragraph("•&nbsp;&nbsp;Análisis estático de cada repositorio (código, dependencias, secretos, infraestructura y pipelines), "
                         "sin ejecutar el código ni enviarlo a servicios externos.", STYLE["body"]),
               Paragraph("•&nbsp;&nbsp;El estado de cada repositorio reúne sus análisis completos y las revisiones de pull requests: un hallazgo "
                         "queda remediado cuando deja de aparecer en un análisis completo, nunca por uno incompleto.", STYLE["body"])]
     # Por repositorio
-    story.append(Paragraph(f"Por repositorio ({len(rows)})", STYLE["h2"]))
+    story.append(h2(f"Por repositorio ({len(rows)})"))
     table = [[Paragraph(label, STYLE["head"]) for label in ("Repositorio", "Crít.", "Altas", "Medias", "Bajas", "Abiertos", "Remed.", "Excep.", "Último completo")]]
     for name, counts, pending, fixed, excepted, last, _ in rows[:1000]:
         table.append([Paragraph(_t(name, 80), STYLE["cell"]),
-                      *[Paragraph(f'<font color="{SEVERITY[level][1 if level == "critical" else 0].hexval().replace("0x", "#")}"><b>{counts[level]}</b></font>' if counts[level] else "0",
+                      *[Paragraph(f'<font color="{hexval(SEVERITY[level][1 if level == "critical" else 0])}"><b>{counts[level]}</b></font>' if counts[level] else "0",
                                   STYLE["cell"]) for level in ("critical", "high", "medium", "low")],
                       Paragraph(str(pending), STYLE["cell"]), Paragraph(str(fixed), STYLE["cellmuted"]), Paragraph(str(excepted), STYLE["cellmuted"]),
                       Paragraph(_day(last) if last else '<font color="#b71824">Sin análisis completo</font>', STYLE["cellmuted"])])
     story.append(_grid(table, [WIDTH - 125 * mm, 11 * mm, 12 * mm, 14 * mm, 12 * mm, 15 * mm, 14 * mm, 13 * mm, 26 * mm], zebra=True))
-    # Críticos y altos abiertos, con el repositorio: lo que hay que atender primero.
-    story.append(Paragraph(f"Críticos y altos abiertos ({len(open_items)})", STYLE["h2"]))
+    # Críticos y altos abiertos, con el repositorio y agrupados por corrección: lo que hay que atender primero.
+    pending_count = sum(len(entry["items"]) for _, entry in open_items)
+    story.append(h2(f"Críticos y altos abiertos ({pending_count})"))
     if open_items:
         table = [[Paragraph(label, STYLE["head"]) for label in ("Severidad", "Repositorio", "Hallazgo", "Detectado", "Acción recomendada")]]
-        for name, finding in open_items[:400]:
-            ids = ", ".join((finding.get("cve") or [])[:1])
-            table.append([_chip(finding.get("severity", "info")), Paragraph(_t(name, 60), STYLE["cellmuted"]),
-                          Paragraph(_t(finding.get("title"), 130) + (f'<br/><font color="#636363">{_t(ids, 40)}</font>' if ids else ""), STYLE["cell"]),
-                          Paragraph(_day((finding.get("lifecycle") or {}).get("first_seen")), STYLE["cellmuted"]),
-                          Paragraph(_t(_fix(finding), 140), STYLE["cell"])])
+        for name, entry in open_items[:400]:
+            text, _ = _group_cells(entry, None)
+            text += KEV_MARK if entry["kev"] else ""
+            table.append([_chip(entry["severity"]), Paragraph(_t(name, 60), STYLE["cellmuted"]), Paragraph(text, STYLE["cell"]),
+                          Paragraph(_first_seen(entry["items"], None), STYLE["cellmuted"]), Paragraph(_t(action(entry, short=True), 160), STYLE["cell"])])
         story.append(_grid(table, [19 * mm, 36 * mm, 57 * mm, 17 * mm, WIDTH - 129 * mm], zebra=True))
         if len(open_items) > 400:
-            story.append(Paragraph(f"Se muestran 400 de {len(open_items)}; el detalle completo está en el informe de cada repositorio.", STYLE["note"]))
+            story.append(Paragraph(f"Se muestran 400 de {len(open_items)} acciones; el detalle completo está en el informe de cada repositorio.", STYLE["note"]))
     else:
         story.append(Paragraph("No hay hallazgos críticos ni altos abiertos.", STYLE["body"]))
     if options["include_exceptions"]:
-        story.append(Paragraph(f"Excepciones y decisiones ({len(exceptions)})", STYLE["h2"]))
+        story.append(h2(f"Excepciones y decisiones ({len(exceptions)})"))
         if exceptions:
             table = [[Paragraph(label, STYLE["head"]) for label in ("Repositorio", "Hallazgo", "Decisión", "Motivo", "Decidido por", "Vence")]]
             for name, finding in exceptions[:500]:
@@ -439,33 +368,7 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
             story.append(_grid(table, [32 * mm, 42 * mm, 20 * mm, WIDTH - 132 * mm, 21 * mm, 17 * mm]))
         else:
             story.append(Paragraph("No hay riesgos aceptados ni falsos positivos declarados.", STYLE["body"]))
-    story += [Spacer(1, 8), Paragraph("Revisión y aprobación", STYLE["h2"]),
-              _grid([[Paragraph(label, STYLE["head"]) for label in ("Rol", "Nombre", "Firma", "Fecha")]]
-                    + [[Paragraph(role, STYLE["cell"]), Paragraph(_t(name, 60), STYLE["cell"]), Paragraph("", STYLE["cell"]), Paragraph("", STYLE["cell"])]
-                       for role, name in (("Preparado por", options["prepared_by"]), ("Revisado por", ""), ("Aprobado por", ""))],
-                    [32 * mm, 50 * mm, WIDTH - 112 * mm, 30 * mm]),
-              Spacer(1, 6),
-              Paragraph("Evidencia técnica generada con herramientas automatizadas y revisada por el equipo. No constituye una opinión de "
-                        "auditoría, una certificación ni una declaración de cumplimiento.", STYLE["note"])]
-    story = [part for flowable in story for part in ((CondPageBreak(32 * mm), flowable)
-                                                     if isinstance(flowable, Paragraph) and flowable.style.name == "h2" else (flowable,))]
-    output = io.BytesIO()
+    story += signoff(options["prepared_by"]) + [Spacer(1, 6), Paragraph(DISCLAIMER, STYLE["note"])]
     title = options["title"] or "Evidencia de gestión de vulnerabilidades"
-
-    def frame(canvas, document):
-        canvas.saveState()
-        width, height = A4
-        canvas.setFillColor(BRAND)
-        canvas.rect(0, height - 4, width, 4, stroke=0, fill=1)
-        canvas.setStrokeColor(LINE)
-        canvas.line(18 * mm, 13 * mm, width - 18 * mm, 13 * mm)
-        canvas.setFont("Helvetica", 7)
-        canvas.setFillColor(MUTED)
-        canvas.drawString(18 * mm, 8.5 * mm, f"{title[:70]}  ·  {scope_label[:50]}")
-        canvas.drawRightString(width - 18 * mm, 8.5 * mm, f"Tamandua {version}  ·  página {document.page}")
-        canvas.restoreState()
-
-    SimpleDocTemplate(output, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=18 * mm,
-                      title=title[:120], author=options["prepared_by"][:80] or "Tamandua", subject=framework_label,
-                      creator=f"Tamandua {version}").build(story, onFirstPage=frame, onLaterPages=frame)
-    return output.getvalue()
+    return build(story, title=title, footer=f"{title[:70]}  ·  {scope_label[:50]}", version=version,
+                 author=options["prepared_by"] or "Tamandua", subject=framework_label)

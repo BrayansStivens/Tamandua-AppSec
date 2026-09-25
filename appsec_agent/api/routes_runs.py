@@ -19,6 +19,7 @@ from ..scanners import docker_available
 from ..scan_plan import plan as scan_plan
 from ..github_app import GitHubAppError
 from ..pdf_reports import render_pdf
+from ..technical_report import render_technical_pdf
 from ..audit_report import ReportError, render_audit_pdf, render_portfolio_pdf, validate_options
 from ..kinds import FULL_SCANS
 from ..store import _run_dir, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
@@ -35,10 +36,9 @@ def _artifact(request: Request, record: dict, artifact: str):
     if artifact == "tickets.json" and repository:
         return request.json(200, render_tickets(record))
     if artifact in ("report.md", "report.pdf") and repository:
-        report = render_asset_report(record) if record["type"] == "asset_state" else render_repository_report(record)
         if artifact.endswith(".pdf"):
-            return request.send(200, render_pdf(report, title="Informe de hallazgos", kind="Registro técnico",
-                                                 reference=record["id"]), "application/pdf")
+            return request.send(200, render_technical_pdf(record, version=VERSION), "application/pdf")
+        report = render_asset_report(record) if record["type"] == "asset_state" else render_repository_report(record)
         return request.send(200, report.encode("utf-8"), "text/markdown; charset=utf-8")
     if artifact == "findings.sarif" and repository:
         return request.send(200, json.dumps(render_repository_sarif(record), ensure_ascii=False, indent=2).encode("utf-8"),

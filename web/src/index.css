@@ -294,7 +294,7 @@ body { min-width: 320px; }
 .tm-canvas .tm-handle { width: 9px; height: 9px; opacity: 0; transition: opacity .15s; }
 .tm-canvas .react-flow__node:hover .tm-handle, .tm-canvas .react-flow__node.selected .tm-handle, .tm-canvas .react-flow.connecting .tm-handle { opacity: 1; }
 .tm-canvas .tm-flow { stroke: var(--app-muted); stroke-width: 1.5; }
-.tm-canvas .tm-flow--plain { stroke-dasharray: 5 4; }
+.tm-canvas .tm-flow--plain { stroke: var(--danger); stroke-dasharray: 5 4; }
 .tm-canvas .tm-flow--flagged { stroke: var(--attention); stroke-width: 2; }
 .tm-canvas .tm-flow--selected { stroke: var(--brand); stroke-width: 2.25; }
 .tm-canvas .tm-flow-label { position: absolute; pointer-events: all; cursor: pointer; }

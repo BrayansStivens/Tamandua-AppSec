@@ -16,12 +16,11 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-INK = colors.HexColor("#17252a")
-MUTED = colors.HexColor("#53666c")
-TEAL = colors.HexColor("#087f77")
-LINE = colors.HexColor("#dbe5e3")
-SOFT = colors.HexColor("#eff7f5")
-AMBER = colors.HexColor("#8b5e18")
+# Los tokens del sistema de diseño de informes (report_design); este renderizador queda para los
+# informes que aún son Markdown (dossiers heredados, revisiones de PR).
+from .report_design import BRAND as TEAL, INK, LINE, MUTED, SOFT
+
+AMBER = colors.HexColor("#8a4c00")
 
 STYLES = {
     "eyebrow": ParagraphStyle("eyebrow", fontName="Helvetica-Bold", fontSize=9, leading=13, textColor=TEAL, spaceAfter=8),
@@ -40,7 +39,7 @@ def _inline(value: str) -> str:
     # Primero escapar el texto sin confianza; solo después se agregan marcas propias.
     safe = html.escape(value, quote=False)
     safe = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", safe)
-    safe = re.sub(r"`([^`]+)`", r'<font color="#087f77">\1</font>', safe)
+    safe = re.sub(r"`([^`]+)`", r'<font color="#7342d3">\1</font>', safe)
     return safe.replace("\n", "<br/>")
 
 
@@ -73,7 +72,7 @@ def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "") -> 
     doc = SimpleDocTemplate(output, pagesize=A4, rightMargin=20 * mm, leftMargin=20 * mm,
                             topMargin=24 * mm, bottomMargin=20 * mm,
                             title=title[:120], author="Tamandua", subject=kind)
-    story = [Paragraph("TAMANDUA  /  APPSEC EVIDENCE", STYLES["eyebrow"]),
+    story = [Paragraph("TAMANDUA", STYLES["eyebrow"]),
              Paragraph(_inline(title), STYLES["title"]),
              Paragraph(_inline(kind + (f"  ·  {reference}" if reference else "")), STYLES["subtitle"]),
              HRFlowable(width="100%", thickness=1.2, color=TEAL, spaceAfter=12)]
@@ -103,7 +102,7 @@ def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "") -> 
         elif line.startswith("> "):
             story.append(Paragraph(_inline(line[2:]), STYLES["quote"]))
         elif re.match(r"^(?:[-*] |\d+\. )", line):
-            story.append(Paragraph("<font color='#087f77'>•</font>  " + _inline(re.sub(r"^(?:[-*] |\d+\. )", "", line)), STYLES["body"]))
+            story.append(Paragraph("<font color='#7342d3'>•</font>  " + _inline(re.sub(r"^(?:[-*] |\d+\. )", "", line)), STYLES["body"]))
         else:
             story.append(Paragraph(_inline(line), STYLES["body"]))
         index += 1
@@ -111,8 +110,9 @@ def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "") -> 
     def frame(canvas, document):
         canvas.saveState()
         width, height = A4
+        canvas.setFillColor(TEAL)
+        canvas.rect(0, height - 4, width, 4, stroke=0, fill=1)
         canvas.setStrokeColor(LINE)
-        canvas.line(20 * mm, height - 15 * mm, width - 20 * mm, height - 15 * mm)
         canvas.line(20 * mm, 14 * mm, width - 20 * mm, 14 * mm)
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)

@@ -19,7 +19,6 @@ quiera seguir en esas herramientas.
 from __future__ import annotations
 
 import hashlib
-import html
 import json
 import os
 import re
@@ -29,7 +28,7 @@ import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
-from . import threat_methods, triage
+from . import threat_diagram, threat_methods, threat_report, triage
 
 
 class ModelError(ValueError):
@@ -115,6 +114,15 @@ def _box(raw) -> dict | None:
 
 # ------------------------------------------------------------ validación
 
+def _color(value, identifier: str) -> str:
+    """Color elegido en el editor: un token de la paleta o nada (automático, según el tipo)."""
+    if value in (None, ""):
+        return ""
+    if value not in threat_diagram.COLORS:
+        raise ModelError(f"Color inválido en {identifier}")
+    return value
+
+
 def validate(payload: dict, *, known_assets: set[str]) -> dict:
     """Normaliza un modelo que llega del panel. Todo lo que no se reconoce se rechaza."""
     if not isinstance(payload, dict):
@@ -150,6 +158,7 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
                            "internet_facing": bool(raw.get("internet_facing")),
                            "authenticates": bool(raw.get("authenticates")),
                            "encrypted_at_rest": bool(raw.get("encrypted_at_rest")),
+                           "color": _color(raw.get("color"), identifier),
                            "origin": raw.get("origin") if raw.get("origin") in ("suggested", "manual") else "manual"})
     flows, flow_ids = [], set()
     for raw in payload.get("flows") or []:
@@ -185,7 +194,8 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
         placed.update(members)
         boundary_ids.add(identifier)
         boundaries.append({"id": identifier, "name": _text(raw.get("name"), 80, "El nombre de la frontera", required=True),
-                           "components": list(dict.fromkeys(members)), "box": _box(raw.get("box"))})
+                           "components": list(dict.fromkeys(members)), "box": _box(raw.get("box")),
+                           "color": _color(raw.get("color"), identifier)})
     for key, items in (("components", components), ("flows", flows), ("boundaries", boundaries)):
         if len(items) > LIMITS[key]:
             raise ModelError(f"Máximo {LIMITS[key]} {key} por modelo")
@@ -961,173 +971,16 @@ STRIDE_EN = {"S": "Spoofing", "T": "Tampering", "R": "Repudiation", "I": "Inform
 
 
 def _layout(model: dict) -> dict:
-    """Respeta cada posición dibujada, coloca solo lo que no la tiene y ajusta cada caja a sus componentes."""
-    layout = _auto_layout(model)
-    for component in model.get("components", []):
-        if component.get("position"):
-            layout["nodes"][component["id"]] = dict(component["position"])
-    sizes = {item["id"]: _node_size(item) for item in model.get("components", [])}
-    for boundary in model.get("boundaries", []):
-        box = dict(boundary.get("box") or layout["boundaries"].get(boundary["id"]) or {"x": 40, "y": 40, "width": 320, "height": 220})
-        members = [(layout["nodes"][member], sizes[member]) for member in boundary["components"] if member in layout["nodes"] and member in sizes]
-        if members:  # una caja siempre contiene a sus componentes, aunque llegue pequeña de un JSON
-            left = min([box["x"]] + [point["x"] - LAYOUT_PAD for point, _ in members])
-            top = min([box["y"]] + [point["y"] - LAYOUT_HEADER for point, _ in members])
-            right = max([box["x"] + box["width"]] + [point["x"] + size[0] + LAYOUT_PAD for point, size in members])
-            bottom = max([box["y"] + box["height"]] + [point["y"] + size[1] + LAYOUT_PAD for point, size in members])
-            box = {"x": left, "y": top, "width": right - left, "height": bottom - top}
-        layout["boundaries"][boundary["id"]] = box
-    return layout
-
-
-# Mismo algoritmo que el editor del panel (threat-layout.ts): capas por tipo empujadas por los flujos,
-# cada frontera como un bloque que contiene a sus componentes.
-LAYOUT_NODE_H, LAYOUT_GAP_X, LAYOUT_GAP_INNER, LAYOUT_GAP_Y, LAYOUT_PAD, LAYOUT_HEADER = 88, 160, 150, 44, 32, 44
-LAYERS = {"actor": 0, "web_app": 1, "identity": 1, "api": 2, "service": 2, "function": 2, "cache": 3, "queue": 3,
-          "database": 3, "storage": 3, "external": 4}
+    return threat_diagram.layout(model)
 
 
 def _node_size(component: dict) -> tuple[float, float]:
-    size = component.get("size") or {}
-    return size.get("width") or NODE_W, size.get("height") or LAYOUT_NODE_H
-
-
-def _layer(component: dict) -> int:
-    kind = (component.get("custom_base") or "service") if component["kind"] == "custom" else component["kind"]
-    return LAYERS.get(kind, 2)
-
-
-def _ranks(ids: list[str], edges: list[tuple[str, str]], seed, start=None) -> dict[str, int]:
-    rank = {item: (start or seed)(item) for item in ids}
-    known = set(ids)
-    forward = [(a, b) for a, b in edges if a != b and a in known and b in known and seed(a) <= seed(b)]
-    for _ in ids:
-        changed = False
-        for a, b in forward:
-            if rank[b] < rank[a] + 1:
-                rank[b], changed = rank[a] + 1, True
-        if not changed:
-            break
-    levels = sorted(set(rank.values()))
-    return {item: levels.index(rank[item]) for item in ids}
-
-
-def _auto_layout(model: dict) -> dict:
-    components = {item["id"]: item for item in model.get("components", [])}
-    flows = model.get("flows", [])
-    nodes: dict = {}
-    boxes: dict = {}
-    groups, group_of, placed = [], {}, set()
-    for boundary in model.get("boundaries", []):
-        members = [components[member] for member in boundary["components"] if member in components and member not in placed]
-        if not members:
-            continue
-        placed.update(item["id"] for item in members)
-        ids = [item["id"] for item in members]
-        inner = _ranks(ids, [(f["source"], f["target"]) for f in flows if f["source"] in ids and f["target"] in ids], lambda i: _layer(components[i]))
-        columns: dict[int, list] = {}
-        for item in members:
-            columns.setdefault(inner[item["id"]], []).append(item)
-        solid = [sorted(columns[key], key=_layer) for key in sorted(columns)]
-        widths = [max(_node_size(item)[0] for item in column) for column in solid]
-        heights = [sum(_node_size(item)[1] for item in column) + LAYOUT_GAP_Y * (len(column) - 1) for column in solid]
-        inner_w = sum(widths) + LAYOUT_GAP_INNER * (len(solid) - 1)
-        inner_h = max(heights + [LAYOUT_NODE_H])
-        group = {"id": f"b:{boundary['id']}", "boundary": boundary["id"], "members": members, "solid": solid, "widths": widths,
-                 "heights": heights, "inner_w": inner_w, "inner_h": inner_h,
-                 "width": inner_w + LAYOUT_PAD * 2, "height": LAYOUT_HEADER + inner_h + LAYOUT_PAD}
-        groups.append(group)
-        for item in members:
-            group_of[item["id"]] = group["id"]
-    for item in model.get("components", []):
-        if item["id"] in placed:
-            continue
-        width, height = _node_size(item)
-        groups.append({"id": f"c:{item['id']}", "boundary": None, "members": [item], "width": width, "height": height})
-        group_of[item["id"]] = f"c:{item['id']}"
-    seed = {group["id"]: min(_layer(item) for item in group["members"]) for group in groups}
-    between = [(group_of[f["source"]], group_of[f["target"]]) for f in flows
-               if f["source"] in group_of and f["target"] in group_of and group_of[f["source"]] != group_of[f["target"]]]
-    rank = _ranks([group["id"] for group in groups], between, lambda i: seed[i], lambda i: 0 if seed[i] == 0 else 1)
-    columns: dict[int, list] = {}
-    for group in groups:
-        columns.setdefault(rank[group["id"]], []).append(group)
-    solid = [sorted(columns[key], key=lambda g: seed[g["id"]]) for key in sorted(columns)]
-    heights = [sum(g["height"] for g in column) + LAYOUT_GAP_Y * 1.5 * (len(column) - 1) for column in solid]
-    tallest = max(heights + [0])
-    x = 40.0
-    for column, column_h in zip(solid, heights):
-        y = 40 + (tallest - column_h) / 2
-        width = max(g["width"] for g in column)
-        for group in column:
-            gx = x + (width - group["width"]) / 2
-            if group["boundary"] is None:
-                nodes[group["members"][0]["id"]] = {"x": round(gx), "y": round(y)}
-            else:
-                boxes[group["boundary"]] = {"x": gx, "y": y, "width": group["width"], "height": group["height"]}
-                cx = gx + LAYOUT_PAD
-                for members, col_w, col_h in zip(group["solid"], group["widths"], group["heights"]):
-                    cy = y + LAYOUT_HEADER + (group["inner_h"] - col_h) / 2
-                    for item in members:
-                        nodes[item["id"]] = {"x": round(cx + (col_w - _node_size(item)[0]) / 2), "y": round(cy)}
-                        cy += _node_size(item)[1] + LAYOUT_GAP_Y
-                    cx += col_w + LAYOUT_GAP_INNER
-            y += group["height"] + LAYOUT_GAP_Y * 1.5
-        x += width + LAYOUT_GAP_X
-    empty_y = 40
-    for boundary in model.get("boundaries", []):
-        if boundary["id"] not in boxes:
-            boxes[boundary["id"]] = {"x": x, "y": empty_y, "width": NODE_W + LAYOUT_PAD * 2, "height": LAYOUT_HEADER + LAYOUT_NODE_H + LAYOUT_PAD}
-            empty_y += LAYOUT_NODE_H + LAYOUT_HEADER + LAYOUT_PAD + LAYOUT_GAP_Y
-    return {"nodes": nodes, "boundaries": boxes}
+    return threat_diagram.node_size(component)
 
 
 def to_svg(model: dict) -> str:
     """Exporta solamente el diagrama actual como SVG autónomo, sin código ni scripts."""
-    layout = _layout(model)
-    positions = layout["nodes"]
-    boxes = layout["boundaries"]
-    nodes = {item["id"]: item for item in model.get("components", [])}
-    extents = [(point["x"], point["y"], point["x"] + _node_size(nodes[key])[0], point["y"] + _node_size(nodes[key])[1])
-               for key, point in positions.items() if key in nodes]
-    extents += [(box["x"], box["y"], box["x"] + box["width"], box["y"] + box["height"]) for box in boxes.values()]
-    left = min((item[0] for item in extents), default=0) - 40
-    top = min((item[1] for item in extents), default=0) - 74
-    right = max((item[2] for item in extents), default=720) + 40
-    bottom = max((item[3] for item in extents), default=420) + 40
-    width, height = max(480, right - left), max(280, bottom - top)
-    escape = lambda value: html.escape(str(value), quote=True)
-    parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{left:g} {top:g} {width:g} {height:g}" role="img" aria-label="Diagrama de {escape(model["name"])}">',
-             '<defs><marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 Z" fill="#475569"/></marker></defs>',
-             f'<rect x="{left:g}" y="{top:g}" width="{width:g}" height="{height:g}" fill="#ffffff"/>',
-             f'<text x="{left + 24:g}" y="{top + 35:g}" font-family="sans-serif" font-size="20" font-weight="700" fill="#0f172a">{escape(model["name"])}</text>']
-    for boundary in model.get("boundaries", []):
-        box = boxes.get(boundary["id"])
-        if box:
-            parts += [f'<rect x="{box["x"]:g}" y="{box["y"]:g}" width="{box["width"]:g}" height="{box["height"]:g}" rx="16" fill="#f8fafc" stroke="#94a3b8" stroke-width="2" stroke-dasharray="8 6"/>',
-                      f'<text x="{box["x"] + 12:g}" y="{box["y"] + 22:g}" font-family="sans-serif" font-size="13" fill="#475569">{escape(boundary["name"])}</text>']
-    for flow in model.get("flows", []):
-        source, target = positions.get(flow["source"]), positions.get(flow["target"])
-        if not source or not target:
-            continue
-        sx, sy = source["x"] + 92, source["y"] + 36
-        tx, ty = target["x"] + 92, target["y"] + 36
-        dx, dy = tx - sx, ty - sy
-        if not dx and not dy:
-            continue
-        scale = min(92 / abs(dx) if dx else float("inf"), 36 / abs(dy) if dy else float("inf"))
-        x1, y1 = sx + dx * scale, sy + dy * scale
-        x2, y2 = tx - dx * scale, ty - dy * scale
-        parts.append(f'<line x1="{x1:g}" y1="{y1:g}" x2="{x2:g}" y2="{y2:g}" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>')
-        parts.append(f'<text x="{(x1 + x2) / 2:g}" y="{(y1 + y2) / 2 - 8:g}" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#334155">{escape(flow.get("name") or flow["protocol"].upper())}</text>')
-    for identifier, point in positions.items():
-        item = nodes[identifier]
-        label = item.get("custom_kind") or KINDS[item["kind"]]
-        parts += [f'<rect x="{point["x"]:g}" y="{point["y"]:g}" width="184" height="72" rx="12" fill="#ffffff" stroke="#475569" stroke-width="2"/>',
-                  f'<text x="{point["x"] + 92:g}" y="{point["y"] + 30:g}" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="700" fill="#0f172a">{escape(item["name"])}</text>',
-                  f'<text x="{point["x"] + 92:g}" y="{point["y"] + 51:g}" text-anchor="middle" font-family="sans-serif" font-size="10" fill="#64748b">{escape(item.get("technology") or label)}</text>']
-    parts.append('</svg>')
-    return "\n".join(parts)
+    return threat_diagram.to_svg(model, KINDS)
 
 
 def to_pytm(model: dict) -> str:
@@ -1168,75 +1021,4 @@ def to_pytm(model: dict) -> str:
 
 
 def to_markdown(model: dict, rows: list[dict]) -> str:
-    components, _ = _index(model)
-    counts = summary(rows)
-    method = model.get("methodology") or "stride"
-    method_label = threat_methods.METHODOLOGIES.get(method, method)
-    lines = [f"# Modelo de amenazas · {model['name']}", "", model.get("description") or "", "",
-             f"Enfoque: **{method_label}** · actualizado {model.get('updated_at', '')[:16].replace('T', ' ')} por {model.get('updated_by', '—')}.", "",
-             "## Resumen", "",
-             f"- {counts['total']} amenazas sobre {len(components)} componentes y {len(model.get('flows', []))} flujos"
-             f" ({sum(1 for row in rows if row.get('framework') == 'manual')} escritas por el equipo).",
-             f"- **{counts['by_status']['evidenced']} con indicios** en hallazgos abiertos de los análisis (señal para revisar, no confirmación); "
-             f"{counts['by_status']['open']} abiertas sin indicios (revisar); {counts['by_status']['mitigated']} mitigadas; "
-             f"{counts['by_status']['accepted']} aceptadas; {counts['by_status']['not_applicable']} no aplican.", "",
-             "## Componentes", "", "| Componente | Tipo | Datos | Expuesto | Repositorio |", "|---|---|---|---|---|"]
-    for item in model.get("components", []):
-        lines.append(f"| {item['name']} | {item.get('custom_kind') or KINDS[item['kind']]} | {', '.join(CLASSIFICATION_LABELS[d] for d in item['data']) or '—'} | "
-                     f"{'sí' if item['internet_facing'] else 'no'} | {item.get('asset') or '—'} |")
-    lines += ["", "## Amenazas", ""]
-    labels = {"evidenced": "CON INDICIOS", "open": "abierta", "mitigated": "mitigada", "accepted": "aceptada", "not_applicable": "no aplica"}
-    families = {"stride": "STRIDE", "linddun": "LINDDUN", "manual": "Propia"}
-    levels = {"low": "baja", "medium": "media", "high": "alta"}
-    for row in rows:
-        lines += [f"### [{row['severity'].upper()}] {row['title']} · {row['element_name']}", "",
-                  f"{families.get(row.get('framework'), 'Categoría')}: {row['category']} · regla `{row['rule']}` · estado: **{labels[row['status']]}**"
-                  + (f" ({row['decision']['by']}: {row['decision']['reason']})" if row.get("decision") else ""), "",
-                  row["why"], "", "Mitigaciones: " + ("; ".join(row["mitigations"]) or "—"),
-                  "CWE: " + (", ".join(f"CWE-{item}" for item in row["cwe"]) or "—")]
-        if row.get("framework") == "manual" and (row.get("likelihood") or row.get("impact") or row.get("owner")):
-            lines.append(f"Posibilidad: {levels.get(row.get('likelihood'), '—')} · impacto: {levels.get(row.get('impact'), '—')} · responsable: {row.get('owner') or '—'}")
-        for item in row["evidence"][:5]:
-            lines.append(f"- Evidencia: {item['title']} ({item['severity']}) en `{item['location']}` · {item['asset']}")
-        lines.append("")
-    flows = {flow["id"]: flow for flow in model.get("flows", [])}
-
-    def element_name(element: str) -> str:
-        if element in components:
-            return components[element]["name"]
-        if element in flows:
-            return f"{components[flows[element]['source']]['name']} → {components[flows[element]['target']]['name']}"
-        return "todo el sistema"
-    notes = model.get("pasta") or {}
-    if notes:
-        lines += ["## PASTA", ""]
-        for key, title in threat_methods.PASTA_STAGES:
-            if notes.get(key):
-                lines += [f"### {title}", "", notes[key], ""]
-    for tree in model.get("attack_trees") or []:
-        lines += [f"## Árbol de ataque · {tree['goal']}", ""]
-        children: dict = {}
-        for node in tree["nodes"]:
-            children.setdefault(node["parent"], []).append(node)
-
-        def walk(parent, depth):
-            for node in children.get(parent, []):
-                extra = [f"dificultad {levels[node['difficulty']]}" if node.get("difficulty") else "",
-                         f"sobre {element_name(node['element'])}" if node.get("element") else "", "mitigado" if node.get("mitigated") else ""]
-                gate = " (se necesitan todos)" if node["gate"] == "and" and children.get(node["id"]) else ""
-                lines.append(f"{'  ' * depth}- {node['text']}{gate}" + (f" · {', '.join(item for item in extra if item)}" if any(extra) else ""))
-                walk(node["id"], depth + 1)
-        walk(None, 0)
-        lines.append("")
-    mappings = model.get("attack_mappings") or []
-    if mappings:
-        status = {"relevant": "relevante", "mitigated": "mitigada", "not_applicable": "no aplica"}
-        lines += ["## MITRE ATT&CK", "", "| Técnica | Táctica | Elemento | Estado | Nota |", "|---|---|---|---|---|"]
-        for item in mappings:
-            name, spanish, tactics = threat_methods.TECHNIQUES[item["technique"]]
-            lines.append(f"| {item['technique']} {name} | {', '.join(threat_methods.TACTICS[tactic] for tactic in tactics)} | "
-                         f"{element_name(item['element'])} | {status[item['status']]} | {(item.get('note') or '').replace(chr(10), ' ').replace('|', chr(92) + '|')} |")
-        lines += ["", "MITRE ATT&CK® es una marca de The MITRE Corporation: https://attack.mitre.org", ""]
-    lines += ["> Las amenazas salen de reglas sobre el modelo declarado y de lo que escribe el equipo: si el modelo no refleja el sistema, "
-              "tampoco lo harán las amenazas. Los indicios de los análisis son señales para revisar, no confirmaciones.", ""]
-    return "\n".join(lines)
+    return threat_report.to_markdown(model, rows)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from .. import threat_model as tm
+from .. import threat_model as tm, threat_report
 from ..domains import list_domains
 from ..github_app import GitHubAppError
 from ..integrations import github_installations
@@ -12,8 +12,7 @@ from ..inventory import live as live_inventory
 from ..repository_sources import SourceError, find_source
 from ..assets import asset_key
 from ..store import list_runs, load_run
-from ..pdf_reports import render_pdf
-from .core import Request, route
+from .core import VERSION, Request, route
 
 
 def _model_keys(model) -> list[str]:
@@ -91,9 +90,8 @@ def model_detail(request: Request):
     if artifact == "report.md":
         return request.send(200, tm.to_markdown(view["model"], view["threats"]).encode("utf-8"), "text/markdown; charset=utf-8")
     if artifact == "report.pdf":
-        return request.send(200, render_pdf(tm.to_markdown(view["model"], view["threats"]),
-                                             title=f"Modelo de amenazas · {view['model']['name']}",
-                                             kind="Análisis de amenazas", reference=model_id), "application/pdf")
+        return request.send(200, threat_report.render_pdf({**view["model"], "id": model_id}, view["threats"], version=VERSION),
+                            "application/pdf")
     if artifact == "diagram.svg":
         return request.send(200, tm.to_svg(view["model"]).encode("utf-8"), "image/svg+xml; charset=utf-8")
     if artifact == "model.json":

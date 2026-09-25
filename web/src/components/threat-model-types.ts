@@ -2,10 +2,10 @@ export type Point = { x: number; y: number }
 export type Box = Point & { width: number; height: number }
 // Tipos del modelo de amenazas compartidos por la vista y el editor de diagramas.
 export type Kind = 'actor' | 'web_app' | 'api' | 'service' | 'function' | 'database' | 'cache' | 'queue' | 'storage' | 'external' | 'identity' | 'custom'
-export type Component = { id: string; name: string; kind: Kind; custom_kind?: string; custom_base?: Exclude<Kind, 'custom'>; description?: string; technology?: string; asset?: string | null; asset_ref?: string; path?: string; position?: Point | null; size?: { width: number; height: number } | null; data: string[]; internet_facing: boolean; authenticates: boolean; encrypted_at_rest: boolean; origin?: string }
+export type Component = { id: string; name: string; kind: Kind; custom_kind?: string; custom_base?: Exclude<Kind, 'custom'>; description?: string; technology?: string; asset?: string | null; asset_ref?: string; path?: string; position?: Point | null; size?: { width: number; height: number } | null; data: string[]; internet_facing: boolean; authenticates: boolean; encrypted_at_rest: boolean; origin?: string; color?: string }
 export type CustomModule = 'stride' | 'linddun' | 'manual' | 'pasta' | 'trees' | 'attack' | 'elements'
 export type Flow = { id: string; source: string; target: string; name?: string; protocol: string; data: string[]; authenticated: boolean; encrypted: boolean }
-export type Boundary = { id: string; name: string; components: string[]; box?: Box | null }
+export type Boundary = { id: string; name: string; components: string[]; box?: Box | null; color?: string }
 export type Level = 'low' | 'medium' | 'high'
 export type ManualThreat = { id: string; title: string; category?: string; element?: string; severity: 'critical' | 'high' | 'medium' | 'low'; scenario?: string; mitigation?: string; likelihood?: Level | null; impact?: Level | null; owner?: string }
 export type TreeNode = { id: string; parent: string | null; text: string; gate: 'and' | 'or'; element?: string; difficulty?: Level | null; mitigated: boolean }
