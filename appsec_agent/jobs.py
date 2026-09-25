@@ -40,6 +40,8 @@ class ScanJobs:
         self._queue: queue.Queue[dict] = queue.Queue()
         self._lock = threading.Lock()
         self._records: dict[str, dict] = {}
+        # Cada cuánto mira el trabajador, sin nada en cola, si hay un lote que avanzar.
+        self.idle_poll = 3.0
         self._recover()
         # El registro de hallazgos se deriva de las ejecuciones: si no existe, se reconstruye.
         if not (data_dir / "findings").is_dir():
@@ -58,6 +60,8 @@ class ScanJobs:
                 continue
             self._fail(record, "El servidor se reinició mientras corría esta ejecución y quedó interrumpida. Vuelve a lanzarla.")
             log.warning("ejecución interrumpida por reinicio", extra={"run_id": row["id"]})
+        from . import batches
+        batches.release_taken(self.data_dir)
 
     # --- API pública ---------------------------------------------------------------
 
@@ -119,11 +123,35 @@ class ScanJobs:
     def pending(self) -> int:
         return self._queue.qsize()
 
+    def _feed_batch(self) -> None:
+        from . import batches
+        try:
+            taken = batches.take_next(self.data_dir)
+        except (OSError, ValueError):
+            log.exception("no se pudo leer el lote activo")
+            return
+        if taken is None:
+            return
+        batch, index = taken
+        item = batch["items"][index]
+        try:
+            queued = self.enqueue_repository_scan(source_id=item["source_id"], source_name=item["name"],
+                                                  allow_osv_upload=batch["allow_osv_upload"], context=batch["context"],
+                                                  tokens={}, installation_id=item.get("installation_id"), uid=item.get("uid"))
+            batches.attach(self.data_dir, batch["id"], index, run_id=queued["id"])
+        except Exception as exc:  # noqa: BLE001 — un repositorio que falla no detiene el lote
+            batches.attach(self.data_dir, batch["id"], index, error=str(exc))
+
     # --- trabajador ----------------------------------------------------------------
 
     def _loop(self) -> None:
         while True:
-            job = self._queue.get()
+            try:
+                job = self._queue.get(timeout=self.idle_poll)
+            except queue.Empty:
+                # Sin nada pendiente, el siguiente repositorio del lote activo (si lo hay).
+                self._feed_batch()
+                continue
             try:
                 self._execute(job)
             except Exception:  # noqa: BLE001 — el trabajador nunca debe morir por un escaneo

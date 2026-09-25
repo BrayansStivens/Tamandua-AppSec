@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import { ExternalLink, GitBranch, LockKeyhole, RefreshCw, Search, ShieldCheck } from 'lucide-react'
+import { ChevronDown, ExternalLink, GitBranch, Layers3, LoaderCircle, LockKeyhole, RefreshCw, Search, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { GitHubAppGuide, GitHubInstall, type GitHubStatus } from '@/components/github-setup'
 import { Pager } from '@/components/source-search'
 import { SkeletonCard, SkeletonList } from '@/components/loading'
+import { BatchPanel, OrganizationScanDialog, useBatches } from '@/components/batches'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { useSourcePage } from '@/lib/sources'
 
 export type { Source, SourcePage } from '@/lib/sources'
@@ -29,6 +31,16 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [confirmForget, setConfirmForget] = useState(false)
+  // Varios repositorios de una vez: selección a mano (lote) o una organización entera (administración).
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [organization, setOrganization] = useState<string | null>(null)
+  const [starting, setStarting] = useState(false)
+  const { active: batch, last: lastBatch, reload: reloadBatches } = useBatches()
+  const startSelected = async () => {
+    setStarting(true); setError('')
+    try { await api.post('/api/repositories/batches', 'scan-batch', { source_ids: [...selected] }); setSelected(new Set()); void reloadBatches() }
+    catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setStarting(false) }
+  }
   // Solo la página visible: con cientos de repositorios la respuesta tarda lo mismo que con diez.
   const { data, error: sourcesError, loading, reload } = useSourcePage({ query: filter, account: accountFilter || undefined, page, perPage: PAGE_SIZE })
   const loadAll = async () => { reload(); setGithub(await api.get<GitHubStatus>('/api/integrations/github')) }
@@ -46,6 +58,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
   const changed = (next: GitHubStatus) => { setGithub(next); reload() }
 
   const installations = github?.installations ?? []
+  const selectable = (data?.sources ?? []).filter(source => source.installation_id).map(source => source.id)
   const accounts = Array.from(new Set([...installations.map(item => item.account), ...(data?.accounts ?? [])].filter((account): account is string => !!account))).sort()
 
   return <div className="space-y-5">
@@ -98,20 +111,34 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
     {data?.providers.github?.error && <div role="alert" className="rounded-xl border border-warning-line bg-warning-soft p-3 text-sm text-warning">{data.providers.github.error}</div>}
 
     {showRepositories && <Card className="border-app-line bg-panel">
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3"><div><CardTitle>Repositorios</CardTitle><CardDescription>Repositorios concedidos en todas las organizaciones conectadas.</CardDescription></div><Button variant="outline" disabled={loading} onClick={() => reload(true)} className="border-app-line bg-app-soft"><RefreshCw className={loading ? 'animate-spin' : ''} /> Actualizar lista</Button></CardHeader>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3"><div><CardTitle>Repositorios</CardTitle><CardDescription>Repositorios concedidos en todas las organizaciones conectadas.</CardDescription></div><Button variant="outline" disabled={loading} onClick={() => reload(true)} className="border-app-line bg-app-soft"><RefreshCw className={loading ? 'animate-spin' : ''} /> Actualizar lista</Button>
+        {canManage && accounts.length > 0 && <Menu><MenuTrigger render={<Button variant="outline" disabled={!!batch} className="border-app-line bg-app-soft" />}><Layers3 />Analizar organización<ChevronDown className="size-3.5" /></MenuTrigger>
+          <MenuContent>{accounts.map(account => <MenuItem key={account} onClick={() => setOrganization(account)}>{account}</MenuItem>)}</MenuContent></Menu>}</CardHeader>
       <CardContent className="space-y-4">
+        <BatchPanel active={batch} last={lastBatch} onChanged={() => void reloadBatches()} />
         <div className="flex flex-wrap items-center gap-3"><div className="relative w-full max-w-sm"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar repositorios" placeholder="Buscar repositorios…" value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }} className="border-app-line bg-app-soft pl-9" /></div>
           {data && <span className="text-xs text-app-muted">{data.total} {data.total === 1 ? 'repositorio' : 'repositorios'}{data.partial ? ' · resultados parciales, se completan solos' : ''}</span>}</div>
         {accounts.length > 1 && <div role="group" aria-label="Filtrar por organización" className="flex flex-wrap gap-2">
           <Button size="sm" aria-pressed={accountFilter === ''} variant={accountFilter === '' ? 'default' : 'outline'} onClick={() => { setAccountFilter(''); setPage(1) }}>Todas</Button>
           {accounts.map(account => <Button key={account} size="sm" aria-pressed={accountFilter === account} variant={accountFilter === account ? 'default' : 'outline'} onClick={() => { setAccountFilter(account); setPage(1) }}>{account}</Button>)}
         </div>}
+        {selected.size > 0 && <div className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-panel px-4 py-2.5 shadow-lg">
+          <span className="text-sm font-medium">{selected.size} {selected.size === 1 ? 'seleccionado' : 'seleccionados'}</span>
+          <Button size="sm" disabled={starting || !!batch || selected.size > 100} onClick={() => void startSelected()} className="bg-primary text-primary-foreground hover:bg-primary/90">{starting && <LoaderCircle className="animate-spin" />}Analizar seleccionados</Button>
+          {(batch || selected.size > 100) && <span className="text-xs text-app-muted">{batch ? 'Hay un lote en curso: espera o cancélalo.' : 'Hasta 100; para más, analiza la organización.'}</span>}
+          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} className="ml-auto">Quitar selección</Button>
+        </div>}
         <div className="overflow-hidden rounded-xl border border-app-line">
-          <div className="hidden grid-cols-[minmax(0,1fr)_120px_130px_130px] gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid"><span>Repositorio</span><span>Origen</span><span>Último análisis</span><span>Acción</span></div>
+          <div className="hidden grid-cols-[20px_minmax(0,1fr)_120px_130px_130px] items-center gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid">
+            <input type="checkbox" aria-label="Seleccionar la página" className="size-4 accent-brand" checked={selectable.length > 0 && selectable.every(id => selected.has(id))}
+              onChange={event => setSelected(previous => { const next = new Set(previous); for (const id of selectable) { if (event.target.checked) next.add(id); else next.delete(id) } return next })} />
+            <span>Repositorio</span><span>Origen</span><span>Último análisis</span><span>Acción</span></div>
           {!data && <SkeletonList rows={8} action label="Cargando repositorios" />}
           {data?.sources.map(source => {
             const last = runs.find(run => run.source?.name === source.name)
-            return <div key={source.id} className="grid gap-2 border-b border-app-line px-4 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_120px_130px_130px] md:items-center">
+            return <div key={source.id} className="grid gap-2 border-b border-app-line px-4 py-3 last:border-b-0 md:grid-cols-[20px_minmax(0,1fr)_120px_130px_130px] md:items-center">
+              {source.installation_id ? <input type="checkbox" aria-label={`Seleccionar ${source.name}`} className="size-4 accent-brand" checked={selected.has(source.id)}
+                onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(source.id); else next.delete(source.id); return next })} /> : <span />}
               <div className="flex min-w-0 items-center gap-2"><GitBranch className="size-4 shrink-0 text-app-muted" /><span className="truncate text-sm font-medium">{source.name}</span>{source.private && <LockKeyhole className="size-3 shrink-0 text-app-subtle" />}</div>
               <span className="text-xs text-app-muted">{source.account ?? source.provider.toUpperCase()}</span>
               <span className="text-xs text-app-muted">{last ? new Date(last.created_at).toLocaleDateString('es-CO') : 'No probado'}</span>
@@ -123,6 +150,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
         {data && <Pager page={page} perPage={PAGE_SIZE} total={data.total} onPage={setPage} loading={loading} />}
       </CardContent>
     </Card>}
+    <OrganizationScanDialog account={organization} onClose={() => setOrganization(null)} onStarted={() => void reloadBatches()} />
   </div>
 }
 

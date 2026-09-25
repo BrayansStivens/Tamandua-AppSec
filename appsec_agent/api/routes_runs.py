@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from ..kinds import FINDING_RUNS
-from .. import exclusions, findings_registry, jira, triage
+from .. import batches, exclusions, findings_registry, jira, triage
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
 from ..dashboard import compute as compute_dashboard
@@ -313,6 +313,81 @@ def repository_plan(request: Request):
         return request.json(200, scan_plan(source["id"], installation_id=source.get("installation_id")))
     except GitHubAppError as exc:
         return request.json(502, {"error": str(exc)})
+
+
+@route("POST", "/api/repositories/batches", action="scan-batch", body=64_000)
+def create_batch(request: Request):
+    """Varios repositorios de una vez: una selección (hasta 100) o una organización entera (administración)."""
+    payload = request.payload
+    if (not isinstance(payload, dict) or not set(payload) <= {"source_ids", "account", "allow_osv_upload", "context"}
+            or ("source_ids" in payload) == ("account" in payload)
+            or not isinstance(payload.get("allow_osv_upload", False), bool) or not isinstance(payload.get("context", ""), str)):
+        return request.json(400, {"error": "Indica los repositorios o una organización"})
+    installations = github_installations(request.data_dir)
+    if not installations:
+        return request.json(400, {"error": "Los lotes usan la GitHub App: conéctala en Integraciones"})
+    if "account" in payload:
+        # Una organización entera ocupa el servidor durante horas: es una decisión de administración.
+        if request.user.get("role") != "admin":
+            return request.json(403, {"error": "Analizar una organización entera es cosa de un administrador"})
+        from ..github_app import installation_info, installation_repositories
+        account = payload["account"]
+        if not isinstance(account, str) or not account or len(account) > 100:
+            return request.json(400, {"error": "Organización inválida"})
+        items = []
+        for installation in installations:
+            try:
+                if (installation_info(installation).get("account") or "").casefold() != account.casefold():
+                    continue
+                items = [{**row, "source_id": row["id"], "installation_id": installation}
+                         for row in installation_repositories(installation) if not row.get("archived")]
+            except GitHubAppError as exc:
+                return request.json(502, {"error": str(exc)})
+            break
+        if not items:
+            return request.json(404, {"error": "No hay repositorios de esa organización en la GitHub App"})
+        label = f"Organización {account}"
+    else:
+        chosen = payload["source_ids"]
+        if not isinstance(chosen, list) or not 1 <= len(chosen) <= batches.MAX_SELECTED or not all(isinstance(item, str) for item in chosen):
+            return request.json(400, {"error": f"Elige entre 1 y {batches.MAX_SELECTED} repositorios (para más, analiza la organización)"})
+        items = []
+        for source_id in dict.fromkeys(chosen):
+            source = find_source(None, installations, source_id)
+            if source is None or source.get("installation_id") is None:
+                return request.json(400, {"error": f"Repositorio no disponible en la GitHub App: {source_id[:120]}"})
+            items.append({**source, "source_id": source["id"]})
+        label = f"{len(items)} repositorios seleccionados"
+    try:
+        batch = batches.create(request.data_dir, items, by=request.user["username"], label=label,
+                               allow_osv_upload=payload.get("allow_osv_upload", False), context=payload.get("context", ""))
+    except batches.BatchError as exc:
+        return request.json(409, {"error": str(exc)})
+    request.log.info("scan_batch", extra={"user": request.user["username"], "reason": f"{label}: {len(batch['items'])}"})
+    return request.json(202, batches.summary(request.data_dir, batch))
+
+
+@route("GET", "/api/repositories/batches")
+def list_batches(request: Request):
+    rows = batches.all_batches(request.data_dir)
+    current = next((row for row in rows if row["status"] == "running"), None)
+    return request.json(200, {"active": batches.summary(request.data_dir, current) if current else None,
+                              "recent": [batches.summary(request.data_dir, row) for row in rows if row["status"] != "running"][:5]})
+
+
+@route("POST", "/api/repositories/batches/cancel", action="cancel-batch", body=256)
+def cancel_batch(request: Request):
+    payload = request.payload
+    if not isinstance(payload, dict) or set(payload) != {"id"} or not isinstance(payload["id"], str):
+        return request.json(400, {"error": "Lote inválido"})
+    try:
+        batch = batches.load(request.data_dir, payload["id"])
+        if batch.get("by") != request.user["username"] and request.user.get("role") != "admin":
+            return request.json(403, {"error": "Solo quien lo lanzó o un administrador puede cancelarlo"})
+        batch = batches.cancel(request.data_dir, payload["id"], by=request.user["username"])
+    except batches.BatchError as exc:
+        return request.json(404, {"error": str(exc)})
+    return request.json(200, batches.summary(request.data_dir, batch))
 
 
 REPOSITORY_SCAN_FIELDS = {"source_id", "allow_osv_upload", "context"}
