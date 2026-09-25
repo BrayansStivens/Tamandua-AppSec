@@ -196,7 +196,7 @@ function ProjectRepositories({ draft, setDraft, catalog, onError, onPicked }: { 
 }
 
 const EXPORTS: { label: string; items: [string, string][] }[] = [
-  { label: 'Informes', items: [['Informe PDF', 'report.pdf'], ['Evidencia SOC 2 Tipo II · PDF', 'report-soc2.pdf'], ['Evidencia ISO/IEC 27001 · PDF', 'report-iso27001.pdf'], ['Informe Markdown', 'report.md']] },
+  { label: 'Informes', items: [['Informe PDF', 'report.pdf'], ['Informe Markdown', 'report.md']] },
   { label: 'Para otras herramientas', items: [['Modelo JSON (reimportable)', 'model.json'], ['Diagrama SVG', 'diagram.svg'], ['OWASP Threat Dragon', 'threat-dragon.json'], ['pytm (Python)', 'tm.py']] },
 ]
 

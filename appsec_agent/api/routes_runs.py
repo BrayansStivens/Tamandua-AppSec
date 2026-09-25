@@ -19,6 +19,7 @@ from ..scanners import docker_available
 from ..scan_plan import plan as scan_plan
 from ..github_app import GitHubAppError
 from ..pdf_reports import render_pdf
+from ..audit_report import ReportError, render_audit_pdf, validate_options
 from ..store import _run_dir, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
 from ..store import render_repository_sarif, render_tickets
 from .core import VERSION, Request, route
@@ -129,6 +130,50 @@ def asset_export(request: Request):
         return _artifact(request, record, artifact)
     except ValueError as exc:
         return request.json(400, {"error": str(exc)})
+
+
+@route("POST", "/api/reports/audit", action="audit-report", body=400_000)
+def audit_report(request: Request):
+    """Informe de evidencia para auditoría de una ejecución o del estado de un activo, con los hallazgos elegidos.
+
+    Mismo acceso que ver esa ejecución o ese activo. `fingerprints` acota el informe (uno, varios o los filtrados);
+    sin él entran todos los del alcance."""
+    payload = request.payload
+    if not isinstance(payload, dict) or not set(payload) <= {"run_id", "asset", "status", "fingerprints", "options"} \
+            or ("run_id" in payload) == ("asset" in payload):
+        return request.json(400, {"error": "Indica una ejecución o un activo"})
+    chosen = payload.get("fingerprints")
+    if chosen is not None and (not isinstance(chosen, list) or len(chosen) > 5000
+                               or not all(isinstance(item, str) and 0 < len(item) <= 128 for item in chosen)):
+        return request.json(400, {"error": "Selección de hallazgos inválida (hasta 5000)"})
+    try:
+        if "run_id" in payload:
+            run_id = payload["run_id"]
+            if not isinstance(run_id, str) or not re.fullmatch(r"[0-9a-f]{32}", run_id):
+                return request.json(400, {"error": "Ejecución inválida"})
+            record = triage.annotate(request.data_dir, load_run(request.data_dir, run_id))
+            if record.get("type") not in FINDING_RUNS:
+                return request.json(400, {"error": "Esta ejecución no tiene hallazgos que informar"})
+        else:
+            key, status = payload["asset"], payload.get("status", "open")
+            if not isinstance(key, str) or not key or len(key) > 200 or status not in ("open", "fixed", "all"):
+                return request.json(400, {"error": "Activo o estado inválido"})
+            if not any(row["key"] == key for row in assets_overview(request.data_dir)):
+                return request.json(404, {"error": "Activo no encontrado"})
+            record = findings_registry.view(request.data_dir, key, status=status)
+    except (FileNotFoundError, ValueError):
+        return request.json(404, {"error": "Ejecución no encontrada"})
+    findings = record.get("findings") or []
+    if chosen is not None:
+        wanted = set(chosen)
+        findings = [item for item in findings if item.get("fingerprint") in wanted]
+    try:
+        options = validate_options(payload.get("options"), default_by=request.user.get("display_name") or request.user["username"])
+        pdf = render_audit_pdf(record, findings, options, version=VERSION)
+    except ReportError as exc:
+        return request.json(400, {"error": str(exc)})
+    request.log.info("audit_report", extra={"user": request.user["username"], "reason": f"{record['id']}: {len(findings)} hallazgos, {options['framework']}"})
+    return request.send(200, pdf, "application/pdf")
 
 
 @route("GET", "/api/assets/exclusions")

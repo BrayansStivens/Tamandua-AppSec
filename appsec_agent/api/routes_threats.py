@@ -94,12 +94,6 @@ def model_detail(request: Request):
         return request.send(200, render_pdf(tm.to_markdown(view["model"], view["threats"]),
                                              title=f"Modelo de amenazas · {view['model']['name']}",
                                              kind="Análisis de amenazas", reference=model_id), "application/pdf")
-    if artifact in ("report-soc2.pdf", "report-iso27001.pdf"):
-        profile = artifact.removeprefix("report-").removesuffix(".pdf")
-        label = "SOC 2 Tipo II" if profile == "soc2" else "ISO/IEC 27001:2022"
-        report = tm.to_profile_markdown(view["model"], view["threats"], profile)
-        return request.send(200, render_pdf(report, title=f"Amenazas · evidencia para {label}",
-                                             kind="Dossier para revisión", reference=model_id), "application/pdf")
     if artifact == "diagram.svg":
         return request.send(200, tm.to_svg(view["model"]).encode("utf-8"), "image/svg+xml; charset=utf-8")
     if artifact == "model.json":

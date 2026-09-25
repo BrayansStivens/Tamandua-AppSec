@@ -405,13 +405,13 @@ class RouteTests(HttpCase):
             self.assertEqual(next(row for row in decided["threats"] if row["id"] == threat)["status"], "mitigated")
             status, _, _ = self.post("/api/threat-models", "save-threat-model", {"id": model_id, "model": {**decided["model"], "name": "Tienda v2"}}, cookie)
             self.assertEqual(status, 200)
-            for artifact in ("threat-dragon.json", "tm.py", "report.md", "report.pdf", "report-soc2.pdf",
-                             "report-iso27001.pdf", "diagram.svg", "model.json"):
+            for artifact in ("threat-dragon.json", "tm.py", "report.md", "report.pdf", "diagram.svg", "model.json"):
                 self.assertEqual(self.call("GET", f"/api/threat-models/{model_id}/{artifact}", headers={"Cookie": cookie})[0], 200)
             status, pdf = self.call("GET", f"/api/threat-models/{model_id}/report.pdf", headers={"Cookie": cookie})[:2]
             self.assertEqual(status, 200)
             self.assertTrue(pdf.startswith(b"%PDF-"))
-            self.assertIn("operación a lo largo del periodo", tm.to_profile_markdown(decided["model"], decided["threats"], "soc2"))
+            # Un modelo de amenazas no es evidencia de SOC 2 ni de ISO: esos informes son de los hallazgos.
+            self.assertEqual(self.call("GET", f"/api/threat-models/{model_id}/report-soc2.pdf", headers={"Cookie": cookie})[0], 404)
             for artifact in ("report.md", "report.pdf", "report-soc2.pdf", "report-iso27001.pdf", "findings.sarif", "tickets.json", "record.json"):
                 status, body = self.call("GET", f"/api/assets/export?key={REPO}&status=all&artifact={artifact}", headers={"Cookie": cookie})[:2]
                 self.assertEqual(status, 200, (artifact, str(body)[:300]))

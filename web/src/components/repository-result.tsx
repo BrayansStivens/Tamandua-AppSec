@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { ArrowDownToLine, ArrowRight, ChevronDown, ChevronRight, ExternalLink, Flame, Search, ShieldCheck, SlidersHorizontal, Ticket, Wrench } from 'lucide-react'
+import { ArrowDownToLine, ArrowRight, ChevronDown, ChevronRight, ExternalLink, FileCheck2, Flame, Search, ShieldCheck, SlidersHorizontal, Ticket, Wrench } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Menu, MenuContent, MenuGroup, MenuItem, MenuTrigger } from '@/components/ui/menu'
+import { AuditReportDialog } from '@/components/audit-report'
 import { Pagination } from '@/components/ui/pagination'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { JiraExportDialog, useJiraStatus, type TicketLink } from '@/components/jira'
@@ -26,7 +27,6 @@ const severityLabel: Record<string, string> = { critical: 'Crítica', high: 'Alt
 const actionLabel: Record<string, string> = { act: 'Actuar ya', attend: 'Atender', track: 'Seguimiento' }
 const scannerLabel: Record<string, string> = { sca: 'Dependencia', sast: 'Código', secrets: 'Secreto', iac: 'Infraestructura', cicd: 'CI/CD' }
 const RUN_EXPORTS: { label: string; items: [string, string][] }[] = [
-  { label: 'Evidencia para auditoría', items: [['SOC 2 Tipo II · PDF', 'report-soc2.pdf'], ['ISO/IEC 27001 · PDF', 'report-iso27001.pdf']] },
   { label: 'Datos', items: [['Informe Markdown', 'report.md'], ['SARIF (code scanning)', 'findings.sarif'], ['JSON completo', 'run.json'], ['Tickets para Jira (JSON)', 'tickets.json']] },
 ]
 const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', 'osv-scanner': 'OSV-Scanner', checkov: 'Checkov', zizmor: 'zizmor', 'appsec-agent': 'Reglas propias' }
@@ -75,6 +75,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const [scanner, setScanner] = useState('all')
   const [open, setOpen] = useState<string | null>(null)
   const [triageView, setTriageView] = useState(initialView)
+  const [auditOpen, setAuditOpen] = useState(false)
   // Filtros secundarios plegados; se abren solos si alguno ya está en uso.
   const hiddenActive = Number(triageView !== initialView) + Number(action !== 'all') + Number(scanner !== 'all')
   const [moreFilters, setMoreFilters] = useState(false)
@@ -154,6 +155,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
         <span className="text-sm font-medium">{selected.size} {selected.size === 1 ? 'seleccionado' : 'seleccionados'}</span>
         <TriageActions canAccept={canAccept} onPick={status => setDecision({ status, fingerprints: [...selected] })} />
         {jira?.configured && <Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={selected.size > 50 || findings.some(item => selected.has(item.fingerprint) && SUPPRESSED.includes(statusOf(item)))} title={selected.size > 50 ? 'Hasta 50 por exportación' : undefined} onClick={() => setExporting([...selected])}><Ticket />Crear en Jira</Button>}
+        <Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => setAuditOpen(true)}><FileCheck2 />Informe de los seleccionados</Button>
         <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="ml-auto">Quitar selección</Button>
       </div>}
       {findings.length === 0
@@ -185,9 +187,12 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
     {/* Ley de Hick: el informe habitual a mano y los demás formatos agrupados en un menú. */}
     <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" onClick={() => void exportFile('report.pdf')}><ArrowDownToLine />{downloading === 'report.pdf' ? 'Preparando…' : 'Informe PDF'}</Button>
       <Menu><MenuTrigger render={<Button variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" />}>{downloading && downloading !== 'report.pdf' ? 'Preparando…' : 'Más formatos'}<ChevronDown className="size-3.5" /></MenuTrigger>
-        <MenuContent align="start">{RUN_EXPORTS.map(group => <MenuGroup key={group.label} label={group.label}>{group.items.map(([label, artifact]) => <MenuItem key={artifact} onClick={() => void exportFile(artifact)}>{label}</MenuItem>)}</MenuGroup>)}</MenuContent></Menu></div>
+        <MenuContent align="start"><MenuGroup label="Auditoría"><MenuItem onClick={() => setAuditOpen(true)}><FileCheck2 />Evidencia para auditoría (SOC 2, ISO)…</MenuItem></MenuGroup>{RUN_EXPORTS.map(group => <MenuGroup key={group.label} label={group.label}>{group.items.map(([label, artifact]) => <MenuItem key={artifact} onClick={() => void exportFile(artifact)}>{label}</MenuItem>)}</MenuGroup>)}</MenuContent></Menu></div>
     {downloadError && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">No se pudo descargar el informe: {downloadError}</div>}
 
+    {auditOpen && <AuditReportDialog open onClose={() => setAuditOpen(false)} name={(run.source as { name?: string } | undefined)?.name ?? 'hallazgos'}
+      target={run.type === 'asset_state' ? { asset: (run.source as { id?: string } | undefined)?.id ?? '', status: exportStatus === 'fixed' || exportStatus === 'all' ? exportStatus : 'open' } : { runId: run.id }}
+      selected={[...selected]} filtered={groups.flatMap(group => group.findings.map(item => item.fingerprint))} total={findings.length} />}
     <JiraExportDialog key={exporting?.join(',') ?? 'none'} runId={run.id} fingerprints={exporting} onClose={() => { setExporting(null); setSelected(new Set()) }} onDone={onChanged} />
     <TriageDialog key={decision ? `${decision.status}:${decision.fingerprints.length}` : 'none'} runId={run.id} status={decision?.status ?? null} fingerprints={decision?.fingerprints ?? []} onClose={() => setDecision(null)} onDone={decided} />
 
