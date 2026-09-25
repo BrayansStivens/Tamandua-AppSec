@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
-import { ChevronDown, ExternalLink, GitBranch, Layers3, LoaderCircle, LockKeyhole, RefreshCw, Search, ShieldCheck } from 'lucide-react'
+import { ChevronDown, ExternalLink, FileCheck2, GitBranch, Layers3, LoaderCircle, LockKeyhole, RefreshCw, Search, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +9,7 @@ import { GitHubAppGuide, GitHubInstall, type GitHubStatus } from '@/components/g
 import { Pager } from '@/components/source-search'
 import { SkeletonCard, SkeletonList } from '@/components/loading'
 import { BatchPanel, OrganizationScanDialog, useBatches } from '@/components/batches'
+import { AuditReportDialog } from '@/components/audit-report'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu'
 import { useSourcePage } from '@/lib/sources'
 
@@ -34,6 +35,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
   // Varios repositorios de una vez: selección a mano (lote) o una organización entera (administración).
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [organization, setOrganization] = useState<string | null>(null)
+  const [reportFor, setReportFor] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
   const { active: batch, last: lastBatch, reload: reloadBatches } = useBatches()
   const startSelected = async () => {
@@ -113,7 +115,9 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
     {showRepositories && <Card className="border-app-line bg-panel">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3"><div><CardTitle>Repositorios</CardTitle><CardDescription>Repositorios concedidos en todas las organizaciones conectadas.</CardDescription></div><Button variant="outline" disabled={loading} onClick={() => reload(true)} className="border-app-line bg-app-soft"><RefreshCw className={loading ? 'animate-spin' : ''} /> Actualizar lista</Button>
         {canManage && accounts.length > 0 && <Menu><MenuTrigger render={<Button variant="outline" disabled={!!batch} className="border-app-line bg-app-soft" />}><Layers3 />Analizar organización<ChevronDown className="size-3.5" /></MenuTrigger>
-          <MenuContent>{accounts.map(account => <MenuItem key={account} onClick={() => setOrganization(account)}>{account}</MenuItem>)}</MenuContent></Menu>}</CardHeader>
+          <MenuContent>{accounts.map(account => <MenuItem key={account} onClick={() => setOrganization(account)}>{account}</MenuItem>)}</MenuContent></Menu>}
+        {accounts.length > 0 && <Menu><MenuTrigger render={<Button variant="outline" className="border-app-line bg-app-soft" />}><FileCheck2 />Informe de organización<ChevronDown className="size-3.5" /></MenuTrigger>
+          <MenuContent>{accounts.map(account => <MenuItem key={account} onClick={() => setReportFor(account)}>{account}</MenuItem>)}</MenuContent></Menu>}</CardHeader>
       <CardContent className="space-y-4">
         <BatchPanel active={batch} last={lastBatch} onChanged={() => void reloadBatches()} />
         <div className="flex flex-wrap items-center gap-3"><div className="relative w-full max-w-sm"><Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-app-subtle" /><Input aria-label="Buscar repositorios" placeholder="Buscar repositorios…" value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }} className="border-app-line bg-app-soft pl-9" /></div>
@@ -151,6 +155,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
       </CardContent>
     </Card>}
     <OrganizationScanDialog account={organization} onClose={() => setOrganization(null)} onStarted={() => void reloadBatches()} />
+    {reportFor && <AuditReportDialog open onClose={() => setReportFor(null)} target={{ account: reportFor }} name={reportFor} selected={[]} filtered={[]} total={0} />}
   </div>
 }
 

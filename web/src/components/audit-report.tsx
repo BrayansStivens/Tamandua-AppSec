@@ -8,7 +8,7 @@ import { api } from '@/lib/api'
 type Framework = 'soc2' | 'iso27001' | 'general'
 type Detail = 'none' | 'high' | 'all'
 type Scope = 'selected' | 'filtered' | 'all'
-export type AuditTarget = { runId: string } | { asset: string; status: 'open' | 'fixed' | 'all' }
+export type AuditTarget = { runId: string } | { asset: string; status: 'open' | 'fixed' | 'all' } | { account: string }
 
 const FRAMEWORKS: [Framework, string, string][] = [
   ['soc2', 'SOC 2 Tipo II', 'Relaciona la evidencia con CC3.2, CC7.1 y CC8.1'],
@@ -41,13 +41,16 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const counts: Record<Scope, number> = { selected: selected.length, filtered: filtered.length, all: total }
+  // Consolidado de una organización: todos sus repositorios analizados, su cobertura y un solo documento.
+  const portfolio = 'account' in target
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setBusy(true); setError('')
     try { localStorage.setItem(MEMORY, JSON.stringify({ framework, organization, prepared_for: preparedFor, prepared_by: preparedBy })) } catch { /* sin almacenamiento */ }
-    const fingerprints = scope === 'selected' ? selected : scope === 'filtered' ? filtered : undefined
-    const body = { ...('runId' in target ? { run_id: target.runId } : { asset: target.asset, status: target.status }), ...(fingerprints ? { fingerprints } : {}),
+    const fingerprints = portfolio ? undefined : scope === 'selected' ? selected : scope === 'filtered' ? filtered : undefined
+    const where = 'runId' in target ? { run_id: target.runId } : 'account' in target ? { account: target.account } : { asset: target.asset, status: target.status }
+    const body = { ...where, ...(fingerprints ? { fingerprints } : {}),
       options: { framework, detail, include_exceptions: exceptions, title, organization, prepared_for: preparedFor, prepared_by: preparedBy, scope: scopeText, period_from: from, period_to: to } }
     const file = `${name.replace(/[^a-z0-9-]+/gi, '-').slice(0, 40) || 'hallazgos'}-evidencia-${framework}.pdf`
     try { await api.downloadPost('/api/reports/audit', 'audit-report', body, file); onClose() }
@@ -55,7 +58,7 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
   }
 
   return <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
-    <DialogHeader><DialogTitle>Informe de evidencia para auditoría</DialogTitle>
+    <DialogHeader><DialogTitle>{portfolio ? `Informe consolidado · ${name}` : 'Informe de evidencia para auditoría'}</DialogTitle>
       <DialogDescription>Un PDF conciso con alcance, método, hallazgos con su estado, excepciones aprobadas y firmas. Todo es opcional: sin tocar nada se genera con valores por defecto.</DialogDescription></DialogHeader>
     <form className="space-y-5" onSubmit={submit}>
       <fieldset className="space-y-2"><legend className={label}>Marco</legend>
@@ -63,10 +66,11 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
           <span className="flex items-center gap-2"><input type="radio" name="framework" value={id} checked={framework === id} onChange={() => setFramework(id)} className="size-4 accent-brand" /><span className="font-medium">{text}</span></span>
           <span className="pl-6 text-xs text-app-muted">{hint}</span></label>)}</div></fieldset>
 
-      <fieldset className="space-y-2"><legend className={label}>Hallazgos del informe</legend>
+      {portfolio ? <p className="rounded-lg border border-app-line bg-inset p-3 text-sm text-app-muted">Todos los repositorios analizados de la organización, su cobertura frente a GitHub (cuáles no tienen un análisis completo), los críticos y altos abiertos y las excepciones, en un solo documento.</p>
+      : <fieldset className="space-y-2"><legend className={label}>Hallazgos del informe</legend>
         <div className="grid gap-2 sm:grid-cols-3">{([['selected', 'Seleccionados'], ['filtered', 'Los que ves con los filtros'], ['all', 'Todos']] as [Scope, string][]).map(([id, text]) =>
           <label key={id} className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${counts[id] === 0 ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${scope === id ? 'border-brand/60 bg-brand/10' : 'border-app-line bg-inset'}`}>
-            <input type="radio" name="scope" value={id} checked={scope === id} disabled={counts[id] === 0} onChange={() => setScope(id)} className="size-4 accent-brand" />{text} · {counts[id]}</label>)}</div></fieldset>
+            <input type="radio" name="scope" value={id} checked={scope === id} disabled={counts[id] === 0} onChange={() => setScope(id)} className="size-4 accent-brand" />{text} · {counts[id]}</label>)}</div></fieldset>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className={field}><label htmlFor="ar-org" className={label}>Organización</label><Input id="ar-org" maxLength={120} value={organization} onChange={event => setOrganization(event.target.value)} placeholder="p. ej. Acme S.A.S. · Equipo AppSec" className="border-app-line bg-app-soft" /></div>
@@ -80,16 +84,16 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
       <details className="rounded-lg border border-app-line px-3 py-2 text-sm"><summary className="cursor-pointer text-app-muted">Más opciones</summary>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
           <div className={field}><label htmlFor="ar-title" className={label}>Título</label><Input id="ar-title" maxLength={120} value={title} onChange={event => setTitle(event.target.value)} placeholder="Evidencia de gestión de vulnerabilidades" className="border-app-line bg-app-soft" /></div>
-          <div className={field}><label htmlFor="ar-detail" className={label}>Detalle por hallazgo</label>
+          {!portfolio && <div className={field}><label htmlFor="ar-detail" className={label}>Detalle por hallazgo</label>
             <select id="ar-detail" value={detail} onChange={event => setDetail(event.target.value as Detail)} className="h-9 w-full rounded-lg border border-app-line bg-app-soft px-2 text-sm">
-              <option value="high">Solo críticos y altos</option><option value="all">Todos</option><option value="none">Ninguno (solo la tabla)</option></select></div>
+              <option value="high">Solo críticos y altos</option><option value="all">Todos</option><option value="none">Ninguno (solo la tabla)</option></select></div>}
           <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={exceptions} onChange={event => setExceptions(event.target.checked)} className="size-4 accent-brand" />Incluir excepciones y decisiones (riesgos aceptados y falsos positivos con su motivo)</label>
         </div></details>
 
       {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger">{error}</div>}
       <p className="text-xs text-app-subtle">Es evidencia técnica para el auditor, no una opinión de auditoría ni una certificación. Revísala y fírmala antes de entregarla.</p>
       <DialogFooter><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" disabled={busy || counts[scope] === 0} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <FileCheck2 />}{busy ? 'Generando…' : `Generar PDF · ${counts[scope]} ${counts[scope] === 1 ? 'hallazgo' : 'hallazgos'}`}</Button></DialogFooter>
+        <Button type="submit" disabled={busy || (!portfolio && counts[scope] === 0)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <FileCheck2 />}{busy ? 'Generando…' : portfolio ? 'Generar PDF consolidado' : `Generar PDF · ${counts[scope]} ${counts[scope] === 1 ? 'hallazgo' : 'hallazgos'}`}</Button></DialogFooter>
     </form>
   </DialogContent></Dialog>
 }

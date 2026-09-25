@@ -324,3 +324,148 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
                       title=title[:120], author=options["prepared_by"][:80] or "Tamandua", subject=framework_label,
                       creator=f"Tamandua {version}").build(story, onFirstPage=frame, onLaterPages=frame)
     return output.getvalue()
+
+
+# --- informe consolidado (organización o varios repositorios) -----------------------------
+
+def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scope_label: str, coverage: dict) -> bytes:
+    """Una organización (o una selección de repositorios) en un solo documento.
+
+    `items`: [{"name", "findings", "last_complete", "last_status"}] con los hallazgos del registro de cada
+    repositorio. `coverage`: {"total": repositorios en GitHub o None, "missing": nombres sin análisis completo}.
+    Lo que pregunta un auditor a este nivel: ¿se analiza todo?, ¿dónde está el riesgo?, ¿qué sigue abierto?"""
+    framework_label, controls = FRAMEWORKS[options["framework"]]
+    issued = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    period = (f"{options['period_from'] or '—'} a {options['period_to'] or issued}" if options["period_from"] or options["period_to"]
+              else f"Estado al {issued}")
+    active_states = ("open", "in_progress")
+    rows, open_items, exceptions = [], [], []
+    totals = {"critical": 0, "high": 0, "open": 0, "fixed": 0, "excepted": 0}
+    for item in items:
+        findings = [finding for finding in item["findings"] if status_of(finding) != "excluded"]
+        states = [status_of(finding) for finding in findings]
+        pending = [finding for finding, state in zip(findings, states) if state in active_states]
+        counts = {level: sum(1 for finding in pending if finding.get("severity") == level) for level in ORDER}
+        fixed, excepted = states.count("fixed"), sum(1 for state in states if state in ("accepted", "false_positive"))
+        rows.append((item["name"], counts, len(pending), fixed, excepted, item.get("last_complete"), item.get("last_status")))
+        open_items += [(item["name"], finding) for finding in pending if finding.get("severity") in ("critical", "high")]
+        exceptions += [(item["name"], finding) for finding, state in zip(findings, states) if state in ("accepted", "false_positive")]
+        totals["critical"] += counts["critical"]; totals["high"] += counts["high"]; totals["open"] += len(pending)
+        totals["fixed"] += fixed; totals["excepted"] += excepted
+    rows.sort(key=lambda row: (-row[1]["critical"], -row[1]["high"], -row[2], row[0]))
+    open_items.sort(key=lambda pair: (ORDER.get(pair[1].get("severity"), 9), pair[0]))
+    analysed = sum(1 for row in rows if row[5])
+    known_total = coverage.get("total")
+
+    eyebrow = "EVIDENCIA DE GESTIÓN DE VULNERABILIDADES · CONSOLIDADO" + (f"  ·  {framework_label.upper()}" if controls else "")
+    story = [Paragraph(html.escape(eyebrow), STYLE["eyebrow"]),
+             Paragraph(_t(options["title"] or "Evidencia de gestión de vulnerabilidades", 120), STYLE["title"]),
+             Paragraph(_t(options["scope"] or scope_label, 200), STYLE["subtitle"])]
+    meta = [("Organización", options["organization"] or "—"), ("Alcance", options["scope"] or scope_label), ("Periodo", period),
+            ("Preparado por", options["prepared_by"] or "—"), ("Preparado para", options["prepared_for"] or "—"), ("Emitido", issued)]
+    story.append(_grid([[Paragraph(_t(label), STYLE["label"]) for label, _ in meta[:3]], [Paragraph(_t(value, 160), STYLE["value"]) for _, value in meta[:3]],
+                        [Paragraph(_t(label), STYLE["label"]) for label, _ in meta[3:]], [Paragraph(_t(value, 160), STYLE["value"]) for _, value in meta[3:]]],
+                       [WIDTH / 3] * 3, header=False))
+    story += [Spacer(1, 10), Paragraph("Resumen", STYLE["h2"]),
+              _kpis([("repositorios con análisis completo", f"{analysed} de {known_total}" if known_total else analysed, INK, SOFT),
+                     ("críticas abiertas", totals["critical"], SEVERITY["critical"][1], colors.HexColor("#ffefed")),
+                     ("altas abiertas", totals["high"], SEVERITY["high"][0], SEVERITY["high"][1]),
+                     ("abiertas o en curso", totals["open"], INK, SOFT), ("remediadas", totals["fixed"], SUCCESS, SUCCESS_BG),
+                     ("excepciones aprobadas", totals["excepted"], BRAND, BRAND_BG)]),
+              Spacer(1, 6),
+              Paragraph(_t(f"{_n(len(rows), 'repositorio', 'repositorios')} en el informe; {_n(totals['open'], 'hallazgo pendiente', 'hallazgos pendientes')}, "
+                           f"de los que {_n(totals['critical'], 'es crítico', 'son críticos')} y {totals['high']} altos. "
+                           f"{_n(totals['fixed'], 'hallazgo remediado', 'hallazgos remediados')} y {_n(totals['excepted'], 'excepción aprobada', 'excepciones aprobadas')}.", 700), STYLE["body"])]
+    # Cobertura: ¿se analiza todo? Es lo primero que se pregunta a nivel de organización.
+    story.append(Paragraph("Cobertura", STYLE["h2"]))
+    incomplete = [row[0] for row in rows if not row[5] and row[6]]
+    lines = []
+    if known_total:
+        lines.append(f"{analysed} de {known_total} repositorios de la organización tienen al menos un análisis completo"
+                     f" ({round(100 * analysed / known_total)} %).")
+    else:
+        lines.append(f"{analysed} de {len(rows)} repositorios del informe tienen al menos un análisis completo.")
+    if incomplete:
+        lines.append(f"Con análisis, pero ninguno completo (un motor no se ejecutó): {', '.join(incomplete[:30])}{'…' if len(incomplete) > 30 else ''}.")
+    missing = coverage.get("missing") or []
+    if missing:
+        lines.append(f"Sin ningún análisis ({len(missing)}): {', '.join(missing[:40])}{f' y {len(missing) - 40} más' if len(missing) > 40 else ''}.")
+    story += [Paragraph("•&nbsp;&nbsp;" + _t(line, 1200), STYLE["body"]) for line in lines]
+    if controls:
+        story += [Paragraph(f"Controles relacionados · {html.escape(framework_label)}", STYLE["h2"]),
+                  _grid([[Paragraph("Control", STYLE["head"]), Paragraph("Qué aporta esta evidencia", STYLE["head"])]]
+                        + [[Paragraph(f"<b>{html.escape(code)}</b><br/>{html.escape(name)}", STYLE["cell"]), Paragraph(html.escape(text), STYLE["cell"])]
+                           for code, name, text in controls], [42 * mm, WIDTH - 42 * mm]),
+                  Paragraph("La relación con cada control es orientativa: la eficacia la evalúa el auditor con la documentación del equipo.", STYLE["note"])]
+    story += [Paragraph("Método", STYLE["h2"]),
+              Paragraph("•&nbsp;&nbsp;Análisis estático de cada repositorio (código, dependencias, secretos, infraestructura y pipelines), "
+                        "sin ejecutar el código ni enviarlo a servicios externos.", STYLE["body"]),
+              Paragraph("•&nbsp;&nbsp;El estado de cada repositorio reúne sus análisis completos y las revisiones de pull requests: un hallazgo "
+                        "queda remediado cuando deja de aparecer en un análisis completo, nunca por uno incompleto.", STYLE["body"])]
+    # Por repositorio
+    story.append(Paragraph(f"Por repositorio ({len(rows)})", STYLE["h2"]))
+    table = [[Paragraph(label, STYLE["head"]) for label in ("Repositorio", "Crít.", "Altas", "Medias", "Bajas", "Abiertos", "Remed.", "Excep.", "Último completo")]]
+    for name, counts, pending, fixed, excepted, last, _ in rows[:1000]:
+        table.append([Paragraph(_t(name, 80), STYLE["cell"]),
+                      *[Paragraph(f'<font color="{SEVERITY[level][1 if level == "critical" else 0].hexval().replace("0x", "#")}"><b>{counts[level]}</b></font>' if counts[level] else "0",
+                                  STYLE["cell"]) for level in ("critical", "high", "medium", "low")],
+                      Paragraph(str(pending), STYLE["cell"]), Paragraph(str(fixed), STYLE["cellmuted"]), Paragraph(str(excepted), STYLE["cellmuted"]),
+                      Paragraph(_day(last) if last else '<font color="#b71824">Sin análisis completo</font>', STYLE["cellmuted"])])
+    story.append(_grid(table, [WIDTH - 125 * mm, 11 * mm, 12 * mm, 14 * mm, 12 * mm, 15 * mm, 14 * mm, 13 * mm, 26 * mm], zebra=True))
+    # Críticos y altos abiertos, con el repositorio: lo que hay que atender primero.
+    story.append(Paragraph(f"Críticos y altos abiertos ({len(open_items)})", STYLE["h2"]))
+    if open_items:
+        table = [[Paragraph(label, STYLE["head"]) for label in ("Severidad", "Repositorio", "Hallazgo", "Detectado", "Acción recomendada")]]
+        for name, finding in open_items[:400]:
+            ids = ", ".join((finding.get("cve") or [])[:1])
+            table.append([_chip(finding.get("severity", "info")), Paragraph(_t(name, 60), STYLE["cellmuted"]),
+                          Paragraph(_t(finding.get("title"), 130) + (f'<br/><font color="#636363">{_t(ids, 40)}</font>' if ids else ""), STYLE["cell"]),
+                          Paragraph(_day((finding.get("lifecycle") or {}).get("first_seen")), STYLE["cellmuted"]),
+                          Paragraph(_t(_fix(finding), 140), STYLE["cell"])])
+        story.append(_grid(table, [19 * mm, 36 * mm, 57 * mm, 17 * mm, WIDTH - 129 * mm], zebra=True))
+        if len(open_items) > 400:
+            story.append(Paragraph(f"Se muestran 400 de {len(open_items)}; el detalle completo está en el informe de cada repositorio.", STYLE["note"]))
+    else:
+        story.append(Paragraph("No hay hallazgos críticos ni altos abiertos.", STYLE["body"]))
+    if options["include_exceptions"]:
+        story.append(Paragraph(f"Excepciones y decisiones ({len(exceptions)})", STYLE["h2"]))
+        if exceptions:
+            table = [[Paragraph(label, STYLE["head"]) for label in ("Repositorio", "Hallazgo", "Decisión", "Motivo", "Decidido por", "Vence")]]
+            for name, finding in exceptions[:500]:
+                decision = finding.get("triage") or {}
+                table.append([Paragraph(_t(name, 60), STYLE["cellmuted"]), Paragraph(_t(finding.get("title"), 100), STYLE["cell"]),
+                              Paragraph(STATUS_LABEL[status_of(finding)], STYLE["cell"]), Paragraph(_t(decision.get("reason") or "—", 200), STYLE["cell"]),
+                              Paragraph(_t(decision.get("by") or "—", 40), STYLE["cellmuted"]), Paragraph(_day(decision.get("expires_at")), STYLE["cellmuted"])])
+            story.append(_grid(table, [32 * mm, 42 * mm, 20 * mm, WIDTH - 132 * mm, 21 * mm, 17 * mm]))
+        else:
+            story.append(Paragraph("No hay riesgos aceptados ni falsos positivos declarados.", STYLE["body"]))
+    story += [Spacer(1, 8), Paragraph("Revisión y aprobación", STYLE["h2"]),
+              _grid([[Paragraph(label, STYLE["head"]) for label in ("Rol", "Nombre", "Firma", "Fecha")]]
+                    + [[Paragraph(role, STYLE["cell"]), Paragraph(_t(name, 60), STYLE["cell"]), Paragraph("", STYLE["cell"]), Paragraph("", STYLE["cell"])]
+                       for role, name in (("Preparado por", options["prepared_by"]), ("Revisado por", ""), ("Aprobado por", ""))],
+                    [32 * mm, 50 * mm, WIDTH - 112 * mm, 30 * mm]),
+              Spacer(1, 6),
+              Paragraph("Evidencia técnica generada con herramientas automatizadas y revisada por el equipo. No constituye una opinión de "
+                        "auditoría, una certificación ni una declaración de cumplimiento.", STYLE["note"])]
+    story = [part for flowable in story for part in ((CondPageBreak(32 * mm), flowable)
+                                                     if isinstance(flowable, Paragraph) and flowable.style.name == "h2" else (flowable,))]
+    output = io.BytesIO()
+    title = options["title"] or "Evidencia de gestión de vulnerabilidades"
+
+    def frame(canvas, document):
+        canvas.saveState()
+        width, height = A4
+        canvas.setFillColor(BRAND)
+        canvas.rect(0, height - 4, width, 4, stroke=0, fill=1)
+        canvas.setStrokeColor(LINE)
+        canvas.line(18 * mm, 13 * mm, width - 18 * mm, 13 * mm)
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(MUTED)
+        canvas.drawString(18 * mm, 8.5 * mm, f"{title[:70]}  ·  {scope_label[:50]}")
+        canvas.drawRightString(width - 18 * mm, 8.5 * mm, f"Tamandua {version}  ·  página {document.page}")
+        canvas.restoreState()
+
+    SimpleDocTemplate(output, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm, bottomMargin=18 * mm,
+                      title=title[:120], author=options["prepared_by"][:80] or "Tamandua", subject=framework_label,
+                      creator=f"Tamandua {version}").build(story, onFirstPage=frame, onLaterPages=frame)
+    return output.getvalue()

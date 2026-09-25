@@ -63,6 +63,26 @@ class RouteTests(HttpCase):
         self.assertEqual(status, 200, pdf)
         self.assertTrue(pdf.startswith(b"%PDF-"))
 
+    def test_an_organization_report_includes_its_coverage_against_github(self):
+        from fake_github import fake_github
+        from appsec_agent.integrations import save_github
+        save_github(self.data_dir, 7, {"account": "org", "repository_selection": "all"}, "admin")
+        with patch("appsec_agent.api.routes_runs.render_portfolio_pdf", wraps=__import__("appsec_agent.audit_report", fromlist=["x"]).render_portfolio_pdf) as render, \
+                fake_github({7: [(1, "org/api"), (2, "org/web"), (3, "org/infra")]}, {7: ("org", "all")}):
+            status, pdf, _ = self.report({"account": "org", "options": {"framework": "iso27001"}})
+        self.assertEqual(status, 200, pdf)
+        self.assertTrue(pdf.startswith(b"%PDF-"))
+        coverage = render.call_args.kwargs["coverage"]
+        self.assertEqual((coverage["total"], coverage["missing"]), (3, ["org/infra", "org/web"]))
+
+    def test_a_selection_of_repositories_goes_into_one_document(self):
+        from appsec_agent.assets import asset_key
+        status, pdf, _ = self.report({"assets": [asset_key(self.run)]})
+        self.assertEqual(status, 200, pdf)
+        for body, expected in (({"assets": []}, 400), ({"assets": ["no-existe"]}, 404), ({"account": "nadie"}, 404),
+                               ({"account": "org", "run_id": self.run["id"]}, 400)):
+            self.assertEqual(self.report(body)[0], expected, body)
+
     def test_bad_requests(self):
         cases = [{"run_id": self.run["id"], "asset": "x"}, {}, {"run_id": "../../etc/passwd"}, {"run_id": "f" * 32},
                  {"run_id": self.run["id"], "fingerprints": "a"}, {"run_id": self.run["id"], "options": {"framework": "pci"}},

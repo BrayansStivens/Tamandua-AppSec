@@ -19,7 +19,8 @@ from ..scanners import docker_available
 from ..scan_plan import plan as scan_plan
 from ..github_app import GitHubAppError
 from ..pdf_reports import render_pdf
-from ..audit_report import ReportError, render_audit_pdf, validate_options
+from ..audit_report import ReportError, render_audit_pdf, render_portfolio_pdf, validate_options
+from ..kinds import FULL_SCANS
 from ..store import _run_dir, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
 from ..store import render_repository_sarif, render_tickets
 from .core import VERSION, Request, route
@@ -139,9 +140,11 @@ def audit_report(request: Request):
     Mismo acceso que ver esa ejecución o ese activo. `fingerprints` acota el informe (uno, varios o los filtrados);
     sin él entran todos los del alcance."""
     payload = request.payload
-    if not isinstance(payload, dict) or not set(payload) <= {"run_id", "asset", "status", "fingerprints", "options"} \
-            or ("run_id" in payload) == ("asset" in payload):
-        return request.json(400, {"error": "Indica una ejecución o un activo"})
+    if not isinstance(payload, dict) or not set(payload) <= {"run_id", "asset", "account", "assets", "status", "fingerprints", "options"} \
+            or sum(key in payload for key in ("run_id", "asset", "account", "assets")) != 1:
+        return request.json(400, {"error": "Indica una ejecución, un activo, una organización o varios repositorios"})
+    if "account" in payload or "assets" in payload:
+        return _portfolio_report(request, payload)
     chosen = payload.get("fingerprints")
     if chosen is not None and (not isinstance(chosen, list) or len(chosen) > 5000
                                or not all(isinstance(item, str) and 0 < len(item) <= 128 for item in chosen)):
@@ -173,6 +176,60 @@ def audit_report(request: Request):
     except ReportError as exc:
         return request.json(400, {"error": str(exc)})
     request.log.info("audit_report", extra={"user": request.user["username"], "reason": f"{record['id']}: {len(findings)} hallazgos, {options['framework']}"})
+    return request.send(200, pdf, "application/pdf")
+
+
+def _portfolio_report(request: Request, payload: dict):
+    """Informe consolidado: una organización (con su cobertura frente a GitHub) o una selección de repositorios."""
+    rows = assets_overview(request.data_dir)
+    coverage: dict = {"total": None, "missing": []}
+    if "account" in payload:
+        account = payload["account"]
+        if not isinstance(account, str) or not account or len(account) > 100:
+            return request.json(400, {"error": "Organización inválida"})
+        prefix = f"{account.casefold()}/"
+        chosen = [row for row in rows if (row.get("name") or "").casefold().startswith(prefix)]
+        scope = f"Organización {account}"
+        # ¿Se analiza todo? Se contrasta con la lista real de la organización en la GitHub App.
+        from ..github_app import installation_info, installation_repositories
+        for installation in github_installations(request.data_dir):
+            try:
+                if (installation_info(installation).get("account") or "").casefold() != account.casefold():
+                    continue
+                names = [repo["name"] for repo in installation_repositories(installation) if not repo.get("archived")]
+            except GitHubAppError:
+                break
+            analysed = {(row.get("name") or "").casefold() for row in chosen}
+            coverage = {"total": len(names), "missing": sorted(name for name in names if name.casefold() not in analysed)}
+            break
+    else:
+        keys = payload["assets"]
+        if not isinstance(keys, list) or not 1 <= len(keys) <= 500 or not all(isinstance(key, str) and len(key) <= 200 for key in keys):
+            return request.json(400, {"error": "Elige entre 1 y 500 repositorios"})
+        wanted = set(keys)
+        chosen = [row for row in rows if row["key"] in wanted]
+        scope = f"{len(chosen)} repositorios"
+    if not chosen:
+        return request.json(404, {"error": "No hay repositorios analizados en ese alcance"})
+    status = payload.get("status", "all")
+    if status not in ("open", "all"):
+        return request.json(400, {"error": "Estado inválido"})
+    latest: dict[str, dict] = {}
+    for row in list_runs(request.data_dir):  # del más reciente al más antiguo
+        if row["type"] in FULL_SCANS:
+            from ..assets import asset_key
+            entry = latest.setdefault(asset_key(row), {"complete": None, "status": row["status"]})
+            if row["status"] == "completed" and entry["complete"] is None:
+                entry["complete"] = row["created_at"]
+    items = [{"name": row.get("name") or row["key"], "findings": findings_registry.view(request.data_dir, row["key"], status=status)["findings"],
+              "last_complete": (latest.get(row["key"]) or {}).get("complete"), "last_status": (latest.get(row["key"]) or {}).get("status")}
+             for row in chosen]
+    try:
+        options = validate_options(payload.get("options"), default_by=request.user.get("display_name") or request.user["username"])
+        pdf = render_portfolio_pdf(items, options, version=VERSION, scope_label=scope, coverage=coverage)
+    except ReportError as exc:
+        return request.json(400, {"error": str(exc)})
+    request.log.info("audit_report", extra={"user": request.user["username"], "reason": f"{scope}: {len(items)} repositorios, {options['framework']}"})
     return request.send(200, pdf, "application/pdf")
 
 
