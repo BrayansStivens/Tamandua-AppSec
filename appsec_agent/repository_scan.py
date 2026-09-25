@@ -348,6 +348,8 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             "source": source, "fixture": source["name"], "variant": "code", "context": declared,
             "steps": steps, "findings": findings,
             "owasp_coverage": coverage, "inventory": collect_inventory(root), "unused_dependencies": unused_dependencies(root),
+            # Paquetes con versión (de Trivy): la vigilancia diaria de avisos los contrasta sin reanalizar.
+            "dependencies": next((tool.get("packages") or [] for tool in tools if tool["tool"] == "trivy"), []),
             "summary": {"files": len(files), "dependencies": len(dependencies),
                                                     "candidates": len(findings), "sast": sast_count,
                                                     "secrets": secret_count, "sca": sum(item["scanner"] == "sca" for item in findings),

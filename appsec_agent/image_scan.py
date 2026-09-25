@@ -33,7 +33,7 @@ from . import data_sources, logging_setup
 from .advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
 from .coverage import owasp_coverage
 from .config_scanners import merge_image, run_checkov_image
-from .scanners import _pick_fixed, _result, _run, docker_available, parse_trivy, writable_cache
+from .scanners import _pick_fixed, _result, _run, docker_available, parse_trivy, trivy_packages, writable_cache
 
 _log = logging_setup.get("images")
 VAULT_NAME = "registries"
@@ -172,7 +172,7 @@ def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
     cache_dir = writable_cache(cache_dir)
     secrets = {"TRIVY_USERNAME": credentials["username"], "TRIVY_PASSWORD": credentials["token"]} if credentials else None
     try:
-        completed = _run("trivy", ["image", "--image-src", "remote", "--scanners", "vuln,secret",
+        completed = _run("trivy", ["image", "--image-src", "remote", "--scanners", "vuln,secret", "--list-all-pkgs",
                                    "--image-config-scanners", "misconfig,secret", "--cache-dir", "/cache", "--format", "json", "--quiet",
                                    "--timeout", "14m", reference], None, network=True, secret_env=secrets,
                          mounts=["-v", f"{_host(cache_dir)}:/cache"])
@@ -188,7 +188,7 @@ def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
     counts = {kind: sum(1 for item in findings if item["scanner"] == kind) for kind in ("sca", "iac", "secrets")}
     detail = (f"{counts['sca']} avisos en paquetes, {counts['iac']} problemas de configuración de la imagen y "
               f"{counts['secrets']} secretos en capas, variables de entorno o historial.")
-    return _result("trivy", "completed", detail, findings, started), metadata
+    return {**_result("trivy", "completed", detail, findings, started), "packages": trivy_packages(payload)}, metadata
 
 
 def _grype_finding(match: dict, feeds: dict) -> dict:
@@ -471,6 +471,7 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
             "source": {"id": image["asset"], "uid": None, "name": image["name"], "provider": "registry", "image": image_meta},
             "fixture": image["reference"], "variant": "image", "context": " ".join(str(context).split())[:400],
             "steps": steps, "findings": findings, "owasp_coverage": coverage,
+            "dependencies": trivy.get("packages") or [],
             "summary": {"files": 0, "dependencies": 0, "candidates": len(findings), "sast": 0, "secrets": secret_count,
                         "sca": sca_count, "iac": iac_count, "severities": severities, "priorities": priorities,
                         "kev": sum(1 for item in findings if item.get("kev")),

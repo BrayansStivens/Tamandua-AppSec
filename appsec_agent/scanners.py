@@ -520,6 +520,31 @@ def _trivy_secret(entry: dict, target: str) -> dict:
                  cwe=[798], owasp="A04:2025", confidence=8, digest=_stable("secrets", rule, target, str(line)))
 
 
+MAX_PACKAGES = 20_000
+
+
+def trivy_packages(payload: dict) -> list[dict]:
+    """Todos los paquetes de aplicación con su versión (no solo los vulnerables): con ellos se comprueban a diario
+    los avisos que se publiquen después, sin volver a analizar (ver advisory_watch). Los del sistema operativo
+    de una imagen no entran: sus avisos dependen de la versión de la distribución."""
+    packages, seen = [], set()
+    for result in payload.get("Results", []) or []:
+        if result.get("Class") != "lang-pkgs":
+            continue
+        ecosystem = str(result.get("Type") or "").lower()
+        target = _relative(str(result.get("Target", "")))
+        for item in result.get("Packages") or []:
+            name, version = str(item.get("Name") or ""), str(item.get("Version") or "")
+            key = (ecosystem, name, version, target)
+            if not name or not version or key in seen:
+                continue
+            seen.add(key)
+            packages.append({"ecosystem": ecosystem, "name": name, "version": version, "path": target})
+            if len(packages) >= MAX_PACKAGES:
+                return packages
+    return packages
+
+
 def parse_trivy(payload: dict, feeds: dict) -> list[dict]:
     findings = []
     for result in payload.get("Results", []) or []:
@@ -573,7 +598,7 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
               + f", {kinds['iac']} fallos de configuración, {kinds['secrets']} secretos.")
     if not feeds.get("kev") or not feeds.get("epss"):
         detail += " KEV/EPSS no disponibles; la prioridad usa solo CVSS."
-    return _result("trivy", "completed", detail, findings, started)
+    return {**_result("trivy", "completed", detail, findings, started), "packages": trivy_packages(payload)}
 
 
 # --- OSV-Scanner ---------------------------------------------------------------------

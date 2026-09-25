@@ -93,7 +93,8 @@ def apply(data_dir: Path, record: dict) -> dict:
             if entry is None:
                 entry = entries[digest] = {"first_seen": stamp, "first_run": record["id"],
                                            "origin": {"kind": "pr", "pr": pull.get("number"), "branch": pull.get("head_ref")}
-                                           if record["type"] == "pr_review" else {"kind": "scan"}}
+                                           if record["type"] == "pr_review" else {"kind": "advisory"}
+                                           if record["type"] == "advisory_watch" else {"kind": "scan"}}
                 opened += 1
             elif entry["status"] == "fixed":
                 opened += 1
@@ -117,7 +118,8 @@ def apply(data_dir: Path, record: dict) -> dict:
             if entry["status"] != "open" or digest in present or not complete:
                 continue
             origin = entry.get("origin") or {}
-            if record["type"] in FULL_SCANS and (origin.get("kind") == "scan" or origin.get("merged")):
+            # Un aviso nuevo afecta a la rama principal: el siguiente análisis completo sin él lo da por corregido.
+            if record["type"] in FULL_SCANS and (origin.get("kind") in ("scan", "advisory") or origin.get("merged")):
                 how = f"Ya no aparece en el escaneo completo del {stamp[:10]}"
             elif record["type"] == "pr_review" and origin.get("kind") == "pr" and origin.get("pr") == pull.get("number"):
                 how = f"Corregido en el commit {str(pull.get('head_sha') or '')[:7]} del PR #{pull.get('number')}"

@@ -24,6 +24,9 @@ def make_handler(data_dir: Path, *, watch_pull_requests: bool = False):
         Watcher(data_dir, state.jobs, lambda: github_installations(data_dir)).start()
         from ..cve_db import Syncer
         Syncer(data_dir).start()
+        # Una vez al día, las dependencias ya analizadas contra los avisos publicados después (sin conexión).
+        from ..advisory_watch import Watcher as AdvisoryWatcher
+        AdvisoryWatcher(data_dir).start()
     return build_handler(state)
 
 

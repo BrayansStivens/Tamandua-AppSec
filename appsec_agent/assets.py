@@ -167,7 +167,8 @@ def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
                                         "source_id": (row.get("source") or {}).get("id"), "scans": 0, "pr_reviews": 0,
                                         "last_activity": row["created_at"], "latest_scan": None,
                                         "removed_at": (registry.get(key) or {}).get("removed_at")})
-        entry["scans" if row["type"] in FULL_SCANS else "pr_reviews"] += 1
+        if row["type"] in FULL_SCANS or row["type"] == "pr_review":
+            entry["scans" if row["type"] in FULL_SCANS else "pr_reviews"] += 1
         if row["type"] in FULL_SCANS and entry["latest_scan"] is None and row["status"] in ("completed", "incomplete"):
             entry["latest_scan"] = {"run_id": row["id"], "created_at": row["created_at"], "status": row["status"]}
     from .findings_registry import summarize

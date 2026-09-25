@@ -100,6 +100,6 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
 
 function runOption(row: RunRow | Detail): ComboOption {
   const pull = (row as Detail).pull_request ?? (row as RunRow & { pull_request?: { number: number; title: string } }).pull_request
-  const kind = row.type === 'pr_review' ? `PR${pull ? ` #${pull.number}` : ''}` : 'Escaneo completo'
+  const kind = row.type === 'pr_review' ? `PR${pull ? ` #${pull.number}` : ''}` : row.type === 'advisory_watch' ? 'Avisos nuevos' : 'Escaneo completo'
   return { id: row.id, label: `${kind} · ${formatDate(row.created_at)}`, hint: `${statusLabel(row.status)} · ${plural(row.summary?.candidates ?? 0, 'hallazgo', 'hallazgos')}${pull?.title ? ` · ${pull.title}` : ''}` }
 }

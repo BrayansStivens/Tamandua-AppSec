@@ -40,6 +40,8 @@ services:
       # admins (por defecto): TOTP obligatorio para administradores · all: para todos · none: opcional
       APPSEC_AGENT_REQUIRE_TOTP: ${APPSEC_AGENT_REQUIRE_TOTP:-admins}
       APPSEC_AGENT_PR_POLL_SECONDS: ${APPSEC_AGENT_PR_POLL_SECONDS:-300}
+      APPSEC_AGENT_BRANCH_MIN_MINUTES: ${APPSEC_AGENT_BRANCH_MIN_MINUTES:-60}
+      APPSEC_AGENT_ADVISORY_WATCH_HOURS: ${APPSEC_AGENT_ADVISORY_WATCH_HOURS:-24}
       HOME: /home/appsec
     volumes:
       - ./data:/data

@@ -75,6 +75,10 @@ La página muestra, para cada CVE, severidad y CVSS, EPSS, si está en CISA KEV,
 
 **Pull requests** lista los PRs abiertos de cada repositorio de la GitHub App. Un administrador activa por repositorio **Vigilar PRs**, **Comentar y marcar el commit en GitHub** y el umbral de bloqueo (crítica, alta o superior —por defecto—, media o superior, o nunca). Sin webhooks, para que el servidor no tenga que ser accesible desde internet, un vigilante sondea cada `APPSEC_AGENT_PR_POLL_SECONDS` (300 s por defecto, mínimo 60) y encola una revisión por cada commit de cabeza nuevo; los borradores se saltan y **Revisar ahora** la lanza a mano.
 
+**Rama principal al día.** Con la vigilancia activa, el vigilante también mira el último commit de la rama principal: si cambió (un merge), reanaliza el repositorio entero, como mucho una vez cada `APPSEC_AGENT_BRANCH_MIN_MINUTES` (60 min) y solo con la cola casi vacía. Se puede desactivar por repositorio («Reanalizar la rama principal cuando cambie»).
+
+**Avisos nuevos sin reanalizar.** Cada análisis guarda sus dependencias con versión. Una vez al día (`APPSEC_AGENT_ADVISORY_WATCH_HOURS`) se contrastan con la base OSV actualizada usando OSV-Scanner **sin conexión**: se descargan los avisos, la lista de dependencias no sale del servidor. Lo que el registro no conocía se abre como una ejecución «Avisos nuevos» que solo añade: el siguiente análisis completo manda. Los paquetes del sistema operativo de las imágenes se revisan al reanalizarlas.
+
 La revisión escanea el commit de cabeza con los mismos motores y cuenta solo lo que el PR **introduce**:
 
 - un hallazgo de código o secreto cuenta si cae en una línea añadida o modificada del diff; uno de dependencias, si el PR toca el manifiesto que lo declara;

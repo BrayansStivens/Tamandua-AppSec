@@ -54,7 +54,16 @@ def compute(data_dir: Path, days: int = 30) -> dict:
     records = []
     decisions = load_triage(data_dir)
     triage_totals: Counter = Counter()
+    advisories: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
+        if row["type"] == "advisory_watch" and row["status"] == "completed":
+            # Avisos publicados después de un análisis: cuentan hasta que el siguiente análisis completo manda.
+            try:
+                record = annotate(data_dir, load_run(data_dir, row["id"]), decisions)
+                advisories[asset_key(record)].append(record)
+            except (ValueError, OSError):
+                pass
+            continue
         if row["type"] not in FULL_SCANS or row["status"] not in ("completed", "incomplete"):
             continue
         try:
@@ -86,6 +95,11 @@ def compute(data_dir: Path, days: int = 30) -> dict:
                 fixed.setdefault(digest, (first_seen[digest][0], record["created_at"]))
             seen_before |= set(current)
             if index == len(runs) - 1:
+                for later in advisories.get(key, []):
+                    if later["created_at"] > record["created_at"]:
+                        for item in later.get("findings", []):
+                            current.setdefault(item["fingerprint"], item)
+                            first_seen.setdefault(item["fingerprint"], (later["created_at"], item, asset))
                 triage_totals.update((item.get("triage") or {}).get("status", "open") for item in current.values())
                 current = {digest: item for digest, item in current.items() if is_active(item)}
                 open_findings.extend((asset, finding) for finding in current.values())
