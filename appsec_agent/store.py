@@ -315,11 +315,19 @@ def _sarif_suppression(finding: dict) -> dict:
     return {"suppressions": [{"kind": "external", "status": "accepted", "justification": justification[:500]}]}
 
 
+# SARIF 2.1.0: nivel del resultado y `security-severity` (0-10), que GitHub code scanning usa para ordenar y filtrar.
+SARIF_LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note", "info": "note"}
+SECURITY_SEVERITY = {"critical": "9.5", "high": "8.0", "medium": "5.5", "low": "3.0", "info": "0.0"}
+
+
 def render_repository_sarif(record: dict) -> dict:
+    from .api.core import VERSION
     findings = record["findings"]
-    rules = {item["rule_id"]: {"id": item["rule_id"], "shortDescription": {"text": item["title"]}}
+    rules = {item["rule_id"]: {"id": item["rule_id"], "shortDescription": {"text": item["title"]},
+                               "properties": {"security-severity": SECURITY_SEVERITY.get(item["severity"], "5.5"),
+                                              "tags": ["security", item["scanner"]]}}
              for item in findings}
-    results = [{"ruleId": item["rule_id"], "level": "warning", "message": {"text": item["reason"]},
+    results = [{"ruleId": item["rule_id"], "level": SARIF_LEVEL.get(item["severity"], "warning"), "message": {"text": item["reason"] or item["title"]},
                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": item["path"]},
                                                     "region": {"startLine": item["line"]}}}],
                 "partialFingerprints": {"appsecAgent/v1": item["fingerprint"]},
@@ -327,7 +335,8 @@ def render_repository_sarif(record: dict) -> dict:
                 "properties": {"verdict": "candidate", "scanner": item["scanner"], "cwe": item["cwe"],
                                "owasp": item["owasp"]}} for item in findings]
     return {"$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
-            "version": "2.1.0", "runs": [{"tool": {"driver": {"name": "Tamandua", "version": "0.3.0",
+            "version": "2.1.0", "runs": [{"tool": {"driver": {"name": "Tamandua", "version": VERSION,
+                                                     "informationUri": "https://github.com/BrayansStivens/appsec-agent",
                                                      "rules": list(rules.values())}}, "results": results}]}
 
 

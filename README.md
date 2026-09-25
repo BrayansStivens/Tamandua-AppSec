@@ -20,7 +20,7 @@ Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Con
 - **Informes** PDF paginados para hallazgos y amenazas (general, SOC 2 Tipo II e ISO/IEC 27001:2022), además de JSON, Markdown y SARIF; exportación a **Jira** sin duplicados.
 - **Equipo**: invitaciones, roles y segundo factor (TOTP).
 
-**En desarrollo** (se ven en gris en el panel y aún no dan resultados): pruebas dinámicas (DAST) de aplicaciones web y API sobre dominios verificados, GitLab, Bitbucket y Azure DevOps, y asistencia con IA opcional. También vendrán una API pública con tokens y un modo CLI para CI.
+**En desarrollo** (se ven en gris en el panel y aún no dan resultados): pruebas dinámicas (DAST) de aplicaciones web y API sobre dominios verificados, GitLab, Bitbucket y Azure DevOps, y asistencia con IA opcional. También vendrá una API pública con tokens. El análisis desde la terminal y en CI ya está: [docs/cli.md](docs/cli.md).
 
 ## Inicio rápido
 
@@ -52,6 +52,7 @@ Abre <http://127.0.0.1:8766> y:
 | [Funcionalidades](docs/funcionalidades.md) | Qué hace cada parte y con qué criterio |
 | [Arquitectura](docs/arquitectura.md) | Componentes, flujo de un análisis y datos en disco |
 | [Solución de problemas](docs/solucion-problemas.md) | Errores frecuentes |
+| [Terminal y CI](docs/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos para CI |
 | [Desarrollo](docs/desarrollo.md) | Sin contenedores, CLI y pruebas |
 
 ## Seguridad, en corto

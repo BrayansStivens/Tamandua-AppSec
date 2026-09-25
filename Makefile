@@ -9,6 +9,8 @@ PUBLIC_URL := $(shell sed -n 's/^APPSEC_AGENT_PUBLIC_URL=//p' .env 2>/dev/null |
 HOST_PORT := $(if $(PORT),$(PORT),8766)
 URL := $(if $(PUBLIC_URL),$(PUBLIC_URL),http://127.0.0.1:$(HOST_PORT))
 PYTHON ?= python3
+DIR ?=
+ARGS ?=
 VENV := .venv
 export APPSEC_VERSION := $(VERSION)
 # Grupo del socket de Docker en Linux y WSL con Docker nativo (en macOS, Docker Desktop usa el 0).
@@ -28,7 +30,7 @@ export DOCKER_SOCKET_GID
 ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' appsec_agent/scanners.py
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor setup build up down restart status logs ps setup-code engines update backup shell cli \
+.PHONY: help doctor setup build up down restart status logs ps setup-code engines scan update backup shell cli \
         clean purge dev-setup dev test lint web check
 
 ## —— Uso ———————————————————————————————————————————————————————————————
@@ -88,6 +90,10 @@ engines: ## Descarga las imágenes de los motores que falten (Trivy, OSV-Scanner
 	  echo "→ $${image%%@*}"; \
 	  docker pull "$$image" || { echo "Falló la descarga de $${image%%@*}: revisa la conexión y repite make engines."; exit 1; }; \
 	done; echo 'Motores: listos.'
+
+scan: ## Analiza una carpeta local: make scan DIR=../mi-repo ARGS="--base main --fail-on high"
+	@[ -d "$(DIR)" ] || { echo 'Indica la carpeta: make scan DIR=../mi-repo (y opciones en ARGS="--base main")'; exit 2; }
+	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro appsec python -m appsec_agent scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
 
 update: ## Actualiza el código (git pull) y reconstruye
 	git pull --ff-only

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import os
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -24,9 +25,35 @@ from .store import list_runs, save_repository_scan, save_run, save_scan
 DEFAULT_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "tenant-api-lab"
 
 
+def _scan_command(args) -> int:
+    from .local_scan import EXIT_ERROR, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, render_json, render_sarif, render_text, run
+
+    def progress(level: str, message: str) -> None:
+        # Progreso por la salida de errores: la estándar queda limpia para JSON o SARIF.
+        if not args.quiet:
+            print(f"{'!' if level in ('warn', 'error') else '·'} {message}", file=sys.stderr, flush=True)
+
+    try:
+        result = run(args.path, data_dir=args.data_dir, base=args.base, baseline=not args.no_baseline, name=args.name,
+                     fail_on=args.fail_on, allow_osv_upload=args.allow_osv_upload, progress=progress)
+    except (LocalScanError, OSError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+    rendered = {"text": render_text, "json": render_json, "sarif": render_sarif}[args.format](result)
+    if args.output:
+        args.output.write_text(rendered, encoding="utf-8")
+        if args.format != "text":
+            print(render_text(result), end="", file=sys.stderr)
+    else:
+        print(rendered, end="")
+    code = result["exit_code"]
+    return EXIT_OK if code == EXIT_INCOMPLETE and args.allow_incomplete else code
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="appsec-agent", description="Prototipo local de evaluación AppSec")
-    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="Directorio de artefactos locales")
+    parser.add_argument("--data-dir", type=Path, default=None,
+                        help="Directorio de artefactos locales (por defecto ./data; en `scan`, ~/.cache/tamandua)")
     commands = parser.add_subparsers(dest="command", required=True)
     verify = commands.add_parser("verify-fixture", help="Ejecutar los casos conocidos del laboratorio sintético")
     verify.add_argument("--fixture", type=Path, required=True)
@@ -39,6 +66,24 @@ def main(argv: list[str] | None = None) -> int:
     repository.add_argument("--source-id", required=True, help="ID devuelto por sources")
     repository.add_argument("--allow-osv-upload", action="store_true",
                             help="Autorizar el envío de nombres y versiones de dependencias a api.osv.dev")
+    local = commands.add_parser("scan", help="Analizar una carpeta local (terminal, pre-commit, CI)",
+                                description="Analiza una carpeta local sin ejecutar su código. Con --base solo informa de lo que "
+                                            "introduce el cambio. Salida: 0 pasa · 1 hay hallazgos del umbral o peores · "
+                                            "2 error de uso · 3 análisis incompleto.")
+    local.add_argument("path", nargs="?", type=Path, default=Path("."), help="Carpeta a analizar (por defecto, la actual)")
+    local.add_argument("--base", help="Rama o commit de partida (p. ej. main u origin/main): solo cuenta lo que introduce el cambio")
+    local.add_argument("--no-baseline", action="store_true",
+                       help="Con --base, no analizar el punto de partida: más rápido, pero cuenta todo lo que cae en líneas cambiadas")
+    local.add_argument("--fail-on", choices=("critical", "high", "medium", "low", "never"), default="high",
+                       help="Severidad desde la que falla (por defecto high)")
+    local.add_argument("--format", choices=("text", "json", "sarif"), default="text", help="Formato de salida (por defecto text)")
+    local.add_argument("--output", type=Path, help="Escribir el resultado en un archivo en lugar de la salida estándar")
+    local.add_argument("--allow-incomplete", action="store_true",
+                       help="No fallar si un motor no pudo ejecutarse (por defecto sale con 3: no equivale a limpio)")
+    local.add_argument("--allow-osv-upload", action="store_true",
+                       help="Autorizar consultas externas (nombres y versiones de dependencias a OSV y deps.dev)")
+    local.add_argument("--quiet", action="store_true", help="Sin mensajes de progreso en la salida de errores")
+    local.add_argument("--name", help="Nombre a mostrar (por defecto, el de la carpeta; útil dentro de un contenedor)")
     image = commands.add_parser("scan-image", help="Analizar una imagen de contenedor desde su registro, sin ejecutarla")
     image.add_argument("--reference", required=True, help="registro/repositorio:etiqueta, p. ej. ghcr.io/acme/api:1.4")
     commands.add_parser("providers", help="Mostrar qué proveedores de IA tienen credencial en el servidor")
@@ -67,6 +112,12 @@ def main(argv: list[str] | None = None) -> int:
     panel.add_argument("--port", type=int, default=8766)
     panel.add_argument("--bind", default=None, help="Interfaz de escucha; por defecto 127.0.0.1 (o APPSEC_AGENT_BIND)")
     args = parser.parse_args(argv)
+    if args.command == "scan":
+        # Se ejecuta dentro del repositorio del usuario: sus datos (y la caché de avisos) no van a parar a él.
+        args.data_dir = args.data_dir or (Path(os.environ["APPSEC_AGENT_DATA_DIR"]) if os.environ.get("APPSEC_AGENT_DATA_DIR")
+                                          else Path.home() / ".cache" / "tamandua")
+        return _scan_command(args)
+    args.data_dir = args.data_dir or Path("data")
     try:
         if args.command == "verify-fixture":
             record = save_run(args.data_dir, verify_fixture(args.fixture))

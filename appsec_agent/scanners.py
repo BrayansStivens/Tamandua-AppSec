@@ -381,6 +381,18 @@ def minified_files(snapshot: Path, limit: int = 200) -> list[str]:
     return found
 
 
+def _rules_for(snapshot: Path) -> Path:
+    """Las reglas tal como puede montarlas el motor. Con compose vienen montadas del host; lanzada la app
+    con `docker run` (CI) están solo dentro de su imagen, y el motor —un contenedor hermano— no las vería.
+    En ese caso se copian junto al snapshot, que sí está en la carpeta de datos montada."""
+    if not in_container() or any(Path(inside).resolve() == RULES_DIR.resolve() for inside, _ in _host_pairs()):
+        return RULES_DIR
+    target = snapshot.parent / "opengrep-rules"
+    if not target.exists():
+        shutil.copytree(RULES_DIR, target)
+    return target
+
+
 def run_opengrep(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():
@@ -396,7 +408,11 @@ def run_opengrep(snapshot: Path) -> dict:
     excludes = [part for path in compiled for part in ("--exclude", path)]
     try:
         completed = _run("opengrep", ["scan", "--config", "/rules", "--json", "--quiet", *excludes, "/src"], snapshot,
-                         mounts=["-v", f"{host_path(RULES_DIR)}:/rules:ro"])
+                         mounts=["-v", f"{host_path(_rules_for(snapshot))}:/rules:ro"])
+        # 0: sin hallazgos · 1: con hallazgos. Otro código (2 fatal, 7 configuración inválida…) es que no analizó:
+        # contarlo como «0 candidatos» sería un falso limpio.
+        if completed.returncode not in (0, 1):
+            return _result("opengrep", "inconclusive", with_cause(f"Opengrep terminó con error (código {completed.returncode}); el SAST no concluyó", completed), started=started)
         payload = json.loads(completed.stdout or "{}")
     except subprocess.TimeoutExpired:
         return _result("opengrep", "inconclusive", "Opengrep superó el tiempo máximo; el SAST no concluyó.", started=started)

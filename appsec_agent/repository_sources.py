@@ -485,42 +485,49 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
     return stats
 
 
+def snapshot_directory(source: Path, destination: Path) -> dict:
+    """Copia de solo lectura de una carpeta local con los mismos filtros que un repositorio remoto.
+
+    Sin enlaces simbólicos (no se sale de la carpeta), sin lo que ignora el análisis y con los
+    mismos límites: código hasta 2 MB por archivo, manifiestos y lockfiles hasta 64 MB."""
+    total = count = skipped = 0
+    truncated = False
+    for directory, folders, filenames in os.walk(source, followlinks=False):
+        folders[:] = [folder for folder in folders if folder not in IGNORED
+                      and (not folder.startswith(".") or _dot_allowed(folder, last=False))
+                      and not (Path(directory) / folder).is_symlink()]
+        for filename in filenames:
+            path = Path(directory) / filename
+            if path.is_symlink() or not path.is_file() or (filename.startswith(".") and filename != ".env.example"
+                                                                    and not _dot_allowed(filename, last=True)):
+                continue
+            relative = path.relative_to(source)
+            size = path.stat().st_size
+            if not _analyzable(relative) or size > (MAX_MANIFEST if is_manifest(relative) else MAX_FILE):
+                skipped += 1
+                continue
+            if count >= MAX_FILES or total + size > MAX_TOTAL:
+                skipped += 1
+                truncated = True
+                continue
+            target = destination / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            content = path.read_bytes()
+            target.write_bytes(content)
+            total += len(content)
+            count += 1
+    return {"files": count, "bytes": total, "skipped": skipped, "truncated": truncated}
+
+
 def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | None = None,
                     installation_id: int | None = None, ref: str | None = None, progress=None) -> tuple[Path, dict]:
     """Snapshot de solo lectura. `ref` fija un commit concreto (revisión de un PR); solo GitHub."""
     if ref is not None and (not re.fullmatch(r"[0-9a-f]{40}", ref) or not source_id.startswith("github:")):
         raise SourceError("Commit inválido")
     if source_id == "local:appsec-agent":
-        source = WORKSPACE
-        total = count = skipped = 0
-        truncated = False
-        for directory, folders, filenames in os.walk(source, followlinks=False):
-            folders[:] = [folder for folder in folders if folder not in IGNORED
-                          and (not folder.startswith(".") or _dot_allowed(folder, last=False))
-                          and not (Path(directory) / folder).is_symlink()]
-            for filename in filenames:
-                path = Path(directory) / filename
-                if path.is_symlink() or not path.is_file() or (filename.startswith(".") and filename != ".env.example"
-                                                                        and not _dot_allowed(filename, last=True)):
-                    continue
-                relative = path.relative_to(source)
-                size = path.stat().st_size
-                if not _analyzable(relative) or size > MAX_FILE:
-                    skipped += 1
-                    continue
-                if count >= MAX_FILES or total + size > MAX_TOTAL:
-                    skipped += 1
-                    truncated = True
-                    continue
-                target = destination / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                content = path.read_bytes()
-                target.write_bytes(content)
-                total += len(content)
-                count += 1
+        stats = snapshot_directory(WORKSPACE, destination)
         return destination, {"id": source_id, "name": "appsec-agent · código propio", "provider": "local",
-                             "files": count, "snapshot": {"files": count, "bytes": total, "skipped": skipped,
-                                                          "truncated": truncated}}
+                             "files": stats["files"], "snapshot": stats}
     if not re.fullmatch(r"(?:github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+|gitlab:[0-9]+)", source_id):
         raise SourceError("Repositorio inválido")
     provider = source_id.partition(":")[0]

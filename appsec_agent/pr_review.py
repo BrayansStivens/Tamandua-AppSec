@@ -80,7 +80,7 @@ def verdict(introduced: list[dict], gate: str = "high") -> dict:
     else:
         limit = SEVERITY_ORDER.index(gate)
         blocking = sum(count for level, count in counts.items() if SEVERITY_ORDER.index(level) <= limit)
-    label = {"critical": "crítica", "high": "alta o superior", "medium": "media o superior"}.get(gate, gate)
+    label = {"critical": "crítica", "high": "alta o superior", "medium": "media o superior", "low": "baja o superior"}.get(gate, gate)
     if blocking:
         description = f"{blocking} {'hallazgo nuevo' if blocking == 1 else 'hallazgos nuevos'} de severidad {label}"
     elif introduced:
