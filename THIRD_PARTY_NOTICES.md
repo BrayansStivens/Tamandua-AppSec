@@ -41,10 +41,60 @@ Se consultan en tiempo de análisis; no se redistribuyen dentro de Tamandua.
 | [NVD](https://nvd.nist.gov) (API 2.0) | CVSS y descripciones | Dominio público (Gobierno de EE. UU.) | «This product uses data from the NVD API but is not endorsed or certified by the NVD.» |
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Explotación activa conocida | Dominio público (Gobierno de EE. UU.) | Citar CISA |
 | [EPSS](https://www.first.org/epss/) | Probabilidad de explotación | Uso libre con atribución (FIRST) | «EPSS: FIRST.org» |
-| Bases de Trivy y Grype (`trivy-db`, `grype-db`) | Descargadas por cada motor | Código Apache-2.0; los datos agregan fuentes con términos propios (distribuciones, GitLab, etc.) | **Pendiente**: revisar fuente por fuente antes de operar el servicio gestionado |
+| Bases de Trivy y Grype (`trivy-db`, `grype-db`) | Descargadas por cada motor | Código Apache-2.0; las bases no declaran licencia propia y agregan fuentes con términos distintos | Ver la sección siguiente |
 
 Los informes de Tamandua muestran los identificadores (CVE, GHSA) y enlazan a la fuente; la descripción
 íntegra de cada aviso se conserva con su referencia.
+
+## Datos que agregan `trivy-db` y `grype-db`
+
+Revisado el 2026-09-25 fuente por fuente: la URL exacta en el código de `aquasecurity/trivy-db`,
+`aquasecurity/vuln-list-update` y `anchore/vunnel`, y la licencia en el origen de cada una. Tamandua no
+redistribuye estas bases: cada motor las descarga en la instalación que lo ejecuta. Aun así, al ofrecer
+Tamandua como servicio, los resultados derivados de ellas se muestran a clientes.
+
+**Incompatibles con un servicio de pago tal cual:**
+
+| Fuente | Licencia | Por qué |
+|---|---|---|
+| Wolfi (`packages.wolfi.dev`) y Chainguard (`packages.cgr.dev`, `advisories.cgr.dev`, `libraries.cgr.dev`) | CC BY-NC-ND 4.0, o la *Chainguard License for Commercial Scanners* | Prohíbe el uso comercial y las obras derivadas. La licencia para escáneres excluye el uso «for the benefit of a Competitor of Chainguard» y su redistribución dentro de otra oferta |
+| Minimus (`packages.mini.dev`) | CC BY-NC-ND 4.0, sin excepción | Prohíbe el uso comercial y las obras derivadas |
+
+**Ambiguas o sin licencia declarada** (no conceden derechos de forma expresa):
+
+- Amazon Linux ALAS: los términos del sitio de AWS excluyen «resale or commercial use» salvo licencia aparte.
+- Echo (sus términos prohíben copiar y el acceso automatizado al sitio) y RapidFort (repositorio sin licencia).
+- Root.io, Seal, SecureOS, Debian, Arch Linux, Oracle Linux (solo copyright), Photon, Bottlerocket, Fedora y
+  el Ubuntu CVE Tracker que usa Trivy.
+- ruby-advisory-db: dominio público, salvo el contenido de OSVDB, cuya licencia es no comercial. Trivy
+  descarta los avisos que solo tienen identificador OSVDB.
+
+**Compatibles con atribución:**
+
+| Licencia | Fuentes | Obligación |
+|---|---|---|
+| CC BY-SA 4.0 | Alpine secdb; avisos de Ubuntu que usa Grype (`canonical/ubuntu-security-notices`) | Atribuir, y compartir bajo la misma licencia el material adaptado de estos avisos |
+| CC BY 4.0 | Red Hat (CSAF/VEX, también Hummingbird), SUSE, GitHub Advisory Database, Go, Julia, Kubernetes | Atribuir, enlazar la licencia e indicar si se modificó |
+| CC0 / dominio público / Unlicense | CISA KEV, NVD (con su aviso), FriendsOfPHP, RustSec | NVD: «This product uses the NVD API but is not endorsed or certified by the NVD.» |
+| MIT / Apache-2.0 / BSD | GitLab Advisory Database *community* (MIT, 30 días de retraso), Node.js security WG, Azure Linux, AlmaLinux OSV, Bitnami, endoflife.date, Rocky (BSD) | Conservar el aviso |
+| Sin licencia, uso libre solicitado | EPSS (FIRST pide atribución) | Citar FIRST |
+
+**Descarga de las bases:** `trivy-db` se sirve desde `mirror.gcr.io` y `ghcr.io/aquasecurity/trivy-db` y la base
+de Grype desde `grype.anchore.io`. Ninguna declara términos de uso, pero dependen de una infraestructura
+gratuita con límites compartidos, y Aqua recomienda a los usos empresariales alojar su propia copia.
+
+**Qué hacer antes de operar el servicio gestionado:**
+
+1. Construir y alojar copias propias de `trivy-db` y de la base de Grype **sin** las fuentes de Wolfi, Chainguard y
+   Minimus, o conseguir licencia de esas empresas. Mientras tanto, las imágenes basadas en esas distribuciones
+   no se analizan en el servicio de pago.
+2. Decidir las fuentes ambiguas (Amazon en primer lugar) pidiendo permiso o excluyéndolas.
+3. Mostrar en los informes y en el panel la fuente de cada aviso (Trivy la da en `DataSource`, Grype en
+   `dataSource`) y publicar una página de atribuciones de datos.
+
+En la edición community autoalojada, cada organización ejecuta Trivy y Grype con sus bases como cualquier otro
+usuario de esas herramientas, y los términos de cada fuente le aplican directamente. Esto es un análisis
+técnico, no asesoría legal.
 
 ## Dependencias de la aplicación
 
@@ -71,7 +121,7 @@ el CSS y no se distribuye.
 - **La AGPL-3.0 de Tamandua** obliga a ofrecer el código fuente de la versión que se ejecuta a quien la usa por
   red. Las funciones de la edición comercial que no sean AGPL deben vivir fuera de este repositorio; el CLA
   (`CLA.md`) permite al titular distribuir las contribuciones también bajo licencia comercial.
-- **Los motores y las bases** permiten el uso como servicio con las atribuciones de arriba. Queda pendiente
-  revisar los términos de los datos que agregan `trivy-db` y `grype-db`.
+- **Los motores** permiten el uso como servicio. **Los datos**, no todos: ver «Datos que agregan `trivy-db` y
+  `grype-db`» (Wolfi, Chainguard y Minimus son no comerciales).
 - **Modelos de IA**: los términos comerciales del proveedor que se use rigen el reenvío de consumo a clientes.
   Hay que revisarlos antes de revenderlo.
