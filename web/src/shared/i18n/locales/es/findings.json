@@ -128,7 +128,7 @@
     "sbom": "SBOM · CycloneDX 1.6",
     "sarif": "SARIF (code scanning)",
     "audit_group": "Auditoría",
-    "audit": "Evidencia para auditoría (SOC 2, ISO, PCI, CRA…)…",
+    "audit": "Evidencia para auditoría (SOC 2, ISO, PCI…)…",
     "compliance": "Cumplimiento",
     "data": "Datos",
     "vex": "VEX · OpenVEX (desde el triage)",

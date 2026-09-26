@@ -36,8 +36,16 @@
       "audit": "Audit evidence",
       "audit_hint": "PDF · {{framework}}: scope, controls and every finding",
       "portfolio": "Consolidated audit evidence",
-      "portfolio_hint": "PDF · {{framework}}: every analyzed asset, its coverage and open risk"
-    }
+      "portfolio_hint": "PDF · {{framework}}: every analyzed asset, its coverage and open risk",
+      "portfolio_sbom": "Portfolio SBOM",
+      "portfolio_sbom_hint": "CycloneDX · every asset with a completed full scan, each with its own packages",
+      "portfolio_vex": "Portfolio VEX",
+      "portfolio_vex_hint": "OpenVEX · your triage decisions on those same assets",
+      "portfolio_missing": "Needs at least one asset with a completed full scan"
+    },
+    "portfolio_sbom_hint": "CycloneDX · components and versions of every asset with a completed full scan",
+    "portfolio_vex_hint": "OpenVEX · your triage of every asset with a completed full scan",
+    "portfolio_missing": "Needs a completed full scan"
   },
   "cra": {
     "title": "EU Cyber Resilience Act (CRA) · vulnerability reporting",

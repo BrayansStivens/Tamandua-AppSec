@@ -25,6 +25,10 @@ SPEC = "1.6"
 TOOL_URL = "https://github.com/BrayansStivens/appsec-agent"
 
 
+def _stamp(now: datetime | None) -> str:
+    return (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def root_ref(record: dict) -> str:
     """Identificador estable del producto analizado, para el SBOM y para el VEX."""
     source = record.get("source") or {}
@@ -39,12 +43,16 @@ def _root(record: dict) -> dict:
     source = record.get("source") or {}
     image = source.get("image") or {}
     component = {"type": "container" if image else "application", "bom-ref": root_ref(record), "name": str(source.get("name") or "producto")}
-    version = image.get("resolved_digest") or (record.get("pull_request") or {}).get("head_sha")
+    version = image.get("resolved_digest") or (record.get("pull_request") or {}).get("head_sha") or source.get("commit")
     if version:
         component["version"] = str(version)
     if source.get("sha256"):
         # Huella de la instantánea analizada (el árbol de archivos), no de un binario publicado.
         component["hashes"] = [{"alg": "SHA-256", "content": source["sha256"]}]
+    identity = [("tamandua:uid", source.get("uid")), ("tamandua:image", image.get("reference")),
+                ("tamandua:branch", source.get("branch")), ("tamandua:commit", source.get("commit"))]
+    if any(value for _, value in identity):
+        component["properties"] = [{"name": name, "value": str(value)} for name, value in identity if value]
     return component
 
 
@@ -110,7 +118,7 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale
     # Sin información de relación (análisis antiguos o imágenes), el producto depende de todo lo inventariado.
     depends_on = direct if known_relation else list(components)
     gaps = coverage_gaps(record.get("steps") or [], locale=locale)
-    stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    stamp = _stamp(now)
     scanned = record.get("finished_at") or record.get("created_at")
     return {
         "$schema": f"http://cyclonedx.org/schema/bom-{SPEC}.schema.json", "bomFormat": "CycloneDX", "specVersion": SPEC,
@@ -149,3 +157,66 @@ def latest_scan(data_dir: Path, key: str) -> dict | None:
             except (ValueError, OSError):
                 return None
     return None
+
+
+# A portfolio SBOM or VEX holds at most this many assets and packages; past it the document says what was left out.
+PORTFOLIO_ASSETS = 200
+PORTFOLIO_COMPONENTS = 20_000
+
+
+def portfolio(assets: list[dict], *, total: int, name: str, version: str, now: datetime | None = None,
+              locale: str | None = None) -> dict:
+    """One SBOM for several assets (`{"key", "ref", "scan"}`, `ref` unique): each asset is a top-level component with
+    its packages nested and linked through `dependencies`, built with `cyclonedx()`. Nothing is deduplicated across
+    assets, so bom-refs get the asset's ref as prefix. `total` counts every asset with a complete scan."""
+    locale = locale or default_locale()
+    root = {"type": "application", "bom-ref": "urn:tamandua:portfolio", "name": name}
+    components, graph, partial, phases = [], [], [], set()
+    budget, kept_total, cut = PORTFOLIO_COMPONENTS, 0, False
+    for asset in assets:
+        if budget <= 0:
+            break
+        document = cyclonedx(asset["scan"], version=version, now=now, locale=locale)
+        ref, packages = asset["ref"], document["components"]
+        kept = packages[:budget]
+        budget -= len(kept)
+        kept_total += len(kept)
+        refs = {package["bom-ref"] for package in kept}
+        own = document["metadata"]["component"]
+        properties = [*own.get("properties", []), {"name": "tamandua:asset", "value": asset["key"]}, *document["metadata"]["properties"]]
+        if len(kept) < len(packages):
+            cut = True
+            properties.append({"name": "tamandua:truncated",
+                               "value": t("compliance.sbom.asset_truncated", locale, shown=len(kept), total=len(packages))})
+        component = {**own, "bom-ref": ref, "properties": properties}
+        if kept:
+            component["components"] = [{**package, "bom-ref": f"{ref}|{package['bom-ref']}"} for package in kept]
+        components.append(component)
+        graph.append({"ref": ref, "dependsOn": [f"{ref}|{item}" for item in document["dependencies"][0]["dependsOn"] if item in refs]})
+        phases.update(phase["phase"] for phase in document["metadata"]["lifecycles"])
+        if len(kept) < len(packages) or document.get("compositions"):
+            partial.append(ref)
+    missing = total - len(components)
+    notes = [{"name": "tamandua:assets", "value": str(len(components))}, {"name": "tamandua:components", "value": str(kept_total)}]
+    if missing > 0:
+        notes.append({"name": "tamandua:truncated", "value": t("compliance.sbom.portfolio_truncated", locale, shown=len(components), total=total,
+                                                             max_assets=PORTFOLIO_ASSETS, max_components=PORTFOLIO_COMPONENTS)})
+    elif cut:
+        notes.append({"name": "tamandua:truncated", "value": t("compliance.sbom.components_truncated", locale, max_components=PORTFOLIO_COMPONENTS)})
+    incomplete = partial + ([root["bom-ref"]] if missing > 0 else [])
+    return {
+        "$schema": f"http://cyclonedx.org/schema/bom-{SPEC}.schema.json", "bomFormat": "CycloneDX", "specVersion": SPEC,
+        "serialNumber": f"urn:uuid:{uuid.uuid4()}", "version": 1,
+        "metadata": {
+            "timestamp": _stamp(now),
+            "lifecycles": [{"phase": phase} for phase in sorted(phases)],
+            "tools": {"components": [{"type": "application", "name": "Tamandua", "version": version,
+                                      "externalReferences": [{"type": "website", "url": TOOL_URL}]}]},
+            "authors": [{"name": "Tamandua"}],
+            "component": root,
+            "properties": [*notes, {"name": "tamandua:origin", "value": t("compliance.sbom.origin_portfolio", locale)}],
+        },
+        "components": components,
+        "dependencies": [{"ref": root["bom-ref"], "dependsOn": [item["bom-ref"] for item in components]}, *graph],
+        **({"compositions": [{"aggregate": "incomplete", "assemblies": incomplete}]} if incomplete else {}),
+    }

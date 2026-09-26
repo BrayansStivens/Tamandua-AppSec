@@ -18,7 +18,8 @@ from tamandua.modules.intel.advisories import dependency_finding
 from tamandua.shared.i18n import localize, text
 from tamandua.modules.reporting.audit import FRAMEWORKS, render_audit_pdf, validate_options
 from tamandua.modules.identity.auth import Users
-from tamandua.modules.runs.store import save_repository_scan
+from tamandua.modules.runs.store import list_runs, load_run, save_repository_scan
+import asgi
 from test_auth import ORIGIN, PASSWORD, HttpCase
 from test_cve_db import nvd_entry
 from test_dashboard import _finding, _scan
@@ -53,14 +54,18 @@ class MaliciousTests(unittest.TestCase):
         self.assertTrue(action(groups[0], short=True).startswith("Eliminar event-stream 3.3.6"))
 
 
+def acme_record():
+    findings = [_finding("a" * 64, "critical", package="lodash"), _finding("b" * 64, "high", package="minimist")]
+    return {"id": "r1", "type": "repository_scan", "created_at": "2026-09-20T00:00:00+00:00",
+            "source": {"id": "github:acme/api", "name": "acme/api", "provider": "github", "sha256": "f" * 64},
+            "dependencies": [dependency("lodash", "4.17.20", purl="pkg:npm/lodash@4.17.20", licenses=["MIT"], direct=True),
+                             dependency("left-pad", "1.3.0", direct=False)],
+            "findings": findings}
+
+
 class SbomAndVexTests(unittest.TestCase):
     def record(self):
-        findings = [_finding("a" * 64, "critical", package="lodash"), _finding("b" * 64, "high", package="minimist")]
-        return {"id": "r1", "type": "repository_scan", "created_at": "2026-09-20T00:00:00+00:00",
-                "source": {"id": "github:acme/api", "name": "acme/api", "provider": "github", "sha256": "f" * 64},
-                "dependencies": [dependency("lodash", "4.17.20", purl="pkg:npm/lodash@4.17.20", licenses=["MIT"], direct=True),
-                                 dependency("left-pad", "1.3.0", direct=False)],
-                "findings": findings}
+        return acme_record()
 
     def test_cyclonedx_uses_inventory_and_fills_gaps_from_findings(self):
         document = sbom.cyclonedx(self.record(), version="0.9", now=NOW)
@@ -107,6 +112,108 @@ class SbomAndVexTests(unittest.TestCase):
         self.assertEqual(first["impact_statement"], "La función vulnerable no se usa")
         self.assertIn("hasta 2026-12-01", second["action_statement"])
         self.assertEqual(first["products"][0]["subcomponents"][0]["@id"], "pkg:npm/lodash@1.0.0")
+
+
+def assert_cyclonedx(case, document):
+    """The CycloneDX 1.6 JSON shape Tamandua relies on (no schema validator in the test dependencies): required
+    fields, unique bom-refs across nested components, and every dependency or composition ref pointing to one."""
+    case.assertEqual((document["bomFormat"], document["specVersion"], document["version"]), ("CycloneDX", "1.6", 1))
+    case.assertRegex(document["serialNumber"], r"^urn:uuid:[0-9a-f-]{36}$")
+    refs = [document["metadata"]["component"]["bom-ref"]]
+
+    def walk(components):
+        for component in components:
+            case.assertIn(component["type"], ("application", "container", "library"))
+            case.assertTrue(component["name"])
+            refs.append(component["bom-ref"])
+            walk(component.get("components") or [])
+    walk(document["components"])
+    case.assertEqual(len(refs), len(set(refs)), "bom-refs must be unique")
+    for entry in document["dependencies"]:
+        case.assertIn(entry["ref"], refs)
+        case.assertTrue(set(entry["dependsOn"]) <= set(refs), entry)
+    for composition in document.get("compositions") or []:
+        case.assertTrue(set(composition["assemblies"]) <= set(refs))
+    for prop in [*document["metadata"].get("properties", []), *(p for c in document["components"] for p in c.get("properties", []))]:
+        case.assertEqual(set(prop), {"name", "value"})
+        case.assertIsInstance(prop["value"], str)
+
+
+def assert_openvex(case, document):
+    case.assertEqual(document["@context"], "https://openvex.dev/ns/v0.2.0")
+    case.assertRegex(document["@id"], r"^urn:uuid:")
+    for statement in document["statements"]:
+        case.assertIn(statement["status"], ("not_affected", "affected", "fixed", "under_investigation"))
+        case.assertTrue(statement["vulnerability"]["name"] and statement["products"][0]["@id"])
+        if statement["status"] == "not_affected":
+            case.assertTrue(statement.get("impact_statement") or statement.get("justification"))
+        if statement["status"] == "affected":
+            case.assertTrue(statement.get("action_statement"))
+
+
+class PortfolioSbomAndVexTests(unittest.TestCase):
+    def assets(self):
+        api = acme_record()
+        api["source"] = {**api["source"], "uid": "github#1", "branch": "main", "commit": "c" * 40}
+        image = {"id": "i1", "type": "image_scan", "source": {"id": "image:nginx", "name": "nginx", "provider": "registry",
+                                                             "image": {"reference": "nginx:1.21", "resolved_digest": "sha256:abc"}},
+                 "dependencies": [dependency("lodash", "4.17.20", purl="pkg:npm/lodash@4.17.20")],
+                 "system_packages": [{"ecosystem": "debian", "name": "libc6", "version": "2.31-13"}], "findings": [],
+                 "steps": [{"name": "Grype", "status": "failed", "tool": {"name": "grype"}}]}
+        return [{"key": "github#1", "ref": sbom.root_ref(api), "scan": api}, {"key": "image:nginx", "ref": sbom.root_ref(image), "scan": image}]
+
+    def test_each_asset_is_a_parent_with_its_own_packages_and_nothing_is_deduplicated(self):
+        document = sbom.portfolio(self.assets(), total=2, name="Acme", version="0.9", now=NOW, locale="en")
+        assert_cyclonedx(self, document)
+        self.assertEqual(document["metadata"]["component"]["name"], "Acme")
+        self.assertEqual(document["metadata"]["tools"]["components"][0]["version"], "0.9")
+        api, image = document["components"]
+        self.assertEqual((api["type"], api["bom-ref"], api["version"]), ("application", "pkg:github/acme/api", "c" * 40))
+        identity = {prop["name"]: prop["value"] for prop in api["properties"]}
+        self.assertEqual((identity["tamandua:uid"], identity["tamandua:branch"], identity["tamandua:asset"], identity["tamandua:run"]),
+                         ("github#1", "main", "github#1", "r1"))
+        self.assertEqual((image["type"], image["bom-ref"], image["version"]), ("container", "oci:nginx:1.21", "sha256:abc"))
+        # The same package in two assets is two entries, each under its parent, with the plain purl kept.
+        lodash = [(parent["bom-ref"], child) for parent in (api, image) for child in parent["components"] if child["purl"] == "pkg:npm/lodash@4.17.20"]
+        self.assertEqual([child["bom-ref"] for _, child in lodash], ["pkg:github/acme/api|pkg:npm/lodash@4.17.20", "oci:nginx:1.21|pkg:npm/lodash@4.17.20"])
+        graph = {entry["ref"]: entry["dependsOn"] for entry in document["dependencies"]}
+        self.assertEqual(graph["urn:tamandua:portfolio"], ["pkg:github/acme/api", "oci:nginx:1.21"])
+        self.assertIn("pkg:github/acme/api|pkg:npm/lodash@4.17.20", graph["pkg:github/acme/api"])
+        self.assertNotIn("pkg:github/acme/api|pkg:npm/left-pad@1.3.0", graph["pkg:github/acme/api"])  # transitive, as in the per-asset SBOM
+        self.assertEqual(set(graph["oci:nginx:1.21"]), {child["bom-ref"] for child in image["components"]})
+        # The image scan had an engine fail: that asset (only) is declared incomplete; nothing was truncated.
+        self.assertEqual(document["compositions"], [{"aggregate": "incomplete", "assemblies": ["oci:nginx:1.21"]}])
+        self.assertNotIn("tamandua:truncated", {prop["name"] for prop in document["metadata"]["properties"]})
+        self.assertEqual({phase["phase"] for phase in document["metadata"]["lifecycles"]}, {"pre-build", "post-build"})
+
+    def test_past_the_limits_the_document_says_what_was_left_out(self):
+        with patch.object(sbom, "PORTFOLIO_COMPONENTS", 3):
+            document = sbom.portfolio(self.assets(), total=5, name="Acme", version="0.9", now=NOW, locale="en")
+        assert_cyclonedx(self, document)
+        (api,) = document["components"]  # the image didn't fit
+        self.assertEqual(len(api["components"]), 3)
+        self.assertIn("Only 3 of 4 components", {prop["name"]: prop["value"] for prop in api["properties"]}["tamandua:truncated"])
+        notes = {prop["name"]: prop["value"] for prop in document["metadata"]["properties"]}
+        self.assertEqual((notes["tamandua:assets"], notes["tamandua:components"]), ("1", "3"))
+        self.assertIn("1 of 5 assets", notes["tamandua:truncated"])
+        self.assertEqual(document["compositions"], [{"aggregate": "incomplete", "assemblies": ["pkg:github/acme/api", "urn:tamandua:portfolio"]}])
+
+    def test_portfolio_vex_keeps_each_statement_on_its_asset(self):
+        first, second = acme_record(), {**acme_record(), "findings": [_finding("c" * 64, "high", package="qs")]}
+        first["findings"][0]["triage"] = {"status": "false_positive", "reason": "No se usa", "at": "2026-09-21T00:00:00+00:00"}
+        document = vex.portfolio([("pkg:github/acme/api", first), ("oci:nginx:1.21", second)], total=2, version="0.9", now=NOW, locale="en")
+        assert_openvex(self, document)
+        products = [(statement["products"][0]["@id"], statement["products"][0]["subcomponents"][0]["@id"]) for statement in document["statements"]]
+        self.assertEqual(products, [("pkg:github/acme/api", "pkg:npm/lodash@1.0.0"), ("pkg:github/acme/api", "pkg:npm/minimist@1.0.0"),
+                                    ("oci:nginx:1.21", "pkg:npm/qs@1.0.0")])
+        self.assertEqual(document["statements"][0]["products"][0]["identifiers"], {"purl": "pkg:github/acme/api"})
+        self.assertNotIn("identifiers", document["statements"][2]["products"][0])
+        self.assertEqual(document["tooling"], "Tamandua 0.9")
+        partial = vex.portfolio([("pkg:github/acme/api", first)], total=3, version="0.9", now=NOW, locale="en")
+        self.assertIn("1 of 3 assets", partial["tooling"])
+        with patch.object(vex, "PORTFOLIO_STATEMENTS", 1):
+            capped = vex.portfolio([("pkg:github/acme/api", first)], total=1, version="0.9", now=NOW, locale="en")
+        self.assertEqual((len(capped["statements"]), "partial" in capped["tooling"]), (1, True))
 
 
 class ExportRouteTests(HttpCase):
@@ -432,7 +539,7 @@ class EvidenceHubTests(HttpCase):
         status, body, _ = self.post("/api/reports/audit", "audit-report", {"asset": "github:org/api", "status": "all", "options": {"framework": "iso27001"}}, member)
         self.assertEqual((status, body[:5]), (200, b"%PDF-"))
 
-        for framework in FRAMEWORKS:
+        for framework in set(FRAMEWORKS) - {"cra"}:
             status, body, _ = _send(self, "/api/evidence/portfolio", "audit-report", {"framework": framework}, member)
             self.assertEqual((status, body[:5]), (200, b"%PDF-"), framework)
         self.assertEqual(self.call("POST", "/api/evidence/portfolio", {"framework": "soc2"}, {"Cookie": member, "Origin": ORIGIN, **JSON})[0], 403)  # CSRF
@@ -443,6 +550,69 @@ class EvidenceHubTests(HttpCase):
     def test_portfolio_without_analyzed_assets_is_404(self):
         member = _login(self, "miembro")
         self.assertEqual(_send(self, "/api/evidence/portfolio", "audit-report", {"framework": "soc2"}, member)[0], 404)
+
+    def test_portfolio_sbom_and_vex(self):
+        member = _login(self, "miembro")
+        stamp = datetime.now(timezone.utc).isoformat()
+        for path in ("/api/evidence/portfolio/sbom", "/api/evidence/portfolio/vex"):
+            self.assertEqual(self.call("GET", path)[0], 401, path)
+        # Only a failed scan: nothing to export yet.
+        save_repository_scan(self.data_dir, {**_scan("org/web", [], stamp), "status": "failed"}, created_at=stamp)
+        for path in ("/api/evidence/portfolio/sbom", "/api/evidence/portfolio/vex"):
+            status, body, _ = self.call("GET", path, headers={"Cookie": member, "Accept-Language": "en"})
+            self.assertEqual((status, body["error"]), (404, "No asset has a completed full scan yet: the portfolio SBOM and VEX need at least one."), path)
+
+        for name, package in (("org/api", "lodash"), ("org/ui", "lodash")):
+            scan = {**_scan(name, [_finding("a" * 64, "critical", package=package)], stamp), "dependencies": [dependency(package, "1.0.0", direct=True)]}
+            save_repository_scan(self.data_dir, scan, created_at=stamp)
+        run = triage.annotate(self.data_dir, load_run(self.data_dir, next(row["id"] for row in list_runs(self.data_dir) if row["target"] == "org/api")))
+        triage.decide(self.data_dir, run, ["a" * 64], "false_positive", reason="No se alcanza desde el código", user=ADMIN)
+
+        response = asgi.request(self.client, "GET", "/api/evidence/portfolio/sbom?organization=Acme%20%20Corp", None, {"Cookie": member})
+        self.assertEqual((response.status_code, response.headers["content-type"]), (200, "application/vnd.cyclonedx+json"))
+        self.assertIn('filename="portfolio.cdx.json"', response.headers["content-disposition"])
+        document = response.json()
+        assert_cyclonedx(self, document)
+        self.assertEqual(document["metadata"]["component"]["name"], "Acme Corp")
+        self.assertEqual({component["name"] for component in document["components"]}, {"org/api", "org/ui"})  # not the failed one
+        self.assertEqual([len(component["components"]) for component in document["components"]], [1, 1])  # lodash twice
+        _, default, _ = self.call("GET", "/api/evidence/portfolio/sbom", headers={"Cookie": member})
+        self.assertEqual(default["metadata"]["component"]["name"], "Tamandua portfolio")  # machine-readable: never localized
+        self.assertEqual(self.call("GET", "/api/evidence/portfolio/sbom?organization=" + "a" * 121, headers={"Cookie": member})[0], 400)
+        _, control, _ = self.call("GET", "/api/evidence/portfolio/sbom?organization=%07x", headers={"Cookie": member})
+        self.assertEqual(control["metadata"]["component"]["name"], "Tamandua portfolio")
+
+        response = asgi.request(self.client, "GET", "/api/evidence/portfolio/vex", None, {"Cookie": member})
+        self.assertEqual((response.status_code, response.headers["content-type"]), (200, "application/json"))
+        self.assertIn('filename="portfolio.openvex.json"', response.headers["content-disposition"])
+        statements = response.json()["statements"]
+        assert_openvex(self, response.json())
+        # One statement per asset, each about the same product ref as the asset's component in the SBOM.
+        self.assertEqual({(item["products"][0]["@id"], item["status"]) for item in statements},
+                         {("pkg:github/org/api", "not_affected"), ("pkg:github/org/ui", "under_investigation")})
+        self.assertEqual({item["products"][0]["@id"] for item in statements}, {component["bom-ref"] for component in document["components"]})
+
+
+class CraFrameworkGateTests(HttpCase):
+    """The CRA mapping of the audit evidence only exists while the CRA policy is on."""
+
+    def test_cra_framework_is_rejected_when_off_and_accepted_when_on(self):
+        member = _login(self, "miembro")
+        stamp = datetime.now(timezone.utc).isoformat()
+        save_repository_scan(self.data_dir, _scan("org/api", [_finding("a" * 64, "critical")], stamp), created_at=stamp)
+        options = {"framework": "cra"}
+        requests = (("/api/reports/audit", {"asset": "github:org/api", "status": "all", "options": options}),
+                    ("/api/reports/audit", {"assets": ["github:org/api"], "options": options}),
+                    ("/api/evidence/portfolio", options))
+        message = "The CRA mapping is only available while CRA reporting is on. An admin can turn it on in Policies."
+        for path, body in requests:
+            status, answer, _ = self.call("POST", path, body, {"Origin": ORIGIN, "X-Tamandua-Action": "audit-report", "Cookie": member,
+                                                             "Accept-Language": "en", **JSON})
+            self.assertEqual((status, answer["error"]), (400, message), (path, body))
+        cra.set_policy(self.data_dir, True, reason="Vendemos en la UE", user=ADMIN)
+        for path, body in requests:
+            status, answer, _ = _send(self, path, "audit-report", body, member)
+            self.assertEqual((status, answer[:5]), (200, b"%PDF-"), (path, body))
 
 
 class FrameworkTests(unittest.TestCase):

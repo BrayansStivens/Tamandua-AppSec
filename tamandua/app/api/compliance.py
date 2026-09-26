@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Literal, Union
 
 from fastapi import APIRouter, Depends, Query
@@ -15,6 +16,9 @@ from tamandua.modules.reporting.audit import FRAMEWORKS, ReportError, render_por
 from tamandua.modules.sources.assets import overview as assets_overview
 from tamandua.shared.i18n import msg, text
 from tamandua.version import VERSION
+
+# Machine-readable data: the same name for every reader, whatever their language.
+PORTFOLIO_NAME = "Tamandua portfolio"
 
 router = APIRouter(tags=["compliance"])
 EventId = Annotated[str, Field(max_length=300)]
@@ -244,8 +248,8 @@ def assets(q: str = Query("", max_length=100), page: Paging = Depends(paging()),
 
 
 # --- Evidence hub ---------------------------------------------------------------------------------------------------
-# The files come from the existing exports: /api/assets/export (SBOM, VEX, technical report) and /api/reports/audit
-# (audit evidence of one asset). Only the portfolio-wide audit evidence needs its own route.
+# The files of one asset come from the existing exports: /api/assets/export (SBOM, VEX, technical report) and
+# /api/reports/audit (audit evidence). Only the portfolio-wide files need their own routes.
 
 class EvidenceOverview(BaseModel):
     assets: int  # analyzed repositories and images
@@ -292,10 +296,42 @@ def portfolio_evidence(body: PortfolioEvidenceIn,
     user = context.user
     scope = text(msg("api.scope.repositories", count=len(chosen)), context.locale)
     try:
+        cra.check_framework(context.data_dir, body.framework)
         options = validate_options({"framework": body.framework}, default_by=user.get("display_name") or user["username"])
         pdf = render_portfolio_pdf(evidence.portfolio(context.data_dir, chosen), options, version=VERSION, scope_label=scope,
                                    coverage={"total": None, "missing": []}, locale=context.locale)
-    except ReportError as exc:
+    except (ReportError, cra.CraError) as exc:
         raise ApiError(400, exc.message) from exc
     context.state.log.info("audit_report", extra={"user": user["username"], "reason": f"{scope}: {len(chosen)} assets, {body.framework}"})
     return Response(pdf, media_type="application/pdf")
+
+
+def _file(schema_type: str, what: str) -> dict:
+    return {200: {"description": what, "content": {schema_type: {"schema": {"type": "string", "format": "binary", "maxLength": 100_000_000}}}}}
+
+
+@router.get("/api/evidence/portfolio/sbom", response_class=Response,
+            responses=_file("application/vnd.cyclonedx+json", "CycloneDX SBOM of every asset with a completed full scan"))
+def portfolio_sbom(organization: str = Query("", max_length=120), context: Context = Depends(guard())) -> Response:
+    """One CycloneDX document: each asset a top-level component with its packages. `organization` names the portfolio."""
+    name = " ".join(organization.split()) if organization.isprintable() else ""
+    document = evidence.portfolio_sbom(context.data_dir, name=name or PORTFOLIO_NAME,
+                                       version=VERSION, locale=context.locale)
+    if document is None:
+        raise ApiError(404, msg("compliance.evidence.no_complete_scan"))
+    return _json_download(document, "application/vnd.cyclonedx+json", "portfolio.cdx.json")
+
+
+@router.get("/api/evidence/portfolio/vex", response_class=Response,
+            responses=_file("application/json", "OpenVEX statements of every asset with a completed full scan"))
+def portfolio_vex(context: Context = Depends(guard())) -> Response:
+    """One OpenVEX document with the statements of the same assets as the portfolio SBOM."""
+    document = evidence.portfolio_vex(context.data_dir, version=VERSION, locale=context.locale)
+    if document is None:
+        raise ApiError(404, msg("compliance.evidence.no_complete_scan"))
+    return _json_download(document, "application/json", "portfolio.openvex.json")
+
+
+def _json_download(document: dict, media_type: str, filename: str) -> Response:
+    body = json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8")
+    return Response(body, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{filename}"'})

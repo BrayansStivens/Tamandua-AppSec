@@ -289,6 +289,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence/portfolio/sbom": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Sbom
+         * @description One CycloneDX document: each asset a top-level component with its packages. `organization` names the portfolio.
+         */
+        get: operations["portfolio_sbom_api_evidence_portfolio_sbom_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/portfolio/vex": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Vex
+         * @description One OpenVEX document with the statements of the same assets as the portfolio SBOM.
+         */
+        get: operations["portfolio_vex_api_evidence_portfolio_vex_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/pull-requests/branches": {
         parameters: {
             query?: never;
@@ -1665,6 +1705,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    portfolio_sbom_api_evidence_portfolio_sbom_get: {
+        parameters: {
+            query?: {
+                organization?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CycloneDX SBOM of every asset with a completed full scan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.cyclonedx+json": string;
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    portfolio_vex_api_evidence_portfolio_vex_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OpenVEX statements of every asset with a completed full scan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
                 };
             };
         };

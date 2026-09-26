@@ -15,7 +15,8 @@
       "already_assessed": "This event is already assessed.",
       "not_reopenable": "Only an event marked as not affecting the product can be reopened.",
       "not_exploited": "Record that it's actively exploited in your product before marking what you sent.",
-      "disabled": "CRA reporting is off. An admin can turn it on in Policies."
+      "disabled": "CRA reporting is off. An admin can turn it on in Policies.",
+      "framework_off": "The CRA mapping is only available while CRA reporting is on. An admin can turn it on in Policies."
     },
     "draft": {
       "body": "Product: {{product}}{{support}}\nVulnerability: {{cve}}{{kev_name}}\nAffected component: {{packages}}\nActive exploitation in the product: confirmed by the manufacturer (listed in CISA KEV since {{kev_date}}{{ransomware}})\nManufacturer became aware: {{aware}} UTC\nGeneral nature of the exploit: [summarize how it is exploited, without details that would help an attacker]\nCorrective measure available: {{fixed}}\nMeasures users can take: [e.g. update to version X, turn off feature Y]\nMember states where the product is sold: [list]\nSensitivity of the information: [say whether anything must not be shared]\n\nBefore you send it: fill in the bracketed fields.",
@@ -34,12 +35,21 @@
     "accepted": "Risk accepted: {{reason}}",
     "accepted_until": "Risk accepted (until {{date}}): {{reason}}",
     "in_progress": "Fix in progress.",
-    "role": "Document generated from triage"
+    "role": "Document generated from triage",
+    "portfolio_truncated": "partial: {{shown}} of {{total}} assets with a completed full scan (at most {{max_assets}} assets and {{max_statements}} statements per document); export the rest one by one",
+    "statements_truncated": "partial: a portfolio VEX holds at most {{max_statements}} statements; statements from {{asset}} onwards are missing. Export each asset's VEX for the complete list"
   },
   "sbom": {
     "needs_full_scan": "The SBOM comes from a full analysis that has finished: this one isn't.",
     "os_package": "operating system",
     "origin": "Trivy inventory of the analyzed manifests and lockfiles. No supplier or hash per component: they aren't inferred.",
-    "origin_image": "Trivy inventory of the analyzed manifests and lockfiles and of the image's system packages. No supplier or hash per component: they aren't inferred."
+    "origin_image": "Trivy inventory of the analyzed manifests and lockfiles and of the image's system packages. No supplier or hash per component: they aren't inferred.",
+    "origin_portfolio": "One component per asset, from its latest completed full scan (Trivy inventory). Packages aren't deduplicated across assets. No supplier or hash per package: they aren't inferred.",
+    "portfolio_truncated": "Partial: a portfolio SBOM holds at most {{max_assets}} assets and {{max_components}} components. It includes {{shown}} of {{total}} assets with a completed full scan; export the rest, and any asset marked as truncated, one by one.",
+    "asset_truncated": "Only {{shown}} of {{total}} components fit in the portfolio SBOM; export this asset's own SBOM for the full list.",
+    "components_truncated": "Partial: a portfolio SBOM holds at most {{max_components}} components. Every asset is listed, but those marked tamandua:truncated are incomplete: export their SBOM individually."
+  },
+  "evidence": {
+    "no_complete_scan": "No asset has a completed full scan yet: the portfolio SBOM and VEX need at least one."
   }
 }

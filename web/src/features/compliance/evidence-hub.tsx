@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from 'react'
+import { useCallback, useState, type ReactNode, useId } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { ArrowDownToLine, LoaderCircle } from 'lucide-react'
@@ -10,14 +10,14 @@ import { SkeletonCard } from '@/shared/ui/loading'
 import { api, query } from '@/shared/api/http'
 import type { Response } from '@/shared/api/client'
 import { evidenceAssetsQuery, evidenceQuery } from '@/shared/api/queries'
-import { rememberFramework, rememberedFramework, useAuditFrameworks, type Framework } from '@/features/findings/audit-frameworks'
+import { remembered, rememberFramework, rememberedFramework, useAuditFrameworks, type Framework } from '@/features/findings/audit-frameworks'
 
 type Asset = Response<'/api/evidence/assets'>['items'][number]
-type Item = 'sbom' | 'vex' | 'technical' | 'audit' | 'portfolio'
+type Item = 'sbom' | 'vex' | 'technical' | 'audit' | 'portfolio' | 'portfolio_sbom' | 'portfolio_vex'
 const slug = (name: string, fallback: string) => name.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50) || fallback
 
-// Evidence hub: the files auditors and customers ask for, per asset and for the whole portfolio. Every button calls an
-// existing export (the same ones as Findings); nothing is generated here.
+// Evidence hub: the files auditors and customers ask for, per asset and for the whole portfolio. Every file is built on
+// the server; the per-asset ones are the same exports as in Findings.
 export function EvidenceHub({ onNew }: { onNew: () => void }) {
   const { t } = useTranslation('compliance')
   const { t: tf } = useTranslation('findings')
@@ -42,6 +42,8 @@ export function EvidenceHub({ onNew }: { onNew: () => void }) {
   }
   const exportFile = (item: Item, asset: Asset, artifact: string, status: 'open' | 'all') => download(item, () =>
     api.download(`/api/assets/export?${query({ key: asset.key, status, artifact })}`, `${slug(asset.name, t('evidence.file_asset'))}-${artifact}`))
+  const portfolioFile = (item: Item, url: string, suffix: string) => download(item, () =>
+    api.download(url, `${slug(t('evidence.file_portfolio'), 'portfolio')}-${suffix}`))
   const auditFile = (name: string) => tf('audit.file', { name: slug(name, t('evidence.file_asset')).slice(0, 40), framework })
   const choose = (value: string | null) => { if (!value) return; setChosen(value as Framework); rememberFramework(value as Framework) }
 
@@ -79,7 +81,11 @@ export function EvidenceHub({ onNew }: { onNew: () => void }) {
         <section aria-labelledby="evidence-portfolio" className="space-y-2">
           <h3 id="evidence-portfolio" className="text-sm font-medium">{t('evidence.portfolio_title')}</h3>
           <p className="text-xs text-app-muted">{t('evidence.portfolio_summary', { count: counts.assets, complete: counts.complete })}</p>
-          <ul className="overflow-hidden rounded-xl border border-app-line">
+          <ul className="divide-y divide-app-line overflow-hidden rounded-xl border border-app-line">
+            <Row name={t('evidence.items.portfolio_sbom')} hint={counts.complete ? t('evidence.items.portfolio_sbom_hint') : t('evidence.items.portfolio_missing')} busy={busy === 'portfolio_sbom'} waiting={busy !== null} unavailable={!counts.complete}
+              onClick={() => void portfolioFile('portfolio_sbom', `/api/evidence/portfolio/sbom?${query({ organization: remembered().organization })}`, 'sbom.cdx.json')} />
+            <Row name={t('evidence.items.portfolio_vex')} hint={counts.complete ? t('evidence.items.portfolio_vex_hint') : t('evidence.items.portfolio_missing')} busy={busy === 'portfolio_vex'} waiting={busy !== null} unavailable={!counts.complete}
+              onClick={() => void portfolioFile('portfolio_vex', '/api/evidence/portfolio/vex', 'vex.openvex.json')} />
             <Row name={t('evidence.items.portfolio')} hint={t('evidence.items.portfolio_hint', { framework: frameworkName })} busy={busy === 'portfolio'} waiting={busy !== null}
               onClick={() => void download('portfolio', () => api.downloadPost('/api/evidence/portfolio', 'audit-report', { framework }, auditFile(t('evidence.file_portfolio'))))} />
           </ul>
@@ -95,10 +101,12 @@ export function EvidenceHub({ onNew }: { onNew: () => void }) {
 // focused button keeps the keyboard focus.
 function Row({ name, hint, busy, waiting = false, unavailable = false, onClick }: { name: string; hint: ReactNode; busy: boolean; waiting?: boolean; unavailable?: boolean; onClick: () => void }) {
   const { t } = useTranslation('compliance')
+  const hintId = useId()
+  // Unavailable stays focusable (aria-disabled) so keyboard users still hear why, through the linked hint.
   return <li className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-    <span className="min-w-0"><span className="block text-sm font-medium">{name}</span><span className="block text-xs text-app-muted">{hint}</span></span>
-    <Button size="sm" variant="outline" disabled={unavailable} aria-disabled={waiting || undefined} aria-busy={busy || undefined} aria-label={t('evidence.download_label', { item: name })} onClick={onClick}
-      className={`border-app-line bg-app-soft ${waiting && !busy ? 'opacity-60' : ''}`}>
+    <span className="min-w-0"><span className="block text-sm font-medium">{name}</span><span id={hintId} className="block text-xs text-app-muted">{hint}</span></span>
+    <Button size="sm" variant="outline" aria-describedby={hintId} aria-disabled={waiting || unavailable || undefined} aria-busy={busy || undefined} aria-label={t('evidence.download_label', { item: name })} onClick={() => { if (!unavailable) onClick() }}
+      className={`border-app-line bg-app-soft ${(waiting && !busy) || unavailable ? 'opacity-60' : ''}`}>
       {busy ? <LoaderCircle className="motion-safe:animate-spin" /> : <ArrowDownToLine />}{busy ? t('evidence.preparing') : t('evidence.download')}</Button>
   </li>
 }

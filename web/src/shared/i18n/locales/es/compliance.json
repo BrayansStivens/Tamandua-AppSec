@@ -36,8 +36,16 @@
       "audit": "Evidencia de auditoría",
       "audit_hint": "PDF · {{framework}}: alcance, controles y todos los hallazgos",
       "portfolio": "Evidencia de auditoría consolidada",
-      "portfolio_hint": "PDF · {{framework}}: cada activo analizado, su cobertura y el riesgo abierto"
-    }
+      "portfolio_hint": "PDF · {{framework}}: cada activo analizado, su cobertura y el riesgo abierto",
+      "portfolio_sbom": "SBOM del portafolio",
+      "portfolio_sbom_hint": "CycloneDX · cada activo con un análisis completo terminado, con sus propios paquetes",
+      "portfolio_vex": "VEX del portafolio",
+      "portfolio_vex_hint": "OpenVEX · tus decisiones de triage sobre esos mismos activos",
+      "portfolio_missing": "Necesita al menos un activo con un análisis completo terminado"
+    },
+    "portfolio_sbom_hint": "CycloneDX · componentes y versiones de cada activo con un análisis completo terminado",
+    "portfolio_vex_hint": "OpenVEX · tu triage de cada activo con un análisis completo terminado",
+    "portfolio_missing": "Necesita un análisis completo terminado"
   },
   "cra": {
     "title": "Reglamento de Ciberresiliencia de la UE (CRA) · notificación de vulnerabilidades",

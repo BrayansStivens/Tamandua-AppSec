@@ -15,7 +15,8 @@
       "already_assessed": "Este evento ya está evaluado.",
       "not_reopenable": "Solo se puede reabrir un evento marcado como que no afecta al producto.",
       "not_exploited": "Registra que se explota activamente en tu producto antes de marcar lo enviado.",
-      "disabled": "La notificación CRA está desactivada. Un administrador puede activarla en Políticas."
+      "disabled": "La notificación CRA está desactivada. Un administrador puede activarla en Políticas.",
+      "framework_off": "El marco CRA solo está disponible con la notificación CRA activada. Un administrador puede activarla en Políticas."
     },
     "draft": {
       "body": "Producto: {{product}}{{support}}\nVulnerabilidad: {{cve}}{{kev_name}}\nComponente afectado: {{packages}}\nExplotación activa en el producto: confirmada por el fabricante (en el catálogo CISA KEV desde {{kev_date}}{{ransomware}})\nConocimiento por el fabricante: {{aware}} UTC\nNaturaleza general del exploit: [resume cómo se explota, sin detalles que faciliten el ataque]\nMedida correctora disponible: {{fixed}}\nMedidas que pueden tomar los usuarios: [p. ej. actualizar a la versión X, desactivar la función Y]\nEstados miembros donde se comercializa el producto: [lista]\nSensibilidad de la información: [indica si algo no debe compartirse]\n\nAntes de enviar: completa los campos entre corchetes.",
@@ -34,12 +35,21 @@
     "accepted": "Riesgo aceptado: {{reason}}",
     "accepted_until": "Riesgo aceptado (hasta {{date}}): {{reason}}",
     "in_progress": "Corrección en curso.",
-    "role": "Documento generado a partir del triage"
+    "role": "Documento generado a partir del triage",
+    "portfolio_truncated": "parcial: {{shown}} de {{total}} activos con un análisis completo terminado (como máximo {{max_assets}} activos y {{max_statements}} declaraciones por documento); exporta los demás uno por uno",
+    "statements_truncated": "parcial: un VEX de portafolio admite como máximo {{max_statements}} declaraciones; faltan las de {{asset}} en adelante. Exporta el VEX de cada activo para tener la lista completa"
   },
   "sbom": {
     "needs_full_scan": "El SBOM sale de un análisis completo que haya terminado: este no lo es.",
     "os_package": "sistema operativo",
     "origin": "Inventario de Trivy sobre los manifiestos y lockfiles analizados. Sin proveedor ni hash por componente: no se infieren.",
-    "origin_image": "Inventario de Trivy sobre los manifiestos y lockfiles analizados y los paquetes del sistema de la imagen. Sin proveedor ni hash por componente: no se infieren."
+    "origin_image": "Inventario de Trivy sobre los manifiestos y lockfiles analizados y los paquetes del sistema de la imagen. Sin proveedor ni hash por componente: no se infieren.",
+    "origin_portfolio": "Un componente por activo, a partir de su último análisis completo terminado (inventario de Trivy). Los paquetes no se deduplican entre activos. Sin proveedor ni hash por paquete: no se infieren.",
+    "portfolio_truncated": "Parcial: un SBOM de portafolio admite como máximo {{max_assets}} activos y {{max_components}} componentes. Incluye {{shown}} de {{total}} activos con un análisis completo terminado; exporta los demás, y cualquier activo marcado como truncado, uno por uno.",
+    "asset_truncated": "Solo caben {{shown}} de {{total}} componentes en el SBOM del portafolio; exporta el SBOM de este activo para ver la lista completa.",
+    "components_truncated": "Parcial: un SBOM de portafolio admite como máximo {{max_components}} componentes. Están todos los activos, pero los marcados con tamandua:truncated están incompletos: exporta su SBOM uno a uno."
+  },
+  "evidence": {
+    "no_complete_scan": "Ningún activo tiene todavía un análisis completo terminado: el SBOM y el VEX del portafolio necesitan al menos uno."
   }
 }

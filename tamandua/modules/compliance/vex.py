@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 
 from tamandua.modules.intel.advisory_watch import purl as build_purl
-from tamandua.modules.compliance.sbom import root_ref
+from tamandua.modules.compliance.sbom import PORTFOLIO_ASSETS, root_ref
 from tamandua.shared.i18n import default_locale, t, text
 
 CONTEXT = "https://openvex.dev/ns/v0.2.0"
@@ -50,11 +50,9 @@ def _vulnerability(finding: dict) -> dict | None:
     return {"name": main, **({"aliases": aliases} if aliases else {})}
 
 
-def openvex(record: dict, *, version: str, now: datetime | None = None, locale: str | None = None) -> dict:
-    locale = locale or default_locale()
-    stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    product = root_ref(record)
-    statements = []
+def statements(record: dict, product: dict, locale: str) -> list[dict]:
+    """One statement per dependency advisory of `record`, about `product` (an OpenVEX component)."""
+    result = []
     for finding in record.get("findings") or []:
         package = finding.get("package") or {}
         if finding.get("scanner") != "sca" or not package.get("name") or (finding.get("lifecycle") or {}).get("status") == "excluded":
@@ -65,8 +63,40 @@ def openvex(record: dict, *, version: str, now: datetime | None = None, locale: 
         status, extra = _status(finding, locale)
         subcomponent = build_purl(package)
         decided = (finding.get("triage") or {}).get("at")
-        statements.append({"vulnerability": vulnerability,
-                           "products": [{"@id": product, **({"subcomponents": [{"@id": subcomponent}]} if subcomponent else {})}],
-                           "status": status, **extra, **({"timestamp": decided} if decided else {})})
+        result.append({"vulnerability": vulnerability,
+                       "products": [{**product, **({"subcomponents": [{"@id": subcomponent}]} if subcomponent else {})}],
+                       "status": status, **extra, **({"timestamp": decided} if decided else {})})
+    return result
+
+
+def _document(items: list[dict], *, tooling: str, now: datetime | None, locale: str) -> dict:
+    stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     return {"@context": CONTEXT, "@id": f"urn:uuid:{uuid.uuid4()}", "author": "Tamandua", "role": t("compliance.vex.role", locale),
-            "timestamp": stamp, "version": 1, "tooling": f"Tamandua {version}", "statements": statements}
+            "timestamp": stamp, "version": 1, "tooling": tooling, "statements": items}
+
+
+def openvex(record: dict, *, version: str, now: datetime | None = None, locale: str | None = None) -> dict:
+    locale = locale or default_locale()
+    return _document(statements(record, {"@id": root_ref(record)}, locale), tooling=f"Tamandua {version}", now=now, locale=locale)
+
+
+PORTFOLIO_STATEMENTS = 50_000
+
+
+def portfolio(records: list[tuple[str, dict]], *, total: int, version: str, now: datetime | None = None, locale: str | None = None) -> dict:
+    """The statements of several assets in one document. `records` pairs each asset's ref (the same as in the
+    portfolio SBOM) with its registry view; `total` counts every asset with a complete scan. Past the limits the
+    tooling line says the document is partial."""
+    locale = locale or default_locale()
+    items: list[dict] = []
+    for ref, record in records:
+        product = {"@id": ref, **({"identifiers": {"purl": ref}} if ref.startswith("pkg:") and "#" not in ref else {})}
+        items.extend(statements(record, product, locale))
+    tooling = f"Tamandua {version}"
+    if len(records) < total:
+        tooling += " · " + t("compliance.vex.portfolio_truncated", locale, shown=len(records), total=total, max_assets=PORTFOLIO_ASSETS,
+                             max_statements=PORTFOLIO_STATEMENTS)
+    elif len(items) > PORTFOLIO_STATEMENTS:
+        first_cut = items[PORTFOLIO_STATEMENTS]["products"][0]["@id"]
+        tooling += " · " + t("compliance.vex.statements_truncated", locale, max_statements=PORTFOLIO_STATEMENTS, asset=first_cut)
+    return _document(items[:PORTFOLIO_STATEMENTS], tooling=tooling, now=now, locale=locale)

@@ -852,6 +852,77 @@
         }
       }
     },
+    "/api/evidence/portfolio/sbom": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Portfolio Sbom",
+        "description": "One CycloneDX document: each asset a top-level component with its packages. `organization` names the portfolio.",
+        "operationId": "portfolio_sbom_api_evidence_portfolio_sbom_get",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120,
+              "default": "",
+              "title": "Organization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CycloneDX SBOM of every asset with a completed full scan",
+            "content": {
+              "application/vnd.cyclonedx+json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 100000000
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/portfolio/vex": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Portfolio Vex",
+        "description": "One OpenVEX document with the statements of the same assets as the portfolio SBOM.",
+        "operationId": "portfolio_vex_api_evidence_portfolio_vex_get",
+        "responses": {
+          "200": {
+            "description": "OpenVEX statements of every asset with a completed full scan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "maxLength": 100000000,
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pull-requests/branches": {
       "post": {
         "tags": [

@@ -89,6 +89,12 @@ def enabled(data_dir: Path) -> bool:
     return load(data_dir)["policy"].get("enabled") is True
 
 
+def check_framework(data_dir: Path, framework: str) -> None:
+    """The CRA mapping of the audit evidence only exists while the policy is on."""
+    if framework == "cra" and not enabled(data_dir):
+        raise CraError(msg("compliance.cra.errors.framework_off"))
+
+
 def set_policy(data_dir: Path, on: bool, *, reason: str | None, user: dict) -> dict:
     """Turns the CRA kit on or off. Off hides it and stops events; products and decisions are kept."""
     note = _reason(reason, required=True)

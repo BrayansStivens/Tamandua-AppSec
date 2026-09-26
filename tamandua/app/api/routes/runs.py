@@ -13,7 +13,7 @@ from tamandua.modules.runs import batches
 from tamandua.modules.findings import exclusions
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.integrations import jira
-from tamandua.modules.compliance import evidence, sbom
+from tamandua.modules.compliance import cra, evidence, sbom
 from tamandua.modules.findings import sla
 from tamandua.modules.findings import triage
 from tamandua.modules.compliance import vex
@@ -185,8 +185,9 @@ def audit_report(request: Request):
         findings = [item for item in findings if item.get("fingerprint") in wanted]
     try:
         options = validate_options(payload.get("options"), default_by=request.user.get("display_name") or request.user["username"])
+        cra.check_framework(request.data_dir, options["framework"])
         pdf = render_audit_pdf(record, findings, options, version=VERSION, locale=request.locale)
-    except ReportError as exc:
+    except (ReportError, cra.CraError) as exc:
         return request.json(400, {"error": problem(exc)})
     request.log.info("audit_report", extra={"user": request.user["username"], "reason": f"{record['id']}: {len(findings)} hallazgos, {options['framework']}"})
     return request.send(200, pdf, "application/pdf")
@@ -230,8 +231,9 @@ def _portfolio_report(request: Request, payload: dict):
     items = evidence.portfolio(request.data_dir, chosen, status=status)
     try:
         options = validate_options(payload.get("options"), default_by=request.user.get("display_name") or request.user["username"])
+        cra.check_framework(request.data_dir, options["framework"])
         pdf = render_portfolio_pdf(items, options, version=VERSION, scope_label=scope, coverage=coverage, locale=request.locale)
-    except ReportError as exc:
+    except (ReportError, cra.CraError) as exc:
         return request.json(400, {"error": problem(exc)})
     request.log.info("audit_report", extra={"user": request.user["username"], "reason": f"{scope}: {len(items)} repositorios, {options['framework']}"})
     return request.send(200, pdf, "application/pdf")
