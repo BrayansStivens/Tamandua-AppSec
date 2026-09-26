@@ -1,0 +1,12 @@
+{
+  "host_not_allowed": "Host no permitido",
+  "invalid_parameters": "Parámetros inválidos",
+  "invalid_request": "Solicitud inválida",
+  "invalid_json": "JSON inválido",
+  "not_found": "Ruta no encontrada",
+  "internal_error": "Error interno del servidor",
+  "csrf_denied": "Origen o acción no permitidos",
+  "login_required": "Inicia sesión para continuar",
+  "totp_required": "Activa el segundo factor para continuar",
+  "admin_only": "Solo un administrador puede hacer esto"
+}

@@ -27,7 +27,7 @@ export type Dashboard = {
 export const severityLabel: Record<string, string> = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja', info: 'Info' }
 export const actionLabel: Record<string, string> = { act: 'Actuar ya', attend: 'Atender', track: 'Seguimiento' }
 export const statusLabel = (status: string) => ({ completed: 'Completada', incomplete: 'Incompleta', failed: 'Fallida', queued: 'En cola', running: 'Analizando…' }[status] ?? status)
-export const formatDate = (stamp: string) => new Date(stamp).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })
+export { formatDate } from '@/shared/i18n/format'
 
 // «1 hallazgo», «2 hallazgos»: el número siempre concuerda con el sustantivo.
 export const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`

@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from tamandua.modules.identity.auth import Authenticator
+from tamandua.shared.i18n import msg
 from tamandua.modules.runs.jobs import ScanJobs
 
 DEFAULT_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; "
@@ -50,7 +51,7 @@ class State:
 class Denied:
     """Respuesta de la tubería de seguridad cuando no deja pasar."""
     status: int
-    message: str
+    message: dict
     extra: dict = field(default_factory=dict)
 
 
@@ -60,14 +61,14 @@ def authorize(state: State, entry, *, method: str, port: int, origin: str | None
     if method == "POST":
         # CSRF antes que nada: un POST de otro origen no llega ni a mirar la sesión.
         if origin not in allowed_origins(port) or action != entry.action:
-            return Denied(403, "Origen o acción no permitidos")
+            return Denied(403, msg("api.csrf_denied"))
     user, session = state.auth.current(cookie)
     if user is not None and user.get("totp", {}).get("enabled") and not (session or {}).get("mfa"):
         user, session = None, None
     if user is None and not entry.public:
-        return Denied(401, "Inicia sesión para continuar")
+        return Denied(401, msg("api.login_required"))
     if user is not None and not entry.enrolment and state.auth.needs_totp(user):
-        return Denied(403, "Activa el segundo factor para continuar", {"code": "totp_required"})
+        return Denied(403, msg("api.totp_required"), {"code": "totp_required"})
     if entry.admin and (user is None or user["role"] != "admin"):
-        return Denied(403, "Solo un administrador puede hacer esto")
+        return Denied(403, msg("api.admin_only"))
     return user, session

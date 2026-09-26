@@ -8,12 +8,13 @@ from pathlib import Path
 from fastapi import Request
 
 from tamandua.app.api.security import Denied, State, authorize
+from tamandua.shared.i18n import localize, negotiate
 
 
 class ApiError(Exception):
     """Error con la forma de siempre: {"error": mensaje, …extra}."""
 
-    def __init__(self, status: int, message: str, **extra):
+    def __init__(self, status: int, message, **extra):
         super().__init__(message)
         self.status, self.message, self.extra = status, message, extra
 
@@ -33,6 +34,11 @@ class Context:
     state: State
     user: dict | None
     session: dict | None
+    locale: str
+
+    def render(self, value):
+        """Renders the messages in a module result for this reader."""
+        return localize(value, self.locale)
 
     @property
     def data_dir(self) -> Path:
@@ -49,5 +55,5 @@ def guard(policy: Policy = Policy()):
         if isinstance(verdict, Denied):
             raise ApiError(verdict.status, verdict.message, **verdict.extra)
         user, session = verdict
-        return Context(state, user, session)
+        return Context(state, user, session, negotiate(request.headers.get("accept-language")))
     return dependency

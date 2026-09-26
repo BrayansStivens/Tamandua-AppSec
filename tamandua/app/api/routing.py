@@ -18,6 +18,7 @@ from starlette.requests import Request as HttpRequest
 from starlette.responses import Response
 
 from tamandua.app.api.security import Denied, State, authorize, public_url
+from tamandua.shared.i18n import localize, msg, negotiate
 
 
 @dataclass(frozen=True)
@@ -61,8 +62,8 @@ def _response(status: int, payload: bytes, content_type: str, *, csp: str | None
     return Response(payload, status_code=status, headers=headers)
 
 
-def error(status: int, message: str, **extra) -> Response:
-    return _response(status, json.dumps({"error": message, **extra}, ensure_ascii=False).encode("utf-8"),
+def error(status: int, message, locale: str, **extra) -> Response:
+    return _response(status, json.dumps(localize({"error": message, **extra}, locale), ensure_ascii=False).encode("utf-8"),
                      "application/json; charset=utf-8")
 
 
@@ -76,6 +77,7 @@ class Request:
         self.query = parse_qs(http.url.query)
         self.client = http.client.host if http.client else ""
         self.cookie_header = http.headers.get("cookie")
+        self.locale = negotiate(http.headers.get("accept-language"))
         self.port: int = http.app.state.port
 
     def arg(self, name: str, default: str | None = None) -> str | None:
@@ -86,7 +88,8 @@ class Request:
         return public_url(self.port).startswith("https://")
 
     def json(self, status: int, data, *, cookie: str | None = None) -> Response:
-        return _response(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8", cookie=cookie)
+        return _response(status, json.dumps(localize(data, self.locale), ensure_ascii=False).encode("utf-8"),
+                         "application/json; charset=utf-8", cookie=cookie)
 
     def send(self, status: int, payload: bytes, content_type: str, *, csp: str | None = None, cookie: str | None = None) -> Response:
         return _response(status, payload, content_type, csp=csp, cookie=cookie)
@@ -94,11 +97,12 @@ class Request:
 def _endpoint(entry: Route):
     async def endpoint(http: HttpRequest) -> Response:
         state: State = http.app.state.core
+        locale = negotiate(http.headers.get("accept-language"))
         verdict = await run_in_threadpool(authorize, state, entry, method=entry.method, port=http.app.state.port,
                                           origin=http.headers.get("origin"), action=http.headers.get("x-tamandua-action"),
                                           cookie=http.headers.get("cookie"))
         if isinstance(verdict, Denied):
-            return error(verdict.status, verdict.message, **verdict.extra)
+            return error(verdict.status, verdict.message, locale, **verdict.extra)
         payload = None
         if entry.method == "POST":
             # El límite se mira antes de leer: un cuerpo mayor que lo declarado ni siquiera se recibe.
@@ -107,11 +111,11 @@ def _endpoint(entry: Route):
             except ValueError:
                 length = 0
             if length < 2 or length > entry.body:
-                return error(400, "Solicitud inválida")
+                return error(400, msg("api.invalid_request"), locale)
             try:
                 payload = json.loads(await http.body())
             except (json.JSONDecodeError, UnicodeDecodeError):
-                return error(400, "JSON inválido")
+                return error(400, msg("api.invalid_json"), locale)
         user, session = verdict
         response = await run_in_threadpool(entry.handler, Request(http, state, user, session, payload))
         if not isinstance(response, Response):

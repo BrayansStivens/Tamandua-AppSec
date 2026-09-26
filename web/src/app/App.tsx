@@ -29,6 +29,7 @@ import { PullRequests } from '@/pages/PullRequests'
 import { ThreatModels } from '@/pages/ThreatModels'
 import { Compliance } from '@/pages/Compliance'
 import type { RunRow } from '@/shared/lib/types'
+import { LocaleSwitch } from '@/shared/i18n/locale-switch'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
@@ -156,6 +157,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
       <span className="min-w-0"><span className="block truncate text-sm font-medium">{user.display_name}</span><span className="block truncate text-xs text-app-subtle">{user.role === 'admin' ? 'Administrador' : 'Miembro'}{user.totp_enabled ? '' : ' · sin 2FA'}</span></span>
       {!user.totp_enabled && <span role="img" aria-label="Segundo factor sin activar" className="ml-auto size-2 shrink-0 rounded-full bg-warning" />}
     </button>
+    <LocaleSwitch className="px-3 py-1" />
     <Button variant="ghost" size="sm" onClick={() => void session.logout()} className="w-full justify-start text-app-muted"><LogOut />Cerrar sesión</Button>
   </div>
 

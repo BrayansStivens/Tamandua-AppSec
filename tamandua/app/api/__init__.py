@@ -22,6 +22,7 @@ from tamandua.app.api.deps import ApiError
 from tamandua.app.api.routes import auth, cra, prs, runs, sources, threats  # noqa: F401 — registran sus rutas
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
 from tamandua.modules.identity.auth import COOKIE_NAME
+from tamandua.shared.i18n import localize, msg, negotiate
 from tamandua.version import VERSION
 
 ROUTERS = (system, reporting, intel, findings, compliance)
@@ -39,6 +40,10 @@ def _security_headers(response, port: int) -> None:
         headers.setdefault("strict-transport-security", "max-age=31536000; includeSubDomains")
 
 
+def _error(request: Request, message, **extra) -> dict:
+    return localize({"error": message, **extra}, negotiate(request.headers.get("accept-language")))
+
+
 def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: bool = False) -> FastAPI:
     """`state`: el estado ya creado (las pruebas lo reutilizan); si no, se crea con su cola y sus hilos."""
     if state is None:
@@ -53,7 +58,7 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
     async def pipeline(request: Request, call_next):
         started = time.time()
         if not host_allowed(port, request.headers.get("host")):
-            response = JSONResponse({"error": "Host no permitido"}, status_code=403)
+            response = JSONResponse(_error(request, msg("api.host_not_allowed")), status_code=403)
         else:
             response = await call_next(request)
         _security_headers(response, port)
@@ -64,23 +69,23 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
 
     @app.exception_handler(ApiError)
     async def api_error(request: Request, error: ApiError):
-        return JSONResponse({"error": error.message, **error.extra}, status_code=error.status)
+        return JSONResponse(_error(request, error.message, **error.extra), status_code=error.status)
 
     @app.exception_handler(RequestValidationError)
     async def invalid(request: Request, error: RequestValidationError):
-        return JSONResponse({"error": "Parámetros inválidos"}, status_code=400)
+        return JSONResponse(_error(request, msg("api.invalid_parameters")), status_code=400)
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, error: StarletteHTTPException):
         if error.status_code in (404, 405):  # método no admitido: como antes, la ruta no existe para ese método
-            return JSONResponse({"error": "Ruta no encontrada"}, status_code=404)
+            return JSONResponse(_error(request, msg("api.not_found")), status_code=404)
         return JSONResponse({"error": str(error.detail)}, status_code=error.status_code)
 
     @app.exception_handler(Exception)
     async def crashed(request: Request, error: Exception):
         # Sin traza hacia fuera; el detalle queda en el log del servidor.
         log.exception("error no controlado", extra={"method": request.method, "path": request.url.path})
-        response = JSONResponse({"error": "Error interno del servidor"}, status_code=500)
+        response = JSONResponse(_error(request, msg("api.internal_error")), status_code=500)
         _security_headers(response, port)  # este manejador corre fuera del middleware: las pone él
         return response
 

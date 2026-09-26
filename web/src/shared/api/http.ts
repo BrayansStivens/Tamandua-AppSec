@@ -1,6 +1,8 @@
 // Cliente único: todas las llamadas pasan por aquí, con la cabecera de acción y errores normalizados.
 // La cookie de sesión es HttpOnly y viaja sola en peticiones del mismo origen; si el servidor
 // responde 401, se avisa a la puerta de sesión para volver a la pantalla de acceso.
+import { currentLocale } from '@/shared/i18n'
+
 export class ApiError extends Error {
   status: number
   retryIn?: number
@@ -34,6 +36,9 @@ async function parse<T>(response: Response, path: string): Promise<T> {
   return body as T
 }
 
+// Server text (findings, errors, reports) comes back in the reader's language.
+const localeHeaders = () => ({ 'Accept-Language': currentLocale() })
+
 function saveBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   try {
@@ -48,20 +53,20 @@ function saveBlob(blob: Blob, filename: string) {
 
 export const api = {
   get: <T>(path: string, init?: { signal?: AbortSignal }) =>
-    track(fetch(path, { credentials: 'same-origin', signal: init?.signal }).then(response => parse<T>(response, path))),
+    track(fetch(path, { credentials: 'same-origin', signal: init?.signal, headers: localeHeaders() }).then(response => parse<T>(response, path))),
   post: <T>(path: string, action: string, body: unknown, init?: { signal?: AbortSignal }) => track(fetch(path, {
     method: 'POST', credentials: 'same-origin', signal: init?.signal,
-    headers: { 'Content-Type': 'application/json', 'X-Tamandua-Action': action }, body: JSON.stringify(body),
+    headers: { ...localeHeaders(), 'Content-Type': 'application/json', 'X-Tamandua-Action': action }, body: JSON.stringify(body),
   }).then(response => parse<T>(response, path))),
   // Descarga la respuesta de un POST (p. ej. un informe generado con opciones de un formulario).
   downloadPost: (path: string, action: string, body: unknown, filename: string) => track(fetch(path, {
     method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-Tamandua-Action': action }, body: JSON.stringify(body),
+    headers: { ...localeHeaders(), 'Content-Type': 'application/json', 'X-Tamandua-Action': action }, body: JSON.stringify(body),
   }).then(async response => {
     if (!response.ok) { await parse(response, path); throw new ApiError(`Error ${response.status}`, response.status) }
     saveBlob(await response.blob(), filename)
   })),
-  download: (path: string, filename: string) => track(fetch(path, { credentials: 'same-origin' }).then(async response => {
+  download: (path: string, filename: string) => track(fetch(path, { credentials: 'same-origin', headers: localeHeaders() }).then(async response => {
     if (!response.ok) { await parse(response, path); throw new ApiError(`Error ${response.status}`, response.status) }
     saveBlob(await response.blob(), filename)
   })),
