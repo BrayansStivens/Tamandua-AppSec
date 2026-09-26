@@ -1,3 +1,5 @@
+[English](../installation.md) · Español
+
 # Instalación
 
 ## Requisitos
@@ -37,6 +39,8 @@ Al terminar muestra el **código de configuración** (también con `make setup-c
 ```
 
 Abre <http://127.0.0.1:8766>, escribe ese código y crea tu usuario administrador. El código demuestra que eres quien controla el servidor: sin él, el primero que abriera la URL podría quedarse con la instancia. Si reinicias antes de usarlo, sale uno nuevo.
+
+El panel sigue el idioma de tu navegador; puedes cambiarlo desde la barra lateral o la pantalla de inicio de sesión. Lo que Tamandua escribe sin que nadie lo pida en persona (comentarios en PRs, avisos, Jira, informes y salida de la CLI) usa `TAMANDUA_DEFAULT_LOCALE` (`en` o `es`, por defecto `en`): ponlo en `es` en `.env` si tu equipo trabaja en español. Ver [configuracion.md](configuracion.md).
 
 Luego:
 
@@ -79,7 +83,7 @@ Si pierdes `config/master.key` (o cambias `TAMANDUA_MASTER_KEY`), los secretos g
 
 ## Exponerlo en tu red o en internet
 
-Por defecto el puerto solo se publica en `127.0.0.1`. Para abrirlo desde otras máquinas necesitas HTTPS: el servidor **se niega a arrancar** si `TAMANDUA_PUBLIC_URL` no es loopback y no empieza por `https://`. La forma más sencilla es Caddy delante; está explicado en el [README](../README.md#usarlo-desde-otra-máquina-https).
+Por defecto el puerto solo se publica en `127.0.0.1`. Para abrirlo desde otras máquinas necesitas HTTPS: el servidor **se niega a arrancar** si `TAMANDUA_PUBLIC_URL` no es loopback y no empieza por `https://`. La forma más sencilla es Caddy delante; está explicado en el [README](../../README.es.md#usarlo-desde-otra-máquina-https).
 
 Aunque uses HTTPS, ten en cuenta que la app controla Docker a través de su socket, lo que equivale a root en el host. Expón el panel solo a personas de confianza.
 
@@ -87,7 +91,7 @@ Aunque uses HTTPS, ten en cuenta que la app controla Docker a través de su sock
 
 ```bash
 make clean                   # contenedores e imágenes; conserva data/ y config/
-make purge CONFIRM=borrar    # además borra datos y secretos: solo si ya no los necesitas
+make purge CONFIRM=delete    # además borra datos y secretos: solo si ya no los necesitas
 ```
 
 Borra también tu GitHub App en GitHub (*Settings → Developer settings → GitHub Apps → tu App → Advanced → Delete*), o al menos revoca su clave privada.

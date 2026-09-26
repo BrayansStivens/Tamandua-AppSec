@@ -28,6 +28,7 @@ from pathlib import Path
 
 from tamandua.shared import paths
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import msg, text
 
 VAULT_FILE = "secrets.vault"
 KEY_FILE = "master.key"
@@ -35,7 +36,11 @@ _lock = threading.Lock()
 
 
 class VaultError(RuntimeError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 def _dir() -> Path:
@@ -69,9 +74,9 @@ def _master_key() -> bytes:
         try:
             key = base64.b64decode(configured, validate=True)
         except ValueError as exc:
-            raise VaultError("TAMANDUA_MASTER_KEY no es base64 válido") from exc
+            raise VaultError(msg("vault.errors.master_key_not_base64")) from exc
         if len(key) != 32:
-            raise VaultError("TAMANDUA_MASTER_KEY debe tener 32 bytes (openssl rand -base64 32)")
+            raise VaultError(msg("vault.errors.master_key_length"))
         return key
     path = _private_dir() / KEY_FILE
     try:
@@ -81,9 +86,9 @@ def _master_key() -> bytes:
         _write_private(path, base64.b64encode(key) + b"\n", stat.S_IRUSR)
         return key
     except (ValueError, OSError) as exc:
-        raise VaultError("No se pudo leer la clave maestra del almacén") from exc
+        raise VaultError(msg("vault.errors.master_key_unreadable")) from exc
     if len(key) != 32:
-        raise VaultError("La clave maestra del almacén está dañada")
+        raise VaultError(msg("vault.errors.master_key_damaged"))
     return key
 
 
@@ -93,7 +98,7 @@ def _load() -> dict:
     except FileNotFoundError:
         return {}
     except (ValueError, OSError) as exc:
-        raise VaultError("El almacén de secretos está dañado") from exc
+        raise VaultError(msg("vault.errors.vault_damaged")) from exc
     return payload if isinstance(payload, dict) else {}
 
 
@@ -108,7 +113,7 @@ def get(name: str):
         plain = AESGCM(_master_key()).decrypt(base64.b64decode(entry["nonce"]), base64.b64decode(entry["data"]), name.encode())
         value = json.loads(plain)
     except (InvalidTag, KeyError, ValueError, TypeError) as exc:
-        raise VaultError("No se pudo descifrar un secreto: ¿cambió la clave maestra?") from exc
+        raise VaultError(msg("vault.errors.cannot_decrypt")) from exc
     _register(value)
     return value
 
@@ -143,7 +148,7 @@ def unseal(sealed: str, purpose: str):
         raw = base64.b64decode(sealed, validate=True)
         return json.loads(AESGCM(_master_key()).decrypt(raw[:12], raw[12:], f"sealed:{purpose}".encode()))
     except (InvalidTag, ValueError, TypeError) as exc:
-        raise VaultError("No se pudo abrir un valor sellado: ¿cambió la clave maestra?") from exc
+        raise VaultError(msg("vault.errors.cannot_unseal")) from exc
 
 
 def put(name: str, value) -> None:

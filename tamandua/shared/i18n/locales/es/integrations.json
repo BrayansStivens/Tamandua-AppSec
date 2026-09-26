@@ -49,7 +49,7 @@
     "no_branch_head": "GitHub no devolvió el último commit de la rama",
     "invalid_pr_number": "Número de pull request inválido",
     "invalid_pull": "GitHub devolvió un pull request inválido",
-    "invalid_files": "GitHub devolvió los ficheros del PR en un formato inválido",
+    "invalid_files": "GitHub devolvió los archivos del PR en un formato inválido",
     "invalid_status": "Estado de commit inválido",
     "invalid_tree": "GitHub devolvió el árbol del repositorio en un formato inválido",
     "env_managed_change": "La App viene de variables de entorno del servidor; cámbiala allí",
@@ -57,18 +57,18 @@
     "invalid_action": "Acción de integración inválida",
     "not_connected": "Esa instalación no está conectada",
     "foreign_installation": "Esta instalación no pertenece a la GitHub App configurada",
-    "not_installed": "La App todavía no está instalada en ninguna cuenta. Pulsa Instalar en GitHub y elige los repositorios.",
+    "not_installed": "La App todavía no está instalada en ninguna cuenta. Haz clic en Instalar en GitHub y elige los repositorios.",
     "landing": {
       "back": "Volver al panel",
       "no_installation": "GitHub no devolvió una instalación",
       "no_installation_detail": "Si cancelaste la instalación no hay nada que guardar.",
       "too_many": "Demasiados intentos",
-      "too_many_detail": "Espera unos minutos y vuelve a pulsar «Buscar instalaciones» en Integraciones.",
+      "too_many_detail": "Espera unos minutos y vuelve a hacer clic en «Buscar instalaciones» en Integraciones.",
       "unknown": "Instalación desconocida",
       "unknown_detail": "Esa instalación no pertenece a la GitHub App configurada en este panel.",
       "failed": "La conexión con GitHub falló",
       "available": "Instalación disponible",
-      "available_detail": "Vuelve al panel, pulsa «Buscar instalaciones» y elige la cuenta que quieres conectar."
+      "available_detail": "Vuelve al panel, haz clic en «Buscar instalaciones» y elige la cuenta que quieres conectar."
     }
   },
   "jira": {

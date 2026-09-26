@@ -70,7 +70,7 @@ def provider_status() -> list[dict]:
         entry = stored.get(name) if isinstance(stored.get(name), dict) else None
         from_user = bool(entry and entry.get("api_key"))
         rows.append({"id": name, "configured": bool(_key(name)),
-                     "owner": "usuario" if from_user else "servidor" if os.environ.get(config["env"]) else None,
+                     "owner": "user" if from_user else "server" if os.environ.get(config["env"]) else None,
                      "last4": entry.get("last4") if from_user else None,
                      "saved_at": entry.get("saved_at") if from_user else None,
                      "env": config["env"]})

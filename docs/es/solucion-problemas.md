@@ -1,3 +1,5 @@
+[English](../troubleshooting.md) · Español
+
 # Solución de problemas
 
 Lo primero, siempre:
@@ -26,3 +28,4 @@ Los logs de la app no contienen contraseñas, tokens ni claves: puedes compartir
 | Un análisis quedó *Fallido* tras reiniciar | Al arrancar se marcan como fallidos los que estaban a medias. | Vuelve a lanzarlo. |
 | Perdí el segundo factor | — | Otro administrador lo quita en **Usuarios**, o por CLI: `make cli ARGS="user reset-totp --username tu-usuario"`. |
 | Olvidé la contraseña | — | **Usuarios → Enlace de contraseña**, o `user reset-password` por CLI. |
+| El panel, un informe o un comentario de PR sale en otro idioma | El panel sigue al navegador; todo lo demás usa `TAMANDUA_DEFAULT_LOCALE`. | Usa el selector de idioma de la barra lateral (o de la pantalla de inicio de sesión); para informes, comentarios en PRs, avisos, Jira y la CLI, pon `TAMANDUA_DEFAULT_LOCALE=es` o `en` en `.env` y ejecuta `docker compose up -d`. |

@@ -25,7 +25,7 @@ class OpenApiSecurityTests(unittest.TestCase):
         from tamandua.modules.identity.auth import COOKIE_NAME
         document = json.loads(openapi_document())
         self.assertEqual(document["components"]["securitySchemes"]["session"], {
-            "type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Sesión iniciada en el panel."})
+            "type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Session signed in to the panel."})
         self.assertEqual(document["security"], [{"session": []}])
         self.assertEqual(document["paths"]["/api/health"]["get"]["security"], [{}, {"session": []}])
 

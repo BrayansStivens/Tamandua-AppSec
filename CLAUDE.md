@@ -10,7 +10,7 @@
 - **Data.** All state lives in PostgreSQL (tables per context in `modules/<ctx>/tables.py`; settings in
   `shared/documents.py`). A schema change needs an Alembic migration; rewriting data, a migration in
   `tamandua/app/data_migrations.py` with its test. Never reorder or delete published migrations.
-- **Architecture.** Modular monolith in `tamandua/` (see `docs/arquitectura.md`). Business code in
+- **Architecture.** Modular monolith in `tamandua/` (see `docs/architecture.md`). Business code in
   `tamandua/modules/<context>/`; `modules` never imports `app`/`cli`, `shared` never imports `modules`, and the
   business code never imports FastAPI/Starlette. `make arch` (import-linter) enforces it. Discuss a new context or a new
   cross-context dependency first.

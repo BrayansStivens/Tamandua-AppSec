@@ -231,7 +231,7 @@ def github_app_credentials(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"app_id", "private_key"}:
         return request.json(400, {"error": msg("api.invalid_request")})
-    if github_config()["source"] == "entorno":
+    if github_config()["source"] == "environment":
         return request.json(409, {"error": msg("integrations.github.env_managed_change")})
     previous_app = github_config().get("app_id")
     try:
@@ -258,7 +258,7 @@ def github_action(request: Request):
     action = payload["action"]
     if action in ("disconnect", "forget_app"):
         if action == "forget_app":
-            if github_config()["source"] == "entorno":
+            if github_config()["source"] == "environment":
                 return request.json(409, {"error": msg("integrations.github.env_managed_remove")})
         installation_id = payload.get("installation_id")
         if installation_id is not None and installation_id not in github_installations(request.data_dir):

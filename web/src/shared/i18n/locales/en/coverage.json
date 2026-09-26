@@ -13,6 +13,6 @@
   "loading": "Loading coverage",
   "empty": {
     "no_repositories": "No repositories scanned yet. OWASP coverage shows up after the first full scan.",
-    "no_full_scan": "This repository has no finished full scan yet, and OWASP coverage is measured on one. Start one from “New analysis”."
+    "no_full_scan": "This repository has no finished full scan yet, and OWASP coverage is measured on one. Start one from “New scan”."
   }
 }

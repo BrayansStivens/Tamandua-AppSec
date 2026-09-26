@@ -20,12 +20,12 @@
     "none_one": "{{tools}} no encontró archivos de infraestructura (Dockerfile, Kubernetes, Terraform) en el snapshot"
   },
   "rules": {
-    "configuration_one": "{{count}} regla propia de configuración",
-    "configuration_other": "{{count}} reglas propias de configuración",
-    "crypto_one": "{{count}} regla propia de criptografía y secretos",
-    "crypto_other": "{{count}} reglas propias de criptografía y secretos",
-    "opengrep_one": "{{count}} regla propia en Opengrep",
-    "opengrep_other": "{{count}} reglas propias en Opengrep"
+    "configuration_one": "{{count}} regla de configuración de Tamandua",
+    "configuration_other": "{{count}} reglas de configuración de Tamandua",
+    "crypto_one": "{{count}} regla de criptografía y secretos de Tamandua",
+    "crypto_other": "{{count}} reglas de criptografía y secretos de Tamandua",
+    "opengrep_one": "{{count}} regla de Tamandua en Opengrep",
+    "opengrep_other": "{{count}} reglas de Tamandua en Opengrep"
   },
   "secrets": {
     "engines": "secretos con Gitleaks y Trivy",

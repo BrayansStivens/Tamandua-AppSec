@@ -1,3 +1,5 @@
+[English](../brand.md) · Español
+
 # Marca
 
 ## Nombre
@@ -8,9 +10,9 @@ Se escribe **Tamandua**, sin tilde, en la marca; en texto en español se puede d
 
 ## Mascota y logo
 
-<img src="assets/tamandua.svg" width="96" alt="Logo de Tamandua">
+<img src="../assets/tamandua.svg" width="96" alt="Logo de Tamandua">
 
-El tamandúa, de perfil, atrapa un bug amarillo con la lengua sobre un cuadrado violeta redondeado. El archivo fuente es [`assets/tamandua.svg`](assets/tamandua.svg) (el mismo que usa el panel como favicon); en el panel lo dibuja `web/src/shared/ui/brand-mark.tsx`.
+El tamandúa, de perfil, atrapa un bug amarillo con la lengua sobre un cuadrado violeta redondeado. El archivo fuente es [`assets/tamandua.svg`](../assets/tamandua.svg) (el mismo que usa el panel como favicon); en el panel lo dibuja `web/src/shared/ui/brand-mark.tsx`.
 
 - Tamaño mínimo: 16 px (favicon). Por debajo de 24 px el bug deja de leerse, pero la silueta se reconoce.
 - No se deforma, no se gira y no se cambian sus colores; sobre fondos violetas usa el logo sobre blanco o negro.
@@ -32,4 +34,4 @@ Contraste del acento: 6,1:1 sobre blanco y 8,5:1 sobre las tarjetas del tema osc
 
 ## Voz
 
-Directa, en español neutro, sin miedo ni alarmismo: decimos qué pasa, por qué importa y cómo se arregla. Lema: **«Se come tus bugs»**.
+Directa, sin miedo ni alarmismo: decimos qué pasa, por qué importa y cómo se arregla. En español: neutro latinoamericano, de *tú*. En inglés: llano, en segunda persona y en voz activa. Cada idioma se escribe para sus lectores, no se traduce del otro (ver [`.claude/skills/tamandua-i18n/SKILL.md`](../../.claude/skills/tamandua-i18n/SKILL.md)). Lema: **«Se come tus bugs»** (en inglés, **"Eats your bugs"**).

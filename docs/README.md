@@ -1,15 +1,17 @@
-# Documentación
+English · [Español](es/README.md)
 
-| Documento | Para qué |
+# Documentation
+
+| Document | What it covers |
 | --- | --- |
-| [Inicio rápido](inicio-rapido.md) | De cero al primer hallazgo corregido, con datos de demostración, y qué configurar después. |
-| [Instalación](instalacion.md) | Requisitos, primer arranque, actualizar, copias de seguridad y desinstalar. |
-| [Contenedores y Makefile](contenedores.md) | Qué necesitas, todos los comandos `make`, imágenes, estructura de `docker/` y endurecimiento. |
-| [Conectar GitHub](github-app.md) | Crear tu GitHub App paso a paso, instalarla y revisar pull requests. |
-| [Configuración](configuracion.md) | Todas las variables de `.env`. |
-| [Seguridad](seguridad.md) | Cómo se guardan los secretos, qué sale de tu máquina y concesiones conocidas. |
-| [Funcionalidades](funcionalidades.md) | Panel, hallazgos y su ciclo de vida, CVE tracker, PRs, amenazas, Jira y motores. |
-| [Arquitectura](arquitectura.md) | Componentes, flujo de un análisis y datos en disco. |
-| [Solución de problemas](solucion-problemas.md) | Errores frecuentes y cómo resolverlos. |
-| [Desarrollo](desarrollo.md) | Ejecutar sin contenedores, CLI y pruebas. |
-| [Marca](marca.md) | Nombre, mascota, logo, colores y voz de Tamandua. |
+| [Quickstart](quickstart.md) | From zero to your first fixed finding, with demo data, and what to set up next. |
+| [Installation](installation.md) | Requirements, first start, upgrades, backups and uninstalling. |
+| [Containers and Makefile](containers.md) | What you need, every `make` command, the images, the `docker/` layout and hardening. |
+| [Connect GitHub](github-app.md) | Create your GitHub App step by step, install it and review pull requests. |
+| [Configuration](configuration.md) | Every `.env` variable. |
+| [Security](security.md) | How secrets are stored, what leaves your machine and known trade-offs. |
+| [Features](features.md) | Panel, findings and their lifecycle, CVE tracker, PRs, threats, Jira and engines. |
+| [Architecture](architecture.md) | Components, how a scan flows and what is stored on disk. |
+| [Troubleshooting](troubleshooting.md) | Common errors and how to fix them. |
+| [Development](development.md) | Running without containers, the CLI, tests and bilingual text. |
+| [Brand](brand.md) | Tamandua's name, mascot, logo, colors and voice. |

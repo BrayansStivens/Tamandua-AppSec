@@ -1,3 +1,5 @@
+[English](../quickstart.md) · Español
+
 # Inicio rápido
 
 De cero a ver un hallazgo corregido y verificado, en unos 15 minutos. Los pasos marcados **opcional** se
@@ -18,6 +20,10 @@ La primera vez descarga los motores (unos minutos). Al terminar muestra la URL (
 `make setup-code` lo vuelve a mostrar.
 
 Después, en **Cuenta**, activa el segundo factor.
+
+El panel sigue el idioma de tu navegador; puedes cambiarlo cuando quieras desde la barra lateral o la pantalla de
+inicio de sesión. Los comentarios en PRs, los avisos, Jira, los informes y la salida de la CLI usan
+`TAMANDUA_DEFAULT_LOCALE` (`en` por defecto, ver [configuracion.md](configuracion.md)).
 
 ## 2. Verlo funcionar sin conectar nada (2 min)
 

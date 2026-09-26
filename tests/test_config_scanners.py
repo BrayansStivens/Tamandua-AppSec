@@ -141,7 +141,7 @@ class ImageTests(unittest.TestCase):
         self.assertFalse(rules & {"CKV_DOCKER_1", "CKV_DOCKER_2", "CKV_DOCKER_8"})  # ya cubiertas por reglas propias
         self.assertTrue({"CKV2_DOCKER_2", "CKV2_DOCKER_4", "CKV2_DOCKER_6"} <= rules)  # curl -k, pip --trusted-host, NODE_TLS
         curl = next(item for item in merged if item["rule_id"] == "CKV2_DOCKER_2")
-        self.assertEqual(curl["path"], "historial, paso 5")
+        self.assertEqual(curl["path"], "image-history/step-5")
         self.assertEqual(joined, 3)
         root = next(item for item in merged if item["rule_id"] == "IMG-ROOT")
         self.assertEqual((root["also_detected_by"], root["related_rules"]), (["checkov"], ["CKV_DOCKER_8"]))

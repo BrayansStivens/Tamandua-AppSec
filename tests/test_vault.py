@@ -9,6 +9,7 @@ from unittest.mock import patch
 from tamandua.shared import paths
 from tamandua.shared import log as logging_setup
 from tamandua.shared import vault
+from tamandua.shared.i18n import text
 
 # Valores sintéticos armados por partes: el repositorio no lleva literales con forma de credencial.
 OPENAI_KEY = "-".join(("sk", "proj", "valor", "muy", "secreto", "123"))
@@ -56,8 +57,11 @@ class VaultTests(unittest.TestCase):
             with self.assertRaises(vault.VaultError):
                 vault.get("jira")
         with patch.dict(os.environ, {"TAMANDUA_MASTER_KEY": "corta"}):
-            with self.assertRaises(vault.VaultError):
+            with self.assertRaises(vault.VaultError) as raised:
                 vault.put("x", "y")
+        # English for logs; the message renders in each reader's language.
+        self.assertEqual(str(raised.exception), "TAMANDUA_MASTER_KEY isn't valid base64")
+        self.assertEqual(text(raised.exception.message, "es"), "TAMANDUA_MASTER_KEY no es base64 válido")
 
     def test_master_key_from_environment_is_never_written(self):
         with patch.dict(os.environ, {"TAMANDUA_MASTER_KEY": base64.b64encode(b"m" * 32).decode()}):

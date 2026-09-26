@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from tamandua.app.api.deps import Context, guard
 from tamandua.modules.compliance import cra
 
-router = APIRouter(tags=["cumplimiento"])
+router = APIRouter(tags=["compliance"])
 
 
 class CraStage(BaseModel):
@@ -61,5 +61,5 @@ class CraOverview(BaseModel):
 
 @router.get("/api/cra", response_model=CraOverview)
 def overview(context: Context = Depends(guard())) -> dict:
-    """Lo ve cualquier sesión (el equipo necesita saber qué vence); solo un administrador lo cambia."""
+    """Any session can read it (the team needs to know what is due); only an administrator changes it."""
     return context.render(cra.overview(context.data_dir))

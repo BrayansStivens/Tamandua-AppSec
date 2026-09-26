@@ -1,20 +1,20 @@
 ---
-name: Error
-about: Algo no funciona como dice la documentación
+name: Bug
+about: Something doesn't work the way the documentation says
 labels: bug
 ---
 
-> **No pegues tokens, claves, `.pem` ni el contenido de `config/`.** Para fallos de seguridad usa *Security → Report a vulnerability*.
+> **Don't paste tokens, keys, `.pem` files or the contents of `config/`.** For security issues, use *Security → Report a vulnerability*.
 
-**Qué pasó**
+**What happened**
 
-**Qué esperabas**
+**What you expected**
 
-**Pasos para reproducirlo**
+**Steps to reproduce**
 
-**Entorno**
-- Versión (etiqueta del panel):
-- Sistema y arquitectura:
+**Environment**
+- Version (label in the panel):
+- OS and architecture:
 - `docker compose version`:
 
-**Logs** (`docker compose logs --tail 100 api`, revisados)
+**Logs** (`docker compose logs --tail 100 api`, reviewed)

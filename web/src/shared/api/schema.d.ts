@@ -98,7 +98,7 @@ export interface paths {
         };
         /**
          * Policy
-         * @description Los ve cualquiera (explican las fechas límite); los cambia un administrador.
+         * @description Anyone can read them (they explain due dates); an administrator changes them.
          */
         get: operations["policy_api_sla_get"];
         put?: never;
@@ -118,7 +118,7 @@ export interface paths {
         };
         /**
          * Overview
-         * @description Lo ve cualquier sesión (el equipo necesita saber qué vence); solo un administrador lo cambia.
+         * @description Any session can read it (the team needs to know what is due); only an administrator changes it.
          */
         get: operations["overview_api_cra_get"];
         put?: never;
@@ -413,7 +413,7 @@ export interface components {
         };
         /**
          * SlaDays
-         * @description Días por severidad; None = esa severidad no vence.
+         * @description Days per severity; null means that severity has no due date.
          */
         SlaDays: {
             /** Critical */

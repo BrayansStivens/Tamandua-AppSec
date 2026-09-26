@@ -48,7 +48,7 @@
     "high": "High"
   },
   "status": {
-    "evidenced": "Evidence found",
+    "evidenced": "Evidenced",
     "open": "Open",
     "mitigated": "Mitigated",
     "accepted": "Accepted",
@@ -563,7 +563,7 @@
   },
   "filter": {
     "all": "All",
-    "manual": "MANUAL",
+    "manual": "Manual",
     "add_threat": "Threat",
     "status": "Status",
     "pending": "Unresolved",

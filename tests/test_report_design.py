@@ -16,7 +16,7 @@ from tamandua.modules.findings.remediation import action, fix_groups
 from tamandua.modules.reporting.technical import render_technical_pdf
 from test_threat_model import model
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "web/src/examples/threat-models/stride.json"
+EXAMPLE = Path(__file__).resolve().parents[1] / "web/src/examples/threat-models/en/stride.json"
 
 
 def advisory(identifier: str, severity: str, fixed: str | None, *, kev: bool = False, name: str = "pillow", version: str = "10.3.0") -> dict:

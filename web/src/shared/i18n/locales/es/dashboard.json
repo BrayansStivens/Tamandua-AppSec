@@ -23,7 +23,7 @@
     "new_per_day": { "title": "Hallazgos nuevos por día", "description": "Primera vez que aparece cada huella, por severidad: {{total}} en la ventana." },
     "open_by_severity": { "title": "Abiertos por severidad", "description": "Lo que hay en la última ejecución de cada activo." },
     "found_vs_fixed": { "title": "Hallados frente a corregidos", "description": "Acumulado en la ventana. Corregido = la huella dejó de aparecer en el activo." },
-    "by_cwe": { "title": "Por tipo de vulnerabilidad", "description": "Los CWE más frecuentes entre los abiertos.", "empty": "Sin CWE todavía." },
+    "by_cwe": { "title": "Por tipo de debilidad", "description": "Los CWE más frecuentes entre los abiertos.", "empty": "Sin CWE todavía." },
     "exploitability": { "title": "Explotabilidad", "description": "Abiertos en CISA KEV o con EPSS ≥ 10 %, lo más urgente primero." },
     "top_assets": {
       "title": "Activos más afectados", "description": "Última ejecución de cada repositorio.",
@@ -65,7 +65,7 @@
   },
   "exploitability": {
     "empty": "Ningún hallazgo abierto tiene explotación conocida ni EPSS alto.",
-    "region": "Hallazgos explotables",
+    "region": "Hallazgos con señales de explotación",
     "show_less": "Ver menos",
     "show_all": "Ver los {{total}}",
     "showing": "Se muestran {{shown}} de {{total}}: el resto, en Hallazgos"

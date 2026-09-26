@@ -124,7 +124,7 @@ class ServerTests(unittest.TestCase):
         self.assertNotIn(secret.encode(), listing)
         openai = json.loads(listing)[0]
         self.assertTrue(openai["configured"])
-        self.assertEqual(openai["owner"], "usuario")
+        self.assertEqual(openai["owner"], "user")
         self.assertEqual(openai["last4"], "2333")
 
         # Retirarla la borra del almacén.

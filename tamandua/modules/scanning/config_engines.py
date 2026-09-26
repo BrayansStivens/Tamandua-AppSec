@@ -260,7 +260,7 @@ def parse_checkov(payload, *, image: dict | None = None, step_of: dict[int, int]
             severity = checkov_severity(rule, name)
             if image is not None:
                 step = (step_of or {}).get(start) if start == end else None
-                path = f"historial, paso {step + 1}" if step is not None else "configuración de la imagen"
+                path = f"image-history/step-{step + 1}" if step is not None else "image-config"
                 digest = _stable("image-config", rule, image["asset"], str(step) if step is not None else "image")
                 finding = _base("iac", rule, name or rule, path, 1, severity, tool="checkov",
                                 reason=msg("scanning.checkov.image_reason_step", rule=rule, step=step + 1) if step is not None

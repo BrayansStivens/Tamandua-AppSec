@@ -1,0 +1,11 @@
+{
+  "errors": {
+    "master_key_not_base64": "TAMANDUA_MASTER_KEY no es base64 válido",
+    "master_key_length": "TAMANDUA_MASTER_KEY debe tener 32 bytes (openssl rand -base64 32)",
+    "master_key_unreadable": "No se pudo leer la clave maestra del almacén",
+    "master_key_damaged": "La clave maestra del almacén está dañada",
+    "vault_damaged": "El almacén de secretos está dañado",
+    "cannot_decrypt": "No se pudo descifrar un secreto. ¿Cambió la clave maestra?",
+    "cannot_unseal": "No se pudo abrir un valor sellado. ¿Cambió la clave maestra?"
+  }
+}

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { keys, runsQuery } from '@/shared/api/queries'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import {
   ChevronRight, Clock3, GitPullRequest, LayoutDashboard, Network,
@@ -68,7 +68,7 @@ const DESCRIPTION: Partial<Record<View, string>> = {
 }
 
 function App({ user, session }: { user: SessionUser; session: SessionActions }) {
-  const { t } = useTranslation('nav')
+  const { t, i18n } = useTranslation('nav')
   const [view, setView] = useState<View>(() => (readRoute().view as View | null) ?? 'overview')
   const runsResult = useQuery(runsQuery())
   const rows = useMemo(() => runsResult.data ?? [], [runsResult.data])
@@ -169,7 +169,6 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
       <span className="min-w-0"><span className="block truncate text-sm font-medium">{user.display_name}</span><span className="block truncate text-xs text-app-subtle">{user.totp_enabled ? role : t('role_without_2fa', { role })}</span></span>
       {!user.totp_enabled && <span role="img" aria-label={t('two_factor_off')} className="ml-auto size-2 shrink-0 rounded-full bg-warning" />}
     </button>
-    <LocaleSwitch className="px-3 py-1" />
     <Button variant="ghost" size="sm" onClick={() => void session.logout()} className="w-full justify-start text-app-muted"><LogOut />{t('auth:sign_out')}</Button>
   </div>
 
@@ -193,10 +192,11 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
 
   return <div className="min-h-screen bg-app text-app-fg"><TopProgress /><div className="flex min-h-screen">
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-app-line bg-inset px-4 py-6 lg:flex"><div className="mb-9 px-2"><BrandLockup subtitle={t('tagline')} /></div>{nav}<div className="mt-auto">{userCard}</div></aside>
-    <div className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-app-line bg-app px-4 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetTrigger render={<Button aria-label={t('open_navigation')} variant="ghost" size="icon" className="lg:hidden" />}><Menu /></SheetTrigger><SheetContent side="left" className="w-72 border-app-line bg-inset"><SheetHeader><SheetTitle className="text-left"><BrandLockup size={32} subtitle={t('tagline')} /></SheetTitle></SheetHeader><div className="space-y-6 px-3">{nav}{userCard}</div></SheetContent></Sheet><span className="hidden text-sm text-app-muted sm:inline">{t('workspace')}</span><ChevronRight className="hidden size-3 text-app-subtle sm:block" /><span className="text-sm font-medium">{currentTitle}</span></div><div className="flex items-center gap-3"><Select value={theme} onValueChange={value => setTheme(value as Theme)}><SelectTrigger aria-label={t('theme.label')} size="sm" className="min-w-28 border-app-line bg-app-soft text-app-secondary sm:min-w-32">{theme === 'dark' ? <Moon className="size-3.5" /> : theme === 'light' ? <Sun className="size-3.5" /> : <Monitor className="size-3.5" />}<span className="min-w-0 flex-1 text-left">{theme === 'system' ? t('theme.system') : theme === 'light' ? t('theme.light') : t('theme.dark')}</span></SelectTrigger><SelectContent align="end" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="system">{t('theme.system')}</SelectItem><SelectItem value="light">{t('theme.light')}</SelectItem><SelectItem value="dark">{t('theme.dark')}</SelectItem></SelectContent></Select><Badge variant="outline" className="hidden border-app-line text-app-muted sm:inline-flex">Local · v0.9</Badge><Button aria-label={t('items.new')} onClick={() => selectView('new')} className="bg-primary text-primary-foreground hover:bg-primary/90"><Play /><span className="hidden sm:inline">{t('items.new')}</span></Button></div></header>
+    <div className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-app-line bg-app px-4 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><Sheet open={mobileOpen} onOpenChange={setMobileOpen}><SheetTrigger render={<Button aria-label={t('open_navigation')} variant="ghost" size="icon" className="lg:hidden" />}><Menu /></SheetTrigger><SheetContent side="left" className="w-72 border-app-line bg-inset"><SheetHeader><SheetTitle className="text-left"><BrandLockup size={32} subtitle={t('tagline')} /></SheetTitle></SheetHeader><div className="space-y-6 px-3">{nav}{userCard}</div></SheetContent></Sheet><span className="hidden text-sm text-app-muted sm:inline">{t('workspace')}</span><ChevronRight className="hidden size-3 text-app-subtle sm:block" /><span className="text-sm font-medium">{currentTitle}</span></div><div className="flex items-center gap-3"><LocaleSwitch /><Select value={theme} onValueChange={value => setTheme(value as Theme)}><SelectTrigger aria-label={t('theme.label')} size="sm" className="min-w-28 border-app-line bg-app-soft text-app-secondary sm:min-w-32">{theme === 'dark' ? <Moon className="size-3.5" /> : theme === 'light' ? <Sun className="size-3.5" /> : <Monitor className="size-3.5" />}<span className="min-w-0 flex-1 text-left">{theme === 'system' ? t('theme.system') : theme === 'light' ? t('theme.light') : t('theme.dark')}</span></SelectTrigger><SelectContent align="end" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl"><SelectItem value="system">{t('theme.system')}</SelectItem><SelectItem value="light">{t('theme.light')}</SelectItem><SelectItem value="dark">{t('theme.dark')}</SelectItem></SelectContent></Select><Badge variant="outline" className="hidden border-app-line text-app-muted sm:inline-flex">{t('edition', { version: '0.9' })}</Badge><Button aria-label={t('items.new')} onClick={() => selectView('new')} className="bg-primary text-primary-foreground hover:bg-primary/90"><Play /><span className="hidden sm:inline">{t('items.new')}</span></Button></div></header>
     <main className="mx-auto max-w-[1520px] space-y-7 px-4 py-7 sm:px-8 sm:py-9"><div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between"><div><div className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.22em] text-brand"><span className="size-1.5 rounded-full bg-brand" />{t('eyebrow')}</div><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{currentTitle}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-app-muted">{t(DESCRIPTION[view] ?? 'descriptions.default')}</p></div>{latest && <div className="flex items-center gap-2 text-xs text-app-subtle"><Clock3 className="size-3.5" />{t('last_run', { date: formatDate(latest.created_at) })}</div>}</div>
       {error && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>}
-      {renderMain()}
+      {/* Server text is fetched in the reader's language: remount views when it changes. */}
+      <Fragment key={i18n.language}>{renderMain()}</Fragment>
       <footer className="border-t border-app-line pt-5 text-xs text-app-subtle"><Trans t={t} i18nKey="footer" values={{ name: BRAND.name }} components={{
         license: <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline" />,
         source: <a href={BRAND.repo} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline" />,

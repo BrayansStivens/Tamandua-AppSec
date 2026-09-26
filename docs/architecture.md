@@ -1,0 +1,150 @@
+English · [Español](es/arquitectura.md)
+
+# Architecture
+
+Tamandua is three services: the **API** (FastAPI, which also serves the panel), one or more **workers** that run the
+queued scans and the periodic tasks, and **PostgreSQL**, which holds all the state. The scan engines run as
+short-lived sibling containers started by the worker, with the code mounted read-only, no capabilities, and memory,
+CPU and process limits. The API has no access to Docker.
+
+```mermaid
+flowchart LR
+  browser["Browser<br/>React panel"] -- "HTTPS or loopback<br/>HttpOnly cookie + CSRF" --> api
+
+  subgraph host["Your machine (Docker)"]
+    api["tamandua<br/>API · panel"]
+    worker["worker<br/>queue · periodic tasks"]
+    db[("PostgreSQL<br/>runs · findings · settings")]
+    api --- db
+    worker --- db
+    worker -- "Docker socket" --> engines
+    subgraph engines["Short-lived engines (read-only, no capabilities)"]
+      trivy["Trivy<br/>SCA · IaC · secrets"]
+      gitleaks["Gitleaks<br/>secrets"]
+      opengrep["Opengrep<br/>SAST, 58 Tamandua rules"]
+      checkov["Checkov<br/>IaC · pipelines"]
+      zizmor["zizmor<br/>GitHub Actions"]
+    end
+    config[("config/<br/>encrypted secrets")]
+    api --- config
+    worker --- config
+  end
+
+  worker -- "App JWT / 1 h installation token" --> github["api.github.com"]
+  worker -- "date ranges" --> nvd["NVD"]
+  worker -- "public feeds" --> feeds["CISA KEV · EPSS"]
+```
+
+## Code layout
+
+A modular monolith (`tamandua/`) whose layers are checked by import-linter on every PR (`make arch`, see
+`pyproject.toml`):
+
+```
+tamandua/
+  cli/          command line (scan for CI, demo, users…)
+  app/          composition: API (api/: typed routes per context and table routes in api/routes/), worker,
+                migrations (Alembic and data), demo data, panel static files
+  modules/      the business logic, one package per context; never imports from app/ or cli/
+    identity/       users, sessions, TOTP
+    sources/        repositories, assets (stable identity), domains
+    scanning/       engines (engines, config_engines), plan, inventory, repository, image and local scans, OWASP
+    runs/           runs, scan queue and batches
+    findings/       registry and lifecycle, triage, exclusions, fix guides, re-verification, due dates (SLA)
+    intel/          advisories, KEV/EPSS, local NVD copy, EUVD, sources and licenses
+    compliance/     SBOM, VEX, CRA kit
+    reporting/      PDF/Markdown reports, shared design, Overview
+    integrations/   GitHub App, Jira, notifications (Slack/Teams/webhook), AI keys
+    pullrequests/   PR review and watching
+    threats/        threat modeling, diagram and report
+  shared/       cross-cutting code with no business logic: logs, encrypted store, paths, i18n (en/es catalogs);
+                never imports from modules/
+```
+
+The panel (`web/src`) follows the same idea, organized by feature (a light Feature-Sliced Design), with layers checked
+by `tests/test_web_layers.py`: a layer never imports from the layers above it.
+
+```
+web/src/
+  app/        composition: App (navigation), providers (TanStack Query)
+  pages/      one screen per view (Overview, Findings, CVE tracker, Compliance…)
+  features/   auth, onboarding, analyses, sources, findings, integrations, threats
+  shared/     ui (Base UI + Tailwind), charts, api (client, types generated from OpenAPI, queries), i18n, lib
+```
+
+Server data goes through TanStack Query (`shared/api/queries.ts`): a cache shared across views, and polling only while
+something is running. Types for the migrated routes come from the OpenAPI schema (`make openapi`).
+
+API security lives in one place (`app/api/security.py`): allowed host → CSRF (Origin + action header) → session →
+second factor → role → body size. Typed routes (`deps.guard`) and table routes (`routing.mount`) apply it the same way.
+Handlers never read headers or cookies on their own; an unhandled error returns a 500 with no stack trace.
+The React + TypeScript panel (`web/`) is built into `tamandua/app/static/`.
+
+Services (compose): `api` (panel and API with FastAPI, no access to Docker), `worker` (runs the queued scans and the
+periodic tasks; the only one with the Docker socket; it can scale out, and only the leader, elected with a PostgreSQL
+lock, runs the periodic tasks), `postgres` and `opengrep` (only builds the engine image). The queue (`jobs`) and the
+notification outbox (`outbox`, with retries) live in PostgreSQL: a restart loses nothing that was queued.
+
+## How a scan flows
+
+1. You click **Scan**, or a pull request is opened on a watched repository.
+2. The API queues the job and answers right away; the panel shows live progress.
+3. The worker asks GitHub for a one-hour installation token (kept in memory) and downloads a snapshot of the repository into `data/work/`.
+4. It builds the plan (languages, applicable rules, manifests, IaC) and runs the engines one at a time: read-only snapshot, `--cap-drop ALL`, `no-new-privileges`, at most 3 GB of memory, 2 CPUs and 512 processes. Gitleaks, Opengrep, Checkov and zizmor run **with no network**; Trivy needs it to download its vulnerability database (cached in `data/trivy-cache/`) and sends nothing from the repository.
+5. Results are normalized, deduplicated by a stable fingerprint, enriched with KEV/EPSS and merged into the repository's registry: whatever no longer shows up is marked **fixed**.
+6. For a pull request, a single comment and a commit status are posted according to the configured threshold.
+7. The snapshot is deleted.
+
+## Data on disk
+
+```
+PostgreSQL (tamandua-pg volume; schema managed by Alembic migrations in tamandua/app/alembic)
+  runs                runs: list row, full record, report and SARIF (JSONB + columns for filtering)
+  registry_*          findings registry per asset (state, CVE with a GIN index) and per-run idempotency
+  triage_decisions    triage decisions with their history
+  users, sessions, auth_challenges   identity: users (scrypt, encrypted TOTP), sessions and 2FA challenges (hashes only)
+  documents           JSONB settings, one document each: due dates, exclusions, integrations, domains, batches,
+                      threat models, PR and advisory watching, Jira links, CRA kit…
+  jobs, workers, outbox   scan queue, worker heartbeat and notification outbox with retries
+data/
+  auth/session.key  cookie signing key (kept out of the database: whoever reads the database cannot sign sessions)
+  feeds/            KEV, EPSS, NVD (cves.sqlite; a cache that can be rebuilt)
+  trivy-cache/      Trivy's vulnerability database
+  logs/app.log      one JSON object per line, rotated (10 MB × 5), no secrets
+  data-version.json version of the data migrations already applied
+  backups/          copy of whatever each data migration touched (the last 5 are kept)
+config/
+  secrets.vault     encrypted secrets
+  master.key        master key (unless it comes from the environment)
+```
+
+**Upgrading without breaking data.** Alembic migrations (`tamandua/app/alembic/versions/`) own the database schema and
+run at startup. For data that has to be rewritten, `tamandua/app/data_migrations.py` compares the version stored in
+`data-version.json` with the code's version and applies the pending migrations in order, exactly once, after copying
+to `data/backups/` only what they are about to touch. Each step records its version: if one fails, the next start
+resumes from there. A fresh install starts at the latest version; data from a newer version than the code (a
+downgrade) blocks startup instead of risking damage.
+
+## Design decisions
+
+- **Few dependencies, pinned.** FastAPI, uvicorn, Pydantic, SQLAlchemy (Core), psycopg and Alembic, at exact
+  versions: a small attack surface and security updates that are easy to follow.
+- **Polling instead of webhooks.** The server doesn't need to be reachable from the internet.
+- **One GitHub App per workspace**, with four permissions. To cover several organizations, GitHub requires the App to be installable on any account; the administrator explicitly picks which ones to connect to the workspace. A leaked key would reach every installation of that App, so keeping it safe is still critical.
+- **Honest results.** Whatever couldn't be tested shows up as `not_tested` with its reason; an incomplete scan is never presented as "zero vulnerabilities".
+- **Language-neutral storage, rendered per reader.** Every user-facing text exists in English (the source and the
+  fallback) and Spanish, in catalogs (`tamandua/shared/i18n/locales/` and `web/src/shared/i18n/locales/`). What gets
+  stored (findings, progress, limitations, errors) is a message code plus parameters, rendered when read in the
+  reader's language: the API renders per request, and reports, PR comments, notifications, Jira and the CLI render
+  with an explicit locale (`TAMANDUA_DEFAULT_LOCALE`, `en` by default). The same finding reads naturally in either
+  language, and switching languages never rewrites data. Third-party text (advisories, scanner check names) is shown
+  as published, never machine-translated.
+
+## Not yet (deliberately deferred)
+
+The community edition comes first, done right. These are prepared for, but not built:
+
+- **Real multi-tenancy.** Every table already carries `tenant_id` (always `default` today); PostgreSQL Row Level
+  Security and the concept of an organization are still missing.
+- **Observability.** Traces and metrics with OpenTelemetry (today: structured JSON logs and the worker heartbeat).
+- **SSO (OIDC/SAML) and usage-based quotas.** They belong to the managed edition and live outside this repository.

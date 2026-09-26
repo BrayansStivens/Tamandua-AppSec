@@ -5,9 +5,9 @@
       "reinstall": "Reinstala",
       "install": "Instala"
     },
-    "verify": "Después: sube el cambio a la rama principal y pulsa «Reverificar» (o espera al análisis automático de la rama).",
-    "verify_dependency": "Después: regenera el lockfile, sube el cambio a la rama principal y pulsa «Reverificar» (o espera al análisis automático de la rama).",
-    "verify_image": "Después: reconstruye y publica la imagen con la misma etiqueta y pulsa «Reverificar».",
+    "verify": "Después: sube el cambio a la rama principal y haz clic en «Reverificar» (o espera al análisis automático de la rama).",
+    "verify_dependency": "Después: regenera el lockfile, sube el cambio a la rama principal y haz clic en «Reverificar» (o espera al análisis automático de la rama).",
+    "verify_image": "Después: reconstruye y publica la imagen con la misma etiqueta y haz clic en «Reverificar».",
     "no_fix": {
       "none_published": "No hay versión corregida publicada de {{package}}.",
       "check_usage": "Comprueba si tu código usa la parte vulnerable (el aviso suele decir qué función o formato).",
@@ -35,7 +35,7 @@
       "vault": "Muévela a un gestor de secretos o a una variable de entorno y léela desde ahí.",
       "remove": "Quítala de {{path}} y haz commit.",
       "history": "Si el repositorio es o fue público, considera reescribir el historial (git filter-repo); rotar es lo que te protege.",
-      "verify": "Después pulsa «Reverificar»."
+      "verify": "Después haz clic en «Reverificar»."
     }
   },
   "fix_examples": {

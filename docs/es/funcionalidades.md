@@ -1,3 +1,5 @@
+[English](../features.md) · Español
+
 # Funcionalidades
 
 Qué hace cada parte del panel y con qué criterio. Para instalarlo, ve a [instalacion.md](instalacion.md).
@@ -184,7 +186,7 @@ La revisión de código corre cinco motores externos, cada uno en su contenedor 
 | **Checkov 3.3.19** | infraestructura como código (Terraform, CloudFormation, Kubernetes, Helm, Kustomize, ARM, Bicep, Serverless, OpenAPI, Ansible, Dockerfile) y pipelines (GitHub Actions, GitLab CI, Bitbucket, Azure Pipelines, CircleCI, Argo) | ninguna (`--skip-download`, sin módulos externos) | `bridgecrew/checkov@sha256:d3e96ada…` |
 | **zizmor 1.30.1** | GitHub Actions a fondo: inyección en plantillas, disparadores peligrosos (`pull_request_target`), permisos del token, acciones sin fijar por SHA o archivadas, credenciales que persisten tras `checkout` | ninguna (`--offline`) | `ghcr.io/zizmorcore/zizmor@sha256:a2eb396d…` |
 
-La imagen de Opengrep la construye `make build` (o `make up`): descarga el binario oficial y lo compara con su SHA-256 fijado (la verificación Cosign está documentada en `containers/opengrep/VERIFY.md`).
+La imagen de Opengrep la construye `make build` (o `make up`): descarga el binario oficial y lo compara con su SHA-256 fijado (la verificación Cosign está documentada en `docker/engines/opengrep/VERIFY.md`).
 
 Las reglas son nuestras porque las del registry de Semgrep no pueden usarse en un producto (licencia de uso interno desde diciembre de 2024). Son 58, orientadas a sumideros concretos con análisis de taint donde el lenguaje lo permite, y se validan contra `fixtures/sast-samples/`: las 58 disparan sobre código vulnerable de los siete lenguajes. Cada paso declara qué lenguajes del repositorio tienen reglas y cuáles no. No hay análisis entre archivos: es una limitación de todo SAST open source y se dice en los límites de cada ejecución.
 

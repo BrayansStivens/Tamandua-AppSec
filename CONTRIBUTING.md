@@ -1,27 +1,29 @@
-# Contribuir
+English · [Español](CONTRIBUTING.es.md)
 
-Gracias por el interés. Antes de abrir un PR:
+# Contributing
 
-1. Abre un issue para hablar de cambios grandes.
-2. Corre las pruebas y el lint:
+Thanks for your interest. Before you open a PR:
+
+1. Open an issue first to discuss big changes.
+2. Run the tests and the linters:
 
    ```bash
-   make dev-setup   # una vez
-   make check       # pruebas y contratos de arquitectura del backend + tipos y lint del panel
+   make dev-setup   # once
+   make check       # backend tests and architecture contracts + panel types and lint
    ```
 
-   El CI ([`ci.yml`](.github/workflows/ci.yml)) repite esto en cada PR, comprueba que `tamandua/app/static` está
-   recompilado (`make web`) y analiza el PR con el propio Tamandua: bloquea si introduce algo de severidad alta o superior.
+   CI ([`ci.yml`](.github/workflows/ci.yml)) repeats this on every PR, checks that `tamandua/app/static` has been
+   rebuilt (`make web`) and scans the PR with Tamandua itself: it blocks anything the PR introduces at high severity or above.
 
-3. Mantén las reglas de la casa:
-   - **Sin dependencias nuevas en el backend** salvo que sea imprescindible: hoy solo usa la biblioteca estándar y `cryptography`.
-   - **Ningún secreto en logs, respuestas ni ficheros de `data/`.** Los secretos van por `vault.py`.
-   - Cada ruta nueva se declara con su permiso, su cabecera de acción (POST) y su tamaño máximo de cuerpo; la prueba de la tabla de rutas lo comprueba.
-   - Lo que no se pudo probar se dice (`not_tested` con motivo); nunca se presenta como «sin vulnerabilidades».
-   - Textos de la interfaz y de la documentación en español.
-   - Si cambias el formato de algo que ya está en `data/`: lector tolerante y, si hay que reescribir datos, una migración con su prueba (ver [desarrollo.md](docs/desarrollo.md)).
-4. Nunca pegues tokens, claves ni logs sin revisar en issues o PRs.
+3. Follow the house rules:
+   - **No new backend dependencies** unless they are essential: today they are the ones in `requirements.txt` (FastAPI, uvicorn, Pydantic, SQLAlchemy, Alembic, psycopg, `cryptography` and ReportLab), at pinned versions.
+   - **No secrets in logs, responses or files under `data/`.** Secrets go through `vault.py`.
+   - Every new route is declared with its permission, its action header (POST) and its maximum body size; the route table test checks it.
+   - Whatever couldn't be tested is said so (`not_tested` with a reason); it is never presented as "no vulnerabilities".
+   - Code, identifiers and comments in English. Every text a person reads (panel, errors, findings, reports) exists in English and Spanish through the catalogs: interpret, don't translate ([`.claude/skills/tamandua-i18n/SKILL.md`](.claude/skills/tamandua-i18n/SKILL.md)). Documentation lives in `docs/` (English) and `docs/es/` (Spanish).
+   - If you change the format of something already stored in `data/`: a tolerant reader and, if data has to be rewritten, a migration with its test (see [development.md](docs/development.md)).
+4. Never paste tokens, keys or unreviewed logs into issues or PRs.
 
-**Firma del CLA.** En tu primer PR, un bot te pedirá aceptar el [Acuerdo de Licencia de Contribución](CLA.md) con un comentario. Conservas los derechos de autor; el acuerdo permite distribuir tu aporte bajo la [AGPL-3.0](LICENSE) (las reglas de `rules/`, bajo MIT) y también en una posible edición comercial, con el compromiso de que siga disponible en la edición libre.
+**Signing the CLA.** On your first PR, a bot will ask you to accept the [Contributor License Agreement](CLA.md) with a comment. You keep your copyright; the agreement lets us distribute your contribution under the [AGPL-3.0](LICENSE) (the rules in `rules/` under MIT) and also in a possible commercial edition, with the commitment that it stays available in the free edition.
 
-Detalles para ejecutar sin contenedores en [docs/desarrollo.md](docs/desarrollo.md).
+Details for running without containers are in [docs/development.md](docs/development.md).

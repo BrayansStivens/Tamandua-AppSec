@@ -20,6 +20,7 @@ from tamandua.modules.sources.repositories import SourceError, available_sources
 from tamandua.app.api.server import serve
 from tamandua.modules.runs.store import list_runs, save_repository_scan
 from tamandua.shared.i18n import localize, msg, t, text
+from tamandua.shared.vault import VaultError
 
 
 def _say(value) -> str:
@@ -213,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result["status"] == "connected" else 3
         serve(args.data_dir, args.port, args.bind)
         return 0
-    except (SourceError, GitHubAppError, FileNotFoundError, ValueError) as exc:
+    except (SourceError, GitHubAppError, VaultError, FileNotFoundError, ValueError) as exc:
         parser.exit(1, t("cli.error", detail=_detail(exc)) + "\n")
 
 

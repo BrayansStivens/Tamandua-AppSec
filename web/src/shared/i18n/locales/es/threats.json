@@ -74,7 +74,7 @@
       "purpose": "Revisar amenazas de seguridad en componentes y flujos: suplantación, manipulación, repudio, exposición de información, denegación de servicio y elevación de privilegios.",
       "when": "Buen punto de partida para una aplicación web o una API. Tamandua propone las amenazas con reglas sobre el diagrama.",
       "steps": [
-        "Delimita el alcance: una funcionalidad (login, pagos, subida de ficheros) antes que todo el sistema.",
+        "Delimita el alcance: una funcionalidad (login, pagos, subida de archivos) antes que todo el sistema.",
         "Dibuja actores, procesos, almacenes, flujos de datos y fronteras de confianza.",
         "Recorre cada elemento con las seis preguntas; no hace falta inventar seis amenazas por elemento.",
         "Describe cada escenario: quién hace qué, sobre qué activo y con qué consecuencia.",
@@ -335,13 +335,13 @@
     "unencrypted": "Sin cifrar",
     "legend": "Leyenda del diagrama",
     "aria": {
-      "node": "Pulsa Intro o Espacio para seleccionar el componente. Supr para quitarlo, Escape para cancelar.",
-      "node_keyboard_disabled": "Pulsa Intro o Espacio para seleccionar el componente.",
+      "node": "Haz clic en Intro o Espacio para seleccionar el componente. Supr para quitarlo, Escape para cancelar.",
+      "node_keyboard_disabled": "Haz clic en Intro o Espacio para seleccionar el componente.",
       "moved_left": "Componente movido hacia la izquierda, a {{x}}, {{y}}",
       "moved_right": "Componente movido hacia la derecha, a {{x}}, {{y}}",
       "moved_up": "Componente movido hacia arriba, a {{x}}, {{y}}",
       "moved_down": "Componente movido hacia abajo, a {{x}}, {{y}}",
-      "edge": "Pulsa Intro o Espacio para seleccionar el flujo. Supr para quitarlo, Escape para cancelar.",
+      "edge": "Haz clic en Intro o Espacio para seleccionar el flujo. Supr para quitarlo, Escape para cancelar.",
       "controls": "Controles del diagrama",
       "zoom_in": "Acercar",
       "zoom_out": "Alejar",
@@ -403,7 +403,7 @@
     "title": "Cómo se usa",
     "add": "Añade componentes y fronteras desde la barra del lienzo.",
     "flows": "Para crear un flujo, arrastra desde uno de los puntos de un componente hasta otro. La flecha indica hacia dónde viajan los datos.",
-    "select": "Pulsa un componente, un flujo o el nombre de una frontera para editarlo aquí. Suprimir borra lo seleccionado.",
+    "select": "Haz clic en un componente, un flujo o el nombre de una frontera para editarlo aquí. Suprimir borra lo seleccionado.",
     "colors": "Color: el del papel de cada componente (leyenda abajo a la derecha); cámbialo al seleccionarlo. Anillo naranja: amenazas con indicios en los análisis. Línea roja discontinua: flujo sin cifrar.",
     "numbers": "Cada flujo lleva un número: es el mismo del SVG y de la tabla de flujos del informe."
   },
@@ -563,7 +563,7 @@
   },
   "filter": {
     "all": "Todas",
-    "manual": "PROPIA",
+    "manual": "Propia",
     "add_threat": "Amenaza",
     "status": "Estado",
     "pending": "Pendientes",

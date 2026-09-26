@@ -15,7 +15,7 @@ Gitleaks, Trivy, OSV-Scanner, Checkov, zizmor) as sibling containers: **the runn
 
 ## 1. Start from the official template
 
-The complete GitHub Actions and GitLab CI templates are in the CI section ("En CI") of `docs/cli.md` in the Tamandua
+The complete GitHub Actions and GitLab CI templates are in the "In CI" section of `docs/cli.md` in the Tamandua
 repository (`${TAMANDUA_DIR:-$HOME/tamandua}/docs/cli.md` if it is cloned). Copy the template instead of writing it
 from memory, and adapt only what is needed.
 

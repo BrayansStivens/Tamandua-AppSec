@@ -1,7 +1,7 @@
 #!/bin/sh
-# Copia de seguridad en backups/<fecha>/: data.tgz (sin cachés regenerables) y config.tgz.
-# config.tgz contiene la clave maestra y el almacén cifrado: guárdalo aparte y protegido.
-# Para una copia coherente, la app se detiene unos segundos. Uso: make backup
+# Backup into backups/<date>/: database.dump, data.tgz (without rebuildable caches) and config.tgz.
+# config.tgz holds the master key and the encrypted vault: keep it apart and protected.
+# For a consistent copy the app stops for a few seconds. Usage: make backup
 set -eu
 
 stamp=$(date +%Y%m%d-%H%M%S)
@@ -11,7 +11,7 @@ running=$(docker compose ps --status running --services 2>/dev/null | grep -x ap
 if [ -n "$running" ]; then
   active=$(docker compose exec -T api python -c "from pathlib import Path; from tamandua.modules.runs.store import list_runs; print(sum(1 for r in list_runs(Path('/data')) if r.get('status') in ('queued', 'running')))" 2>/dev/null || echo 0)
   if [ "${active:-0}" != "0" ] && [ "${FORCE:-}" != "1" ]; then
-    echo "Hay $active análisis en marcha. Espera a que terminen o usa FORCE=1 (se marcarán como fallidos)." >&2
+    echo "$active scans are running. Wait for them to finish or use FORCE=1 (they will be marked as failed)." >&2
     exit 1
   fi
   docker compose stop api >/dev/null
@@ -19,14 +19,14 @@ fi
 
 mkdir -p "$target"
 chmod 700 backups "$target"
-# Ejecuciones, hallazgos y triage: volcado de PostgreSQL (formato custom de pg_restore).
+# Runs, findings and triage: PostgreSQL dump (pg_restore custom format).
 docker compose exec -T postgres pg_dump -U tamandua -d tamandua -Fc > "$target/database.dump"
 tar czf "$target/data.tgz" --exclude=data/feeds --exclude=data/trivy-cache --exclude=data/grype-cache --exclude=data/work --exclude=data/tmp data
 tar czf "$target/config.tgz" config
 chmod 600 "$target"/*.tgz "$target/database.dump"
 
 [ -n "$running" ] && docker compose start api >/dev/null
-echo "Copia en $target/"
-echo "  database.dump  ejecuciones, hallazgos y triage (PostgreSQL; se restaura con pg_restore)"
-echo "  data.tgz    usuarios, ajustes y el resto de data/ (sin secretos)"
-echo "  config.tgz  SECRETOS CIFRADOS + CLAVE MAESTRA: guárdalo fuera de esta máquina y protegido"
+echo "Backup in $target/"
+echo "  database.dump  runs, findings and triage (PostgreSQL; restore with pg_restore)"
+echo "  data.tgz       users, settings and the rest of data/ (no secrets)"
+echo "  config.tgz     ENCRYPTED SECRETS + MASTER KEY: keep it off this machine and protected"

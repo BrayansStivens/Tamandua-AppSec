@@ -8,12 +8,25 @@
   "role_without_2fa": "{{role}} · sin 2FA",
   "two_factor_off": "Segundo factor sin activar",
   "groups": {
-    "risk": "Riesgo", "scanning": "Escaneo", "settings": "Ajustes"
+    "risk": "Riesgo",
+    "scanning": "Escaneo",
+    "settings": "Ajustes"
   },
   "items": {
-    "overview": "Resumen", "findings": "Hallazgos", "threats": "Amenazas", "coverage": "Cobertura", "cves": "CVE tracker",
-    "compliance": "Cumplimiento", "analyses": "Análisis", "repositories": "Repositorios", "pulls": "Pull requests",
-    "integrations": "Integraciones", "users": "Usuarios", "new": "Nuevo análisis", "account": "Cuenta", "domains": "Pruebas web"
+    "overview": "Resumen",
+    "findings": "Hallazgos",
+    "threats": "Amenazas",
+    "coverage": "Cobertura",
+    "cves": "CVE tracker",
+    "compliance": "Cumplimiento",
+    "analyses": "Análisis",
+    "repositories": "Repositorios",
+    "pulls": "Pull requests",
+    "integrations": "Integraciones",
+    "users": "Usuarios",
+    "new": "Nuevo análisis",
+    "account": "Cuenta",
+    "domains": "Pruebas web"
   },
   "descriptions": {
     "overview": "Qué riesgos tiene tu código, sus dependencias y tus imágenes, por qué importan y cómo se corrigen.",
@@ -31,7 +44,10 @@
     "default": "Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles."
   },
   "theme": {
-    "label": "Apariencia", "system": "Sistema", "light": "Claro", "dark": "Oscuro"
+    "label": "Apariencia",
+    "system": "Sistema",
+    "light": "Claro",
+    "dark": "Oscuro"
   },
   "toast": {
     "repository": "repositorio",
@@ -56,5 +72,6 @@
   "update": {
     "message": "Hay una versión nueva del panel. Recarga para usarla; guarda antes lo que tengas sin guardar.",
     "reload": "Recargar"
-  }
+  },
+  "edition": "Autoalojado · v{{version}}"
 }

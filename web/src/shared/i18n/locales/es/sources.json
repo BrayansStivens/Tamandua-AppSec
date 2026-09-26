@@ -79,7 +79,7 @@
       "action": "Acción"
     },
     "loading": "Cargando repositorios",
-    "not_scanned": "No probado",
+    "not_scanned": "Sin analizar",
     "scan": "Analizar",
     "no_match": "No hay repositorios que coincidan."
   },
@@ -94,8 +94,8 @@
   },
   "github": {
     "copy_value": "Copiar {{value}}",
-    "pem_too_large": "Ese fichero es demasiado grande para ser una clave .pem",
-    "pem_invalid": "Ese fichero no parece una clave privada (.pem) de GitHub App",
+    "pem_too_large": "Ese archivo es demasiado grande para ser una clave .pem",
+    "pem_invalid": "Ese archivo no parece una clave privada (.pem) de GitHub App",
     "steps": {
       "open": {
         "title": "Abre el formulario de nueva GitHub App",
@@ -124,11 +124,11 @@
       },
       "install_scope": {
         "title": "Cuentas donde se puede instalar",
-        "body": "En «Where can this GitHub App be installed?» elige <b>Any account</b> si vas a conectar varias organizaciones. Después pulsa <b>Create GitHub App</b>."
+        "body": "En «Where can this GitHub App be installed?» elige <b>Any account</b> si vas a conectar varias organizaciones. Después haz clic en <b>Create GitHub App</b>."
       },
       "key": {
         "title": "Copia el App ID y genera la clave privada",
-        "body": "El <b>App ID</b> aparece arriba, en «About». Baja hasta <b>Private keys</b> y pulsa «Generate a private key»: se descarga un fichero <code>.pem</code>."
+        "body": "El <b>App ID</b> aparece arriba, en «About». Baja hasta <b>Private keys</b> y haz clic en «Generate a private key»: se descarga un archivo <code>.pem</code>."
       }
     },
     "form": {
@@ -139,7 +139,7 @@
       "app_id": "App ID",
       "private_key": "Clave privada (.pem)",
       "key_loaded": "Clave cargada",
-      "choose_file": "Elige el fichero .pem descargado",
+      "choose_file": "Elige el archivo .pem descargado",
       "paste": "o pégala como texto",
       "paste_label": "Clave privada en texto",
       "submit": "Verificar y guardar",
@@ -150,8 +150,8 @@
       "verified_owner": "App <b>{{name}}</b> de <b>{{owner}}</b> verificada.",
       "next_connected": "Puedes añadir otra organización y elegir sus repositorios.",
       "next_first": "Instálala en las organizaciones que necesites y elige sus repositorios.",
-      "step_install": "Pulsa <b>Instalar en GitHub</b> y elige <b>Only select repositories</b> con los que quieras analizar.",
-      "step_detect": "Vuelve y pulsa <b>Buscar instalaciones</b>; selecciona las organizaciones que quieres usar en este workspace.",
+      "step_install": "Haz clic en <b>Instalar en GitHub</b> y elige <b>Only select repositories</b> con los que quieras analizar.",
+      "step_detect": "Vuelve y haz clic en <b>Buscar instalaciones</b>; selecciona las organizaciones que quieres usar en este workspace.",
       "install": "Instalar en GitHub",
       "detect": "Buscar instalaciones",
       "installed_on": "Cuentas donde la App está instalada",

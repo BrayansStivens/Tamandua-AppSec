@@ -9,7 +9,7 @@ import { BRAND } from '@/shared/lib/brand'
 export type PermissionReview = { required: Record<string, string>; declared: Record<string, string>; granted: Record<string, string>; excess: string[]; missing: string[]; pending_acceptance: string[] }
 export type GitHubStatus = {
   configured: boolean; missing: string[]; connected: boolean; app_id: string; slug: string; owner: string | null; name: string | null; html_url: string | null
-  source: 'entorno' | 'almacén cifrado' | null; public_url: string; permissions?: PermissionReview | null; required_permissions: Record<string, string>
+  source: 'environment' | 'vault' | null; public_url: string; permissions?: PermissionReview | null; required_permissions: Record<string, string>
   installation: GitHubInstallation | null; installations: GitHubInstallation[]
   available_installations?: { installation_id: number; account: string | null; account_type: string | null; repository_selection: string | null; connected: boolean }[]
 }
@@ -104,7 +104,7 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
     <form onSubmit={submit} className="space-y-4 self-start rounded-xl border border-app-line bg-panel p-4">
       <div><p className="text-sm font-medium">{t('github.form.title')}</p><p className="mt-1 text-xs leading-5 text-app-muted">{t('github.form.description')}</p></div>
       {!canManage && <p className="rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-muted">{t('github.form.admin_only')}</p>}
-      {status.source === 'entorno' && <p className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning"><Trans t={t} i18nKey="github.form.env_missing" values={{ missing: status.missing.join(', ') }} components={{ code: <code className="font-mono" /> }} /></p>}
+      {status.source === 'environment' && <p className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning"><Trans t={t} i18nKey="github.form.env_missing" values={{ missing: status.missing.join(', ') }} components={{ code: <code className="font-mono" /> }} /></p>}
       <div className="space-y-1.5"><label htmlFor="github-app-id" className="text-xs text-app-muted">{t('github.form.app_id')}</label>
         <Input id="github-app-id" required inputMode="numeric" pattern="[1-9][0-9]{0,11}" maxLength={12} disabled={!canManage} value={appId} onChange={event => setAppId(event.target.value.replace(/\D/g, ''))} placeholder="123456" className="border-app-line bg-app-soft font-mono" /></div>
       <div className="space-y-1.5"><span className="text-xs text-app-muted">{t('github.form.private_key')}</span>

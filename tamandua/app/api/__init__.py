@@ -23,6 +23,7 @@ from tamandua.app.api.routes import auth, cra, prs, runs, sources, threats  # no
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
 from tamandua.modules.identity.auth import COOKIE_NAME
 from tamandua.shared.i18n import localize, msg, negotiate
+from tamandua.shared.vault import VaultError
 from tamandua.version import VERSION
 
 ROUTERS = (system, reporting, intel, findings, compliance)
@@ -71,6 +72,11 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
     async def api_error(request: Request, error: ApiError):
         return JSONResponse(_error(request, error.message, **error.extra), status_code=error.status)
 
+    @app.exception_handler(VaultError)
+    async def vault_error(request: Request, error: VaultError):
+        log.error("vault error: %s", error, extra={"method": request.method, "path": request.url.path})
+        return JSONResponse(_error(request, error.message), status_code=500)
+
     @app.exception_handler(RequestValidationError)
     async def invalid(request: Request, error: RequestValidationError):
         return JSONResponse(_error(request, msg("api.invalid_parameters")), status_code=400)
@@ -105,6 +111,6 @@ def openapi_document(data_dir: Path | None = None) -> str:
     # Cómo se autentica la API: la cookie de sesión (HttpOnly) en todo, salvo lo que cada ruta declare como público.
     # Los POST exigen además Origin y la cabecera X-Tamandua-Action (CSRF), que la cookie sola no cubre.
     document.setdefault("components", {})["securitySchemes"] = {
-        "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Sesión iniciada en el panel."}}
+        "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Session signed in to the panel."}}
     document["security"] = [{"session": []}]
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"

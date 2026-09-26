@@ -14,7 +14,7 @@ from tamandua.modules.threats import diagram as threat_diagram
 from tamandua.modules.threats import model as tm
 
 ROOT = Path(__file__).resolve().parents[1]
-EXAMPLES = sorted((ROOT / "web/src/examples/threat-models").glob("*.json"))
+EXAMPLES = sorted((ROOT / "web/src/examples/threat-models").glob("*/*.json"))
 
 
 def _node_ok() -> bool:

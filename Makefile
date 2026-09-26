@@ -1,5 +1,5 @@
-# Tamandua · comandos habituales.  `make help` para la lista.
-# Solo necesita make y Docker; los objetivos de desarrollo necesitan además Python 3.12 y Node 22.
+# Tamandua · common commands. `make help` for the list.
+# Only needs make and Docker; the development targets also need Python 3.12 and Node 22.
 
 SHELL := /bin/sh
 COMPOSE ?= docker compose
@@ -13,139 +13,139 @@ DIR ?=
 ARGS ?=
 VENV := .venv
 export TAMANDUA_VERSION := $(VERSION)
-# Grupo del socket de Docker en Linux y WSL con Docker nativo (en macOS, Docker Desktop usa el 0).
-# Un valor en el entorno o en .env manda sobre la detección.
+# Docker socket group on Linux and WSL with native Docker (on macOS, Docker Desktop uses 0).
+# A value in the environment or in .env overrides detection.
 DOCKER_SOCKET_GID ?= $(shell sed -n 's/^DOCKER_SOCKET_GID=//p' .env 2>/dev/null | tail -n1)
 ifeq ($(strip $(DOCKER_SOCKET_GID)),)
 DOCKER_SOCKET_GID := $(shell [ "$$(uname -s)" = Linux ] && stat -Lc %g /var/run/docker.sock 2>/dev/null)
 endif
-# El 0 ya va siempre en compose; repetirlo es un error.
+# 0 is always in compose already; repeating it is an error.
 ifeq ($(strip $(DOCKER_SOCKET_GID)),0)
 DOCKER_SOCKET_GID :=
 endif
 export DOCKER_SOCKET_GID
-# Imágenes publicadas de los motores, fijadas por digest, leídas del código (sin Python ni la imagen de la app).
-# `make engines` las descarga desde el host: se ve el progreso, no hay límite de tiempo y no depende
-# de los permisos del socket dentro del contenedor.
+# Published engine images, pinned by digest, read from the code (no Python or app image needed).
+# `make engines` pulls them from the host: progress is visible, there is no time limit and it doesn't depend
+# on the socket permissions inside the container.
 ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' tamandua/modules/scanning/engines.py
 
 .DEFAULT_GOAL := help
 .PHONY: arch openapi help doctor setup build up down restart status logs ps setup-code engines scan demo update backup shell cli \
         clean purge dev-setup dev test lint web check
 
-## —— Uso ———————————————————————————————————————————————————————————————
+## —— Usage —————————————————————————————————————————————————————————————
 
-help: ## Muestra esta ayuda
-	@printf 'Tamandua %s · uso: make <objetivo>\n\n' "$(VERSION)"
+help: ## Show this help
+	@printf 'Tamandua %s · usage: make <target>\n\n' "$(VERSION)"
 	@awk 'BEGIN {FS = ":.*## "} /^## ——/ {sub(/^## /, ""); printf "\n\033[1m%s\033[0m\n", $$0} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
-	@printf '\nPrimera vez:  make up\n'
+	@printf '\nFirst time:  make up\n'
 
-doctor: ## Comprueba requisitos (Docker, Compose, disco, puerto, permisos)
+doctor: ## Check requirements (Docker, Compose, disk, port, permissions)
 	@sh scripts/doctor.sh
 
-setup: ## Crea .env con tu UID/GID y las carpetas data/ y config/
+setup: ## Create .env with your UID/GID and the data/ and config/ folders
 	@sh scripts/init-env.sh
 
-build: setup ## Construye las imágenes (app y motor Opengrep verificado)
+build: setup ## Build the images (app and verified Opengrep engine)
 	$(COMPOSE) build
 
-up: setup ## Construye si hace falta, descarga los motores que falten, arranca y muestra la URL
+up: setup ## Build if needed, pull missing engines, start and show the URL
 	$(COMPOSE) up --build -d
-	@printf 'Esperando a que el panel responda'
+	@printf 'Waiting for the panel to respond'
 	@i=0; until [ "$$(docker inspect -f '{{.State.Health.Status}}' tamandua 2>/dev/null)" = healthy ]; do \
-	  i=$$((i + 1)); if [ $$i -gt 60 ]; then echo; echo 'No arrancó en 2 minutos: make logs'; exit 1; fi; printf '.'; sleep 2; done; echo
-	@$(MAKE) --no-print-directory engines || echo 'Aviso: faltan motores; el panel funciona y se reintentan con make engines.'
+	  i=$$((i + 1)); if [ $$i -gt 60 ]; then echo; echo 'It did not start within 2 minutes: make logs'; exit 1; fi; printf '.'; sleep 2; done; echo
+	@$(MAKE) --no-print-directory engines || echo 'Warning: some engines are missing; the panel works, retry with make engines.'
 	@echo "Panel: $(URL)"
 	@$(MAKE) --no-print-directory setup-code
 
-down: ## Para y elimina los contenedores (conserva data/ y config/)
+down: ## Stop and remove the containers (keeps data/ and config/)
 	$(COMPOSE) down
 
-restart: ## Reinicia la app (marca como fallidos los análisis en curso)
+restart: ## Restart the app (marks running scans as failed)
 	$(COMPOSE) restart api worker
 
-status: ## Estado de los contenedores y de los motores
+status: ## Status of the containers and the engines
 	@$(COMPOSE) ps
 	@echo
-	@$(COMPOSE) exec -T worker python -m tamandua engines 2>/dev/null || echo "La app no está en marcha: make up"
+	@$(COMPOSE) exec -T worker python -m tamandua engines 2>/dev/null || echo "The app is not running: make up"
 
 ps: status
 
-logs: ## Sigue los logs de la app (Ctrl+C para salir)
+logs: ## Follow the app logs (Ctrl+C to exit)
 	$(COMPOSE) logs -f --tail 100 api
 
-setup-code: ## Muestra el código para crear el primer administrador
-	@code=$$($(COMPOSE) logs api 2>/dev/null | grep -A1 'Primer arranque' | tail -n1 | sed 's/.*| *//; s/^ *//'); \
+setup-code: ## Show the code to create the first administrator
+	@code=$$($(COMPOSE) logs api 2>/dev/null | grep -oE '(^|[| ])[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){2} *$$' | tail -n1 | tr -d ' |'); \
 	if [ -n "$$code" ] && curl -fsS -H "Host: 127.0.0.1:$(HOST_PORT)" "http://127.0.0.1:$(HOST_PORT)/api/auth/session" 2>/dev/null | grep -q '"setup_required": true'; then \
-	  echo "Código de configuración: $$code  (créalo en $(URL))"; \
-	else echo "Ya hay un administrador creado: entra con tu usuario."; fi
+	  echo "Setup code: $$code  (create the administrator at $(URL))"; \
+	else echo "An administrator already exists: sign in with your user."; fi
 
-engines: ## Descarga las imágenes de los motores que falten (Trivy, OSV-Scanner, Gitleaks, Grype, Checkov, zizmor), con progreso
+engines: ## Pull the missing engine images (Trivy, OSV-Scanner, Gitleaks, Grype, Checkov, zizmor), with progress
 	@images=$$($(ENGINE_IMAGES)); \
 	missing=0; for image in $$images; do docker image inspect "$$image" >/dev/null 2>&1 || missing=$$((missing + 1)); done; \
-	if [ $$missing -eq 0 ]; then echo 'Motores: todas las imágenes están listas.'; exit 0; fi; \
-	echo "Motores: faltan $$missing imágenes; la primera vez puede tardar según tu conexión."; \
+	if [ $$missing -eq 0 ]; then echo 'Engines: all images are ready.'; exit 0; fi; \
+	echo "Engines: $$missing images missing; the first time can take a while depending on your connection."; \
 	for image in $$images; do \
 	  docker image inspect "$$image" >/dev/null 2>&1 && continue; \
 	  echo "→ $${image%%@*}"; \
-	  docker pull "$$image" || { echo "Falló la descarga de $${image%%@*}: revisa la conexión y repite make engines."; exit 1; }; \
-	done; echo 'Motores: listos.'
+	  docker pull "$$image" || { echo "Pulling $${image%%@*} failed: check your connection and run make engines again."; exit 1; }; \
+	done; echo 'Engines: ready.'
 
-scan: ## Analiza una carpeta local: make scan DIR=../mi-repo ARGS="--base main --fail-on high"
-	@[ -d "$(DIR)" ] || { echo 'Indica la carpeta: make scan DIR=../mi-repo (y opciones en ARGS="--base main")'; exit 2; }
+scan: ## Scan a local folder: make scan DIR=../my-repo ARGS="--base main --fail-on high"
+	@[ -d "$(DIR)" ] || { echo 'Give the folder: make scan DIR=../my-repo (and options in ARGS="--base main")'; exit 2; }
 	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro worker python -m tamandua scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
 
-demo: ## Datos de demostración: analiza los ejemplos vulnerables e importa un modelo de amenazas (IMAGE=nginx:1.21 añade una imagen)
+demo: ## Demo data: scans the vulnerable examples and imports a threat model (IMAGE=nginx:1.21 adds an image)
 	@$(COMPOSE) run --rm -T -v "$(abspath fixtures)":/demo/fixtures:ro -v "$(abspath web/src/examples/threat-models)":/demo/models:ro \
 		worker python -m tamandua --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
 
-update: ## Actualiza el código (git pull) y reconstruye
+update: ## Update the code (git pull) and rebuild
 	git pull --ff-only
 	$(MAKE) --no-print-directory up
 
-backup: ## Copia data/ y config/ en backups/<fecha>/ (FORCE=1 si hay análisis en curso)
+backup: ## Copy data/ and config/ to backups/<date>/ (FORCE=1 if scans are running)
 	@sh scripts/backup.sh
 
-shell: ## Abre una terminal dentro del contenedor
+shell: ## Open a shell inside the container
 	$(COMPOSE) exec api sh
 
-cli: ## CLI de la app: make cli ARGS="user list"
+cli: ## App CLI: make cli ARGS="user list"
 	$(COMPOSE) exec api python -m tamandua --data-dir /data $(ARGS)
 
-clean: ## Para todo y borra las imágenes locales (conserva data/ y config/)
+clean: ## Stop everything and remove the local images (keeps data/ and config/)
 	$(COMPOSE) down --rmi all
 
-purge: ## ¡BORRA data/ y config/! Pide CONFIRM=borrar
-	@if [ "$(CONFIRM)" != "borrar" ]; then echo 'Esto borra ejecuciones, usuarios y secretos. Repite con: make purge CONFIRM=borrar'; exit 1; fi
+purge: ## DELETES data/ and config/. Requires CONFIRM=delete
+	@if [ "$(CONFIRM)" != "delete" ] && [ "$(CONFIRM)" != "borrar" ]; then echo 'This deletes runs, users and secrets. Run again with: make purge CONFIRM=delete'; exit 1; fi
 	$(COMPOSE) down --rmi all
 	rm -rf data config
 
-## —— Desarrollo ———————————————————————————————————————————————————————
+## —— Development ———————————————————————————————————————————————————————
 
-dev-setup: ## Crea .venv e instala dependencias de Python y del panel
+dev-setup: ## Create .venv and install the Python and panel dependencies
 	$(PYTHON) -m venv $(VENV)
 	$(VENV)/bin/pip install -q -r requirements-dev.txt
 	cd web && npm ci --no-audit --no-fund
 
-dev: ## Servidor local sin contenedor en 127.0.0.1:8767 (motores vía tu Docker)
+dev: ## Local server without a container on 127.0.0.1:8767 (engines through your Docker)
 	TAMANDUA_PUBLIC_URL=http://127.0.0.1:8767 TAMANDUA_ALLOWED_ORIGINS=http://127.0.0.1:8767,http://localhost:8767 \
 	TAMANDUA_CONFIG_DIR=$(CURDIR)/.dev/config $(VENV)/bin/python -m tamandua --data-dir .dev/data serve --port 8767
 
-web: ## Compila el panel en tamandua/app/static/
+web: ## Build the panel into tamandua/app/static/
 	cd web && npm run build
 
-test: ## Pruebas del backend (arranca un Postgres efímero de pruebas si hace falta)
+test: ## Backend tests (starts a throwaway test Postgres if needed)
 	@url=$$(sh scripts/test-db.sh) && TAMANDUA_DATABASE_URL="$$url" TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_DEFAULT_LOCALE=es $(VENV)/bin/python -m unittest discover -s tests
 
-openapi: ## Esquema OpenAPI de la API y tipos TypeScript del panel (web/src/shared/api/)
+openapi: ## API OpenAPI schema and the panel's TypeScript types (web/src/shared/api/)
 	@mkdir -p web/src/shared/api
 	$(VENV)/bin/python -c "from tamandua.app.api import openapi_document; print(openapi_document(), end='')" > web/src/shared/api/openapi.json
 	cd web && npx --yes openapi-typescript@7.13.0 src/shared/api/openapi.json -o src/shared/api/schema.d.ts
 
-arch: ## Contratos de arquitectura (import-linter, ver pyproject.toml)
+arch: ## Architecture contracts (import-linter, see pyproject.toml)
 	$(VENV)/bin/lint-imports
 
-lint: ## Lint y tipos del panel
+lint: ## Panel lint and types
 	cd web && npx tsc -b && npm run lint
 
-check: test arch lint ## Pruebas, contratos de arquitectura y lint (lo que se exige antes de un PR)
+check: test arch lint ## Tests, architecture contracts and lint (required before a PR)

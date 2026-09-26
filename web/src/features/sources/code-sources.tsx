@@ -100,7 +100,7 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
 
           {github?.configured && <GitHubInstall status={github} canManage={canManage} onChanged={changed} />}
           {github && !github.configured && <GitHubAppGuide status={github} canManage={canManage} onSaved={changed} />}
-          {github?.configured && github.source === 'almacén cifrado' && canManage && <div className="mt-4 border-t border-app-line pt-3 text-xs">
+          {github?.configured && github.source === 'vault' && canManage && <div className="mt-4 border-t border-app-line pt-3 text-xs">
             {confirmForget ? <div className="flex flex-wrap items-center gap-2"><span className="text-app-muted">{t('providers.forget_confirm')}</span>
               <Button size="sm" variant="destructive" disabled={busy} onClick={() => void act('forget_app')}>{t('providers.forget')}</Button><Button size="sm" variant="ghost" onClick={() => setConfirmForget(false)}>{t('common:actions.cancel')}</Button></div>
               : <button type="button" onClick={() => setConfirmForget(true)} className="text-app-subtle hover:text-app-fg">{t('providers.use_other_app')}</button>}

@@ -1,21 +1,21 @@
-# Tamandua autoalojado. La forma recomendada de usarlo es el Makefile:
+# Self-hosted Tamandua. The recommended way to run it is the Makefile:
 #
-#   make up          # prepara .env, construye, arranca y muestra el código de configuración
-#   make help        # el resto de comandos
+#   make up          # prepares .env, builds, starts and shows the setup code
+#   make help        # every other command
 #
-# Sin make:  cp .env.example .env && mkdir -p data config && docker compose up --build -d
+# Without make:  cp .env.example .env && mkdir -p data config && docker compose up --build -d
 #
-# Servicios: `api` (el panel y la API, sin Docker), `worker` (ejecuta los análisis y las tareas periódicas),
-# `postgres` (datos) y `opengrep` (solo construye la imagen del motor).
+# Services: `api` (panel and API, no Docker), `worker` (runs scans and periodic tasks),
+# `postgres` (data) and `opengrep` (only builds the engine image).
 #
-# Los motores de análisis (Trivy, Gitleaks, Opengrep) son contenedores hermanos que el WORKER lanza por el socket
-# de Docker: por eso solo él lo monta, y por eso la carpeta de datos se comparte con la MISMA ruta absoluta del host
-# (TAMANDUA_HOST_DATA_DIR). El socket de Docker equivale a root en el host: el servicio que atiende peticiones
-# (api) ya no lo tiene.
-# Nombre fijo del proyecto: el volumen y la red no dependen de cómo se llame la carpeta clonada.
+# The analysis engines (Trivy, Gitleaks, Opengrep) are sibling containers the WORKER starts through the Docker
+# socket: that's why only it mounts the socket, and why the data folder is shared at the SAME absolute host path
+# (TAMANDUA_HOST_DATA_DIR). The Docker socket is equivalent to root on the host: the service that serves requests
+# (api) doesn't have it.
+# Fixed project name: the volume and network don't depend on the cloned folder's name.
 name: tamandua
 
-# Lo común al API y al worker (misma imagen, mismos datos y endurecimiento).
+# Shared by api and worker (same image, same data and hardening).
 x-app: &app
   build:
     context: .
@@ -24,13 +24,13 @@ x-app: &app
       VERSION: ${TAMANDUA_VERSION:-0.9}
   image: tamandua/app:${TAMANDUA_VERSION:-0.9}
   init: true
-  # Tu UID/GID para que los ficheros de ./data y ./config sean tuyos (ver .env.example).
+  # Your UID/GID so the files in ./data and ./config are yours (see .env.example).
   user: "${TAMANDUA_UID:-10001}:${TAMANDUA_GID:-10001}"
   env_file:
     - path: .env
       required: false
-  # Endurecimiento: sistema de ficheros de solo lectura (solo se escribe en /data, /config y
-  # temporales en memoria), sin capacidades de Linux y sin escalada de privilegios.
+  # Hardening: read-only filesystem (writes only to /data, /config and in-memory temporary
+  # folders), no Linux capabilities and no privilege escalation.
   read_only: true
   tmpfs:
     - /tmp:size=256m
@@ -54,19 +54,20 @@ x-app-env: &app-env
   TAMANDUA_PUBLIC_URL: ${TAMANDUA_PUBLIC_URL:-http://127.0.0.1:8766}
   TAMANDUA_ALLOWED_ORIGINS: ${TAMANDUA_ALLOWED_ORIGINS:-http://127.0.0.1:8766,http://localhost:8766}
   TAMANDUA_LOG_LEVEL: ${TAMANDUA_LOG_LEVEL:-INFO}
-  # admins (por defecto): TOTP obligatorio para administradores · all: para todos · none: opcional
+  TAMANDUA_DEFAULT_LOCALE: ${TAMANDUA_DEFAULT_LOCALE:-en}
+  # admins (default): TOTP required for administrators · all: for everyone · none: optional
   TAMANDUA_REQUIRE_TOTP: ${TAMANDUA_REQUIRE_TOTP:-admins}
   TAMANDUA_PR_POLL_SECONDS: ${TAMANDUA_PR_POLL_SECONDS:-300}
   TAMANDUA_BRANCH_MIN_MINUTES: ${TAMANDUA_BRANCH_MIN_MINUTES:-60}
   TAMANDUA_ADVISORY_WATCH_HOURS: ${TAMANDUA_ADVISORY_WATCH_HOURS:-24}
-  # Ejecuciones, hallazgos y triage viven en PostgreSQL (servicio `postgres`, solo en la red interna).
-  TAMANDUA_DATABASE_URL: "postgresql+psycopg://tamandua:${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}@postgres:5432/tamandua"
+  # Runs, findings and triage live in PostgreSQL (the `postgres` service, internal network only).
+  TAMANDUA_DATABASE_URL: "postgresql+psycopg://tamandua:${TAMANDUA_DB_PASSWORD:?TAMANDUA_DB_PASSWORD is missing in .env (run make setup)}@postgres:5432/tamandua"
   HOME: /home/tamandua
 
 x-app-volumes: &app-volumes
   - ./data:/data
   - ./rules:/app/rules:ro
-  # Secretos cifrados (GitHub App, claves de IA, Jira) y su clave maestra. Nunca en ./data.
+  # Encrypted secrets (GitHub App, AI keys, Jira) and their master key. Never in ./data.
   - ${TAMANDUA_HOST_CONFIG_DIR:-./config}:/config
 
 services:
@@ -74,11 +75,11 @@ services:
     <<: *app
     container_name: tamandua
     ports:
-      # Solo en esta máquina por defecto. Para exponerlo en la red usa HTTPS (ver README).
+      # This machine only by default. To expose it on the network, use HTTPS (see README).
       - "${TAMANDUA_HOST_BIND:-127.0.0.1}:${TAMANDUA_HOST_PORT:-8766}:8766"
     environment:
       <<: *app-env
-      # Los análisis los ejecuta el servicio `worker`: el API no necesita Docker.
+      # The `worker` service runs the scans: the API doesn't need Docker.
       TAMANDUA_EMBEDDED_WORKER: "0"
     volumes: *app-volumes
     depends_on:
@@ -90,12 +91,12 @@ services:
       timeout: 5s
       retries: 3
 
-  # Ejecuta los análisis de la cola (en PostgreSQL) y las tareas periódicas. Es el único con el socket de Docker.
-  # Se puede escalar (docker compose up -d --scale worker=2): las tareas periódicas solo las corre uno.
+  # Runs the queued scans (in PostgreSQL) and the periodic tasks. It's the only one with the Docker socket.
+  # It can scale (docker compose up -d --scale worker=2): only one runs the periodic tasks.
   worker:
     <<: *app
     command: ["python", "-m", "tamandua", "--data-dir", "/data", "worker"]
-    # Sin HTTP: la salud es su latido en la base (el de la imagen consulta /api/health, que aquí no existe).
+    # No HTTP: health is its heartbeat in the database (the image's check queries /api/health, which doesn't exist here).
     healthcheck:
       test: ["CMD", "python", "-m", "tamandua", "--data-dir", "/data", "worker", "--check"]
       interval: 60s
@@ -108,10 +109,10 @@ services:
       - ./rules:/app/rules:ro
       - ${TAMANDUA_HOST_CONFIG_DIR:-./config}:/config
       - /var/run/docker.sock:/var/run/docker.sock
-    # Acceso al socket de Docker para lanzar los motores. En Docker Desktop y OrbStack (macOS,
-    # Windows) el socket es del grupo 0; en Linux y en WSL con Docker nativo, del grupo `docker`,
-    # cuyo número varía: `make` lo detecta y lo pasa en DOCKER_SOCKET_GID. Si no hay otro grupo
-    # que añadir, la segunda entrada repite tu propio grupo (compose no admite dos iguales).
+    # Docker socket access to start the engines. On Docker Desktop and OrbStack (macOS,
+    # Windows) the socket belongs to group 0; on Linux and WSL with native Docker, to the `docker`
+    # group, whose number varies: `make` detects it and passes it in DOCKER_SOCKET_GID. With no other
+    # group to add, the second entry repeats your own group (compose doesn't allow two identical ones).
     group_add:
       - "0"
       - "${DOCKER_SOCKET_GID:-${TAMANDUA_GID:-10001}}"
@@ -121,15 +122,15 @@ services:
       postgres:
         condition: service_healthy
 
-  # Base de datos. Sin puerto publicado: solo la app la alcanza, por la red interna de compose. Los datos, en el
-  # volumen `tamandua-pg` (make backup hace además un pg_dump).
+  # Database. No published port: only the app reaches it, over the compose internal network. Data lives in the
+  # `tamandua-pg` volume (make backup also takes a pg_dump).
   postgres:
     image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: tamandua-postgres
     environment:
       POSTGRES_USER: tamandua
       POSTGRES_DB: tamandua
-      POSTGRES_PASSWORD: "${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}"
+      POSTGRES_PASSWORD: "${TAMANDUA_DB_PASSWORD:?TAMANDUA_DB_PASSWORD is missing in .env (run make setup)}"
     volumes:
       - tamandua-pg:/var/lib/postgresql
     security_opt:
@@ -147,8 +148,8 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Solo construye la imagen del motor SAST (con su binario verificado por SHA-256) y comprueba
-  # que arranca; la app la lanza después por cada análisis. Termina al momento: es normal.
+  # Only builds the SAST engine image (with its SHA-256-verified binary) and checks that it
+  # starts; the app runs it later for each scan. It exits right away: that's expected.
   opengrep:
     build: docker/engines/opengrep
     image: tamandua/opengrep:1.30.0

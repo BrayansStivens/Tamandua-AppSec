@@ -1,3 +1,5 @@
+[English](../architecture.md) · Español
+
 # Arquitectura
 
 Tamandua son tres servicios: el **API** (FastAPI, sirve también el panel), uno o varios **workers** que ejecutan los
@@ -54,7 +56,7 @@ tamandua/
     integrations/   GitHub App, Jira, avisos (Slack/Teams/webhook), claves de IA
     pullrequests/   revisión de PR y vigilancia
     threats/        modelado de amenazas, diagrama e informe
-  shared/       transversal sin negocio: logs, almacén cifrado, rutas; no importa de modules/
+  shared/       transversal sin negocio: logs, almacén cifrado, rutas, i18n (catálogos en/es); no importa de modules/
 ```
 
 El panel (`web/src`) sigue la misma idea, por funcionalidad (Feature-Sliced Design ligero), con capas que comprueba
@@ -65,7 +67,7 @@ web/src/
   app/        composición: App (navegación), proveedores (TanStack Query)
   pages/      una pantalla por vista (Resumen, Hallazgos, CVE tracker, Cumplimiento…)
   features/   auth, onboarding, analyses, sources, findings, integrations, threats
-  shared/     ui (Base UI + Tailwind), charts, api (cliente, tipos generados del OpenAPI, consultas), lib
+  shared/     ui (Base UI + Tailwind), charts, api (cliente, tipos generados del OpenAPI, consultas), i18n, lib
 ```
 
 Los datos del servidor van con TanStack Query (`shared/api/queries.ts`): caché compartida entre vistas y sondeo solo
@@ -130,6 +132,13 @@ que el código (volver a una versión anterior) impiden arrancar en vez de arrie
 - **Sondeo en vez de webhooks.** El servidor no necesita ser accesible desde internet.
 - **Una GitHub App por workspace**, con cuatro permisos. Para varias organizaciones, GitHub exige que pueda instalarse en cualquier cuenta; el administrador escoge explícitamente cuáles conectar al workspace. Una clave filtrada tendría acceso a todas las instalaciones de esa App, por lo que su custodia sigue siendo crítica.
 - **Honestidad en los resultados.** Lo que no se pudo probar sale como `not_tested` con su motivo; un análisis incompleto nunca se presenta como «cero vulnerabilidades».
+- **Lo guardado no tiene idioma; se muestra en el de quien lee.** Todo texto que lee una persona existe en inglés
+  (origen y respaldo) y en español, en catálogos (`tamandua/shared/i18n/locales/` y `web/src/shared/i18n/locales/`).
+  Lo que se guarda (hallazgos, progreso, limitaciones, errores) es un código de mensaje con sus parámetros, que se
+  muestra al leerlo en el idioma de quien lo lee: la API lo hace por petición, y los informes, comentarios de PR,
+  avisos, Jira y la CLI con un idioma explícito (`TAMANDUA_DEFAULT_LOCALE`, `en` por defecto). Un mismo hallazgo se
+  lee con naturalidad en los dos idiomas, y cambiar de idioma nunca reescribe datos. El texto de terceros (avisos,
+  nombres de comprobaciones de los motores) se muestra tal como se publicó, sin traducción automática.
 
 ## Pendiente (aplazado a propósito)
 

@@ -9,7 +9,7 @@ from tamandua.app.api.deps import Context, Policy, guard
 from tamandua.modules.runs import queue
 from tamandua.version import VERSION
 
-router = APIRouter(tags=["sistema"])
+router = APIRouter(tags=["system"])
 
 
 class Health(BaseModel):

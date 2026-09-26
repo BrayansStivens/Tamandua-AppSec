@@ -1,0 +1,315 @@
+{
+  "format": "tamandua-threat-model",
+  "version": 1,
+  "model": {
+    "name": "Customer portal · STRIDE",
+    "description": "Sample covering sign-in and access to personal data. Includes every component type (plus a custom one) and no positions: the editor lays it out for you.",
+    "methodology": "stride",
+    "components": [
+      {
+        "id": "cliente",
+        "name": "Customer",
+        "kind": "actor",
+        "internet_facing": true
+      },
+      {
+        "id": "soporte",
+        "name": "Support team",
+        "kind": "actor"
+      },
+      {
+        "id": "web",
+        "name": "Web portal",
+        "kind": "web_app",
+        "technology": "React",
+        "internet_facing": true,
+        "authenticates": true
+      },
+      {
+        "id": "api",
+        "name": "Customer API",
+        "kind": "api",
+        "technology": "Spring Boot",
+        "internet_facing": true,
+        "authenticates": true,
+        "data": [
+          "pii"
+        ]
+      },
+      {
+        "id": "facturacion",
+        "name": "Billing service",
+        "kind": "service",
+        "technology": "Go",
+        "authenticates": true,
+        "data": [
+          "payment"
+        ]
+      },
+      {
+        "id": "notificaciones",
+        "name": "Notification sender",
+        "kind": "function",
+        "technology": "Cloud Function"
+      },
+      {
+        "id": "motor",
+        "name": "Pricing rules engine",
+        "kind": "custom",
+        "custom_kind": "Rules engine",
+        "custom_base": "service",
+        "technology": "Drools",
+        "authenticates": true
+      },
+      {
+        "id": "sesiones",
+        "name": "Session cache",
+        "kind": "cache",
+        "technology": "Redis",
+        "data": [
+          "credentials"
+        ]
+      },
+      {
+        "id": "eventos",
+        "name": "Event queue",
+        "kind": "queue",
+        "technology": "RabbitMQ",
+        "data": [
+          "internal"
+        ]
+      },
+      {
+        "id": "datos",
+        "name": "Customer database",
+        "kind": "database",
+        "technology": "PostgreSQL",
+        "data": [
+          "pii",
+          "credentials"
+        ],
+        "encrypted_at_rest": true
+      },
+      {
+        "id": "documentos",
+        "name": "Uploaded documents",
+        "kind": "storage",
+        "technology": "S3",
+        "data": [
+          "pii"
+        ]
+      },
+      {
+        "id": "identidad",
+        "name": "Identity provider",
+        "kind": "identity",
+        "technology": "Keycloak",
+        "internet_facing": true,
+        "data": [
+          "credentials"
+        ]
+      },
+      {
+        "id": "pagos",
+        "name": "Payment gateway",
+        "kind": "external",
+        "technology": "Stripe",
+        "data": [
+          "payment"
+        ]
+      }
+    ],
+    "flows": [
+      {
+        "id": "solicitud",
+        "source": "cliente",
+        "target": "web",
+        "protocol": "https",
+        "data": [
+          "credentials",
+          "pii"
+        ],
+        "authenticated": false,
+        "name": "browsing and sign-in"
+      },
+      {
+        "id": "peticiones",
+        "source": "web",
+        "target": "api",
+        "protocol": "https",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "name": "API calls"
+      },
+      {
+        "id": "login",
+        "source": "web",
+        "target": "identidad",
+        "protocol": "https",
+        "data": [
+          "credentials"
+        ],
+        "authenticated": false,
+        "name": "sign-in"
+      },
+      {
+        "id": "tokens",
+        "source": "api",
+        "target": "identidad",
+        "protocol": "https",
+        "data": [
+          "credentials"
+        ],
+        "authenticated": true,
+        "name": "token validation"
+      },
+      {
+        "id": "gestion",
+        "source": "soporte",
+        "target": "api",
+        "protocol": "https",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "name": "customer management"
+      },
+      {
+        "id": "consulta",
+        "source": "api",
+        "target": "datos",
+        "protocol": "sql",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "encrypted": true
+      },
+      {
+        "id": "sesion",
+        "source": "api",
+        "target": "sesiones",
+        "protocol": "redis",
+        "data": [
+          "credentials"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "publicar",
+        "source": "api",
+        "target": "eventos",
+        "protocol": "amqp",
+        "data": [
+          "internal"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "consumir",
+        "source": "eventos",
+        "target": "notificaciones",
+        "protocol": "amqp",
+        "data": [
+          "internal"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "precios",
+        "source": "api",
+        "target": "motor",
+        "protocol": "grpc",
+        "data": [
+          "internal"
+        ],
+        "authenticated": true,
+        "encrypted": true
+      },
+      {
+        "id": "factura",
+        "source": "api",
+        "target": "facturacion",
+        "protocol": "https",
+        "data": [
+          "payment"
+        ],
+        "authenticated": true
+      },
+      {
+        "id": "cobro",
+        "source": "facturacion",
+        "target": "pagos",
+        "protocol": "https",
+        "data": [
+          "payment"
+        ],
+        "authenticated": true,
+        "encrypted": true
+      },
+      {
+        "id": "almacenamiento",
+        "source": "api",
+        "target": "documentos",
+        "protocol": "https",
+        "data": [
+          "pii"
+        ],
+        "authenticated": true,
+        "name": "document upload"
+      }
+    ],
+    "boundaries": [
+      {
+        "id": "internet",
+        "name": "Internet",
+        "components": [
+          "cliente",
+          "soporte"
+        ]
+      },
+      {
+        "id": "aplicacion",
+        "name": "Application",
+        "components": [
+          "web",
+          "api",
+          "facturacion",
+          "notificaciones",
+          "motor"
+        ]
+      },
+      {
+        "id": "datos-internos",
+        "name": "Data",
+        "components": [
+          "sesiones",
+          "eventos",
+          "datos",
+          "documentos"
+        ]
+      },
+      {
+        "id": "terceros",
+        "name": "Third parties",
+        "components": [
+          "identidad",
+          "pagos"
+        ]
+      }
+    ],
+    "manual_threats": [
+      {
+        "id": "acceso-ajeno",
+        "title": "Access to another account's data",
+        "category": "E",
+        "element": "api",
+        "severity": "high",
+        "scenario": "A customer changes the account ID in the request and reads someone else's data.",
+        "mitigation": "Enforce object-level authorization on every operation."
+      }
+    ]
+  }
+}

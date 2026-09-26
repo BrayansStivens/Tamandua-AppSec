@@ -219,7 +219,7 @@ def _grype_finding(match: dict, feeds: dict) -> dict:
     kev = next((feeds.get("kev", {}).get(cve) for cve in cves if feeds.get("kev", {}).get(cve)), None)
     epss = next((feeds.get("epss", {}).get(cve) for cve in cves if feeds.get("epss", {}).get(cve)), None)
     summary = str(vulnerability.get("description") or "").strip() or identifier
-    location = next((item.get("path") for item in artifact.get("locations") or [] if item.get("path")), "") or "imagen"
+    location = next((item.get("path") for item in artifact.get("locations") or [] if item.get("path")), "") or "image"
     ecosystem = str(artifact.get("type") or "unknown")
     cwe = sorted({int(found.group(1)) for item in vulnerability.get("cwes") or [] if (found := re.fullmatch(r"CWE-(\d+)", str(item.get("cwe"))))})
     references = [url for url in vulnerability.get("urls") or [] if isinstance(url, str) and url.startswith("https://")][:8]
@@ -286,7 +286,7 @@ AUTH_HEADER = re.compile(r"(?i)authorization:\s*(bearer|basic|token)\s+(?!\$)[A-
 
 
 def _config_finding(rule: str, title, severity: str, reason, remediation, cwe: int, asset: str, key: str,
-                    path: str = "configuración de la imagen") -> dict:
+                    path: str = "image-config") -> dict:
     from tamandua.modules.scanning.engines import _base, _stable
     finding = _base("iac" if cwe != 798 else "secrets", rule, title, path, 1, severity, tool="tamandua",
                     reason=reason, remediation=remediation, cwe=[cwe], owasp="A02:2025" if cwe != 798 else "A04:2025",
@@ -316,12 +316,12 @@ def config_findings(metadata: dict, image: dict) -> list[dict]:
             findings.append(_config_finding("IMG-BUILD-SECRET", msg("scanning.image.rules.build_secret.title", name=match.group(1)), "critical",
                 msg("scanning.image.rules.build_secret.reason", step=index + 1, name=match.group(1)),
                 msg("scanning.image.rules.build_secret.remediation"), 798, asset, f"history:{index}:{match.group(1)}",
-                path=f"historial, paso {index + 1}"))
+                path=f"image-history/step-{index + 1}"))
         if URL_CREDENTIALS.search(step) or AUTH_HEADER.search(step):
             findings.append(_config_finding("IMG-BUILD-URL-CREDENTIAL", msg("scanning.image.rules.build_url_credential.title"), "critical",
                 msg("scanning.image.rules.build_url_credential.reason", step=index + 1),
                 msg("scanning.image.rules.build_url_credential.remediation"),
-                798, asset, f"history-url:{index}", path=f"historial, paso {index + 1}"))
+                798, asset, f"history-url:{index}", path=f"image-history/step-{index + 1}"))
         if re.match(r"(?i)\s*ADD\s+(file:)?\s*https?://", step) or re.search(r"(?i)/bin/sh -c #\(nop\) ADD https?://", step):
             findings.append(_config_finding("IMG-ADD-URL", msg("scanning.image.rules.add_url.title"), "medium",
                 msg("scanning.image.rules.add_url.reason", step=index + 1), msg("scanning.image.rules.add_url.remediation"),

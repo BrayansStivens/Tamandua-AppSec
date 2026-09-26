@@ -35,10 +35,29 @@ class DemoTests(unittest.TestCase):
             second = demo.seed(data, fixtures=ROOT / "fixtures", models=ROOT / "web/src/examples/threat-models", report=lambda message: None)
             self.assertEqual(seen[0], ("local:demo-ejemplos", ["sast-samples", "scanner-samples"]))
             self.assertEqual((first["code"]["status"], "threat_model" in first, "threat_model" in second), ("completed", True, False))
-            self.assertEqual([model["name"] for model in tm.list_models(data)], [demo.MODEL_NAME])  # no se duplica
+            self.assertEqual([model["name"] for model in tm.list_models(data)], [demo.model_name()])  # no se duplica
             self.assertEqual({row["source"]["id"] for row in list_runs(data)}, {"local:demo-ejemplos"})
+            # Tests run with TAMANDUA_DEFAULT_LOCALE=es: the demo speaks Spanish and imports the Spanish example.
+            self.assertEqual(demo.model_name(), "Demo · Portal de clientes (STRIDE)")
+            saved = tm.load(data, first["threat_model"])
+            self.assertIn("Portal web", {item["name"] for item in saved["components"]})
+            # Switching the default locale doesn't import the model again.
+            with patch.dict(os.environ, {"TAMANDUA_DEFAULT_LOCALE": "en"}):
+                third = demo.seed(data, fixtures=ROOT / "fixtures", models=ROOT / "web/src/examples/threat-models", report=lambda message: None)
+            self.assertNotIn("threat_model", third)
             with self.assertRaises(FileNotFoundError):
                 demo.seed(data, fixtures=data / "no-existe", report=lambda message: None)
+
+    def test_demo_texts_follow_the_default_locale(self):
+        models = ROOT / "web/src/examples/threat-models"
+        with patch.dict(os.environ, {"TAMANDUA_DEFAULT_LOCALE": "en"}):
+            self.assertEqual(demo.models_folder(models), models / "en")
+            self.assertEqual(demo.model_name(), "Demo · Customer portal (STRIDE)")
+            self.assertEqual(demo.demo_source(), {"id": "local:demo-ejemplos", "name": "demo · vulnerable samples", "provider": "local"})
+        self.assertEqual(demo.models_folder(models), models / "es")
+        self.assertEqual(demo.demo_source()["name"], "demo · ejemplos vulnerables")
+        with tempfile.TemporaryDirectory() as folder:  # a flat folder (no per-language subfolders) is used as is
+            self.assertEqual(demo.models_folder(Path(folder)), Path(folder))
 
 
 class OnboardingTests(HttpCase):

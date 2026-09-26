@@ -1,0 +1,11 @@
+{
+  "errors": {
+    "master_key_not_base64": "TAMANDUA_MASTER_KEY isn't valid base64",
+    "master_key_length": "TAMANDUA_MASTER_KEY must be 32 bytes (openssl rand -base64 32)",
+    "master_key_unreadable": "Couldn't read the vault's master key",
+    "master_key_damaged": "The vault's master key is damaged",
+    "vault_damaged": "The secrets vault is damaged",
+    "cannot_decrypt": "Couldn't decrypt a secret. Did the master key change?",
+    "cannot_unseal": "Couldn't open a sealed value. Did the master key change?"
+  }
+}

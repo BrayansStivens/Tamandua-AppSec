@@ -1,6 +1,6 @@
 """Versión del formato de `data/` y migraciones ordenadas al arrancar.
 
-Regla para quien cambie el formato de algo que ya está en disco (ver docs/desarrollo.md):
+Regla para quien cambie el formato de algo que ya está en disco (ver docs/development.md):
 1. Los lectores toleran el formato viejo (campos que faltan, tipos antiguos): nunca rompen al leer.
 2. Si hay que reescribir datos, se añade una migración al final de MIGRATIONS: idempotente (se puede
    repetir sin daño), declara qué rutas toca (se copian antes) y tiene su prueba con datos viejos.
@@ -129,7 +129,7 @@ def upgrade(data_dir: Path) -> list[str]:
     with _locked(data_dir):
         version = current(data_dir)  # otro proceso pudo migrar mientras se esperaba el cerrojo
         if version is None and not _has_data(data_dir):
-            _write(data_dir, LATEST, [{"version": LATEST, "at": datetime.now(timezone.utc).isoformat(), "name": "instalación nueva"}])
+            _write(data_dir, LATEST, [{"version": LATEST, "at": datetime.now(timezone.utc).isoformat(), "name": "fresh install"}])
             return []
         version = version or 0
         if version > LATEST:

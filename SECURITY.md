@@ -1,21 +1,23 @@
-# Política de seguridad
+English · [Español](SECURITY.es.md)
 
-## Reportar una vulnerabilidad
+# Security policy
 
-**No abras un issue público.** Usa el reporte privado de GitHub: pestaña **Security → Report a vulnerability** de este repositorio (GitHub Security Advisories).
+## Reporting a vulnerability
 
-Incluye, si puedes:
+**Don't open a public issue.** Use GitHub's private reporting: the **Security → Report a vulnerability** tab of this repository (GitHub Security Advisories).
 
-- versión (`/api/health` o la etiqueta del panel) y cómo lo despliegas;
-- pasos para reproducirlo y el impacto que ves;
-- si ya es público o explotado.
+If you can, include:
 
-No incluyas secretos reales, tuyos ni de terceros. Respondemos en cuanto podamos; es un proyecto mantenido por voluntarios, así que no hay un plazo garantizado, pero los fallos que expongan credenciales o código tienen prioridad.
+- the version (`/api/health` or the label in the panel) and how you deploy it;
+- steps to reproduce it and the impact you see;
+- whether it's already public or being exploited.
 
-## Versiones con soporte
+Don't include real secrets, yours or anyone else's. We reply as soon as we can; this project is maintained by volunteers, so there is no guaranteed timeline, but issues that expose credentials or code get priority.
 
-Solo la última versión de la rama `main`.
+## Supported versions
 
-## Alcance
+Only the latest version on the `main` branch.
 
-Entra en el alcance cualquier fallo del propio Tamandua: autenticación, sesiones, almacén de secretos, API, panel y ejecución de motores. Quedan fuera los fallos de las herramientas de terceros (Trivy, Gitleaks, Opengrep): repórtalos a sus proyectos. El uso del socket de Docker es una concesión documentada en [docs/seguridad.md](docs/seguridad.md#concesiones-conocidas).
+## Scope
+
+Any flaw in Tamandua itself is in scope: authentication, sessions, the secret store, the API, the panel and how engines are run. Flaws in third-party tools (Trivy, Gitleaks, Opengrep) are out of scope: report them to their projects. Using the Docker socket is a documented trade-off in [docs/security.md](docs/security.md#known-trade-offs).

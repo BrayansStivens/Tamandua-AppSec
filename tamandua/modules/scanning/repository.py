@@ -151,10 +151,10 @@ def _query_osv(dependencies: list[dict]) -> list[dict]:
     with urlopen(request, timeout=15) as response:
         body = response.read(2_000_001)
     if len(body) > 2_000_000:
-        raise ValueError("Respuesta OSV demasiado grande")
+        raise ValueError("OSV response too large")
     data = json.loads(body)
     if not isinstance(data.get("results"), list) or len(data["results"]) != len(dependencies):
-        raise ValueError("Respuesta OSV inválida")
+        raise ValueError("Invalid OSV response")
     return data["results"]
 
 

@@ -1,3 +1,5 @@
+[English](../configuration.md) · Español
+
 # Configuración
 
 Todas las variables son opcionales y se ponen en `.env` (copia de `.env.example`). Tras cambiarlas: `docker compose up -d`.
@@ -8,6 +10,7 @@ Todas las variables son opcionales y se ponen en `.env` (copia de `.env.example`
 | `TAMANDUA_HOST_BIND` / `TAMANDUA_HOST_PORT` | `127.0.0.1` / `8766` | Dónde se publica el panel en el host. |
 | `TAMANDUA_PUBLIC_URL` | `http://127.0.0.1:8766` | URL con la que se abre el panel; decide cookies `Secure`, HSTS y la Setup URL de la App. |
 | `TAMANDUA_ALLOWED_ORIGINS` | 127.0.0.1 y localhost | Orígenes aceptados (Host y CSRF). |
+| `TAMANDUA_DEFAULT_LOCALE` | `en` | `en` o `es`. Idioma de los comentarios en PRs, los avisos, las incidencias de Jira, los informes y la salida de la CLI cuando nadie pide uno en persona. El panel no lo usa: sigue el idioma del navegador y cada persona puede cambiarlo desde la barra lateral o la pantalla de inicio de sesión. |
 | `TAMANDUA_MASTER_KEY` | se genera en `config/` | Clave maestra del almacén (`openssl rand -base64 32`). |
 | `TAMANDUA_REQUIRE_TOTP` | `admins` | `admins`, `all` o `none`. |
 | `TAMANDUA_NVD_API_KEY` | — | API key de NVD: descarga de CVE más rápida. Va en cabecera y nunca se registra. |

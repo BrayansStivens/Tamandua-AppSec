@@ -1,85 +1,90 @@
-# Analizar desde la terminal y en CI (`scan`)
+English · [Español](es/cli.md)
 
-`scan` analiza una carpeta local con los mismos motores que el panel (Opengrep, Gitleaks,
-Trivy, OSV-Scanner, Checkov, zizmor), sin ejecutar su código y sin enviarlo a ningún servicio.
-Sirve para revisar tu cambio antes de subirlo y para bloquear un pull request en CI.
+# Scanning from the terminal and in CI (`scan`)
 
-## Uso rápido
+`scan` analyzes a local folder with the same engines as the panel (Opengrep, Gitleaks, Trivy,
+OSV-Scanner, Checkov, zizmor). It never runs your code and never sends it to any service. Use it to
+check your change before you push, and to block a pull request in CI.
 
-Desde la carpeta de Tamandua (solo hace falta `make` y Docker):
+## Quick start
+
+From the Tamandua folder (you only need `make` and Docker):
 
 ```bash
-make scan DIR=../mi-repo
-make scan DIR=../mi-repo ARGS="--base main"
+make scan DIR=../my-repo
+make scan DIR=../my-repo ARGS="--base main"
 ```
 
-Con `--base main` solo se informa de lo que **tu cambio introduce**. Tamandua analiza también el
-punto de partida (el merge-base con `main`) y descarta lo que ya estaba: si tocas un
-`package-lock.json` que ya tenía vulnerabilidades, no te las cobra; si añades una dependencia
-vulnerable, sí. Cuenta lo que aún no has subido (cambios sin commit y archivos nuevos que git no
-ignora), así que funciona antes del push.
+With `--base main`, Tamandua reports only what **your change introduces**. It also scans the
+starting point (the merge-base with `main`) and drops whatever was already there: touch a
+`package-lock.json` that already had vulnerabilities and they aren't charged to you; add a
+vulnerable dependency and they are. It counts what you haven't pushed yet (uncommitted changes and
+new files git doesn't ignore), so it works before the push.
 
 ```text
-Tamandua · mi-repo · cambios respecto a main (merge-base 73223791, 3 archivos)
+Tamandua · my-repo · changes since main (merge-base 73223791, 3 files)
 
-CRÍTICA  app.py:8  Injection: eval exec non literal
-ALTA     requirements.txt  urllib3 1.26.4: 9 avisos (5 alta, 4 media) → actualiza a 2.7.0
-ALTA     settings.py:1  Token personal de GitHub expuesto
+CRITICAL app.py:8  Injection: eval exec non literal
+HIGH     requirements.txt  urllib3 1.26.4: 9 advisories (5 high, 4 medium) → update to 2.7.0
+HIGH     settings.py:1  Exposed GitHub personal access token
 
-4 ya existían en el código que tocas: no bloquean.
+4 already existed in the code you're touching: they don't block.
 
-Motores: Opengrep 1.30.0, Gitleaks 8.30.1, Trivy 0.74.0, OSV-Scanner 2.6.0
+Engines: Opengrep 1.30.0, Gitleaks 8.30.1, Trivy 0.74.0, OSV-Scanner 2.6.0
 
-BLOQUEA · umbral: alta o superior · 7 hallazgos nuevos de severidad alta o superior
+BLOCKED · threshold: high or above · 7 new findings at severity high or above
 ```
 
-Los avisos de una misma dependencia salen en una línea con la versión que los cierra todos.
-`--format json` y `--format sarif` conservan cada aviso por separado.
+Advisories for the same dependency are collapsed into one line, with the version that fixes all of
+them. `--format json` and `--format sarif` keep every advisory separate.
 
-## Opciones
+The output speaks the language in `TAMANDUA_DEFAULT_LOCALE` (`en` by default, `es` for Spanish): text,
+JSON and SARIF alike. In a container, pass it with `-e TAMANDUA_DEFAULT_LOCALE=es`.
 
-| Opción | Qué hace |
+## Options
+
+| Option | What it does |
 | --- | --- |
-| `--base REF` | Rama o commit de partida (`main`, `origin/main`, un SHA). Solo cuenta lo que introduce el cambio. |
-| `--no-baseline` | Con `--base`, no analiza el punto de partida: tarda la mitad, pero cuenta todo lo que cae en líneas cambiadas (y cualquier aviso de un lockfile que toques). |
-| `--fail-on` | Severidad desde la que falla: `critical`, `high` (por defecto), `medium`, `low` o `never` (solo informa). |
-| `--format` | `text` (por defecto), `json` o `sarif` (SARIF 2.1.0, con `security-severity` para GitHub code scanning). |
-| `--output FILE` | Escribe el resultado en un archivo; el resumen en texto sale igualmente por la salida de errores. |
-| `--exclude PATRÓN` | Ruta cuyos hallazgos no cuentan: glob relativo a la raíz (`fixtures`, `**/testdata`, `docs/*.md`). Como en `.gitignore`, una carpeta excluye todo lo que tiene dentro; `*` no cruza `/` y `**` sí. Repetible. La salida dice cuántos se excluyeron. |
-| `--allow-incomplete` | No falla si un motor no pudo ejecutarse. Por defecto sí falla: un análisis que no terminó no equivale a «limpio». |
-| `--allow-osv-upload` | Autoriza consultas externas (nombres y versiones de dependencias a OSV y deps.dev para resolver transitivas). Por defecto no sale nada. |
-| `--name` | Nombre a mostrar (útil dentro de un contenedor, donde la carpeta se llama `/src`). |
-| `--quiet` | Sin mensajes de progreso. |
+| `--base REF` | Starting branch or commit (`main`, `origin/main`, a SHA). Only what the change introduces counts. |
+| `--no-baseline` | With `--base`, skip scanning the starting point: it takes half the time, but everything on changed lines counts (and so does any advisory in a lockfile you touch). |
+| `--fail-on` | Severity at which the scan fails: `critical`, `high` (default), `medium`, `low` or `never` (report only). |
+| `--format` | `text` (default), `json` or `sarif` (SARIF 2.1.0, with `security-severity` for GitHub code scanning). |
+| `--output FILE` | Write the result to a file; the text summary still goes to stderr. |
+| `--exclude PATTERN` | Path whose findings don't count: a glob relative to the root (`fixtures`, `**/testdata`, `docs/*.md`). It works like `.gitignore`: a folder excludes everything inside it; `*` doesn't cross `/`, `**` does. Repeatable. The output says how many findings were excluded. |
+| `--allow-incomplete` | Don't fail if an engine couldn't run. By default it fails: an analysis that didn't finish is not the same as "clean". |
+| `--allow-osv-upload` | Allow external lookups (dependency names and versions to OSV and deps.dev, to resolve transitive dependencies). By default nothing leaves the machine. |
+| `--name` | Display name (useful inside a container, where the folder is called `/src`). |
+| `--quiet` | No progress messages. |
 
-El progreso va a la salida de errores; la salida estándar queda limpia para `json` y `sarif`.
+Progress goes to stderr, so stdout stays clean for `json` and `sarif`.
 
-## Códigos de salida
+## Exit codes
 
-| Código | Significado |
+| Code | Meaning |
 | --- | --- |
-| `0` | Pasa: nada del umbral o peor. |
-| `1` | Bloquea: hay hallazgos nuevos del umbral o peores. |
-| `2` | Error de uso: carpeta inexistente, referencia de git inválida o inexistente (¿falta `git fetch`?). |
-| `3` | Incompleto: algún motor no se ejecutó (Docker, imágenes, red). Revisa las líneas «Sin analizar». |
+| `0` | Pass: nothing at or above the threshold. |
+| `1` | Blocked: there are new findings at or above the threshold. |
+| `2` | Usage error: the folder doesn't exist, or the git reference is invalid or missing (forgot `git fetch`?). |
+| `3` | Incomplete: an engine didn't run (Docker, images, network). Check the "Not analyzed" lines. |
 
-`make` convierte cualquier fallo en su propio código 2; en CI usa `docker run` (abajo) para conservar
-el código exacto.
+`make` turns any failure into its own exit code 2; in CI, use `docker run` (below) to keep the exact
+code.
 
-## Antes de subir (pre-push)
+## Before you push (pre-push)
 
-Un análisis completo tarda del orden de medio minuto, así que encaja mejor en `pre-push` que en
-`pre-commit`. En `.git/hooks/pre-push` de tu repositorio (y `chmod +x`):
+A full scan takes around half a minute, so it fits `pre-push` better than `pre-commit`. In your
+repository's `.git/hooks/pre-push` (and `chmod +x` it):
 
 ```sh
 #!/bin/sh
 make -s -C ~/tamandua scan DIR="$(git rev-parse --show-toplevel)" ARGS="--base origin/main --quiet"
 ```
 
-## En CI
+## In CI
 
-Tamandua corre como contenedor y lanza los motores como contenedores hermanos, así que el runner
-necesita el socket de Docker (los runners Linux de GitHub Actions lo tienen). La carpeta de datos
-(`/data`) guarda en caché las bases de avisos entre pasos.
+Tamandua runs as a container and launches the engines as sibling containers, so the runner needs
+the Docker socket (GitHub Actions Linux runners have it). The data folder (`/data`) caches the
+advisory databases between steps.
 
 ### GitHub Actions
 
@@ -89,24 +94,24 @@ on: pull_request
 
 permissions:
   contents: read
-  security-events: write   # para subir el SARIF a code scanning
+  security-events: write   # to upload the SARIF to code scanning
 
 jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      # Fija las acciones por SHA en tu organización.
+      # Pin actions by SHA in your organization.
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0              # hace falta la historia para comparar con la base
+          fetch-depth: 0              # history is needed to compare against the base
           persist-credentials: false
-      - name: Construir Tamandua
+      - name: Build Tamandua
         run: |
           git clone --depth 1 https://github.com/BrayansStivens/appsec-agent "$RUNNER_TEMP/tamandua"
           make -C "$RUNNER_TEMP/tamandua" build
-      - name: Analizar lo que introduce el PR
+      - name: Scan what the PR introduces
         env:
-          BASE_REF: ${{ github.base_ref }}      # nunca interpolado directamente en el script
+          BASE_REF: ${{ github.base_ref }}      # never interpolated directly into the script
           REPO_NAME: ${{ github.event.repository.name }}
         run: |
           mkdir -p "$RUNNER_TEMP/tamandua-data"
@@ -124,8 +129,8 @@ jobs:
 
 ### GitLab CI
 
-Necesita un runner con acceso al socket de Docker del host (ejecutor `shell`, o `docker` con
-`/var/run/docker.sock` montado). Con Docker-in-Docker (`dind`) los motores no verían las carpetas.
+You need a runner with access to the host's Docker socket (the `shell` executor, or `docker` with
+`/var/run/docker.sock` mounted). With Docker-in-Docker (`dind`), the engines can't see the folders.
 
 ```yaml
 tamandua:
@@ -144,17 +149,18 @@ tamandua:
       --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
 ```
 
-> El propio repositorio de Tamandua usa esta plantilla en [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
-> (con `--exclude fixtures/` para sus ejemplos vulnerables a propósito). La de GitLab está comprobada con el
-> mismo `docker run` en local, pero aún no en un runner real. Si algo falla, el error de Docker o del motor
-> aparece en la línea «Sin analizar».
+> Tamandua's own repository uses this template in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+> (with `--exclude fixtures/` for its intentionally vulnerable examples). The GitLab template has been
+> checked with the same `docker run` locally, but not yet on a real runner. If something fails, the
+> Docker or engine error shows up on the "Not analyzed" line.
 
-**Exclusiones en CI.** `--exclude` vive en el workflow, que un pull request puede modificar. Protege
-`.github/workflows/` con CODEOWNERS y revisión obligatoria para que nadie se excluya a sí mismo sin que se vea.
-(En el panel las exclusiones viven en el servidor por eso mismo.)
+**Exclusions in CI.** `--exclude` lives in the workflow, and a pull request can change the workflow.
+Protect `.github/workflows/` with CODEOWNERS and required reviews so nobody can exclude their own code
+unnoticed. (That's exactly why the panel keeps exclusions on the server.)
 
-## Privacidad
+## Privacy
 
-El código se copia a una carpeta temporal (sin enlaces simbólicos ni lo que el análisis ignora) y
-se borra al terminar. Los motores lo leen en solo lectura, sin red salvo para descargar sus bases
-públicas de avisos. Nada del repositorio sale de la máquina salvo que pases `--allow-osv-upload`.
+The code is copied to a temporary folder (without symlinks or anything the scan ignores) and deleted
+when the scan ends. The engines read it read-only, with no network except to download their public
+advisory databases. Nothing from the repository leaves the machine unless you pass
+`--allow-osv-upload`.

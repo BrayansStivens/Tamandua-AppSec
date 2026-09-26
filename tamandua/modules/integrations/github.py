@@ -77,7 +77,7 @@ def _resolved() -> dict:
             "slug": os.environ.get("GITHUB_APP_SLUG", "").strip() or str(stored.get("slug") or ""),
             "key_file": key_file, "pem": "" if key_file else str(stored.get("pem") or ""),
             "owner": stored.get("owner"), "name": stored.get("name"), "html_url": stored.get("html_url"),
-            "source": "entorno" if from_env else "almacén cifrado" if stored else None}
+            "source": "environment" if from_env else "vault" if stored else None}
 
 
 def config() -> dict:

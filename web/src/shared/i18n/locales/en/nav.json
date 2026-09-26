@@ -8,12 +8,25 @@
   "role_without_2fa": "{{role}} · no 2FA",
   "two_factor_off": "Two-factor authentication is off",
   "groups": {
-    "risk": "Risk", "scanning": "Scanning", "settings": "Settings"
+    "risk": "Risk",
+    "scanning": "Scanning",
+    "settings": "Settings"
   },
   "items": {
-    "overview": "Overview", "findings": "Findings", "threats": "Threats", "coverage": "Coverage", "cves": "CVE tracker",
-    "compliance": "Compliance", "analyses": "Scans", "repositories": "Repositories", "pulls": "Pull requests",
-    "integrations": "Integrations", "users": "Users", "new": "New scan", "account": "Account", "domains": "Web testing"
+    "overview": "Overview",
+    "findings": "Findings",
+    "threats": "Threats",
+    "coverage": "Coverage",
+    "cves": "CVE tracker",
+    "compliance": "Compliance",
+    "analyses": "Scans",
+    "repositories": "Repositories",
+    "pulls": "Pull requests",
+    "integrations": "Integrations",
+    "users": "Users",
+    "new": "New scan",
+    "account": "Account",
+    "domains": "Web testing"
   },
   "descriptions": {
     "overview": "What risks your code, dependencies and images carry, why they matter and how to fix them.",
@@ -31,7 +44,10 @@
     "default": "Results for the selected target, with steps and coverage limits in plain view."
   },
   "theme": {
-    "label": "Appearance", "system": "System", "light": "Light", "dark": "Dark"
+    "label": "Appearance",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
   },
   "toast": {
     "repository": "repository",
@@ -56,5 +72,6 @@
   "update": {
     "message": "A new version of the panel is available. Reload to use it, but save any unsaved work first.",
     "reload": "Reload"
-  }
+  },
+  "edition": "Self-hosted · v{{version}}"
 }

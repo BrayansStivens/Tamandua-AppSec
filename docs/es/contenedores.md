@@ -1,3 +1,5 @@
+[English](../containers.md) · Español
+
 # Contenedores y Makefile
 
 Todo Tamandua corre en Docker. El `Makefile` de la raíz envuelve los comandos de `docker compose` para que levantarlo, actualizarlo o hacer copias sea una sola orden.
@@ -55,7 +57,7 @@ Funciona igual en macOS (Apple Silicon e Intel), Linux y Windows con WSL o Git B
 | `make shell` | Terminal dentro del contenedor. |
 | `make cli ARGS="…"` | CLI de la app, p. ej. `make cli ARGS="user list"` o `make cli ARGS="user reset-totp --username ana"`. |
 | `make clean` | Para todo y borra las imágenes de Tamandua. |
-| `make purge CONFIRM=borrar` | **Borra `data/` y `config/`**: ejecuciones, usuarios y secretos. |
+| `make purge CONFIRM=delete` | **Borra `data/` y `config/`**: ejecuciones, usuarios y secretos. |
 | `make dev-setup` · `make dev` | Entorno de desarrollo sin contenedor (ver [desarrollo.md](desarrollo.md)). |
 | `make test` · `make lint` · `make check` | Pruebas del backend, lint del panel y ambos. |
 

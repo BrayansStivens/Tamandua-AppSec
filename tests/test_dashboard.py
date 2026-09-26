@@ -90,7 +90,7 @@ class CoverageTests(unittest.TestCase):
         self.assertIn("Trivy", rows["A03"]["reason"])
         self.assertIn("1 hallazgo", rows["A03"]["reason"])
         self.assertEqual(rows["A05"]["status"], "partial")
-        self.assertIn("reglas propias", rows["A05"]["reason"])
+        self.assertIn("reglas de Tamandua", rows["A05"]["reason"])
         self.assertEqual(rows["A05"]["findings"], 1)
         # Sin archivos de infraestructura, A02 lo dice en vez de fingir cobertura.
         self.assertIn("no encontró archivos de infraestructura", rows["A02"]["reason"])

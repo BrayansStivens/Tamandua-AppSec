@@ -124,9 +124,9 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale
             "component": root,
             "properties": [
                 {"name": "tamandua:run", "value": str(record.get("id") or "")},
-                {"name": "tamandua:analizado", "value": str(scanned or "")},
-                *([{"name": "tamandua:sin-completar", "value": ", ".join(gaps)}] if gaps else []),
-                {"name": "tamandua:origen", "value": t("compliance.sbom.origin_image" if root["type"] == "container"
+                {"name": "tamandua:scanned", "value": str(scanned or "")},
+                *([{"name": "tamandua:incomplete", "value": ", ".join(gaps)}] if gaps else []),
+                {"name": "tamandua:origin", "value": t("compliance.sbom.origin_image" if root["type"] == "container"
                                                        else "compliance.sbom.origin", locale)},
             ],
         },

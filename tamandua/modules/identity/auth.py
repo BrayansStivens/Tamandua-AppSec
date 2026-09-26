@@ -550,6 +550,7 @@ class Authenticator:
             self._setup = None
             return None
         if getattr(self, "_setup", None) is None:
+            # `make setup-code` finds the code in the server log by this format (XXXX-XXXX-XXXX from this alphabet).
             alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
             self._setup = "-".join("".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3))
         return self._setup

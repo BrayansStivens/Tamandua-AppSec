@@ -7,15 +7,26 @@ import { api } from '@/shared/api/http'
 import { formatNumber } from '@/shared/i18n/format'
 import { methodName, METHOD_ORDER, type Methodology } from '@/features/threats/threat-guides'
 import type { View } from '@/features/threats/threat-model-types'
-import stride from '@/examples/threat-models/stride.json'
-import linddun from '@/examples/threat-models/linddun.json'
-import pasta from '@/examples/threat-models/pasta.json'
-import attackTrees from '@/examples/threat-models/attack_trees.json'
-import attack from '@/examples/threat-models/attack.json'
-import custom from '@/examples/threat-models/custom.json'
+import { currentLocale, type Locale } from '@/shared/i18n'
+import strideEn from '@/examples/threat-models/en/stride.json'
+import linddunEn from '@/examples/threat-models/en/linddun.json'
+import pastaEn from '@/examples/threat-models/en/pasta.json'
+import attackTreesEn from '@/examples/threat-models/en/attack_trees.json'
+import attackEn from '@/examples/threat-models/en/attack.json'
+import customEn from '@/examples/threat-models/en/custom.json'
+import strideEs from '@/examples/threat-models/es/stride.json'
+import linddunEs from '@/examples/threat-models/es/linddun.json'
+import pastaEs from '@/examples/threat-models/es/pasta.json'
+import attackTreesEs from '@/examples/threat-models/es/attack_trees.json'
+import attackEs from '@/examples/threat-models/es/attack.json'
+import customEs from '@/examples/threat-models/es/custom.json'
 
 const MAX_BYTES = 600_000
-const EXAMPLES: Record<Methodology, unknown> = { stride, linddun, pasta, attack_trees: attackTrees, attack, custom }
+const EXAMPLES: Partial<Record<Locale, Record<Methodology, unknown>>> & { en: Record<Methodology, unknown> } = {
+  en: { stride: strideEn, linddun: linddunEn, pasta: pastaEn, attack_trees: attackTreesEn, attack: attackEn, custom: customEn },
+  es: { stride: strideEs, linddun: linddunEs, pasta: pastaEs, attack_trees: attackTreesEs, attack: attackEs, custom: customEs },
+}
+const example = (method: Methodology) => (EXAMPLES[currentLocale()] ?? EXAMPLES.en)[method]
 const EXAMPLE_HINTS: Record<Methodology, string> = {
   stride: 'importer.hints.stride', linddun: 'importer.hints.linddun', pasta: 'importer.hints.pasta',
   attack_trees: 'importer.hints.attack_trees', attack: 'importer.hints.attack', custom: 'importer.hints.custom',
@@ -31,7 +42,7 @@ const formatted = (document: unknown) => `${JSON.stringify(document, null, 2)}\n
 export function ThreatJsonImporter({ onClose, onImported }: { onClose: () => void; onImported: (id: string) => void }) {
   const { t } = useTranslation('threats')
   const [selected, setSelected] = useState<Methodology | null>('stride')
-  const [text, setText] = useState(() => formatted(EXAMPLES.stride))
+  const [text, setText] = useState(() => formatted(example('stride')))
   const [preview, setPreview] = useState<Preview | null>(null)
   const [validatedText, setValidatedText] = useState('')
   const [validatedDocument, setValidatedDocument] = useState<unknown>(null)
@@ -45,7 +56,7 @@ export function ThreatJsonImporter({ onClose, onImported }: { onClose: () => voi
   }
   const chooseExample = (method: Methodology) => {
     setSelected(method)
-    changeText(formatted(EXAMPLES[method]))
+    changeText(formatted(example(method)))
   }
   const loadFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]

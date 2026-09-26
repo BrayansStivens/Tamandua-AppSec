@@ -1,0 +1,31 @@
+English · [Español](es/configuracion.md)
+
+# Configuration
+
+Every variable is optional and goes in `.env` (a copy of `.env.example`). After changing any of them, run `docker compose up -d`.
+
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TAMANDUA_HOST_BIND` / `TAMANDUA_HOST_PORT` | `127.0.0.1` / `8766` | Where the panel is published on the host. |
+| `TAMANDUA_PUBLIC_URL` | `http://127.0.0.1:8766` | URL people use to open the panel; it determines `Secure` cookies, HSTS and the App's Setup URL. |
+| `TAMANDUA_ALLOWED_ORIGINS` | 127.0.0.1 and localhost | Accepted origins (Host header and CSRF). |
+| `TAMANDUA_DEFAULT_LOCALE` | `en` | `en` or `es`. Language for PR comments, notifications, Jira issues, reports and CLI output when no person asked for one. The panel doesn't use it: it follows the browser's language, and each person can change it from the sidebar or the sign-in screen. |
+| `TAMANDUA_MASTER_KEY` | generated in `config/` | Master key for the secret store (`openssl rand -base64 32`). |
+| `TAMANDUA_REQUIRE_TOTP` | `admins` | `admins`, `all` or `none`. |
+| `TAMANDUA_NVD_API_KEY` | — | NVD API key: faster CVE downloads. Sent in a header and never logged. |
+| `TAMANDUA_DB_PASSWORD` | (generated) | PostgreSQL password; `make setup` writes it to `.env`. |
+| `TAMANDUA_DATABASE_URL` | (compose) | PostgreSQL connection string. `compose.yaml` builds it from the password; outside compose, e.g. `postgresql+psycopg://tamandua:…@localhost:5432/tamandua`. |
+| `TAMANDUA_EMBEDDED_WORKER` | `1` | `1`: the server also runs the scans (a single process). In compose the API uses `0` and the `worker` service runs them. |
+| `TAMANDUA_CVE_SYNC` | `on` | `off` turns off the local NVD copy. |
+| `TAMANDUA_EUVD` | `on` | `off` stops querying EUVD (ENISA) when NVD hasn't scored a CVE. Only the CVE identifier is sent. |
+| `TAMANDUA_PR_POLL_SECONDS` | `300` | How often watched PRs are checked. |
+| `TAMANDUA_BRANCH_MIN_MINUTES` | `60` | Minimum gap between two automatic rescans of the same repository's main branch (minimum 10). |
+| `TAMANDUA_ADVISORY_WATCH_HOURS` | `24` | How many hours between offline checks of already-scanned dependencies against new advisories. `0` turns it off. |
+| `TAMANDUA_ALLOW_PRIVATE_WEBHOOKS` | empty | `1` allows alerts to webhooks on your internal network (blocked by default to prevent SSRF). |
+| `TAMANDUA_ALLOW_PRIVATE_REGISTRIES` | — | `1` allows scanning images from registries with a private IP (your internal network). Blocked by default to prevent SSRF. |
+| `TAMANDUA_TLS_CERT` / `_KEY` | — | TLS without a proxy. |
+| `GITHUB_APP_ID` + `GITHUB_APP_SLUG` + `GITHUB_APP_PRIVATE_KEY_FILE` | — | Alternative to the form: mount the App as a deployment secret. Takes precedence over the secret store. |
+| `TAMANDUA_HOST_CONFIG_DIR` | `./config` | Host folder holding the encrypted secrets. |
+
+**Deliberate trade-off:** so you don't have to install anything but Docker, the app launches the engines as sibling containers through the Docker socket, which is equivalent to root on the host. If you open the panel to more people, put it behind a socket proxy or a separate runner.

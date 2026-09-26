@@ -8,7 +8,7 @@
     "/api/health": {
       "get": {
         "tags": [
-          "sistema"
+          "system"
         ],
         "summary": "Health",
         "operationId": "health_api_health_get",
@@ -35,7 +35,7 @@
     "/api/dashboard": {
       "get": {
         "tags": [
-          "resumen"
+          "dashboard"
         ],
         "summary": "Dashboard",
         "operationId": "dashboard_api_dashboard_get",
@@ -297,10 +297,10 @@
     "/api/sla": {
       "get": {
         "tags": [
-          "hallazgos"
+          "findings"
         ],
         "summary": "Policy",
-        "description": "Los ve cualquiera (explican las fechas límite); los cambia un administrador.",
+        "description": "Anyone can read them (they explain due dates); an administrator changes them.",
         "operationId": "policy_api_sla_get",
         "responses": {
           "200": {
@@ -319,10 +319,10 @@
     "/api/cra": {
       "get": {
         "tags": [
-          "cumplimiento"
+          "compliance"
         ],
         "summary": "Overview",
-        "description": "Lo ve cualquier sesión (el equipo necesita saber qué vence); solo un administrador lo cambia.",
+        "description": "Any session can read it (the team needs to know what is due); only an administrator changes it.",
         "operationId": "overview_api_cra_get",
         "responses": {
           "200": {
@@ -1349,7 +1349,7 @@
           "low"
         ],
         "title": "SlaDays",
-        "description": "Días por severidad; None = esa severidad no vence."
+        "description": "Days per severity; null means that severity has no due date."
       },
       "SlaDefaults": {
         "properties": {
@@ -1465,7 +1465,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "tamandua_session",
-        "description": "Sesión iniciada en el panel."
+        "description": "Session signed in to the panel."
       }
     }
   },

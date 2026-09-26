@@ -1,16 +1,16 @@
 {
   "run_type": {
-    "repository_scan": "Code analysis", "image_scan": "Container image", "pr_review": "PR review",
+    "repository_scan": "Code scan", "image_scan": "Container image", "pr_review": "PR review",
     "advisory_watch": "New advisories", "dast": "Dynamic web app or API testing"
   },
   "duration": { "minutes": "~{{value}} min", "hours": "~{{value}} h", "under_two_minutes": "under 2 min" },
   "listing_more": "{{names}} and {{rest}} more",
   "remove_item": "Remove {{name}}",
   "wizard": {
-    "choose_type": "Choose the type of analysis",
+    "choose_type": "Choose the type of scan",
     "continue": "Continue",
     "back": "Back",
-    "back_to_types": "Back to analysis types",
+    "back_to_types": "Back to scan types",
     "steps": { "source": "Source code", "targets": "Targets", "image": "Image", "context": "Context", "review": "Review and launch" },
     "kinds": {
       "code": {
@@ -45,8 +45,8 @@
     "empty_text": "Pick one or more of your connected repositories from GitHub, GitLab or this workspace.",
     "without_app": "Scanning several at once only works with GitHub App repositories: their access renews on its own, so it holds up through a batch that runs for hours. Remove {{names}} or scan them one at a time.",
     "over_limit": "Up to {{limit}} by hand; for more, scan the whole organization.",
-    "batch_active": "A batch is already running ({{label}}): wait for it to finish or cancel it in Analyses. Meanwhile you can still scan a single repository.",
-    "batch_hint": "Several at once run as a batch: one at a time and only when nothing else is scanning, so your own scans and PR reviews never wait. Follow its progress in Analyses, where you can cancel it.",
+    "batch_active": "A batch is already running ({{label}}): wait for it to finish or cancel it in Scans. Meanwhile you can still scan a single repository.",
+    "batch_hint": "Several at once run as a batch: one at a time and only when nothing else is scanning, so your own scans and PR reviews never wait. Follow its progress in Scans, where you can cancel it.",
     "single_hint": "Each run scans one repository: the snapshot and its hash identify exactly what was reviewed.",
     "dialog_description": "Select one or more. Several are scanned as a batch (GitHub App repositories, up to {{limit}}).",
     "no_provider": "No code provider connected",
@@ -75,7 +75,7 @@
     "placeholder": "e.g. nginx:1.21\nghcr.io/your-org/your-image:1.0",
     "invalid": "These don't look like valid references (registry/repository:tag, lowercase): <mono>{{names}}</mono>",
     "over_limit": "At most {{limit}} images per batch.",
-    "batch_info": "{{total}} images: they run as a batch, one at a time and only when nothing else is scanning. Follow its progress in Analyses.",
+    "batch_info": "{{total}} images: they run as a batch, one at a time and only when nothing else is scanning. Follow its progress in Scans.",
     "batch_active": "A batch is already running ({{label}}): wait for it to finish or scan a single image.",
     "try_public": "Try a public one:",
     "samples": { "old": "old, lots of advisories", "recent": "recent, few", "vulnerable": "vulnerable on purpose" },
@@ -119,8 +119,8 @@
     "target_org_unset": "Organization not chosen yet",
     "target_repositories": "{{total}} repositories: {{names}}",
     "target_images": "{{total}} images: {{names}}",
-    "batch_code": "This creates a batch: each repository is scanned with its own plan, one at a time and only when nothing else is scanning. You can follow it and cancel it in Analyses; whatever is already scanned is kept. Batches never send dependencies to api.osv.dev.",
-    "batch_image": "This creates a batch: each image is scanned with its own plan, one at a time and only when nothing else is scanning. You can follow it and cancel it in Analyses; whatever is already scanned is kept.",
+    "batch_code": "This creates a batch: each repository is scanned with its own plan, one at a time and only when nothing else is scanning. You can follow it and cancel it in Scans; whatever is already scanned is kept. Batches never send dependencies to api.osv.dev.",
+    "batch_image": "This creates a batch: each image is scanned with its own plan, one at a time and only when nothing else is scanning. You can follow it and cancel it in Scans; whatever is already scanned is kept.",
     "plan_loading": "Reading the repository to work out what to scan",
     "languages": "Repository languages",
     "languages_files_one": "Repository languages · {{count}} file", "languages_files_other": "Repository languages · {{count}} files",
@@ -141,7 +141,7 @@
     },
     "image_skips": {
       "run": "The image is never run or built",
-      "source": "The source code that produced it isn't scanned (run a code analysis on its repository)",
+      "source": "The source code that produced it isn't scanned (run a code scan on its repository)",
       "secrets": "No secret value that turns up is stored, only where it was found"
     },
     "dast_unavailable": "Dynamic tests can't be launched yet: the isolated runner and the rate and scope limits are still missing. This setup is prepared, not run.",
@@ -178,19 +178,19 @@
     "more": "{{count}} more — refine your search"
   },
   "list": {
-    "search": "Search analyses",
-    "search_placeholder": "Search analyses…",
+    "search": "Search scans",
+    "search_placeholder": "Search scans…",
     "filter_status": "Filter by status",
     "all_statuses": "All statuses",
     "status_running": "Scanning",
     "filter_type": "Filter by type",
     "all_types": "All types",
-    "loading": "Loading analyses",
-    "empty_title": "No analyses yet",
-    "empty_text": "Your analyses will show up here. Run the first one on a repository or a container image.",
-    "new": "New analysis",
-    "columns": { "status": "Status", "analysis": "Analysis", "type": "Type", "findings": "Findings", "started": "Started" },
-    "fallback": { "asset": "Asset", "repository": "Repository", "image": "Image", "pull_request": "Pull request", "analysis": "Analysis" },
+    "loading": "Loading scans",
+    "empty_title": "No scans yet",
+    "empty_text": "Your scans will show up here. Run the first one on a repository or a container image.",
+    "new": "New scan",
+    "columns": { "status": "Status", "analysis": "Scan", "type": "Type", "findings": "Findings", "started": "Started" },
+    "fallback": { "asset": "Asset", "repository": "Repository", "image": "Image", "pull_request": "Pull request", "analysis": "Scan" },
     "hint": {
       "pr_review_one": "new in the PR", "pr_review_other": "new in the PR",
       "advisory_watch_one": "new advisory", "advisory_watch_other": "new advisories",
@@ -198,10 +198,10 @@
     },
     "trigger_branch": "· automatic: the main branch changed",
     "trigger_branch_sha": "· automatic: the main branch changed ({{sha}})",
-    "trigger_advisories": "· automatic: published after the last analysis",
+    "trigger_advisories": "· automatic: published after the last scan",
     "severity_letter": { "critical": "C", "high": "H", "medium": "M", "low": "L" },
     "severity_count": "{{severity}}: {{value}}",
-    "noun": "analyses"
+    "noun": "scans"
   },
   "progress": {
     "scan": "scan",

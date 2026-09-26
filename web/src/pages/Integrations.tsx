@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/sha
 import { ComingSoonCard } from '@/shared/ui/coming-soon'
 import { api } from '@/shared/api/http'
 
-type ProviderStatus = { id: 'openai' | 'anthropic'; configured: boolean; env: string; owner: 'usuario' | 'servidor' | null; last4: string | null; saved_at: string | null }
+type ProviderStatus = { id: 'openai' | 'anthropic'; configured: boolean; env: string; owner: 'user' | 'server' | null; last4: string | null; saved_at: string | null }
 
 // Proveedores de código, registros de contenedores, Jira y, en desarrollo, IA.
 export function Integrations({ user }: { user: SessionUser }) {
@@ -21,7 +21,7 @@ export function Integrations({ user }: { user: SessionUser }) {
   const [error, setError] = useState<string | null>(null)
   const loadProviders = useCallback(() => api.get<ProviderStatus[]>('/api/providers').then(setProviders), [])
   useEffect(() => { loadProviders().catch(caught => setError(caught instanceof Error ? caught.message : String(caught))) }, [loadProviders])
-  const mine = providers.filter(provider => provider.owner === 'usuario')
+  const mine = providers.filter(provider => provider.owner === 'user')
   const removeKey = async (provider: ProviderStatus['id']) => {
     setBusy(provider); setError(null)
     try {

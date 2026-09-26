@@ -41,8 +41,8 @@ class DatabaseNotConfigured(RuntimeError):
 def url() -> str:
     value = os.environ.get("TAMANDUA_DATABASE_URL", "").strip()
     if not value:
-        raise DatabaseNotConfigured("Falta TAMANDUA_DATABASE_URL: Tamandua guarda ejecuciones y hallazgos en PostgreSQL "
-                                    "(con `make up` se configura solo).")
+        raise DatabaseNotConfigured("TAMANDUA_DATABASE_URL is missing: Tamandua stores runs and findings in PostgreSQL "
+                                    "(`make up` configures it for you).")
     return value
 
 

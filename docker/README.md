@@ -1,14 +1,14 @@
 # docker/
 
-Definiciones de imagen. Se construyen desde la raíz del repositorio con `make build` (o `docker compose build`); no hace falta entrar aquí.
+Image definitions. They are built from the repository root with `make build` (or `docker compose build`); you don't need to work in here.
 
-| Carpeta | Imagen | Notas |
+| Folder | Image | Notes |
 | --- | --- | --- |
-| `app/` | `tamandua/app:<versión>` | Panel + API + cola de análisis. Multi-etapa: Node solo compila el panel. Bases fijadas por digest, usuario sin privilegios, etiquetas OCI. |
-| `engines/opengrep/` | `tamandua/opengrep:1.30.0` | Motor SAST. Descarga el binario oficial y lo compara con su SHA-256; si no coincide, la construcción falla. `VERIFY.md` explica la verificación con Cosign. |
+| `app/` | `tamandua/app:<version>` | Panel + API + scan queue. Multi-stage: Node only builds the panel. Base images pinned by digest, unprivileged user, OCI labels. |
+| `engines/opengrep/` | `tamandua/opengrep:1.30.0` | SAST engine. Downloads the official binary and checks it against its SHA-256; if it doesn't match, the build fails. `VERIFY.md` explains the Cosign verification. |
 
-Trivy y Gitleaks no se construyen: se usan sus imágenes oficiales fijadas por digest (ver `tamandua/modules/scanning/engines.py`).
+The other engines (Trivy, OSV-Scanner, Gitleaks, Grype, Checkov, zizmor) aren't built: their official images are used, pinned by digest (see `tamandua/modules/scanning/engines.py`).
 
-Para subir de versión un motor: cambia versión y digest (o SHA-256) en un solo sitio, `tamandua/modules/scanning/engines.py` y el Dockerfile correspondiente; `tests/test_packaging.py` comprueba que compose y el código coinciden.
+To upgrade an engine, change its version and digest (or SHA-256) in `tamandua/modules/scanning/engines.py` and in the matching Dockerfile; `tests/test_packaging.py` checks that compose and the code agree.
 
-Más detalles, endurecimiento y referencia de comandos en [docs/contenedores.md](../docs/contenedores.md).
+More details, hardening and a command reference in [docs/containers.md](../docs/containers.md).

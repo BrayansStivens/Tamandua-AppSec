@@ -40,16 +40,26 @@ def model(**overrides):
 class ModelTests(unittest.TestCase):
     def test_every_ui_json_example_is_importable(self):
         examples = Path(__file__).resolve().parents[1] / "web/src/examples/threat-models"
-        for method in ("stride", "linddun", "pasta", "attack_trees", "attack", "custom"):
-            with self.subTest(method=method):
-                document = json.loads((examples / f"{method}.json").read_text(encoding="utf-8"))
-                imported = tm.from_portable(document)
-                self.assertEqual(imported["methodology"], method)
-                # Los ejemplos muestran todos los tipos de componente, incluido uno personalizado, y sin posiciones.
-                self.assertEqual(len(imported["components"]), 13)
-                self.assertEqual(len(imported["flows"]), 13)
-                self.assertIn("custom", {item["kind"] for item in imported["components"]})
-                self.assertTrue(all(item["position"] is None for item in imported["components"]))
+        methods = ("stride", "linddun", "pasta", "attack_trees", "attack", "custom")
+        self.assertEqual({path.name for path in (examples / "en").glob("*.json")}, {f"{method}.json" for method in methods})
+        self.assertEqual({path.name for path in (examples / "es").glob("*.json")}, {f"{method}.json" for method in methods})
+        for locale in ("en", "es"):
+            for method in methods:
+                with self.subTest(locale=locale, method=method):
+                    document = json.loads((examples / locale / f"{method}.json").read_text(encoding="utf-8"))
+                    imported = tm.from_portable(document)
+                    self.assertEqual(imported["methodology"], method)
+                    # Los ejemplos muestran todos los tipos de componente, incluido uno personalizado, y sin posiciones.
+                    self.assertEqual(len(imported["components"]), 13)
+                    self.assertEqual(len(imported["flows"]), 13)
+                    self.assertIn("custom", {item["kind"] for item in imported["components"]})
+                    self.assertTrue(all(item["position"] is None for item in imported["components"]))
+        # Same ids in both languages: only the text differs.
+        ids = lambda doc: {key: [item["id"] for item in doc["model"].get(key) or []] for key in ("components", "flows", "boundaries", "manual_threats", "attack_trees")}
+        for method in methods:
+            with self.subTest(method=method, check="same ids"):
+                english, spanish = (json.loads((examples / locale / f"{method}.json").read_text(encoding="utf-8")) for locale in ("en", "es"))
+                self.assertEqual(ids(english), ids(spanish))
 
     def test_validation_rejects_dangling_and_unknown(self):
         good = model()
@@ -231,7 +241,7 @@ class ModelTests(unittest.TestCase):
 
     def test_automatic_layout_keeps_members_inside_and_boxes_apart(self):
         import glob
-        for path in sorted(glob.glob(str(Path(__file__).parents[1] / "web/src/examples/threat-models/*.json"))):
+        for path in sorted(glob.glob(str(Path(__file__).parents[1] / "web/src/examples/threat-models/*/*.json"))):
             current = tm.from_portable(json.loads(Path(path).read_text(encoding="utf-8")))
             layout = tm._layout(current)
             nodes, boxes = layout["nodes"], layout["boundaries"]

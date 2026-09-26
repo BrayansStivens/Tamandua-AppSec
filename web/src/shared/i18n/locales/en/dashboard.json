@@ -8,7 +8,7 @@
   "empty": {
     "title": "No runs yet",
     "text": "The dashboard is built from your scans: open findings by severity, what got fixed between runs, exploitability and activity.",
-    "new_analysis": "New analysis"
+    "new_analysis": "New scan"
   },
   "kpi": {
     "score": "Score",
@@ -34,7 +34,7 @@
       "title": "Top priority findings", "description": "Ranked by priority, severity and EPSS.",
       "severity": "Severity: {{severity}}", "more": "View all in Findings", "empty": "Nothing open."
     },
-    "recent_runs": { "title": "Recent runs", "description": "Latest scans.", "more": "View all in Analyses", "empty": "No runs." }
+    "recent_runs": { "title": "Recent runs", "description": "Latest scans.", "more": "View all in Scans", "empty": "No runs." }
   },
   "activity": {
     "title": "Scan activity", "description": "Runs per day, up to today.",
@@ -65,7 +65,7 @@
   },
   "exploitability": {
     "empty": "No open finding has a known exploit or a high EPSS.",
-    "region": "Exploitable findings",
+    "region": "Findings with exploitation signals",
     "show_less": "Show less",
     "show_all": "Show all {{total}}",
     "showing": "Showing {{shown}} of {{total}}: the rest are in Findings"

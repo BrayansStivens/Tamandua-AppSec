@@ -1,83 +1,85 @@
-# Conectar GitHub
+English · [Español](es/github-app.md)
 
-Cada instalación de Tamandua usa **su propia** GitHub App: la creas tú, en tu cuenta o en una organización que administres. Si necesitas varias organizaciones, configúrala para que pueda instalarse en cualquier cuenta. GitHub no permite crear Apps por API, así que se hace en su formulario. El panel (**Integraciones**) muestra esta misma guía con los valores ya rellenos para tu instalación y botones para copiarlos.
+# Connecting GitHub
 
-## 1. Crear la App
+Every Tamandua installation uses **its own** GitHub App: you create it, on your account or on an organization you administer. If you need several organizations, set it up so it can be installed on any account. GitHub doesn't let you create Apps through the API, so this happens in GitHub's form. The panel (**Integrations**) shows this same guide with the values already filled in for your installation, plus buttons to copy them.
 
-Abre el formulario de nueva App:
+## 1. Create the App
 
-- Cuenta personal: <https://github.com/settings/apps/new>
-- Organización: `https://github.com/organizations/<tu-org>/settings/apps/new`
+Open the new App form:
 
-Rellena solo esto:
+- Personal account: <https://github.com/settings/apps/new>
+- Organization: `https://github.com/organizations/<your-org>/settings/apps/new`
 
-| Campo | Valor |
+Fill in only these fields:
+
+| Field | Value |
 | --- | --- |
-| **GitHub App name** | El que quieras, p. ej. `Tamandua`. Tiene que ser único en todo GitHub: si ya existe, añade tu equipo. |
-| **Homepage URL** | Cualquier URL tuya; p. ej. tu perfil de GitHub o la URL de tu panel. |
-| **Callback URL** | Vacío. |
-| **Request user authorization (OAuth) during installation** | Sin marcar. |
-| **Setup URL** (opcional) | `http://127.0.0.1:8766/oauth/callback` (o tu URL pública + `/oauth/callback`) y marca **Redirect on update**. Abre una página que te indica cómo seleccionar la instalación en el panel. |
-| **Webhook → Active** | Desmarcado. El panel consulta los PRs por su cuenta. |
+| **GitHub App name** | Anything you like, e.g. `Tamandua`. It must be unique across GitHub: if it's taken, add your team's name. |
+| **Homepage URL** | Any URL of yours, e.g. your GitHub profile or your panel's URL. |
+| **Callback URL** | Leave empty. |
+| **Request user authorization (OAuth) during installation** | Unchecked. |
+| **Setup URL** (optional) | `http://127.0.0.1:8766/oauth/callback` (or your public URL + `/oauth/callback`), and check **Redirect on update**. It opens a page that tells you how to pick the installation in the panel. |
+| **Webhook → Active** | Unchecked. The panel polls pull requests on its own. |
 
-**Repository permissions**, solo estos cuatro:
+**Repository permissions**, only these four:
 
-| Permiso | Nivel | Para qué |
+| Permission | Access | Why |
 | --- | --- | --- |
-| Contents | Read-only | Descargar el código para analizarlo. |
-| Metadata | Read-only | Obligatorio en toda App. |
-| Pull requests | Read and write | Leer los cambios del PR y dejar un comentario con el resultado. |
-| Commit statuses | Read and write | Marcar el commit como aprobado o bloqueado. |
+| Contents | Read-only | Download the code to scan it. |
+| Metadata | Read-only | Required for every App. |
+| Pull requests | Read and write | Read the PR's changes and leave a comment with the result. |
+| Commit statuses | Read and write | Mark the commit as passing or blocked. |
 
-Nada en *Organization permissions* ni en *Account permissions*, y ningún evento suscrito. Si más adelante la App tuviera permisos de más, el panel lo avisa en rojo.
+Nothing under *Organization permissions* or *Account permissions*, and no subscribed events. If the App ever ends up with more permissions than it needs, the panel flags it in red.
 
-En **Where can this GitHub App be installed?** elige **Any account** si necesitas instalarla en varias organizaciones. Para una sola cuenta puedes usar **Only on this account**. Después pulsa **Create GitHub App**.
+Under **Where can this GitHub App be installed?**, choose **Any account** if you need to install it on several organizations. For a single account, **Only on this account** is enough. Then click **Create GitHub App**.
 
-## 2. App ID y clave privada
+## 2. App ID and private key
 
-En la página de la App recién creada:
+On the page of the App you just created:
 
-- **App ID**: aparece arriba, en la sección *About*.
-- **Private keys → Generate a private key**: se descarga un fichero `.pem`.
+- **App ID**: shown at the top, in the *About* section.
+- **Private keys → Generate a private key**: downloads a `.pem` file.
 
-## 3. Conectarla al panel
+## 3. Connect it to the panel
 
-En **Integraciones → GitHub**, escribe el App ID, elige el `.pem` y pulsa **Verificar y guardar**. El panel firma un JWT con la clave y pregunta a GitHub por la App: si no casan, no guarda nada y te dice por qué. Si casan, guarda la clave **cifrada** en `config/` y muestra el nombre, la cuenta y los permisos que GitHub le atribuye.
+In **Integrations → GitHub**, enter the App ID, pick the `.pem` file and click **Verify and save**. The panel signs a JWT with the key and asks GitHub about the App: if they don't match, nothing is saved and the panel tells you why. If they match, it stores the key **encrypted** in `config/` and shows the name, the account and the permissions GitHub reports for the App.
 
-La clave no vuelve a salir del servidor. **Borra el `.pem` de tu carpeta de descargas** cuando termines.
+The key never leaves the server again. **Delete the `.pem` from your downloads folder** when you're done.
 
-## 4. Instalarla en tus repositorios
+## 4. Install it on your repositories
 
-Pulsa **Instalar en GitHub**, elige una cuenta y **Only select repositories**, y marca los repositorios que quieras analizar. Repite la instalación en cada organización. En el panel pulsa **Buscar instalaciones** y **Conectar cuenta** en cada organización que quieras usar. Instalar la App no incorpora automáticamente las cuentas a este workspace. Los repositorios de las cuentas conectadas aparecen en **Repositorios** y en **Nuevo análisis**; allí puedes filtrar por organización.
+Click **Install on GitHub**, choose an account and **Only select repositories**, and tick the repositories you want to scan. Repeat the installation for each organization. Back in the panel, click **Find installations** and then **Connect account** for each organization you want to use: installing the App doesn't add those accounts to this workspace by itself. Repositories from connected accounts appear in **Repositories** and **New scan**, where you can filter by organization.
 
-Para añadir o quitar repositorios más tarde: **Integraciones → Cambiar repositorios** en la cuenta correspondiente. Para dejar de usar una organización aquí, pulsa **Desconectar cuenta**.
+To add or remove repositories later: **Integrations → Change repositories** on the relevant account. To stop using an organization here, click **Disconnect account**.
 
-## Revisión de pull requests
+## Pull request review
 
-En **Pull requests** activa la vigilancia por repositorio y elige el umbral de bloqueo. Cada pocos minutos (`TAMANDUA_PR_POLL_SECONDS`) se revisan los PRs abiertos con commits nuevos: solo cuenta lo que el PR introduce frente a la rama principal. El resultado se publica como **un único comentario** que se actualiza y como un estado de commit `tamandua`.
+In **Pull requests**, turn on watching per repository and choose the blocking threshold. Every few minutes (`TAMANDUA_PR_POLL_SECONDS`), open PRs with new commits are reviewed: only what the PR introduces compared with the main branch counts. The result is published as **a single comment** that gets updated, and as a `tamandua` commit status. The comment speaks the language set in `TAMANDUA_DEFAULT_LOCALE` (English by default, or Spanish), because the whole team reads it.
 
-## Alternativa: montar la App como secreto
+## Alternative: mount the App as a secret
 
-Si prefieres no guardar la clave en el almacén (por ejemplo, porque ya usas un gestor de secretos), declara en el entorno del contenedor:
+If you'd rather not keep the key in the vault (for example, because you already use a secrets manager), set these in the container's environment:
 
 ```bash
 GITHUB_APP_ID=123456
-GITHUB_APP_SLUG=tu-app          # el de github.com/apps/<slug>
+GITHUB_APP_SLUG=your-app        # the one in github.com/apps/<slug>
 GITHUB_APP_PRIVATE_KEY_FILE=/run/secrets/github-app.pem
 ```
 
-El entorno manda sobre el almacén. Monta el `.pem` en solo lectura.
+The environment takes precedence over the vault. Mount the `.pem` read-only.
 
-## Cambiar de App
+## Switching Apps
 
-**Integraciones → Usar otra GitHub App… → Olvidar la App** borra del servidor la clave y la conexión. La App sigue existiendo en GitHub: bórrala allí si ya no la usas.
+**Integrations → Use a different GitHub App… → Forget the App** deletes the key and the connection from the server. The App still exists on GitHub: delete it there if you no longer use it.
 
-## Problemas frecuentes
+## Common problems
 
-| Mensaje | Qué pasa |
+| Message | What's going on |
 | --- | --- |
-| *GitHub no reconoce ese App ID con esa clave privada* | La clave es de otra App, o la revocaste. Genera otra en la página de la App. |
-| *La clave privada debe ser RSA de al menos 2048 bits* | Has subido otro fichero; usa el `.pem` que descarga GitHub. |
-| *La App todavía no está instalada en ninguna cuenta* | Falta el paso 4, o lo cancelaste en GitHub. |
-| *Faltan permisos* | Cambiaste permisos en la App y la instalación no ha aceptado la actualización: acéptala en GitHub (*Settings → Applications → Installed GitHub Apps*). |
-| GitHub rechaza la Setup URL | Déjala vacía y usa **Buscar instalaciones**; funciona igual. |
+| *GitHub doesn't recognize that App ID with that private key* | The key belongs to another App, or you revoked it. Generate a new one on the App's page. |
+| *The private key must be RSA with at least 2048 bits* | You uploaded a different file; use the `.pem` GitHub downloads. |
+| *The App isn't installed on any account yet* | Step 4 is missing, or you cancelled it on GitHub. |
+| *Missing permissions* | You changed the App's permissions and the installation hasn't accepted the update: accept it on GitHub (*Settings → Applications → Installed GitHub Apps*). |
+| GitHub rejects the Setup URL | Leave it empty and use **Find installations**; it works just the same. |

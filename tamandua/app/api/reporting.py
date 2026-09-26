@@ -11,7 +11,7 @@ from tamandua.app.api.deps import ApiError, Context, guard
 from tamandua.modules.reporting.dashboard import cached, zone
 from tamandua.shared.i18n import msg
 
-router = APIRouter(tags=["resumen"])
+router = APIRouter(tags=["dashboard"])
 WINDOWS = (7, 30, 90, 365)
 
 

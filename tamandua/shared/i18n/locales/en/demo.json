@@ -1,0 +1,5 @@
+{
+  "source_name": "demo · vulnerable samples",
+  "context": "Deliberately vulnerable samples that ship with Tamandua so you can try it out: code, dependencies, secrets and a Dockerfile.",
+  "model_name": "Demo · Customer portal (STRIDE)"
+}

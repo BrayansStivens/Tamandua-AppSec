@@ -87,7 +87,7 @@ class GitHubAppTests(unittest.TestCase):
             self.assertNotIn(b"PRIVATE KEY", files["secrets.vault"])
             self.assertEqual(oct((Path(self.store.name) / "config" / "secrets.vault").stat().st_mode & 0o777), "0o600")
             state = github_app.config()
-            self.assertEqual((state["configured"], state["slug"], state["owner"], state["source"]), (True, "appsec-de-acme", "acme", "almacén cifrado"))
+            self.assertEqual((state["configured"], state["slug"], state["owner"], state["source"]), (True, "appsec-de-acme", "acme", "vault"))
             self.assertNotIn("PRIVATE", json.dumps(state))
             github_app._app_jwt()  # firma con la clave descifrada del almacén
             self.assertTrue(github_app.forget_app())

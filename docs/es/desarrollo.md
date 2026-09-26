@@ -1,6 +1,8 @@
+[English](../development.md) · Español
+
 # Desarrollo
 
-Para contribuir o ejecutar Tamandua sin contenedores. Lee también [CONTRIBUTING.md](../CONTRIBUTING.md).
+Para contribuir o ejecutar Tamandua sin contenedores. Lee también [CONTRIBUTING.es.md](../../CONTRIBUTING.es.md).
 
 ## Sin contenedores
 
@@ -82,3 +84,22 @@ Quien actualiza Tamandua ya tiene datos: una versión nueva nunca debe romperlos
 Si el cambio solo añade un campo que puede faltar, basta con el punto 1: no hace falta migración.
 
 `npm run build` actualiza los activos servidos por Python. Para recarga en desarrollo usa `npm run dev`; Vite reenvía `/api` al backend en 8766.
+
+## Textos e idiomas
+
+Tamandua habla inglés y español. **El código, los identificadores y los comentarios van en inglés**; todo lo que lee
+una persona (panel, errores de la API, hallazgos, guías de corrección, progreso, informes, comentarios de PR, avisos)
+existe en los dos idiomas. Antes de añadir o cambiar cualquiera de esos textos, lee
+[`.claude/skills/tamandua-i18n/SKILL.md`](../../.claude/skills/tamandua-i18n/SKILL.md):
+
+- **Catálogos, no literales.** Panel: `web/src/shared/i18n/locales/{en,es}/<namespace>.json` con `t('…')`. Servidor:
+  `tamandua/shared/i18n/locales/{en,es}/<namespace>.json`.
+- **Se guardan códigos, no frases.** En el servidor, `msg("namespace.key", **params)` crea un mensaje sin idioma que
+  se muestra al leerlo, en el idioma de quien lo lee (`localize`, `text`); `t()` solo para lo que no se guarda.
+- **Interpretar, no traducir.** El inglés es el origen y el respaldo; el español dice lo mismo como lo diría un
+  ingeniero de seguridad hispanohablante, nunca palabra por palabra. La skill tiene la voz y el glosario.
+- **Pruebas.** `tests/test_i18n.py` (parte de `make test`) comprueba que en/es tienen las mismas claves y los mismos
+  `{{params}}`, y que toda clave literal usada en el código existe. Las pruebas corren con
+  `TAMANDUA_DEFAULT_LOCALE=es`; el inglés se comprueba de forma explícita con `Accept-Language: en`.
+
+La documentación sigue la misma regla: inglés en `docs/`, español en `docs/es/`, y cada página enlaza con la otra.

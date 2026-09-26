@@ -22,7 +22,7 @@
   },
   "progress": {
     "engine": "{{engine}}: {{detail}}",
-    "opengrep": "Opengrep {{version}}: SAST multi-lenguaje con reglas propias…",
+    "opengrep": "Opengrep {{version}}: SAST multi-lenguaje con las reglas de Tamandua…",
     "gitleaks": "Gitleaks {{version}}: buscando secretos…",
     "trivy": "Trivy {{version}}: dependencias, infraestructura y secretos…",
     "osv": "OSV-Scanner {{version}}: dependencias con la base OSV (la primera vez descarga las bases de avisos)…",
@@ -57,7 +57,7 @@
     "exit_code": "Opengrep terminó con error (código {{code}}); el SAST no concluyó",
     "timeout": "Opengrep superó el tiempo máximo; el SAST no concluyó.",
     "no_covered_language": "ninguno con reglas",
-    "detail": "{{rulesets}} conjuntos de reglas propias sobre {{languages}}; {{candidates}} candidatos.",
+    "detail": "{{rulesets}} conjuntos de reglas de Tamandua sobre {{languages}}; {{candidates}} candidatos.",
     "uncovered": "Sin reglas todavía para: {{languages}}.",
     "minified": "{{files}} archivos compilados o minificados quedaron fuera del SAST (siguen en la búsqueda de secretos).",
     "errors": "{{files}} archivos no se pudieron analizar (sintaxis o tamaño).",
@@ -215,10 +215,10 @@
       "build_url_credential": {
         "title": "Credencial en una URL o cabecera del historial de construcción",
         "reason": "El paso {{step}} del historial usa una URL con usuario y contraseña o una cabecera Authorization con valor fijo (redactado).",
-        "remediation": "Rota la credencial y usa secretos de BuildKit o un fichero .netrc montado como secreto durante la construcción."
+        "remediation": "Rota la credencial y usa secretos de BuildKit o un archivo .netrc montado como secreto durante la construcción."
       },
       "add_url": {
-        "title": "ADD descarga ficheros desde una URL",
+        "title": "ADD descarga archivos desde una URL",
         "reason": "El paso {{step}} usa ADD con una URL: el contenido no se verifica y puede cambiar entre construcciones.",
         "remediation": "Descarga con curl y comprueba el SHA-256 (o usa ADD --checksum=sha256:… con BuildKit)."
       },
@@ -267,7 +267,7 @@
         "single_engine": "{{advisories}} avisos con un solo motor: Trivy: {{trivy}} · Grype: {{grype}}"
       },
       "config": {
-        "name": "Configuración de la imagen · reglas propias + Checkov",
+        "name": "Configuración de la imagen · reglas de Tamandua + Checkov",
         "detail": "{{problems}} problemas (usuario root, HEALTHCHECK, instrucciones inseguras) en la configuración y el historial. {{checkov}}",
         "detail_checkov": "{{problems}} problemas (usuario root, HEALTHCHECK, instrucciones inseguras) en la configuración y el historial. Checkov revisó el Dockerfile reconstruido: {{failures}} fallos, {{joined}} ya cubiertos por otra regla."
       },
@@ -350,7 +350,7 @@
     "limitations": {
       "truncated": "El snapshot se truncó: {{files}} archivos no se analizaron por límite de tamaño total. La cobertura de este repositorio es parcial.",
       "no_execution": "No se ejecutó código del repositorio",
-      "sast_rules": "SAST con reglas propias: cobertura limitada a los lenguajes con reglas y sin análisis entre archivos",
+      "sast_rules": "SAST con las reglas de Tamandua: cobertura limitada a los lenguajes con reglas y sin análisis entre archivos",
       "no_docker": "Sin Docker: SAST solo Python con reglas internas y secretos por patrones",
       "sca_cap": "SCA limita la consulta a 250 versiones por ejecución",
       "osv_not_exploit": "Los avisos de OSV no prueban explotación",
@@ -360,8 +360,8 @@
   "plan": {
     "rules_one": "{{count}} regla",
     "rules_other": "{{count}} reglas",
-    "files_one": "{{count}} fichero",
-    "files_other": "{{count}} ficheros",
+    "files_one": "{{count}} archivo",
+    "files_other": "{{count}} archivos",
     "manifests_one": "{{count}} manifiesto",
     "manifests_other": "{{count}} manifiestos",
     "workflows_one": "{{count}} workflow",
@@ -385,8 +385,8 @@
     },
     "skips": {
       "no_execution": "No se instala ni se ejecuta el código del repositorio: el análisis es estático",
-      "sast_no_files": "SAST: no hay ficheros en los lenguajes que cubren las reglas propias",
-      "no_rules": "Sin reglas SAST propias para {{languages}}: solo se revisan sus secretos y dependencias",
+      "sast_no_files": "SAST: no hay archivos en los lenguajes que cubren las reglas de Tamandua",
+      "no_rules": "Sin reglas SAST de Tamandua para {{languages}}: solo se revisan sus secretos y dependencias",
       "no_manifests": "Dependencias: no hay lockfiles ni manifiestos con versiones que resolver",
       "iac_without_trivy": "Infraestructura como código: hay {{files}}, pero Trivy no está disponible",
       "no_checkov": "Checkov no está disponible: la infraestructura se revisa solo con Trivy",

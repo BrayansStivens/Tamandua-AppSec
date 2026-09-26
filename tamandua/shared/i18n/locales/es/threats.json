@@ -8,7 +8,7 @@
     "database": "Base de datos",
     "cache": "Caché",
     "queue": "Cola o bus de mensajes",
-    "storage": "Almacenamiento de ficheros",
+    "storage": "Almacenamiento de archivos",
     "external": "Servicio de terceros",
     "identity": "Proveedor de identidad",
     "custom": "Tipo personalizado"
@@ -450,7 +450,7 @@
     },
     "tm_i06": {
       "title": "Objetos accesibles sin permiso",
-      "why": "Un almacenamiento de ficheros mal configurado sirve objetos a cualquiera que tenga el enlace.",
+      "why": "Un almacenamiento de archivos mal configurado sirve objetos a cualquiera que tenga el enlace.",
       "mitigation_1": "Buckets privados y URLs firmadas de corta duración",
       "mitigation_2": "Bloquear el acceso público a nivel de cuenta"
     },
