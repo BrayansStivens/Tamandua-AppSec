@@ -80,7 +80,7 @@ class GitHubAppTests(unittest.TestCase):
             self.assertNotIn("PRIVATE KEY", seen[0][1])  # a GitHub va un JWT, nunca la clave
             github_app.save_credentials(verified)
             files = {path.name: path.read_bytes() for path in (Path(self.store.name) / "config").iterdir()}
-            self.assertEqual(set(files), {"secrets.vault", "master.key"})
+            self.assertEqual(set(files) - {".vault.lock"}, {"secrets.vault", "master.key"})  # el cerrojo entre procesos no guarda nada
             self.assertNotIn(b"PRIVATE KEY", files["secrets.vault"])
             self.assertEqual(oct((Path(self.store.name) / "config" / "secrets.vault").stat().st_mode & 0o777), "0o600")
             state = github_app.config()

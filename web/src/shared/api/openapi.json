@@ -1264,6 +1264,17 @@
             ],
             "title": "Docker"
           },
+          "workers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workers"
+          },
           "queued": {
             "anyOf": [
               {

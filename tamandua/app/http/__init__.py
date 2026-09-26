@@ -20,19 +20,20 @@ from tamandua.app.http.core import ROUTES, PREFIXES, State, allowed_origins, bui
 __all__ = ["make_handler", "serve", "allowed_origins", "public_url", "ROUTES", "PREFIXES"]
 
 
-def make_handler(data_dir: Path, *, watch_pull_requests: bool = False):
+def embedded_worker() -> bool:
+    """Un solo proceso (por defecto): el servidor ejecuta también los análisis. En compose, un servicio `worker` aparte
+    los ejecuta y el API corre con APPSEC_AGENT_EMBEDDED_WORKER=0 (sin Docker)."""
+    return os.environ.get("APPSEC_AGENT_EMBEDDED_WORKER", "1").lower() not in ("0", "false", "no", "off")
+
+
+def make_handler(data_dir: Path, *, watch_pull_requests: bool = False, worker: bool | None = None):
     migrations.upgrade(data_dir)  # antes de que nada lea: una actualización convierte los datos viejos una sola vez
-    state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir),
+    embedded = embedded_worker() if worker is None else worker
+    state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir, worker=embedded),
                   auth=Authenticator(data_dir))
-    if watch_pull_requests:
-        from tamandua.modules.integrations.installations import github_installations
-        from tamandua.modules.pullrequests.watch import Watcher
-        Watcher(data_dir, state.jobs, lambda: github_installations(data_dir)).start()
-        from tamandua.modules.intel.cve_db import Syncer
-        Syncer(data_dir).start()
-        # Una vez al día, las dependencias ya analizadas contra los avisos publicados después (sin conexión).
-        from tamandua.modules.intel.advisory_watch import Watcher as AdvisoryWatcher
-        AdvisoryWatcher(data_dir).start()
+    if watch_pull_requests and embedded:
+        from tamandua.app.worker import start_periodic
+        start_periodic(data_dir, state.jobs)
     return build_handler(state)
 
 

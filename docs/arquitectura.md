@@ -55,9 +55,11 @@ La seguridad de la API está en un solo sitio (`app/http/core.py`): host permiti
 sesión → segundo factor → rol → tamaño del cuerpo. Los manejadores no leen cabeceras ni cookies por su cuenta.
 El panel React + TypeScript (`web/`) se compila a `tamandua/app/static/`.
 
-Hacia dónde va (por fases): API con FastAPI y esquemas tipados, PostgreSQL con migraciones Alembic, cola de trabajos
-durable sobre Postgres con un `worker` separado (el único con acceso a Docker) y el panel organizado por funcionalidad
-con TanStack Query. `python -m appsec_agent` y las variables `APPSEC_AGENT_*` siguen funcionando.
+Servicios (compose): `appsec` (panel y API con FastAPI, sin acceso a Docker), `worker` (ejecuta los análisis de la
+cola y las tareas periódicas; el único con el socket de Docker; se puede escalar y las tareas periódicas solo las corre el
+líder, elegido con un cerrojo de PostgreSQL), `postgres` y `opengrep` (solo construye la imagen del motor). La cola
+(`jobs`) y el buzón de avisos (`outbox`, con reintentos) viven en PostgreSQL: un reinicio no pierde lo encolado.
+`python -m appsec_agent` y las variables `APPSEC_AGENT_*` siguen funcionando.
 
 ## Flujo de un análisis
 

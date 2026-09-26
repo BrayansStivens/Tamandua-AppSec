@@ -118,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
         action.add_argument("--username", required=True)
         if name == "reset-password":
             action.add_argument("--password-stdin", action="store_true")
+    commands.add_parser("worker", help="Ejecutar los análisis de la cola y las tareas periódicas (el servicio `worker` de compose)")
     panel = commands.add_parser("serve", help="Abrir el panel web local de solo lectura")
     panel.add_argument("--port", type=int, default=8766)
     panel.add_argument("--bind", default=None, help="Interfaz de escucha; por defecto 127.0.0.1 (o APPSEC_AGENT_BIND)")
@@ -147,6 +148,10 @@ def main(argv: list[str] | None = None) -> int:
             if any(record["status"] == "incomplete" for record in records):
                 return 3
             return 2 if any(record["summary"]["confirmed"] for record in records) else 0
+        if args.command == "worker":
+            from tamandua.app.worker import run as run_worker
+            run_worker(args.data_dir)
+            return 0
         if args.command == "runs":
             print(json.dumps(list_runs(args.data_dir), ensure_ascii=False, indent=2))
             return 0

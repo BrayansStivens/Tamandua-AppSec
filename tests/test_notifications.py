@@ -82,8 +82,8 @@ class NotificationTests(unittest.TestCase):
     def test_a_saved_scan_notifies_what_is_new_and_a_finished_batch_notifies_once(self):
         notifications.save("webhook", "SIEM", "https://siem.example.com/in", ["findings", "batches"], "high", by="ana")
         calls = []
-        with tempfile.TemporaryDirectory() as folder, patch.object(notifications, "on_run", side_effect=lambda record, opened: calls.append(len(opened))), \
-                patch.object(notifications, "on_batch", side_effect=lambda summary: calls.append(summary["label"])):
+        with tempfile.TemporaryDirectory() as folder, patch.object(notifications, "on_run", side_effect=lambda record, opened, **_: calls.append(len(opened))), \
+                patch.object(notifications, "on_batch", side_effect=lambda summary, **_: calls.append(summary["label"])):
             data = Path(folder)
             save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high")], "2026-09-25"))
             save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high")], "2026-09-26"))  # nada nuevo: sin aviso

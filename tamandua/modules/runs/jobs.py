@@ -1,18 +1,19 @@
-"""Escaneos en segundo plano con progreso visible.
+"""Análisis en segundo plano con progreso visible, sobre la cola durable de PostgreSQL (runs/queue.py).
 
-Un escaneo no bloquea la petición HTTP: se encola, devuelve su identificador al
-instante y un único hilo trabajador los procesa en orden. Mientras corre, el
-registro `runs/<id>/run.json` existe con estado `queued` o `running` y una lista
-de eventos de progreso pensada para mostrarse al usuario: qué paso empezó, qué
-terminó y con qué cuenta. Nunca se vuelcan ahí rutas internas del servidor,
-salidas crudas de herramientas ni errores con detalles de infraestructura.
+Encolar no bloquea la petición HTTP: se guarda el registro de la ejecución (`queued`) y un trabajo en la cola, y se
+devuelve su identificador al instante. Un worker —el proceso `worker` o, en instalaciones de un solo proceso, un hilo
+dentro del servidor— reclama los trabajos y los ejecuta. Mientras corre, la ejecución guarda eventos de progreso
+pensados para el usuario: nunca rutas internas, salidas crudas de herramientas ni errores con detalles de
+infraestructura. Los tokens de código que acompañan a un trabajo van sellados con la clave maestra, nunca en claro.
 """
 
 from __future__ import annotations
 
 import json
-import queue
+import os
+import socket
 import threading
+import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,7 +26,9 @@ from tamandua.shared import log as logging_setup
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, snapshot_source
 from tamandua.modules.sources.assets import asset_key
+from tamandua.modules.runs import queue
 from tamandua.modules.runs.store import list_runs, load_run, save_record, save_repository_scan
+from tamandua.shared import vault
 
 log = logging_setup.get("jobs")
 Progress = Callable[[str, str], None]
@@ -36,33 +39,55 @@ def _now() -> str:
 
 
 class ScanJobs:
-    def __init__(self, data_dir: Path):
+    """Encola análisis y, si `worker` (por defecto), los ejecuta en un hilo de este proceso. El proceso `worker`
+    (python -m tamandua worker) usa la misma clase con `run_worker()`, sin hilos."""
+
+    def __init__(self, data_dir: Path, *, worker: bool = True):
         self.data_dir = data_dir
-        self._queue: queue.Queue[dict] = queue.Queue()
-        self._lock = threading.Lock()
-        self._records: dict[str, dict] = {}
+        self.worker_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:6]}"
         # Cada cuánto mira el trabajador, sin nada en cola, si hay un lote que avanzar.
         self.idle_poll = 3.0
-        self._recover()
-        # El registro de hallazgos se deriva de las ejecuciones: si está vacío y hay ejecuciones, se reconstruye.
-        if findings_registry.is_empty(data_dir) and list_runs(data_dir):
-            findings_registry.rebuild(data_dir)
-        self._worker = threading.Thread(target=self._loop, name="appsec-scans", daemon=True)
-        self._worker.start()
+        self._stop = threading.Event()
+        self._thread = None
+        if worker:
+            self.prepare(embedded=True)
+            self._thread = threading.Thread(target=self.run_worker, name="appsec-scans", daemon=True)
+            self._thread.start()
 
-    def _recover(self) -> None:
-        """Al arrancar, nada puede estar en marcha: lo que quedó en cola o corriendo murió con el proceso anterior."""
-        for row in list_runs(self.data_dir):
-            if row["status"] not in ("queued", "running"):
-                continue
-            try:
-                record = load_run(self.data_dir, row["id"])
-            except (ValueError, OSError):
-                continue
-            self._fail(record, "El servidor se reinició mientras corría esta ejecución y quedó interrumpida. Vuelve a lanzarla.")
-            log.warning("ejecución interrumpida por reinicio", extra={"run_id": row["id"]})
+    def prepare(self, *, embedded: bool) -> None:
+        """Al arrancar un worker. `embedded`: un solo proceso, así que lo que figure en curso murió con el anterior."""
         from tamandua.modules.runs import batches
+        self._recover(everything=embedded)
         batches.release_taken(self.data_dir)
+        # El registro de hallazgos se deriva de las ejecuciones: si está vacío y hay ejecuciones, se reconstruye.
+        if findings_registry.is_empty(self.data_dir) and list_runs(self.data_dir):
+            findings_registry.rebuild(self.data_dir)
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _recover(self, *, everything: bool) -> None:
+        """Ejecuciones que no van a terminar: de un worker que dejó de responder, o sin trabajo en la cola (de una
+        versión anterior o de un corte). Se marcan fallidas con un mensaje claro; volver a lanzarlas lo decide el usuario."""
+        from sqlalchemy import select, update
+        from tamandua.modules.runs.tables import jobs
+        from tamandua.shared import db
+        interrupted = {job["run_id"] for job in queue.recover(self.data_dir) if job.get("run_id")}
+        with db.transaction(self.data_dir) as connection:
+            if everything:
+                rows = connection.execute(update(jobs).where(jobs.c.tenant_id == db.TENANT, jobs.c.status == "running")
+                                          .values(status="failed", error="Interrumpido por un reinicio").returning(jobs.c.run_id)).all()
+                interrupted |= {row.run_id for row in rows if row.run_id}
+            active = set(connection.execute(select(jobs.c.run_id).where(jobs.c.tenant_id == db.TENANT,
+                                                                       jobs.c.status.in_(("queued", "running")))).scalars())
+        for row in list_runs(self.data_dir):
+            if row["status"] in ("queued", "running") and (row["id"] in interrupted or row["id"] not in active):
+                try:
+                    record = load_run(self.data_dir, row["id"])
+                except (ValueError, OSError):
+                    continue
+                self._fail(record, "El servidor se reinició mientras corría esta ejecución y quedó interrumpida. Vuelve a lanzarla.")
+                log.warning("ejecución interrumpida por reinicio", extra={"run_id": row["id"]})
 
     # --- API pública ---------------------------------------------------------------
 
@@ -82,10 +107,10 @@ class ScanJobs:
             # Qué lo lanzó (p. ej. la vigilancia de la rama principal, con el commit que vio cambiar).
             record["trigger"] = trigger
         self._save(record)
-        with self._lock:
-            self._records[run_id] = record
-        self._queue.put({"run_id": run_id, "source_id": source_id, "allow_osv_upload": allow_osv_upload,
-                         "context": context, "tokens": tokens, "installation_id": installation_id})
+        # Los tokens de código no se guardan en claro en la cola: van sellados con la clave maestra.
+        queue.enqueue(self.data_dir, "repository_scan", {"source_id": source_id, "allow_osv_upload": allow_osv_upload, "context": context,
+                                                         "tokens": vault.seal(tokens, "job-tokens") if tokens else None,
+                                                         "installation_id": installation_id}, run_id=run_id)
         log.info("escaneo encolado", extra={"run_id": run_id, "path": source_id})
         return {"id": run_id, "status": "queued"}
 
@@ -102,11 +127,8 @@ class ScanJobs:
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
                   "progress": [{"at": _now(), "level": "info", "message": f"En cola: revisión del PR #{pull['number']} ({pull['head_sha'][:7]})."}]}
         self._save(record)
-        with self._lock:
-            self._records[run_id] = record
         pr_watch.mark(self.data_dir, uid or source_id, pull["number"], pull["head_sha"], run_id)
-        self._queue.put({"kind": "pr_review", "run_id": run_id, "source_id": source_id, "pull": pull,
-                         "installation_id": installation_id})
+        queue.enqueue(self.data_dir, "pr_review", {"source_id": source_id, "pull": pull, "installation_id": installation_id}, run_id=run_id)
         log.info("revisión de PR encolada", extra={"run_id": run_id, "path": f"{source_id}#{pull['number']}"})
         return {"id": run_id, "status": "queued"}
 
@@ -121,14 +143,12 @@ class ScanJobs:
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
                   "progress": [{"at": _now(), "level": "info", "message": f"En cola: análisis de la imagen {image['reference']}."}]}
         self._save(record)
-        with self._lock:
-            self._records[run_id] = record
-        self._queue.put({"kind": "image_scan", "run_id": run_id, "image": image, "context": context})
+        queue.enqueue(self.data_dir, "image_scan", {"image": image, "context": context}, run_id=run_id)
         log.info("análisis de imagen encolado", extra={"run_id": run_id, "path": image["reference"]})
         return {"id": run_id, "status": "queued"}
 
     def pending(self) -> int:
-        return self._queue.qsize()
+        return queue.pending(self.data_dir)
 
     def _feed_batch(self) -> None:
         from tamandua.modules.runs import batches
@@ -154,20 +174,39 @@ class ScanJobs:
 
     # --- trabajador ----------------------------------------------------------------
 
-    def _loop(self) -> None:
-        while True:
+    def run_worker(self) -> None:
+        """Reclama y ejecuta trabajos hasta que se pida parar. Renueva su latido para que otro worker no lo dé por muerto."""
+        from tamandua.modules.scanning.engines import docker_available
+        from tamandua.version import VERSION
+        beat = 0.0
+        while not self._stop.is_set():
+            if time.monotonic() - beat > 30:
+                beat = time.monotonic()
+                try:
+                    queue.heartbeat(self.data_dir, self.worker_id, docker=docker_available(), version=VERSION)
+                    queue.touch(self.data_dir, self.worker_id)
+                    self._recover(everything=False)
+                except Exception:  # noqa: BLE001 — la base puede no estar lista un momento; se reintenta
+                    log.exception("latido del worker fallido")
             try:
-                job = self._queue.get(timeout=self.idle_poll)
-            except queue.Empty:
+                job = queue.claim(self.data_dir, self.worker_id)
+            except Exception:  # noqa: BLE001
+                log.exception("no se pudo reclamar trabajo")
+                self._stop.wait(self.idle_poll)
+                continue
+            if job is None:
                 # Sin nada pendiente, el siguiente repositorio del lote activo (si lo hay).
                 self._feed_batch()
+                self._stop.wait(self.idle_poll)
                 continue
+            error = None
             try:
-                self._execute(job)
-            except Exception:  # noqa: BLE001 — el trabajador nunca debe morir por un escaneo
+                self._execute({**job["payload"], "kind": job["kind"], "run_id": job["run_id"]})
+            except Exception as exc:  # noqa: BLE001 — el trabajador nunca debe morir por un análisis
+                error = type(exc).__name__
                 log.exception("fallo inesperado del trabajador", extra={"run_id": job.get("run_id")})
             finally:
-                self._queue.task_done()
+                queue.finish(self.data_dir, job["id"], error=error)
 
     def _execute(self, job: dict) -> None:
         if job.get("kind") == "pr_review":
@@ -175,7 +214,8 @@ class ScanJobs:
         if job.get("kind") == "image_scan":
             return self._execute_image(job)
         run_id = job["run_id"]
-        record = self._records.get(run_id) or load_run(self.data_dir, run_id)
+        tokens = vault.unseal(job["tokens"], "job-tokens") if job.get("tokens") else {}
+        record = load_run(self.data_dir, run_id)
         record["status"] = "running"
         record["started_at"] = _now()
 
@@ -189,7 +229,7 @@ class ScanJobs:
         work.mkdir(parents=True, exist_ok=True)
         try:
             with TemporaryDirectory(prefix="snapshot-", dir=work) as temporary:
-                root, source = snapshot_source(job["source_id"], Path(temporary), job["tokens"], job["installation_id"], progress=progress)
+                root, source = snapshot_source(job["source_id"], Path(temporary), tokens, job["installation_id"], progress=progress)
                 snapshot = source.get("snapshot") or {}
                 progress("ok", f"Snapshot listo: {source.get('files', 0)} archivos analizables"
                                + (f", {snapshot.get('skipped_not_analyzable', 0)} descartados por no ser código" if snapshot.get("skipped_not_analyzable") else "") + ".")
@@ -205,8 +245,6 @@ class ScanJobs:
             final = save_repository_scan(self.data_dir, {**scan, "progress": record["progress"],
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
-            with self._lock:
-                self._records[run_id] = final
             log.info("escaneo terminado", extra={"run_id": run_id, "status": final["status"]})
         except SourceError as exc:
             self._fail(record, f"No se pudo obtener el repositorio: {exc}")
@@ -219,7 +257,7 @@ class ScanJobs:
     def _execute_image(self, job: dict) -> None:
         from tamandua.modules.scanning.image import scan_image
         run_id = job["run_id"]
-        record = self._records.get(run_id) or load_run(self.data_dir, run_id)
+        record = load_run(self.data_dir, run_id)
         record["status"] = "running"
         record["started_at"] = _now()
 
@@ -240,8 +278,6 @@ class ScanJobs:
             final = save_repository_scan(self.data_dir, {**scan, "requested_by": record.get("requested_by"), "progress": record["progress"],
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
-            with self._lock:
-                self._records[run_id] = final
             log.info("análisis de imagen terminado", extra={"run_id": run_id, "status": final["status"]})
         except Exception as exc:  # noqa: BLE001
             log.error("análisis de imagen fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
@@ -265,7 +301,7 @@ class ScanJobs:
         from tamandua.modules.integrations.github import GitHubAppError, pull_files
         run_id, pull, source_id = job["run_id"], job["pull"], job["source_id"]
         repository = source_id.removeprefix("github:")
-        record = self._records.get(run_id) or load_run(self.data_dir, run_id)
+        record = load_run(self.data_dir, run_id)
         record["status"], record["started_at"] = "running", _now()
 
         def progress(level: str, message: str) -> None:
@@ -320,8 +356,6 @@ class ScanJobs:
                                                                     "gate": config["gate"]},
                                                          "progress": record["progress"], "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
-            with self._lock:
-                self._records[run_id] = final
         except (SourceError, GitHubAppError) as exc:
             self._fail(record, f"No se pudo revisar el PR: {exc}")
         except Exception:  # noqa: BLE001

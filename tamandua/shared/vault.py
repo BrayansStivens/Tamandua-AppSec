@@ -17,11 +17,13 @@ registran en el filtro de logs para que, si se colaran en un mensaje, se tachen.
 from __future__ import annotations
 
 import base64
+import fcntl
 import json
 import os
 import secrets
 import stat
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 from tamandua.shared import paths
@@ -111,11 +113,44 @@ def get(name: str):
     return value
 
 
+@contextmanager
+def _exclusive():
+    """Cerrojo del almacén entre hilos y entre procesos (el API y el worker lo escriben): sin él, dos escrituras a la
+    vez podían perder un secreto de la otra."""
+    with _lock:
+        path = _private_dir() / ".vault.lock"
+        with open(path, "a+") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def seal(value, purpose: str) -> str:
+    """Cifra un valor con la clave maestra para guardarlo fuera del almacén (p. ej. los tokens de un trabajo en la cola).
+    `purpose` va como dato asociado: un sellado para una cosa no se puede abrir como otra."""
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    nonce = secrets.token_bytes(12)
+    data = AESGCM(_master_key()).encrypt(nonce, json.dumps(value, ensure_ascii=False).encode(), f"sealed:{purpose}".encode())
+    return base64.b64encode(nonce + data).decode()
+
+
+def unseal(sealed: str, purpose: str):
+    from cryptography.exceptions import InvalidTag
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    try:
+        raw = base64.b64decode(sealed, validate=True)
+        return json.loads(AESGCM(_master_key()).decrypt(raw[:12], raw[12:], f"sealed:{purpose}".encode()))
+    except (InvalidTag, ValueError, TypeError) as exc:
+        raise VaultError("No se pudo abrir un valor sellado: ¿cambió la clave maestra?") from exc
+
+
 def put(name: str, value) -> None:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     nonce = secrets.token_bytes(12)
     data = AESGCM(_master_key()).encrypt(nonce, json.dumps(value, ensure_ascii=False).encode(), name.encode())
-    with _lock:
+    with _exclusive():
         payload = _load()
         payload[name] = {"nonce": base64.b64encode(nonce).decode(), "data": base64.b64encode(data).decode()}
         _write_private(_private_dir() / VAULT_FILE, json.dumps(payload, indent=2).encode())
@@ -123,7 +158,7 @@ def put(name: str, value) -> None:
 
 
 def delete(name: str) -> bool:
-    with _lock:
+    with _exclusive():
         payload = _load()
         if payload.pop(name, None) is None:
             return False

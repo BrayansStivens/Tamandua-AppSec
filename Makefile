@@ -62,12 +62,12 @@ down: ## Para y elimina los contenedores (conserva data/ y config/)
 	$(COMPOSE) down
 
 restart: ## Reinicia la app (marca como fallidos los análisis en curso)
-	$(COMPOSE) restart appsec
+	$(COMPOSE) restart appsec worker
 
 status: ## Estado de los contenedores y de los motores
 	@$(COMPOSE) ps
 	@echo
-	@$(COMPOSE) exec -T appsec python -m tamandua engines 2>/dev/null || echo "La app no está en marcha: make up"
+	@$(COMPOSE) exec -T worker python -m tamandua engines 2>/dev/null || echo "La app no está en marcha: make up"
 
 ps: status
 
@@ -93,11 +93,11 @@ engines: ## Descarga las imágenes de los motores que falten (Trivy, OSV-Scanner
 
 scan: ## Analiza una carpeta local: make scan DIR=../mi-repo ARGS="--base main --fail-on high"
 	@[ -d "$(DIR)" ] || { echo 'Indica la carpeta: make scan DIR=../mi-repo (y opciones en ARGS="--base main")'; exit 2; }
-	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro appsec python -m tamandua scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
+	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro worker python -m tamandua scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
 
 demo: ## Datos de demostración: analiza los ejemplos vulnerables e importa un modelo de amenazas (IMAGE=nginx:1.21 añade una imagen)
 	@$(COMPOSE) run --rm -T -v "$(abspath fixtures)":/demo/fixtures:ro -v "$(abspath web/src/examples/threat-models)":/demo/models:ro \
-		appsec python -m tamandua --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
+		worker python -m tamandua --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
 
 update: ## Actualiza el código (git pull) y reconstruye
 	git pull --ff-only

@@ -24,11 +24,18 @@ import secrets as token_source
 import socket
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert
+
+from tamandua.modules.integrations.tables import outbox
+from tamandua.shared import db
 from tamandua.shared import log as logging_setup
 
 _log = logging_setup.get("notifications")
@@ -246,22 +253,36 @@ def _send(identifier: str, channel: dict, payload: dict, sender=None) -> threadi
     return thread
 
 
-def deliver(event: str, build, *, sender=None, wait: bool = False) -> list[threading.Thread]:
-    """Envía a cada canal suscrito al evento. `build(channel)` arma su mensaje (o None si no le toca nada)."""
+RETRY_MINUTES = (1, 5, 30, 120, 360)  # espera creciente entre intentos; tras el último, el mensaje queda como fallido
+
+
+def deliver(event: str, build, *, sender=None, wait: bool = False, data_dir: Path | None = None) -> list[threading.Thread]:
+    """Cada canal suscrito al evento recibe su mensaje (`build(channel)`, o None si no le toca nada).
+
+    Con `data_dir`, el mensaje va al buzón de salida (tabla outbox) y lo entrega el worker con reintentos: si el proceso
+    cae o el canal falla, no se pierde. Sin él (o con `sender`, en pruebas), se envía al momento en un hilo."""
     threads = []
+    queued = []
     for identifier, channel in _vault().items():
         if event not in channel["events"]:
             continue
         message = build(channel)
-        if message:
+        if not message:
+            continue
+        if data_dir is not None and sender is None:
+            queued.append({"tenant_id": db.TENANT, "id": uuid.uuid4().hex, "channel_id": identifier, "payload": render(channel["kind"], message)})
+        else:
             threads.append(_send(identifier, channel, render(channel["kind"], message), sender))
+    if queued:
+        with db.transaction(data_dir) as connection:
+            connection.execute(insert(outbox), queued)
     if wait:
         for thread in threads:
             thread.join(15)
     return threads
 
 
-def on_run(record: dict, opened: list[dict], *, sender=None, wait: bool = False) -> None:
+def on_run(record: dict, opened: list[dict], *, sender=None, wait: bool = False, data_dir: Path | None = None) -> None:
     """Tras incorporar un análisis al registro: avisa de lo nuevo (no de las revisiones de PR).
     Cada canal recibe solo lo que alcanza su umbral: título, recuento y lista salen de lo mismo."""
     if record.get("type") == "pr_review" or not opened:
@@ -273,18 +294,47 @@ def on_run(record: dict, opened: list[dict], *, sender=None, wait: bool = False)
         return findings_message(record, relevant) if relevant else None
     try:
         if _vault():
-            deliver("findings", build, sender=sender, wait=wait)
+            deliver("findings", build, sender=sender, wait=wait, data_dir=data_dir)
     except Exception:  # noqa: BLE001 — avisar nunca rompe un análisis
         _log.exception("notification_dispatch_failed")
 
 
-def on_batch(summary: dict, *, sender=None, wait: bool = False) -> None:
+def on_batch(summary: dict, *, sender=None, wait: bool = False, data_dir: Path | None = None) -> None:
     try:
         if _vault():
             message = batch_message(summary)
-            deliver("batches", lambda channel: message, sender=sender, wait=wait)
+            deliver("batches", lambda channel: message, sender=sender, wait=wait, data_dir=data_dir)
     except Exception:  # noqa: BLE001
         _log.exception("notification_dispatch_failed")
+
+
+def drain(data_dir: Path, *, sender=None, limit: int = 20) -> int:
+    """Entrega lo que toca del buzón de salida (lo llama el worker cada pocos segundos). Devuelve cuántos intentó."""
+    channels = _vault()
+    with db.transaction(data_dir) as connection:
+        rows = connection.execute(select(outbox.c.id, outbox.c.channel_id, outbox.c.payload, outbox.c.attempts)
+                                  .where(outbox.c.tenant_id == db.TENANT, outbox.c.status == "pending", outbox.c.next_attempt_at <= func.now())
+                                  .order_by(outbox.c.created_at).limit(limit).with_for_update(skip_locked=True)).all()
+        for row in rows:
+            channel = channels.get(row.channel_id)
+            if channel is None:  # el canal se borró mientras esperaba
+                connection.execute(update(outbox).where(outbox.c.tenant_id == db.TENANT, outbox.c.id == row.id)
+                                   .values(status="failed", last_error="Canal eliminado"))
+                continue
+            ok, detail = _post(channel, row.payload, sender=sender)
+            _record_delivery(row.channel_id, ok, detail)
+            attempts = row.attempts + 1
+            if ok:
+                values = {"status": "sent", "attempts": attempts, "last_error": None}
+            elif attempts >= len(RETRY_MINUTES):
+                values = {"status": "failed", "attempts": attempts, "last_error": detail}
+            else:
+                values = {"attempts": attempts, "last_error": detail,
+                          "next_attempt_at": func.now() + timedelta(minutes=RETRY_MINUTES[attempts - 1])}
+            connection.execute(update(outbox).where(outbox.c.tenant_id == db.TENANT, outbox.c.id == row.id).values(**values))
+            (_log.info if ok else _log.warning)("notification_sent" if ok else "notification_failed",
+                                               extra={"reason": f"{channel['kind']} {channel['name']}: {detail} (intento {attempts})"})
+    return len(rows)
 
 
 def test(identifier: str, *, sender=None) -> tuple[bool, str]:

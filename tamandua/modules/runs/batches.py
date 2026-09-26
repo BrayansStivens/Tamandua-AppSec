@@ -122,7 +122,7 @@ def take_next(data_dir: Path) -> tuple[dict, int] | None:
         finished = batch
     # Fuera del cerrojo: el aviso consulta el progreso real (las ejecuciones) y no bloquea a nadie.
     from tamandua.modules.integrations import notifications
-    notifications.on_batch(summary(data_dir, finished))
+    notifications.on_batch(summary(data_dir, finished), data_dir=data_dir)
     return None
 
 

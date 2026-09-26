@@ -406,6 +406,8 @@ export interface components {
             version: string;
             /** Docker */
             docker?: boolean | null;
+            /** Workers */
+            workers?: number | null;
             /** Queued */
             queued?: number | null;
         };

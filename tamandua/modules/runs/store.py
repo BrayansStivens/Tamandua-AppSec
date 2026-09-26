@@ -150,7 +150,7 @@ def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = Non
         from tamandua.modules.findings import triage
         opened = set(changes["new"])
         active = [item for item in triage.annotate(data_dir, saved).get("findings", []) if item["fingerprint"] in opened and triage.is_active(item)]
-        notifications.on_run(saved, active)
+        notifications.on_run(saved, active, data_dir=data_dir)
     return saved
 
 

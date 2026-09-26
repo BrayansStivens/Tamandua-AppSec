@@ -5,50 +5,97 @@
 #
 # Sin make:  cp .env.example .env && mkdir -p data config && docker compose up --build -d
 #
-# Los motores de análisis (Trivy, Gitleaks, Opengrep) son contenedores hermanos que la app
-# lanza por el socket de Docker: por eso se monta, y por eso la carpeta de datos se comparte
-# con la MISMA ruta absoluta del host (APPSEC_AGENT_HOST_DATA_DIR).
+# Servicios: `appsec` (el panel y la API, sin Docker), `worker` (ejecuta los análisis y las tareas periódicas),
+# `postgres` (datos) y `opengrep` (solo construye la imagen del motor).
 #
-# El socket de Docker equivale a root en el host. Es la concesión para no instalar nada más
-# que Docker; si lo expones a más gente, ponlo detrás de un socket-proxy o un runner aparte.
+# Los motores de análisis (Trivy, Gitleaks, Opengrep) son contenedores hermanos que el WORKER lanza por el socket
+# de Docker: por eso solo él lo monta, y por eso la carpeta de datos se comparte con la MISMA ruta absoluta del host
+# (APPSEC_AGENT_HOST_DATA_DIR). El socket de Docker equivale a root en el host: el servicio que atiende peticiones
+# (appsec) ya no lo tiene.
+# Lo común al API y al worker (misma imagen, mismos datos y endurecimiento).
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/app/Dockerfile
+    args:
+      VERSION: ${APPSEC_VERSION:-0.9}
+  image: appsec-agent/app:${APPSEC_VERSION:-0.9}
+  init: true
+  # Tu UID/GID para que los ficheros de ./data y ./config sean tuyos (ver .env.example).
+  user: "${APPSEC_UID:-10001}:${APPSEC_GID:-10001}"
+  env_file:
+    - path: .env
+      required: false
+  # Endurecimiento: sistema de ficheros de solo lectura (solo se escribe en /data, /config y
+  # temporales en memoria), sin capacidades de Linux y sin escalada de privilegios.
+  read_only: true
+  tmpfs:
+    - /tmp:size=256m
+    - /home/appsec:size=16m,uid=${APPSEC_UID:-10001},gid=${APPSEC_GID:-10001}
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+  restart: unless-stopped
+
+x-app-env: &app-env
+  APPSEC_AGENT_DATA_DIR: /data
+  APPSEC_AGENT_HOST_DATA_DIR: ${PWD}/data
+  APPSEC_AGENT_HOST_RULES_DIR: ${PWD}/rules
+  APPSEC_AGENT_CONFIG_DIR: /config
+  APPSEC_AGENT_PUBLIC_URL: ${APPSEC_AGENT_PUBLIC_URL:-http://127.0.0.1:8766}
+  APPSEC_AGENT_ALLOWED_ORIGINS: ${APPSEC_AGENT_ALLOWED_ORIGINS:-http://127.0.0.1:8766,http://localhost:8766}
+  APPSEC_AGENT_LOG_LEVEL: ${APPSEC_AGENT_LOG_LEVEL:-INFO}
+  # admins (por defecto): TOTP obligatorio para administradores · all: para todos · none: opcional
+  APPSEC_AGENT_REQUIRE_TOTP: ${APPSEC_AGENT_REQUIRE_TOTP:-admins}
+  APPSEC_AGENT_PR_POLL_SECONDS: ${APPSEC_AGENT_PR_POLL_SECONDS:-300}
+  APPSEC_AGENT_BRANCH_MIN_MINUTES: ${APPSEC_AGENT_BRANCH_MIN_MINUTES:-60}
+  APPSEC_AGENT_ADVISORY_WATCH_HOURS: ${APPSEC_AGENT_ADVISORY_WATCH_HOURS:-24}
+  # Ejecuciones, hallazgos y triage viven en PostgreSQL (servicio `postgres`, solo en la red interna).
+  APPSEC_AGENT_DATABASE_URL: "postgresql+psycopg://tamandua:${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}@postgres:5432/tamandua"
+  HOME: /home/appsec
+
+x-app-volumes: &app-volumes
+  - ./data:/data
+  - ./rules:/app/rules:ro
+  # Secretos cifrados (GitHub App, claves de IA, Jira) y su clave maestra. Nunca en ./data.
+  - ${APPSEC_CONFIG_DIR:-./config}:/config
+
 services:
   appsec:
-    build:
-      context: .
-      dockerfile: docker/app/Dockerfile
-      args:
-        VERSION: ${APPSEC_VERSION:-0.9}
-    image: appsec-agent/app:${APPSEC_VERSION:-0.9}
+    <<: *app
     container_name: appsec-agent
-    init: true
-    # Tu UID/GID para que los ficheros de ./data y ./config sean tuyos (ver .env.example).
-    user: "${APPSEC_UID:-10001}:${APPSEC_GID:-10001}"
     ports:
       # Solo en esta máquina por defecto. Para exponerlo en la red usa HTTPS (ver README).
       - "${APPSEC_BIND:-127.0.0.1}:${APPSEC_PORT:-8766}:8766"
-    env_file:
-      - path: .env
-        required: false
     environment:
-      APPSEC_AGENT_DATA_DIR: /data
-      APPSEC_AGENT_HOST_DATA_DIR: ${PWD}/data
-      APPSEC_AGENT_HOST_RULES_DIR: ${PWD}/rules
-      APPSEC_AGENT_CONFIG_DIR: /config
-      APPSEC_AGENT_PUBLIC_URL: ${APPSEC_AGENT_PUBLIC_URL:-http://127.0.0.1:8766}
-      APPSEC_AGENT_ALLOWED_ORIGINS: ${APPSEC_AGENT_ALLOWED_ORIGINS:-http://127.0.0.1:8766,http://localhost:8766}
-      APPSEC_AGENT_LOG_LEVEL: ${APPSEC_AGENT_LOG_LEVEL:-INFO}
-      # admins (por defecto): TOTP obligatorio para administradores · all: para todos · none: opcional
-      APPSEC_AGENT_REQUIRE_TOTP: ${APPSEC_AGENT_REQUIRE_TOTP:-admins}
-      APPSEC_AGENT_PR_POLL_SECONDS: ${APPSEC_AGENT_PR_POLL_SECONDS:-300}
-      APPSEC_AGENT_BRANCH_MIN_MINUTES: ${APPSEC_AGENT_BRANCH_MIN_MINUTES:-60}
-      APPSEC_AGENT_ADVISORY_WATCH_HOURS: ${APPSEC_AGENT_ADVISORY_WATCH_HOURS:-24}
-      # Ejecuciones, hallazgos y triage viven en PostgreSQL (servicio `postgres`, solo en la red interna).
-      APPSEC_AGENT_DATABASE_URL: "postgresql+psycopg://tamandua:${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}@postgres:5432/tamandua"
-      HOME: /home/appsec
+      <<: *app-env
+      # Los análisis los ejecuta el servicio `worker`: el API no necesita Docker.
+      APPSEC_AGENT_EMBEDDED_WORKER: "0"
+    volumes: *app-volumes
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/api/health', headers={'Host':'127.0.0.1:8766'}), timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Ejecuta los análisis de la cola (en PostgreSQL) y las tareas periódicas. Es el único con el socket de Docker.
+  # Se puede escalar (docker compose up -d --scale worker=2): las tareas periódicas solo las corre uno.
+  worker:
+    <<: *app
+    command: ["python", "-m", "tamandua", "--data-dir", "/data", "worker"]
+    environment: *app-env
     volumes:
       - ./data:/data
       - ./rules:/app/rules:ro
-      # Secretos cifrados (GitHub App, claves de IA, Jira) y su clave maestra. Nunca en ./data.
       - ${APPSEC_CONFIG_DIR:-./config}:/config
       - /var/run/docker.sock:/var/run/docker.sock
     # Acceso al socket de Docker para lanzar los motores. En Docker Desktop y OrbStack (macOS,
@@ -58,32 +105,11 @@ services:
     group_add:
       - "0"
       - "${DOCKER_SOCKET_GID:-${APPSEC_GID:-10001}}"
-    # Endurecimiento: sistema de ficheros de solo lectura (solo se escribe en /data, /config y
-    # temporales en memoria), sin capacidades de Linux y sin escalada de privilegios.
-    read_only: true
-    tmpfs:
-      - /tmp:size=256m
-      - /home/appsec:size=16m,uid=${APPSEC_UID:-10001},gid=${APPSEC_GID:-10001}
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
     depends_on:
       opengrep:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/api/health', headers={'Host':'127.0.0.1:8766'}), timeout=4).status == 200 else 1)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
 
   # Base de datos. Sin puerto publicado: solo la app la alcanza, por la red interna de compose. Los datos, en el
   # volumen `tamandua-pg` (make backup hace además un pg_dump).

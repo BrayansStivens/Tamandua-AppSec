@@ -70,7 +70,8 @@ No hay telemetría.
 
 ## Concesiones conocidas
 
-- **Socket de Docker.** La app lanza los motores a través de `/var/run/docker.sock`, lo que equivale a root en el host. Es el precio de no instalar nada más que Docker. Si abres el panel a más gente, ponlo detrás de un socket-proxy con lista blanca o separa el runner. Está en el plan de trabajo.
+- **Socket de Docker.** Los motores se lanzan a través de `/var/run/docker.sock`, lo que equivale a root en el host. Solo lo monta el servicio `worker`, que no expone ningún puerto; el servicio que atiende las peticiones (`appsec`) no lo tiene. Es el precio de no instalar nada más que Docker; para endurecerlo más, pon el worker detrás de un socket-proxy con lista blanca o en otra máquina.
+- **Cola de trabajos.** Los análisis pendientes viven en PostgreSQL. Los tokens de código que acompañan a un análisis van sellados con la clave maestra (AES-GCM): la base nunca los guarda en claro.
 - **Clave maestra junto al almacén** si no defines `APPSEC_AGENT_MASTER_KEY`. Protege frente a una copia suelta de `secrets.vault`, no frente a alguien con acceso completo a `config/`.
 - **Un solo workspace** por instalación: todos los usuarios ven todos los repositorios conectados.
 - **Token de registro visible para root.** Mientras dura el análisis de una imagen privada, el token está en la configuración del contenedor del motor: lo puede leer quien tenga acceso a Docker en el host (que ya es root). Usa tokens de solo lectura.
