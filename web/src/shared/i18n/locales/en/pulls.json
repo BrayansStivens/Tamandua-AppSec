@@ -33,17 +33,17 @@
   },
   "repo": {
     "choose": "Choose a repository",
-    "description": "Every new commit on a pull request is scanned and compared with the main branch, so only what the pull request introduces counts. Its findings join the repository's status and are marked fixed automatically when a later commit removes them or the pull request is closed without merging.",
+    "description": "Every new commit on a pull request is scanned and compared with its target branch, so only what the pull request introduces counts. Its findings join the repository's status and are marked fixed automatically when a later commit removes them or the pull request is closed without merging.",
     "watching": "Watching",
     "not_watching": "Not watched",
     "post_comment": "Comment and set the commit status on GitHub",
-    "branch": "Rescan the main branch when it changes",
+    "branch": "Rescan the target branches when they change",
     "gate": "Block at",
     "gate_label": "Blocking threshold",
     "admin_only": "Only an administrator can change these settings.",
     "enable_hint": "Turn it on with its switch in the list so every push gets reviewed automatically, or use \"Review now\" on a pull request.",
-    "branch_scanned": "Main branch: last scanned after a change on {{date}} (commit <code>{{sha}}</code>). After a merge, the repository status catches up on its own, at most once every {{minutes}} min.",
-    "branch_pending": "Main branch: it will be scanned on the watcher's next pass. After a merge, the repository status catches up on its own, at most once every {{minutes}} min.",
+    "branch_scanned": "Target branches: {{branch}} was last scanned after a change on {{date}} (commit <code>{{sha}}</code>). After a merge, the repository status catches up on its own, at most once every {{minutes}} min per branch.",
+    "branch_pending": "Target branches: they will be scanned on the watcher's next pass. After a merge, the repository status catches up on its own, at most once every {{minutes}} min per branch.",
     "missing_write": "The installed GitHub App can't comment yet: it needs write access to <b>Pull requests</b> and <b>Commit statuses</b>. Reviews still run and show up here; once the installation accepts those permissions, they'll be posted on GitHub."
   },
   "list": {
@@ -57,7 +57,7 @@
   },
   "watch": {
     "title": "Watched repositories · {{total}}",
-    "description": "Enabled repositories review every new pull request or push automatically and rescan the main branch when it changes (checked every {{minutes}} min).",
+    "description": "Enabled repositories review every new pull request or push into their target branches automatically and rescan those branches when they change (checked every {{minutes}} min).",
     "admin_hint": "Turn them on one by one or in bulk.",
     "member_hint": "Only an administrator can change what's watched.",
     "bulk": "Bulk actions",
@@ -77,7 +77,7 @@
     "select_one": "Select {{name}}",
     "comments": "comments on GitHub",
     "panel_only": "panel only",
-    "branch_current": "main branch kept up to date",
+    "branch_current": "target branches kept up to date",
     "not_watched": "not watched",
     "reviewed_one": "{{count}} PR reviewed",
     "reviewed_other": "{{count}} PRs reviewed",
@@ -85,6 +85,23 @@
     "off": "Off",
     "toggle": "Watch {{name}}",
     "no_watched_match": "No watched repository matches.",
-    "no_match": "No repository matches."
+    "no_match": "No repository matches.",
+    "targets": "PRs into {{branches}}"
+  },
+  "targets": {
+    "title": "Target branches",
+    "description": "Only pull requests into these branches are reviewed, each one against the latest scan of its target branch.",
+    "default": "Default branch ({{branch}})",
+    "default_unknown": "Default branch",
+    "input_label": "Add a target branch to {{name}}",
+    "placeholder": "Branch, e.g. develop",
+    "remove": "Remove {{branch}}",
+    "save": "Save branches",
+    "discard": "Discard changes",
+    "invalid": "\"{{branch}}\" isn't a valid branch name. Use letters, digits and . _ / -, without spaces or \"..\".",
+    "duplicate": "{{branch}} is already in the list.",
+    "limit": "Up to {{max}} target branches.",
+    "saving": "Saving target branches…",
+    "saved": "Target branches saved."
   }
 }

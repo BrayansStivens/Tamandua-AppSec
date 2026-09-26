@@ -337,6 +337,174 @@
           }
         }
       }
+    },
+    "/api/pull-requests/branches": {
+      "post": {
+        "tags": [
+          "pull-requests"
+        ],
+        "summary": "Target Branches",
+        "description": "Branches whose PRs are reviewed; an empty list means the repository's default branch.",
+        "operationId": "target_branches_api_pull_requests_branches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetBranchesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetBranches"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repositories/branch": {
+      "post": {
+        "tags": [
+          "repositories"
+        ],
+        "summary": "Scan Branch",
+        "description": "Sets the branch every platform scan of this repository reads; null goes back to the default branch.",
+        "operationId": "scan_branch_api_repositories_branch_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanBranchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanBranch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/secrets/config": {
+      "get": {
+        "tags": [
+          "scanning"
+        ],
+        "summary": "Config",
+        "description": "What secret detection applies to every repository scan; only admins see (and change) the patterns.",
+        "operationId": "config_api_secrets_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretConfig"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "scanning"
+        ],
+        "summary": "Save Config",
+        "description": "Replaces the settings; takes effect from the next scan. A reason is required and kept in the history.",
+        "operationId": "save_config_api_secrets_config_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretConfigIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretConfig"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/secrets/builtin-rules": {
+      "get": {
+        "tags": [
+          "scanning"
+        ],
+        "summary": "Builtin Rules",
+        "description": "Gitleaks' default rules (what can be turned off), with the Trivy rule that is turned off with each, if any.",
+        "operationId": "builtin_rules_api_secrets_builtin_rules_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BuiltinRules"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -376,6 +544,57 @@
           "packages"
         ],
         "title": "AffectedAsset"
+      },
+      "BuiltinRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "trivy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trivy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "trivy"
+        ],
+        "title": "BuiltinRule"
+      },
+      "BuiltinRules": {
+        "properties": {
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/BuiltinRule"
+            },
+            "type": "array",
+            "title": "Rules"
+          }
+        },
+        "type": "object",
+        "required": [
+          "engine",
+          "version",
+          "rules"
+        ],
+        "title": "BuiltinRules"
       },
       "CraAsset": {
         "properties": {
@@ -1294,6 +1513,424 @@
         ],
         "title": "Health"
       },
+      "ScanBranch": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "head_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Sha"
+          },
+          "default_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Branch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "branch",
+          "head_sha",
+          "default_branch"
+        ],
+        "title": "ScanBranch"
+      },
+      "ScanBranchIn": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Uid"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "uid",
+          "branch"
+        ],
+        "title": "ScanBranchIn"
+      },
+      "SecretAllowlist": {
+        "properties": {
+          "regexes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Regexes"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Paths"
+          },
+          "stopwords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Stopwords"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SecretAllowlist",
+        "description": "Regexes are matched against the detected secret; paths are globs relative to the repository root."
+      },
+      "SecretAllowlistView": {
+        "properties": {
+          "regexes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Regexes"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths"
+          },
+          "stopwords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stopwords"
+          }
+        },
+        "type": "object",
+        "required": [
+          "regexes",
+          "paths",
+          "stopwords"
+        ],
+        "title": "SecretAllowlistView"
+      },
+      "SecretConfig": {
+        "properties": {
+          "allowlist": {
+            "$ref": "#/components/schemas/SecretAllowlistView"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/SecretRuleView"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "disabled_rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Disabled Rules"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/SecretHistoryEntry"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/SecretLimits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowlist",
+          "rules",
+          "disabled_rules",
+          "reason",
+          "by",
+          "at",
+          "history",
+          "limits"
+        ],
+        "title": "SecretConfig"
+      },
+      "SecretConfigIn": {
+        "properties": {
+          "allowlist": {
+            "$ref": "#/components/schemas/SecretAllowlist"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/SecretRule"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Rules"
+          },
+          "disabled_rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 400,
+            "title": "Disabled Rules"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "allowlist",
+          "rules",
+          "disabled_rules",
+          "reason"
+        ],
+        "title": "SecretConfigIn"
+      },
+      "SecretHistoryEntry": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "changes": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "by",
+          "reason"
+        ],
+        "title": "SecretHistoryEntry"
+      },
+      "SecretLimits": {
+        "properties": {
+          "rules": {
+            "type": "integer",
+            "title": "Rules"
+          },
+          "entries": {
+            "type": "integer",
+            "title": "Entries"
+          },
+          "regex": {
+            "type": "integer",
+            "title": "Regex"
+          },
+          "description": {
+            "type": "integer",
+            "title": "Description"
+          },
+          "keywords": {
+            "type": "integer",
+            "title": "Keywords"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rules",
+          "entries",
+          "regex",
+          "description",
+          "keywords"
+        ],
+        "title": "SecretLimits"
+      },
+      "SecretRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Id"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Description"
+          },
+          "regex": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Regex"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Keywords"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Severity"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "description",
+          "regex",
+          "severity"
+        ],
+        "title": "SecretRule"
+      },
+      "SecretRuleView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "regex": {
+            "type": "string",
+            "title": "Regex"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keywords"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Severity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "description",
+          "regex",
+          "keywords",
+          "severity"
+        ],
+        "title": "SecretRuleView"
+      },
       "SlaDays": {
         "properties": {
           "critical": {
@@ -1418,6 +2055,64 @@
           "updated_at"
         ],
         "title": "SlaPolicy"
+      },
+      "TargetBranches": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "base_branches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Base Branches"
+          },
+          "default_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Branch"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "base_branches",
+          "default_branch"
+        ],
+        "title": "TargetBranches"
+      },
+      "TargetBranchesIn": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "maxLength": 40,
+            "title": "Uid"
+          },
+          "branches": {
+            "items": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Branches"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "uid",
+          "branches"
+        ],
+        "title": "TargetBranchesIn"
       },
       "ValidationError": {
         "properties": {

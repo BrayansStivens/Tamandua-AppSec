@@ -93,7 +93,7 @@ class WorkerTests(unittest.TestCase):
         from tamandua.modules.runs.jobs import ScanJobs
         from test_dashboard import _finding, _scan
 
-        def snapshot(source_id, destination, tokens, installation, progress=None):
+        def snapshot(source_id, destination, tokens, installation, ref=None, progress=None):
             destination.mkdir(parents=True, exist_ok=True)
             return destination, {"id": source_id, "name": source_id.removeprefix("github:"), "provider": "github", "files": 1}
 

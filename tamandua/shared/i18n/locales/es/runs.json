@@ -19,11 +19,12 @@
     "pr_excluded_other": "{{count}} hallazgos en rutas excluidas por un administrador quedan fuera de la revisión.",
     "pr_summary_one": "{{count}} hallazgo nuevo introducido por el PR; {{preexisting}} ya existían.",
     "pr_summary_other": "{{count}} hallazgos nuevos introducidos por el PR; {{preexisting}} ya existían.",
-    "pr_summary_no_baseline_one": "{{count}} hallazgo nuevo introducido por el PR; {{preexisting}} ya existían (sin escaneo previo de la rama principal: se cuenta lo que cae en líneas cambiadas).",
-    "pr_summary_no_baseline_other": "{{count}} hallazgos nuevos introducidos por el PR; {{preexisting}} ya existían (sin escaneo previo de la rama principal: se cuenta lo que cae en líneas cambiadas).",
+    "pr_summary_no_baseline_one": "{{count}} hallazgo nuevo introducido por el PR; {{preexisting}} ya existían (sin análisis previo de la rama de destino: se cuenta lo que cae en líneas cambiadas).",
+    "pr_summary_no_baseline_other": "{{count}} hallazgos nuevos introducidos por el PR; {{preexisting}} ya existían (sin análisis previo de la rama de destino: se cuenta lo que cae en líneas cambiadas).",
     "comment_posted": "Comentario publicado en el PR.",
     "comment_failed": "No se pudo comentar en el PR: {{reason}}",
-    "no_comment_permission": "El resultado no se publicó en GitHub: la App no tiene permiso de escritura en pull requests."
+    "no_comment_permission": "El resultado no se publicó en GitHub: la App no tiene permiso de escritura en pull requests.",
+    "branch_commit": "Se analiza la rama {{branch}} en el commit {{sha}}"
   },
   "failure": {
     "restart": "El servidor se reinició mientras corría esta ejecución y quedó interrumpida. Vuelve a lanzarla.",

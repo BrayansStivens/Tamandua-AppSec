@@ -1,8 +1,9 @@
 """GitHub simulado a nivel HTTP para probar el catálogo por páginas sin red.
 
 `repos` es {instalación: [(id numérico, "owner/repo"), ...]} y `accounts` es
-{instalación: (cuenta, "all" | "selected")}. Se registran las URL pedidas en `calls`
-para comprobar que no se recorre el catálogo entero.
+{instalación: (cuenta, "all" | "selected")}. `branches` es {"owner/repo": {rama: sha}}; sin él, cada
+repositorio solo tiene `main`. Se registran las URL pedidas en `calls` para comprobar que no se
+recorre el catálogo entero.
 """
 
 from __future__ import annotations
@@ -20,10 +21,11 @@ def _item(uid: int, name: str) -> dict:
 
 
 @contextmanager
-def fake_github(repos: dict[int, list[tuple[int, str]]], accounts: dict[int, tuple[str, str]]):
+def fake_github(repos: dict[int, list[tuple[int, str]]], accounts: dict[int, tuple[str, str]],
+                branches: dict[str, dict[str, str]] | None = None):
     calls: list[str] = []
 
-    def get(url: str, token: str, *, jwt: bool = False, forbidden: str | None = None):
+    def get(url: str, token: str, *, jwt: bool = False, forbidden: str | None = None, missing: str | None = None):
         calls.append(url)
         parts = urlsplit(url)
         query = {key: values[0] for key, values in parse_qs(parts.query).items()}
@@ -44,6 +46,12 @@ def fake_github(repos: dict[int, list[tuple[int, str]]], accounts: dict[int, tup
                     if uid == int(match.group(1)):
                         return _item(uid, name)
             raise github_app.GitHubAppError(forbidden or "HTTP 404")
+        match = re.fullmatch(r"/repos/([^/]+/[^/]+)/branches/([^/]+)", parts.path)
+        if match:
+            sha = (branches or {}).get(match.group(1), {"main": "a" * 40}).get(unquote(match.group(2)))
+            if sha is None:
+                raise github_app.GitHubAppError(missing or forbidden or "HTTP 404")
+            return {"name": unquote(match.group(2)), "commit": {"sha": sha}}
         match = re.fullmatch(r"/app/installations/(\d+)", parts.path)
         if match:
             account, selection = accounts[int(match.group(1))]

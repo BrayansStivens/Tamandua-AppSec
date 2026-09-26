@@ -19,11 +19,12 @@
     "pr_excluded_other": "{{count}} findings in paths an administrator excluded are left out of the review.",
     "pr_summary_one": "{{count}} new finding introduced by the PR; {{preexisting}} already existed.",
     "pr_summary_other": "{{count}} new findings introduced by the PR; {{preexisting}} already existed.",
-    "pr_summary_no_baseline_one": "{{count}} new finding introduced by the PR; {{preexisting}} already existed (no earlier scan of the main branch: counting what falls on changed lines).",
-    "pr_summary_no_baseline_other": "{{count}} new findings introduced by the PR; {{preexisting}} already existed (no earlier scan of the main branch: counting what falls on changed lines).",
+    "pr_summary_no_baseline_one": "{{count}} new finding introduced by the PR; {{preexisting}} already existed (no earlier scan of the target branch: counting what falls on changed lines).",
+    "pr_summary_no_baseline_other": "{{count}} new findings introduced by the PR; {{preexisting}} already existed (no earlier scan of the target branch: counting what falls on changed lines).",
     "comment_posted": "Comment posted on the PR.",
     "comment_failed": "Couldn't comment on the PR: {{reason}}",
-    "no_comment_permission": "The result wasn't posted to GitHub: the App can't write to pull requests."
+    "no_comment_permission": "The result wasn't posted to GitHub: the App can't write to pull requests.",
+    "branch_commit": "Scanning branch {{branch}} at commit {{sha}}"
   },
   "failure": {
     "restart": "The server restarted while this run was in progress, so it was interrupted. Run it again.",

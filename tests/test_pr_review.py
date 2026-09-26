@@ -313,7 +313,7 @@ class BranchWatchTests(unittest.TestCase):
                 heads["org/r1"] = "b" * 40                     # un merge, pero dentro de la pausa mínima
                 self.assertEqual(watcher.poll(), 0)
                 state = pr_watch.load(data_dir)
-                state["branches"]["github#1"]["at"] = "2020-01-01T00:00:00+00:00"
+                state["branches"]["github#1"]["heads"]["main"]["at"] = "2020-01-01T00:00:00+00:00"
                 pr_watch._save(data_dir, state)
                 jobs.pending_count = 5                         # cola llena: espera
                 self.assertEqual(watcher.poll(), 0)

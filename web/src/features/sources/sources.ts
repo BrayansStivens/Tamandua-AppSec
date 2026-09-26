@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, query as toQuery } from '@/shared/api/http'
 
-export type Source = { id: string; name: string; provider: 'local' | 'github' | 'gitlab'; private: boolean; branch: string | null; uid?: string; account?: string; installation_id?: number }
+export type Source = { id: string; name: string; provider: 'local' | 'github' | 'gitlab'; private: boolean; branch: string | null; uid?: string; account?: string; installation_id?: number
+  default_branch?: string | null; scan_branch?: string | null }
+
+// Same rule as the server: letters, digits and `._/-`, never starting with `-` or `/`, no `..` or `//`.
+export const validBranch = (name: string) => /^[A-Za-z0-9._/-]{1,200}$/.test(name) && !/^[-/]/.test(name) && !name.includes('..') && !name.includes('//')
 export type Providers = Record<'github' | 'gitlab', { configured: boolean; origin: 'session' | 'environment' | 'github_app' | null; error?: string }>
 // Una página de repositorios: el servidor solo pide a GitHub la página visible (o su búsqueda).
 export type SourcePage = { sources: Source[]; providers: Providers; total: number; page: number; per_page: number; partial?: boolean; accounts?: string[] }

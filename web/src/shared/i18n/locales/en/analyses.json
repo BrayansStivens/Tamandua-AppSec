@@ -196,8 +196,9 @@
       "advisory_watch_one": "new advisory", "advisory_watch_other": "new advisories",
       "candidates_one": "candidate", "candidates_other": "candidates"
     },
-    "trigger_branch": "· automatic: the main branch changed",
-    "trigger_branch_sha": "· automatic: the main branch changed ({{sha}})",
+    "trigger_branch": "· automatic: the branch changed",
+    "trigger_branch_sha": "· automatic: the branch changed ({{sha}})",
+    "on_branch": "· branch {{branch}}",
     "trigger_advisories": "· automatic: published after the last scan",
     "severity_letter": { "critical": "C", "high": "H", "medium": "M", "low": "L" },
     "severity_count": "{{severity}}: {{value}}",

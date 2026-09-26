@@ -101,7 +101,8 @@
       "pypi_upload_token": "Token de PyPI expuesto",
       "azure_ad_client_secret": "Secreto de cliente de Azure AD expuesto",
       "heroku_api_key": "Clave de API de Heroku expuesta"
-    }
+    },
+    "custom_reason": "La regla {{rule}} de tu organización coincidió en {{path}}:{{line}}; valor redactado."
   },
   "trivy": {
     "no_docker": "Docker no disponible: dependencias, IaC y secretos con Trivy no se ejecutaron.",
@@ -109,7 +110,9 @@
     "timeout": "Trivy superó el tiempo máximo; dependencias e IaC no concluyeron.",
     "detail": "{{manifests}} manifiestos de dependencias y {{configs}} archivos de infraestructura examinados: {{sca}} avisos de dependencias, {{iac}} fallos de configuración, {{secrets}} secretos.",
     "detail_dev": "{{manifests}} manifiestos de dependencias y {{configs}} archivos de infraestructura examinados: {{sca}} avisos de dependencias ({{dev}} en dependencias de desarrollo, con menos prioridad), {{iac}} fallos de configuración, {{secrets}} secretos.",
-    "no_feeds": "KEV/EPSS no disponibles; la prioridad usa solo CVSS."
+    "no_feeds": "KEV/EPSS no disponibles; la prioridad usa solo CVSS.",
+    "secret_config_rejected": "Trivy rechazó la configuración de detección de secretos de tu organización: analizó dependencias e IaC, pero no secretos.",
+    "secret_config_rejected_cause": "Trivy rechazó la configuración de detección de secretos de tu organización: analizó dependencias e IaC, pero no secretos. Causa: {{cause}}"
   },
   "osv": {
     "no_docker": "Docker no disponible: dependencias con OSV-Scanner no se ejecutaron.",
@@ -121,7 +124,10 @@
   "gitleaks": {
     "no_docker": "Docker no disponible: la detección de secretos con Gitleaks no se ejecutó.",
     "unreadable": "Gitleaks no devolvió un reporte legible.",
-    "detail": "Reglas de Gitleaks sobre el snapshot: {{secrets}} secretos; valores redactados."
+    "detail": "Reglas de Gitleaks sobre el snapshot: {{secrets}} secretos; valores redactados.",
+    "detail_configured": "Reglas de Gitleaks sobre el snapshot, con la configuración de tu organización ({{rules}} reglas personalizadas, {{disabled}} reglas integradas desactivadas, {{allowlist}} entradas en la lista de permitidos): {{secrets}} secretos; valores redactados.",
+    "config_failed": "Gitleaks rechazó la configuración de detección de secretos de tu organización, así que no analizó secretos. Revísala en Hallazgos → Detección de secretos.",
+    "config_failed_cause": "Gitleaks rechazó la configuración de detección de secretos de tu organización, así que no analizó secretos. Revísala en Hallazgos → Detección de secretos. Causa: {{cause}}"
   },
   "checkov": {
     "image_reason": "Checkov ({{rule}}) sobre el Dockerfile reconstruido del historial de la imagen.",
@@ -455,5 +461,46 @@
     "not_analyzed": "Sin analizar: {{item}}",
     "incomplete": "el análisis no terminó: no equivale a «sin hallazgos»",
     "verdict_line": "{{verdict}} · umbral: {{threshold}} · {{detail}}"
+  },
+  "secret_rules": {
+    "errors": {
+      "not_settings": "La configuración de detección de secretos no es válida.",
+      "not_text": "Escribe un texto.",
+      "not_list": "Se esperaba una lista.",
+      "not_rule": "Cada regla personalizada necesita un ID, una descripción, una expresión regular y una severidad.",
+      "too_long": "Usa como máximo {{max}} caracteres.",
+      "control_characters": "Quita los saltos de línea, tabuladores y otros caracteres de control.",
+      "too_many_entries": "Cada lista de permitidos admite como máximo {{max}} entradas.",
+      "too_many_rules": "Puedes tener como máximo {{max}} reglas personalizadas.",
+      "too_many_keywords": "Usa como máximo {{max}} palabras clave por regla.",
+      "rule_id": "El ID de regla «{{id}}» no es válido: usa de 1 a 60 letras minúsculas, dígitos o guiones.",
+      "duplicate_rule": "Hay dos reglas con el ID {{id}}.",
+      "description_required": "Describe qué detecta la regla {{id}} (al menos 3 caracteres).",
+      "regex_required": "Escribe una expresión regular.",
+      "triple_quote": "La expresión «{{pattern}}» no puede tener tres comillas simples seguidas (''').",
+      "regex_unsupported": "La expresión «{{pattern}}» usa {{construct}}, que Gitleaks y Trivy no admiten.",
+      "regex_invalid": "La expresión «{{pattern}}» no es una expresión regular válida.",
+      "regex_empty": "La expresión «{{pattern}}» coincide con un texto vacío, así que marcaría todas las líneas. Haz que exija al menos un carácter.",
+      "allow_everything": "La expresión «{{pattern}}» coincide con un texto vacío, así que silenciaría todos los secretos. Hazla más específica.",
+      "keyword_invalid": "La palabra clave «{{keyword}}» no es válida: usa letras, dígitos y _ . : = @ / + -.",
+      "severity_invalid": "Elige una severidad para la regla {{id}}: crítica, alta, media o baja.",
+      "path_invalid": "La ruta «{{pattern}}» no es válida: usa letras, dígitos, _ . - / y los comodines * y ?.",
+      "path_not_relative": "La ruta «{{pattern}}» debe ser relativa a la raíz del repositorio, sin . ni ..",
+      "path_everything": "La ruta «{{pattern}}» abarcaría todo el repositorio.",
+      "stopword_invalid": "La palabra de exclusión «{{word}}» no es válida: usa de 3 a 60 letras, dígitos o _ . -.",
+      "unknown_rule": "{{rule}} no es una regla integrada de Gitleaks.",
+      "reason_required": "Explica por qué cambias la configuración (al menos 5 caracteres)."
+    },
+    "constructs": {
+      "lookaround": "una aserción de anticipación o retrospección (lookahead/lookbehind)",
+      "backreference": "una referencia hacia atrás",
+      "atomic": "un grupo atómico",
+      "possessive": "un cuantificador posesivo",
+      "conditional": "un grupo condicional",
+      "group": "una sintaxis de grupo que solo entiende Python",
+      "escape": "un escape que solo entiende Python (\\Z, \\u, \\N…)",
+      "nested_class": "una clase de caracteres dentro de otra",
+      "repeat": "un conteo de repetición sin mínimo o mayor que 1000"
+    }
   }
 }

@@ -129,6 +129,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pull-requests/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Target Branches
+         * @description Branches whose PRs are reviewed; an empty list means the repository's default branch.
+         */
+        post: operations["target_branches_api_pull_requests_branches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repositories/branch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scan Branch
+         * @description Sets the branch every platform scan of this repository reads; null goes back to the default branch.
+         */
+        post: operations["scan_branch_api_repositories_branch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Config
+         * @description What secret detection applies to every repository scan; only admins see (and change) the patterns.
+         */
+        get: operations["config_api_secrets_config_get"];
+        put?: never;
+        /**
+         * Save Config
+         * @description Replaces the settings; takes effect from the next scan. A reason is required and kept in the history.
+         */
+        post: operations["save_config_api_secrets_config_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/builtin-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Builtin Rules
+         * @description Gitleaks' default rules (what can be turned off), with the Trivy rule that is turned off with each, if any.
+         */
+        get: operations["builtin_rules_api_secrets_builtin_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -145,6 +229,22 @@ export interface components {
             fixed: number;
             /** Packages */
             packages: string[];
+        };
+        /** BuiltinRule */
+        BuiltinRule: {
+            /** Id */
+            id: string;
+            /** Trivy */
+            trivy: string | null;
+        };
+        /** BuiltinRules */
+        BuiltinRules: {
+            /** Engine */
+            engine: string;
+            /** Version */
+            version: string;
+            /** Rules */
+            rules: components["schemas"]["BuiltinRule"][];
         };
         /** CraAsset */
         CraAsset: {
@@ -411,6 +511,132 @@ export interface components {
             /** Queued */
             queued?: number | null;
         };
+        /** ScanBranch */
+        ScanBranch: {
+            /** Uid */
+            uid: string;
+            /** Branch */
+            branch: string | null;
+            /** Head Sha */
+            head_sha: string | null;
+            /** Default Branch */
+            default_branch: string | null;
+        };
+        /** ScanBranchIn */
+        ScanBranchIn: {
+            /** Uid */
+            uid: string;
+            /** Branch */
+            branch: string | null;
+        };
+        /**
+         * SecretAllowlist
+         * @description Regexes are matched against the detected secret; paths are globs relative to the repository root.
+         */
+        SecretAllowlist: {
+            /** Regexes */
+            regexes?: string[];
+            /** Paths */
+            paths?: string[];
+            /** Stopwords */
+            stopwords?: string[];
+        };
+        /** SecretAllowlistView */
+        SecretAllowlistView: {
+            /** Regexes */
+            regexes: string[];
+            /** Paths */
+            paths: string[];
+            /** Stopwords */
+            stopwords: string[];
+        };
+        /** SecretConfig */
+        SecretConfig: {
+            allowlist: components["schemas"]["SecretAllowlistView"];
+            /** Rules */
+            rules: components["schemas"]["SecretRuleView"][];
+            /** Disabled Rules */
+            disabled_rules: string[];
+            /** Reason */
+            reason: string | null;
+            /** By */
+            by: string | null;
+            /** At */
+            at: string | null;
+            /** History */
+            history: components["schemas"]["SecretHistoryEntry"][];
+            limits: components["schemas"]["SecretLimits"];
+        };
+        /** SecretConfigIn */
+        SecretConfigIn: {
+            allowlist: components["schemas"]["SecretAllowlist"];
+            /** Rules */
+            rules: components["schemas"]["SecretRule"][];
+            /** Disabled Rules */
+            disabled_rules: string[];
+            /** Reason */
+            reason: string;
+        };
+        /** SecretHistoryEntry */
+        SecretHistoryEntry: {
+            /** At */
+            at: string;
+            /** By */
+            by: string;
+            /** Reason */
+            reason: string | null;
+            /** Changes */
+            changes?: {
+                [key: string]: {
+                    [key: string]: string[];
+                };
+            };
+        };
+        /** SecretLimits */
+        SecretLimits: {
+            /** Rules */
+            rules: number;
+            /** Entries */
+            entries: number;
+            /** Regex */
+            regex: number;
+            /** Description */
+            description: number;
+            /** Keywords */
+            keywords: number;
+        };
+        /** SecretRule */
+        SecretRule: {
+            /** Id */
+            id: string;
+            /** Description */
+            description: string;
+            /** Regex */
+            regex: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "critical" | "high" | "medium" | "low";
+        };
+        /** SecretRuleView */
+        SecretRuleView: {
+            /** Id */
+            id: string;
+            /** Description */
+            description: string;
+            /** Regex */
+            regex: string;
+            /** Keywords */
+            keywords: string[];
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "critical" | "high" | "medium" | "low";
+        };
         /**
          * SlaDays
          * @description Days per severity; null means that severity has no due date.
@@ -444,6 +670,22 @@ export interface components {
             updated_by: string | null;
             /** Updated At */
             updated_at: string | null;
+        };
+        /** TargetBranches */
+        TargetBranches: {
+            /** Uid */
+            uid: string;
+            /** Base Branches */
+            base_branches: string[];
+            /** Default Branch */
+            default_branch: string | null;
+        };
+        /** TargetBranchesIn */
+        TargetBranchesIn: {
+            /** Uid */
+            uid: string;
+            /** Branches */
+            branches: string[];
         };
         /** ValidationError */
         ValidationError: {
@@ -646,6 +888,145 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CraOverview"];
+                };
+            };
+        };
+    };
+    target_branches_api_pull_requests_branches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetBranchesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetBranches"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_branch_api_repositories_branch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScanBranchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanBranch"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    config_api_secrets_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretConfig"];
+                };
+            };
+        };
+    };
+    save_config_api_secrets_config_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecretConfigIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretConfig"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    builtin_rules_api_secrets_builtin_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BuiltinRules"];
                 };
             };
         };

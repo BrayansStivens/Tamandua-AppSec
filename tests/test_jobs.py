@@ -39,7 +39,7 @@ class JobsTests(unittest.TestCase):
     def test_enqueue_returns_immediately_and_records_progress(self):
         jobs = ScanJobs(self.data_dir)
         with patch("tamandua.modules.runs.jobs.snapshot_source") as snapshot:
-            def fake(source_id, destination, tokens, installation, progress=None):
+            def fake(source_id, destination, tokens, installation, ref=None, progress=None):
                 (destination / "app.py").write_text('db.execute(f"SELECT {user_id}")\n')
                 return destination, {"id": source_id, "name": "demo", "provider": "local", "files": 1}
             snapshot.side_effect = fake

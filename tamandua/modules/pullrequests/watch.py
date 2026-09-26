@@ -8,10 +8,10 @@ Sin webhooks (el MVP local no tiene URL pública) se sondea: cada
 abiertos de los repositorios activados y se encola una revisión por cada commit
 de cabeza que aún no se haya revisado. Los borradores se saltan.
 
-La rama principal también: si su último commit cambió, se reanaliza el repositorio entero para que el
-estado no se quede viejo tras un merge. Como mucho una vez cada ``TAMANDUA_BRANCH_MIN_MINUTES``
-(60 por defecto) por repositorio, unos pocos por vuelta y solo con la cola casi vacía: los análisis
-manuales y las revisiones de PR no esperan detrás de la vigilancia.
+Only PRs into the repository's target branches are reviewed (`base_branches`; empty means the default branch).
+Each target branch is watched too: when its latest commit changes, the repository is rescanned at that commit so
+the PR baseline doesn't go stale after a merge. At most once every ``TAMANDUA_BRANCH_MIN_MINUTES`` (60 by default)
+per branch, a few per round and only with an almost empty queue: manual scans and PR reviews don't wait behind it.
 """
 
 from __future__ import annotations
@@ -27,7 +27,8 @@ from tamandua.modules.pullrequests.review import GATES
 from tamandua.shared.i18n import msg, text
 
 _log = logging_setup.get("pr_watch")
-DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": True}
+DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": True, "base_branches": []}
+MAX_BASE_BRANCHES = 10
 BRANCH_PER_POLL = 3     # reanálisis de rama principal encolados por vuelta, como mucho
 BRANCH_QUEUE_LIMIT = 2  # solo si en la cola hay menos que esto
 
@@ -84,6 +85,31 @@ def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_commen
     return results
 
 
+def target_branches(config: dict, default_branch: str | None) -> list[str]:
+    """Branches whose PRs are reviewed and whose baseline is kept fresh; empty if nothing is known."""
+    configured = [branch for branch in config.get("base_branches") or [] if isinstance(branch, str)]
+    return configured or ([default_branch] if default_branch else [])
+
+
+def set_base_branches(data_dir: Path, key: str, branches: list[str], *, default_branch: str | None, by: str) -> dict:
+    """Stores the (already validated) target branches and drops the watch state of branches no longer targeted."""
+    with documents.lock(data_dir, "pr-watch"):
+        payload = load(data_dir)
+        current = {**DEFAULTS, **payload["repositories"].get(key, {})}
+        current.update(base_branches=list(branches), updated_by=by,
+                       updated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        payload["repositories"][key] = current
+        keep = set(target_branches(current, default_branch))
+        heads = {name: state for name, state in _heads(payload["branches"].get(key), default_branch).items() if name in keep}
+        if heads:
+            payload["branches"][key] = {"heads": heads}
+        else:
+            payload["branches"].pop(key, None)
+        _save(data_dir, payload)
+    _log.info("pr_branches_configured", extra={"user": by, "reason": f"{key}: {', '.join(branches) or 'default'}"})
+    return current
+
+
 def forget(data_dir: Path, key: str) -> None:
     with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
@@ -120,15 +146,36 @@ def mark(data_dir: Path, source_id: str, number: int, head_sha: str, run_id: str
         _save(data_dir, payload)
 
 
-def branch_state(data_dir: Path, key: str) -> dict | None:
-    return load(data_dir)["branches"].get(key)
+def _heads(entry, default_branch: str | None = None) -> dict[str, dict]:
+    """Watch state per branch. Older entries hold a single state, which was always the default branch's."""
+    if not isinstance(entry, dict):
+        return {}
+    if isinstance(entry.get("heads"), dict):
+        return {name: state for name, state in entry["heads"].items() if isinstance(state, dict)}
+    return {default_branch: entry} if default_branch and entry.get("head_sha") else {}
 
 
-def mark_branch(data_dir: Path, key: str, head_sha: str, run_id: str) -> None:
+def latest_scan(entry) -> dict | None:
+    """The most recent branch rescan of a repository (what the panel shows), with its branch when known."""
+    if isinstance(entry, dict) and not isinstance(entry.get("heads"), dict):
+        return entry if entry.get("head_sha") else None
+    states = [{**state, "branch": name} for name, state in _heads(entry).items()]
+    return max(states, key=lambda state: str(state.get("at") or ""), default=None)
+
+
+def branch_state(data_dir: Path, key: str, branch: str | None = None, *, default_branch: str | None = None) -> dict | None:
+    entry = load(data_dir)["branches"].get(key)
+    if branch is None:
+        return latest_scan(entry)
+    return _heads(entry, default_branch).get(branch)
+
+
+def mark_branch(data_dir: Path, key: str, head_sha: str, run_id: str, branch: str, *, default_branch: str | None = None) -> None:
     with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
-        payload["branches"][key] = {"head_sha": head_sha, "run_id": run_id,
-                                    "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        heads = _heads(payload["branches"].get(key), default_branch)
+        heads[branch] = {"head_sha": head_sha, "run_id": run_id, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        payload["branches"][key] = {"heads": heads}
         _save(data_dir, payload)
 
 
@@ -231,12 +278,16 @@ class Watcher:
                 continue
             done = reviewed(self.data_dir, key)
             self._closed(installation, key, repository, done, {pull["number"] for pull in pulls})
+            targets = set(target_branches(config, by_uid[key].get("branch")))
             for pull in pulls:
                 if pull["draft"] or not pull["head_sha"] or done.get(str(pull["number"]), {}).get("head_sha") == pull["head_sha"]:
                     continue
+                if targets and pull.get("base_ref") not in targets:
+                    continue
                 if self.jobs.pending() >= 20:
                     return queued
-                self.jobs.enqueue_pr_review(source_id=source_id, uid=key, pull=pull, installation_id=installation, requested_by="vigilante")
+                self.jobs.enqueue_pr_review(source_id=source_id, uid=key, pull=pull, installation_id=installation, requested_by="vigilante",
+                                            default_branch=by_uid[key].get("branch"))
                 queued += 1
         rescans = self._branches(by_uid)
         watched = sum(1 for config in load(self.data_dir)["repositories"].values() if config.get("enabled"))
@@ -245,36 +296,38 @@ class Watcher:
         return queued + rescans
 
     def _branches(self, by_uid: dict) -> int:
-        """Reanaliza la rama principal de los vigilados cuyo último commit cambió (con pausa mínima entre análisis)."""
+        """Rescans each target branch whose latest commit changed, pinned to that commit (with a pause between scans)."""
         from tamandua.modules.integrations.github import GitHubAppError, branch_head
         queued = 0
         now = datetime.now(timezone.utc)
         for key, config in load(self.data_dir)["repositories"].items():
             if not config.get("enabled") or not {**DEFAULTS, **config}.get("branch") or key not in by_uid:
                 continue
-            if queued >= BRANCH_PER_POLL or self.jobs.pending() >= BRANCH_QUEUE_LIMIT:
-                break
             item = by_uid[key]
-            if item.get("archived") or not item.get("branch"):
+            if item.get("archived"):
                 continue
-            last = branch_state(self.data_dir, key) or {}
-            try:
-                if last.get("at") and (now - datetime.fromisoformat(last["at"])).total_seconds() < branch_min_seconds():
+            default = item.get("branch")
+            for branch in target_branches(config, default):
+                if queued >= BRANCH_PER_POLL or self.jobs.pending() >= BRANCH_QUEUE_LIMIT:
+                    return queued
+                last = branch_state(self.data_dir, key, branch, default_branch=default) or {}
+                try:
+                    if last.get("at") and (now - datetime.fromisoformat(last["at"])).total_seconds() < branch_min_seconds():
+                        continue
+                except ValueError:
+                    pass
+                try:
+                    head = branch_head(item["installation_id"], item["name"], branch)
+                except GitHubAppError as exc:
+                    _log.warning("branch_head_failed", extra={"reason": f"{item['name']}@{branch}: {exc}"})
                     continue
-            except ValueError:
-                pass
-            try:
-                head = branch_head(item["installation_id"], item["name"], item["branch"])
-            except GitHubAppError as exc:
-                _log.warning("branch_head_failed", extra={"reason": f"{item['name']}: {exc}"})
-                continue
-            if head == last.get("head_sha"):
-                continue
-            run = self.jobs.enqueue_repository_scan(
-                source_id=item["id"], source_name=item["name"], allow_osv_upload=False, context="", tokens={},
-                installation_id=item["installation_id"], uid=key, requested_by="vigilante",
-                trigger={"kind": "branch", "branch": item["branch"], "head_sha": head, "previous_sha": last.get("head_sha")})
-            mark_branch(self.data_dir, key, head, run["id"])
-            queued += 1
-            _log.info("branch_rescan", extra={"reason": f"{item['name']}@{item['branch']} {head[:7]}"})
+                if head == last.get("head_sha"):
+                    continue
+                run = self.jobs.enqueue_repository_scan(
+                    source_id=item["id"], source_name=item["name"], allow_osv_upload=False, context="", tokens={},
+                    installation_id=item["installation_id"], uid=key, requested_by="vigilante", branch=branch, commit=head,
+                    trigger={"kind": "branch", "branch": branch, "head_sha": head, "previous_sha": last.get("head_sha")})
+                mark_branch(self.data_dir, key, head, run["id"], branch, default_branch=default)
+                queued += 1
+                _log.info("branch_rescan", extra={"reason": f"{item['name']}@{branch} {head[:7]}"})
         return queued

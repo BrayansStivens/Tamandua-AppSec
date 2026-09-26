@@ -9,6 +9,7 @@ import { Combobox, type ComboOption } from '@/shared/ui/combobox'
 import { assetOption, type Asset } from '@/features/sources/asset-picker'
 import { ExclusionsCard } from '@/features/findings/exclusions'
 import { SlaPolicyCard } from '@/features/findings/sla-policy'
+import { SecretRulesCard } from '@/features/findings/secret-rules'
 import { Skeleton } from '@/shared/ui/loading'
 import { api, query } from '@/shared/api/http'
 import { readRoute, setRouteParam } from '@/shared/lib/route'
@@ -95,9 +96,10 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
     </div>
     {asset?.removed_at && <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger"><TriangleAlert className="mt-0.5 size-4 shrink-0" /><span>{t('page.removed', { date: formatDate(asset.removed_at) })}</span></div>}
     {/* Configuración a la vista pero en una sola fila: la lista de hallazgos es lo importante. */}
-    {run === CURRENT && asset && <div className="grid items-start gap-3 lg:grid-cols-2">
+    {run === CURRENT && asset && <div className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
       <ExclusionsCard key={asset.key} assetKey={asset.key} canEdit={user.role === 'admin'} onChanged={() => void load()} />
       <SlaPolicyCard canEdit={user.role === 'admin'} onChanged={() => void load()} />
+      <SecretRulesCard canEdit={user.role === 'admin'} />
     </div>}
     {run === CURRENT && <div className="flex flex-wrap gap-1.5">{([['open', t('page.tabs.open')], ['fixed', t('page.tabs.fixed')], ['excluded', t('page.tabs.excluded')], ['all', t('common:state.all')]] as const)
       .filter(([key]) => key !== 'excluded' || tab === 'excluded' || (counts?.excluded ?? 0) > 0)

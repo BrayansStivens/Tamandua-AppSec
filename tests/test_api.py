@@ -57,3 +57,18 @@ class StackTests(HttpCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BodyLimitTests(unittest.TestCase):
+    def test_oversized_or_unbounded_bodies_are_refused_before_reading(self):
+        import tempfile
+        from pathlib import Path
+        from tamandua.app.api.server import build_state
+        with tempfile.TemporaryDirectory() as temporary:
+            client = asgi.client_for(Path(temporary), build_state(Path(temporary)))
+            big = asgi.request(client, "POST", "/api/repositories/branch", b"{" + b" " * 1_000_001 + b"}",
+                               {"Content-Type": "application/json", "Origin": ORIGIN, "X-Tamandua-Action": "set-scan-branch"})
+            self.assertEqual(big.status_code, 413)
+            chunked = asgi.request(client, "POST", "/api/repositories/branch", iter([b"{}"]),
+                                   {"Content-Type": "application/json", "Origin": ORIGIN, "X-Tamandua-Action": "set-scan-branch"})
+            self.assertEqual(chunked.status_code, 411)

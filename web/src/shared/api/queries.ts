@@ -11,6 +11,8 @@ export const keys = {
   dashboard: (days: number, tz?: string) => ['dashboard', days, tz] as const,
   sla: ['sla'] as const,
   cra: ['cra'] as const,
+  secretRules: ['secret-rules'] as const,
+  secretBuiltinRules: ['secret-rules', 'builtin'] as const,
 }
 
 const active = (status?: string) => status === 'queued' || status === 'running'
@@ -30,6 +32,12 @@ export const runQuery = <T extends { status: string }>(id: string) => queryOptio
 
 export const slaQuery = () => queryOptions({ queryKey: keys.sla, queryFn: ({ signal }) => apiGet('/api/sla', undefined, { signal }) })
 export const craQuery = () => queryOptions({ queryKey: keys.cra, queryFn: ({ signal }) => apiGet('/api/cra', undefined, { signal }) })
+export const secretRulesQuery = () => queryOptions({ queryKey: keys.secretRules, queryFn: ({ signal }) => apiGet('/api/secrets/config', undefined, { signal }) })
+// The built-in rule list only changes with the pinned Gitleaks image.
+export const secretBuiltinRulesQuery = () => queryOptions({
+  queryKey: keys.secretBuiltinRules, staleTime: Infinity,
+  queryFn: ({ signal }) => apiGet('/api/secrets/builtin-rules', undefined, { signal }),
+})
 export const dashboardQuery = (days: number, tz?: string) => queryOptions({
   queryKey: keys.dashboard(days, tz),
   queryFn: ({ signal }) => api.get<Dashboard>(`/api/dashboard?${query({ days, tz })}`, { signal }),

@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import Request
 
 from tamandua.app.api.security import Denied, State, authorize
-from tamandua.shared.i18n import localize, negotiate
+from tamandua.shared.i18n import localize, msg, negotiate
 
 
 class ApiError(Exception):
@@ -26,6 +26,7 @@ class Policy:
     admin: bool = False
     enrolment: bool = False
     action: str | None = None
+    body: int = 256  # maximum JSON body (POST), as declared by the Content-Length
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,13 @@ def guard(policy: Policy = Policy()):
                             cookie=request.headers.get("cookie"))
         if isinstance(verdict, Denied):
             raise ApiError(verdict.status, verdict.message, **verdict.extra)
+        if request.method == "POST":
+            try:
+                length = int(request.headers.get("content-length", "0"))
+            except ValueError:
+                length = 0
+            if length < 2 or length > policy.body:
+                raise ApiError(400, msg("api.invalid_request"))
         user, session = verdict
         return Context(state, user, session, negotiate(request.headers.get("accept-language")))
     return dependency

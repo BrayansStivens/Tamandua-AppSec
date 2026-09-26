@@ -10,3 +10,4 @@ export const formatPercent = (value: number, digits = 0) =>
   new Intl.NumberFormat(intlLocale(), { style: 'percent', maximumFractionDigits: digits }).format(value)
 export const formatTime = (stamp: string | number | Date) =>
   new Date(stamp).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+export const formatList = (items: string[]) => new Intl.ListFormat(intlLocale(), { style: 'long', type: 'conjunction' }).format(items)

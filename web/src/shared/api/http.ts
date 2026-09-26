@@ -7,7 +7,9 @@ export class ApiError extends Error {
   status: number
   retryIn?: number
   code?: string
-  constructor(message: string, status: number, retryIn?: number, code?: string) { super(message); this.status = status; this.retryIn = retryIn; this.code = code }
+  // The input a validation error points at (e.g. `rules.2.regex`), when the API says so.
+  field?: string
+  constructor(message: string, status: number, retryIn?: number, code?: string, field?: string) { super(message); this.status = status; this.retryIn = retryIn; this.code = code; this.field = field }
 }
 
 export const UNAUTHORIZED_EVENT = 'tamandua:unauthorized'
@@ -27,12 +29,13 @@ async function parse<T>(response: Response, path: string): Promise<T> {
   let body: unknown = null
   try { body = text ? JSON.parse(text) : null } catch { body = null }
   if (!response.ok) {
-    const record = body && typeof body === 'object' ? body as { error?: unknown; retry_in?: unknown; code?: unknown } : {}
+    const record = body && typeof body === 'object' ? body as { error?: unknown; retry_in?: unknown; code?: unknown; field?: unknown } : {}
     // El login también responde 401 con credenciales malas: eso no es una sesión caducada.
     if (response.status === 401 && !path.startsWith('/api/auth/')) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
     if (response.status === 403 && record.code === 'totp_required') window.dispatchEvent(new Event(TOTP_REQUIRED_EVENT))
     throw new ApiError(record.error ? String(record.error) : `Error ${response.status}`, response.status,
-      typeof record.retry_in === 'number' ? record.retry_in : undefined, typeof record.code === 'string' ? record.code : undefined)
+      typeof record.retry_in === 'number' ? record.retry_in : undefined, typeof record.code === 'string' ? record.code : undefined,
+      typeof record.field === 'string' ? record.field : undefined)
   }
   return body as T
 }

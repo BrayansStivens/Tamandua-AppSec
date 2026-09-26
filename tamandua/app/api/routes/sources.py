@@ -15,6 +15,7 @@ from tamandua.modules.integrations.github import forget_app, forget_catalog, ins
 from tamandua.modules.integrations.installations import clear_github, github_connections, github_installations, save_github
 from tamandua.modules.integrations.ai_providers import ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
 from tamandua.modules.sources.repositories import SourceError, find_source, list_repositories, source_page
+from tamandua.modules.sources.assets import with_scan_branches
 from tamandua.modules.runs.store import render_tickets
 from tamandua.app.api.routing import Request, problem, route
 from tamandua.app.api.security import public_url
@@ -41,7 +42,7 @@ def sources(request: Request):
     installations = github_installations(request.data_dir)
     if request.arg("id") is not None:
         found = find_source(tokens, installations, request.arg("id") or "")
-        return request.json(200, {"sources": [found] if found else [], "total": 1 if found else 0})
+        return request.json(200, {"sources": with_scan_branches(request.data_dir, [found] if found else []), "total": 1 if found else 0})
     paged = paging(request)
     query, account, provider = request.arg("q", ""), request.arg("account"), request.arg("provider")
     if paged is None or len(query) > 100 or (account is not None and len(account) > 100) or provider not in (None, "github", "gitlab", "local"):
@@ -49,8 +50,8 @@ def sources(request: Request):
     if request.arg("refresh") == "1":
         for installation in installations:
             forget_catalog(installation)
-    return request.json(200, source_page(tokens, installations, query=query, account=account or None, provider=provider,
-                                         page=paged[0], per_page=paged[1]))
+    listing = source_page(tokens, installations, query=query, account=account or None, provider=provider, page=paged[0], per_page=paged[1])
+    return request.json(200, {**listing, "sources": with_scan_branches(request.data_dir, listing["sources"])})
 
 
 @route("POST", "/api/integrations/code", admin=True, action="connect-code", body=1024)

@@ -135,6 +135,7 @@ def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str 
     locale = locale or default_locale()
     introduced, preexisting, state = outcome["introduced"], outcome["preexisting"], outcome["verdict"]
     commit = f"`{pull['head_sha'][:7]}`"
+    base = f"`{pull.get('base_ref') or '?'}`"
     gate_label = text(GATE_LABEL.get(gate, gate), locale)
     lines = [t("pulls.comment.heading", locale), ""]
     if state["blocking"]:
@@ -147,10 +148,10 @@ def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str 
     if introduced:
         lines += ["", t("pulls.comment.attention", locale, count=len(introduced)), "", *_rows(introduced, locale)]
     if preexisting:
-        lines += ["", "<details>", f"<summary>{t('pulls.comment.preexisting', locale, count=len(preexisting))}</summary>", "",
+        lines += ["", "<details>", f"<summary>{t('pulls.comment.preexisting', locale, count=len(preexisting), branch=base)}</summary>", "",
                   *_rows(preexisting, locale, 15), "", "</details>"]
     engines = ", ".join(f"{item['name'].capitalize()} {item['version']}" for item in (tools or []) if item.get("status") in ("completed", "partial"))
-    basis = t("pulls.comment.basis_baseline", locale) if baseline_run else t("pulls.comment.basis_none", locale)
+    basis = t("pulls.comment.basis_baseline" if baseline_run else "pulls.comment.basis_none", locale, branch=base)
     where = t("pulls.comment.where_link", locale, url=panel_url) if panel_url else t("pulls.comment.where_plain", locale)
     lines += ["", t("pulls.comment.footer", locale, commit=commit, basis=basis, gate=gate_label, engines=f" · {engines}" if engines else "",
                     where=where, run=run_id[:12])]

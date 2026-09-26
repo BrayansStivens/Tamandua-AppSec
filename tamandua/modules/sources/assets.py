@@ -34,6 +34,37 @@ def load_registry(data_dir: Path) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
+def scan_branch(data_dir: Path, uid: str | None) -> str | None:
+    """The branch platform scans read for this repository; None means its default branch."""
+    value = (load_registry(data_dir).get(uid) or {}).get("scan_branch") if uid else None
+    return value if isinstance(value, str) and value else None
+
+
+def set_scan_branch(data_dir: Path, uid: str, branch: str | None, *, name: str, source_id: str, by: str) -> None:
+    """`branch` already validated against the repository; None goes back to the default branch."""
+    with documents.lock(data_dir, "repo-registry"):
+        registry = load_registry(data_dir)
+        entry = registry.setdefault(uid, {})
+        entry.update(name=name, source_id=source_id)
+        if branch:
+            entry.update(scan_branch=branch, scan_branch_by=by)
+        else:
+            entry.pop("scan_branch", None)
+            entry.pop("scan_branch_by", None)
+        documents.save(data_dir, "repo-registry", registry)
+    _log.info("scan_branch_configured", extra={"user": by, "reason": f"{uid}: {branch or 'default'}"})
+
+
+def with_scan_branches(data_dir: Path, rows: list[dict]) -> list[dict]:
+    """Repository rows with the branch scans read (`scan_branch`, None = default) and the default one."""
+    registry = load_registry(data_dir)
+    result = []
+    for row in rows:
+        stored = (registry.get(row.get("uid")) or {}).get("scan_branch") if row.get("uid") else None
+        result.append({**row, "default_branch": row.get("branch"), "scan_branch": stored if isinstance(stored, str) and stored else None})
+    return result
+
+
 def backfill(data_dir: Path, repositories: list[dict]) -> int:
     """Ejecuciones guardadas antes de la identidad estable: se les pone su `uid` y se mueven triage y tickets."""
     from tamandua.modules.findings import triage
@@ -105,7 +136,7 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
 
 
 def purge(data_dir: Path, uid: str) -> int:
-    """Borra ejecuciones, triage, tickets enlazados y vigilancia de un repositorio. Devuelve ejecuciones borradas."""
+    """Borra ejecuciones, triage, tickets enlazados, vigilancia y ajustes de rama de un repositorio. Devuelve ejecuciones borradas."""
     from tamandua.modules.pullrequests import watch as pr_watch
     from tamandua.modules.findings import triage
     from tamandua.modules.findings import registry as findings_registry
@@ -116,6 +147,8 @@ def purge(data_dir: Path, uid: str) -> int:
     with documents.edit(data_dir, "jira-links", {}) as payload:
         payload.pop(uid, None)
     pr_watch.forget(data_dir, uid)
+    with documents.edit(data_dir, "repo-registry", {}) as registry:
+        registry.pop(uid, None)
     from tamandua.modules.findings.exclusions import forget as forget_exclusions
     forget_exclusions(data_dir, uid)
     _log.warning("repo_purged", extra={"reason": f"{uid}: {removed} ejecuciones borradas"})

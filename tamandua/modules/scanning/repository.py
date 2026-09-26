@@ -17,6 +17,7 @@ from tamandua.modules.intel.advisories import MAX_DETAILS, dependency_finding, f
 from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
+from tamandua.modules.scanning import secret_rules
 from tamandua.modules.scanning.engines import IMAGES, SEVERITY_NAME, and_list, docker_available, joined as join_messages, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
 from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
@@ -197,11 +198,13 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         sast = run_opengrep(root)
         report("ok" if sast["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Opengrep", detail=sast["detail"]))
         report("info", msg("scanning.progress.gitleaks", version=IMAGES["gitleaks"]["version"]))
-        secrets_gitleaks = run_gitleaks(root)
+        # The organization's secret detection settings apply to both secret engines.
+        secret_settings = secret_rules.for_scan(data_dir)
+        secrets_gitleaks = run_gitleaks(root, secret_settings)
         report("ok" if secrets_gitleaks["status"] != "inconclusive" else "warn",
                msg("scanning.progress.engine", engine="Gitleaks", detail=secrets_gitleaks["detail"]))
         report("info", msg("scanning.progress.trivy", version=IMAGES["trivy"]["version"]))
-        trivy = run_trivy(root, (data_dir or Path("data")) / "trivy-cache", feeds)
+        trivy = run_trivy(root, (data_dir or Path("data")) / "trivy-cache", feeds, secret_settings)
         report("ok" if trivy["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Trivy", detail=trivy["detail"]))
         report("info", msg("scanning.progress.osv", version=IMAGES["osv-scanner"]["version"]))
         osv = run_osv_scanner(root, (data_dir or Path("data")) / "osv-cache", feeds, resolve=allow_osv_upload)

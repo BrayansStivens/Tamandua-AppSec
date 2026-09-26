@@ -33,17 +33,17 @@
   },
   "repo": {
     "choose": "Elige un repositorio",
-    "description": "Cada commit nuevo de un PR se escanea y se compara con la rama principal: solo cuenta lo que el PR introduce. Sus hallazgos entran en el estado del repositorio y se remedian solos cuando un commit posterior los quita o el PR se cierra sin merge.",
+    "description": "Cada commit nuevo de un PR se analiza y se compara con su rama de destino: solo cuenta lo que el PR introduce. Sus hallazgos entran en el estado del repositorio y se remedian solos cuando un commit posterior los quita o el PR se cierra sin merge.",
     "watching": "Vigilancia activa",
     "not_watching": "Sin vigilancia",
     "post_comment": "Comentar y marcar el commit en GitHub",
-    "branch": "Reanalizar la rama principal cuando cambie",
+    "branch": "Reanalizar las ramas de destino cuando cambien",
     "gate": "Bloquear desde",
     "gate_label": "Umbral de bloqueo",
     "admin_only": "Solo un administrador cambia esta configuración.",
     "enable_hint": "Actívala con su interruptor en la lista para que cada push se revise solo, o usa «Revisar ahora» en un PR.",
-    "branch_scanned": "Rama principal: último análisis por un cambio el {{date}} (commit <code>{{sha}}</code>). Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min.",
-    "branch_pending": "Rama principal: se analizará en la próxima vuelta del vigilante. Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min.",
+    "branch_scanned": "Ramas de destino: {{branch}} se analizó por última vez tras un cambio el {{date}} (commit <code>{{sha}}</code>). Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min por rama.",
+    "branch_pending": "Ramas de destino: se analizarán en la próxima vuelta del vigilante. Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min por rama.",
     "missing_write": "La GitHub App instalada aún no puede comentar: falta <b>Pull requests</b> y <b>Commit statuses</b> en escritura. Las revisiones se hacen igual y se ven aquí; en cuanto la instalación acepte esos permisos, se publicarán en GitHub."
   },
   "list": {
@@ -57,7 +57,7 @@
   },
   "watch": {
     "title": "Repositorios vigilados · {{total}}",
-    "description": "Los activados revisan solos cada PR nuevo o cada push y reanalizan la rama principal cuando cambia (se comprueba cada {{minutes}} min).",
+    "description": "Los activados revisan solos cada PR nuevo o cada push hacia sus ramas de destino y reanalizan esas ramas cuando cambian (se comprueba cada {{minutes}} min).",
     "admin_hint": "Actívalos uno a uno o en bloque.",
     "member_hint": "Solo un administrador cambia qué se vigila.",
     "bulk": "Acciones en bloque",
@@ -77,7 +77,7 @@
     "select_one": "Seleccionar {{name}}",
     "comments": "comenta en GitHub",
     "panel_only": "solo en el panel",
-    "branch_current": "rama principal al día",
+    "branch_current": "ramas de destino al día",
     "not_watched": "sin vigilancia",
     "reviewed_one": "{{count}} PR revisado",
     "reviewed_other": "{{count}} PR revisados",
@@ -85,6 +85,23 @@
     "off": "Inactiva",
     "toggle": "Vigilar {{name}}",
     "no_watched_match": "Ningún repositorio vigilado coincide.",
-    "no_match": "Ningún repositorio coincide."
+    "no_match": "Ningún repositorio coincide.",
+    "targets": "PRs hacia {{branches}}"
+  },
+  "targets": {
+    "title": "Ramas de destino",
+    "description": "Solo se revisan los PRs hacia estas ramas, cada uno contra el último análisis de su rama de destino.",
+    "default": "Rama predeterminada ({{branch}})",
+    "default_unknown": "Rama predeterminada",
+    "input_label": "Añadir una rama de destino a {{name}}",
+    "placeholder": "Rama, p. ej. develop",
+    "remove": "Quitar {{branch}}",
+    "save": "Guardar ramas",
+    "discard": "Descartar cambios",
+    "invalid": "\"{{branch}}\" no es un nombre de rama válido. Usa letras, números y . _ / -, sin espacios ni \"..\".",
+    "duplicate": "{{branch}} ya está en la lista.",
+    "limit": "Como máximo {{max}} ramas de destino.",
+    "saving": "Guardando las ramas de destino…",
+    "saved": "Ramas de destino guardadas."
   }
 }

@@ -9,6 +9,7 @@ import { Pager } from '@/features/sources/source-search'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/shared/ui/menu'
 import { SkeletonCard, SkeletonList } from '@/shared/ui/loading'
 import { fetchSource, type SourcePage } from '@/features/sources/sources'
+import { TargetBranches } from '@/features/pulls/target-branches'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
@@ -16,12 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/se
 import { api, query as toQuery } from '@/shared/api/http'
 import { readRoute, setRouteParam } from '@/shared/lib/route'
 import { formatDate } from '@/shared/lib/types'
+import { formatList } from '@/shared/i18n/format'
 
 type Review = { run_id: string; status: string; head_sha: string; created_at: string; current: boolean; new: number; severities: Record<string, number> }
 type Pull = { number: number; title: string; url: string; author: string; draft: boolean; head_sha: string; head_ref: string; base_ref: string; updated_at: string; review: Review | null }
 // Vigilancia de un repositorio: sus PRs y, con `branch`, su rama principal (se reanaliza cuando cambia).
-type BranchScan = { head_sha: string; run_id: string; at: string }
-type Settings = { enabled: boolean; post_comment: boolean; gate: 'critical' | 'high' | 'medium' | 'never'; branch: boolean; branch_scan?: BranchScan | null; branch_min_minutes?: number; updated_by?: string }
+type BranchScan = { head_sha: string; run_id: string; at: string; branch?: string }
+type Settings = { enabled: boolean; post_comment: boolean; gate: 'critical' | 'high' | 'medium' | 'never'; branch: boolean; base_branches?: string[]; branch_scan?: BranchScan | null; branch_min_minutes?: number; updated_by?: string; uid?: string; default_branch?: string | null }
 type Listing = { settings: Settings; pulls: Pull[]; pulls_error?: string }
 type Installation = { permissions?: Record<string, string> }
 const gateLabel = { critical: 'gate.critical', high: 'gate.high', medium: 'gate.medium', never: 'gate.never' } as const
@@ -106,9 +108,12 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
         <span className="flex items-center gap-2">{t('repo.gate')}<Select value={settings.gate} disabled={!admin || !!busy} onValueChange={value => value && void save({ gate: value as Settings['gate'] })}><SelectTrigger size="sm" aria-label={t('repo.gate_label')} className="min-w-40 border-app-line bg-app-soft">{t(gateLabel[settings.gate])}</SelectTrigger><SelectContent className="border border-app-line bg-panel p-1 text-app-fg shadow-xl">{(Object.keys(gateLabel) as Settings['gate'][]).map(key => <SelectItem key={key} value={key}>{t(gateLabel[key])}</SelectItem>)}</SelectContent></Select></span>
         {!admin && <span className="text-xs text-app-subtle">{t('repo.admin_only')}</span>}
       </div>}
+      {settings?.uid && <TargetBranches key={settings.uid} uid={settings.uid} name={selected?.name ?? ''}
+        saved={settings.base_branches ?? []} defaultBranch={settings.default_branch ?? null} admin={admin}
+        onSaved={branches => { setListing(previous => previous ? { ...previous, settings: { ...previous.settings, base_branches: branches } } : previous); setVersion(value => value + 1) }} />}
       {settings && !settings.enabled && <p className="text-xs leading-5 text-app-subtle">{t('repo.enable_hint')}</p>}
       {settings?.enabled && settings.branch && <p className="text-xs leading-5 text-app-subtle">{settings.branch_scan
-        ? <Trans t={t} i18nKey="repo.branch_scanned" values={{ date: formatDate(settings.branch_scan.at), sha: settings.branch_scan.head_sha.slice(0, 7), minutes: settings.branch_min_minutes ?? 60 }} components={{ code: <span className="font-mono" /> }} />
+        ? <Trans t={t} i18nKey="repo.branch_scanned" values={{ branch: settings.branch_scan.branch ?? settings.default_branch ?? '—', date: formatDate(settings.branch_scan.at), sha: settings.branch_scan.head_sha.slice(0, 7), minutes: settings.branch_min_minutes ?? 60 }} components={{ code: <span className="font-mono" /> }} />
         : t('repo.branch_pending', { minutes: settings.branch_min_minutes ?? 60 })}</p>}
       {settings?.post_comment && !canWrite && admin && <p className="text-xs leading-5 text-warning"><Trans t={t} i18nKey="repo.missing_write" components={{ b: <strong /> }} /></p>}
     </CardHeader></Card>
@@ -132,7 +137,7 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
   </div>
 }
 
-type WatchRow = { id: string; name: string; private?: boolean; enabled: boolean; post_comment: boolean; gate: Settings['gate']; branch: boolean; branch_scan?: BranchScan | null; reviewed: number; updated_by?: string }
+type WatchRow = { id: string; name: string; private?: boolean; enabled: boolean; post_comment: boolean; gate: Settings['gate']; branch: boolean; base_branches?: string[]; default_branch?: string | null; branch_scan?: BranchScan | null; reviewed: number; updated_by?: string }
 
 type WatchPage = { repositories: WatchRow[]; interval: number; total: number; enabled: number; partial?: boolean }
 const WATCH_PAGE = 25
@@ -172,7 +177,7 @@ function WatchPanel({ admin, onChanged, onSelect, selected }: { admin: boolean; 
   const rows = data.repositories
   const allPicked = rows.length > 0 && rows.every(row => picked.has(row.id))
   const rowSummary = (row: WatchRow) => [
-    ...(row.enabled ? [row.post_comment ? t('watch.comments') : t('watch.panel_only'), t(gateInline[row.gate]), ...(row.branch ? [t('watch.branch_current')] : [])] : [t('watch.not_watched')]),
+    ...(row.enabled ? [row.post_comment ? t('watch.comments') : t('watch.panel_only'), t(gateInline[row.gate]), ...(row.base_branches?.length ? [t('watch.targets', { branches: formatList(row.base_branches) })] : []), ...(row.branch ? [t('watch.branch_current')] : [])] : [t('watch.not_watched')]),
     ...(row.reviewed ? [t('watch.reviewed', { count: row.reviewed })] : []),
   ].join(' · ')
   return <Card className="border-app-line bg-panel"><CardHeader className="gap-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{t('watch.title', { total: data.enabled })}</CardTitle><CardDescription className="mt-1">{t('watch.description', { minutes: Math.round(data.interval / 60) })} {admin ? t('watch.admin_hint') : t('watch.member_hint')}</CardDescription></div>

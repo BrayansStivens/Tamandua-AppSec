@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { api } from '@/shared/api/http'
 import { ChevronDown, ExternalLink, FileCheck2, GitBranch, Layers3, LoaderCircle, LockKeyhole, RefreshCw, Search, ShieldCheck } from 'lucide-react'
@@ -14,6 +14,7 @@ import { AuditReportDialog } from '@/features/findings/audit-report'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/shared/ui/menu'
 import { formatDay } from '@/shared/i18n/format'
 import { useSourcePage } from '@/features/sources/sources'
+import { ScanBranchEdit, ScanBranchEditor, ScanBranchLabel } from '@/features/sources/scan-branch'
 
 export type { Source, SourcePage } from '@/features/sources/sources'
 type Run = { created_at: string; source?: { id?: string; name: string } }
@@ -40,6 +41,11 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
   const [organization, setOrganization] = useState<string | null>(null)
   const [reportFor, setReportFor] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
+  const [editingBranch, setEditingBranch] = useState<string | null>(null)
+  // Closing the branch editor gives focus back to its Edit button, so keyboard users keep their place in the list.
+  const editButtons = useRef(new Map<string, HTMLButtonElement>())
+  const editButton = (id: string) => (element: HTMLButtonElement | null) => { if (element) editButtons.current.set(id, element); else editButtons.current.delete(id) }
+  const closeBranchEditor = (id: string) => { setEditingBranch(null); window.setTimeout(() => editButtons.current.get(id)?.focus(), 0) }
   const { active: batch, last: lastBatch, reload: reloadBatches } = useBatches()
   const startSelected = async () => {
     setStarting(true); setError('')
@@ -137,20 +143,22 @@ export function CodeSources({ showRepositories = false, onScan, runs = [], canMa
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())} className="ml-auto">{t('repositories.clear_selection')}</Button>
         </div>}
         <div className="overflow-hidden rounded-xl border border-app-line">
-          <div className="hidden grid-cols-[20px_minmax(0,1fr)_120px_130px_130px] items-center gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid">
+          <div className="hidden grid-cols-[20px_minmax(0,1fr)_minmax(0,170px)_120px_130px_130px] items-center gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid">
             <input type="checkbox" aria-label={t('repositories.select_page')} className="size-4 accent-brand" checked={selectable.length > 0 && selectable.every(id => selected.has(id))}
               onChange={event => setSelected(previous => { const next = new Set(previous); for (const id of selectable) { if (event.target.checked) next.add(id); else next.delete(id) } return next })} />
-            <span>{t('repositories.columns.repository')}</span><span>{t('repositories.columns.origin')}</span><span>{t('repositories.columns.last_scan')}</span><span>{t('repositories.columns.action')}</span></div>
+            <span>{t('repositories.columns.repository')}</span><span>{t('repositories.columns.branch')}</span><span>{t('repositories.columns.origin')}</span><span>{t('repositories.columns.last_scan')}</span><span>{t('repositories.columns.action')}</span></div>
           {!data && <SkeletonList rows={8} action label={t('repositories.loading')} />}
           {data?.sources.map(source => {
             const last = runs.find(run => run.source?.name === source.name)
-            return <div key={source.id} className="grid gap-2 border-b border-app-line px-4 py-3 last:border-b-0 md:grid-cols-[20px_minmax(0,1fr)_120px_130px_130px] md:items-center">
+            return <div key={source.id} className="grid gap-2 border-b border-app-line px-4 py-3 last:border-b-0 md:grid-cols-[20px_minmax(0,1fr)_minmax(0,170px)_120px_130px_130px] md:items-center">
               {source.installation_id ? <input type="checkbox" aria-label={t('repositories.select_one', { name: source.name })} className="size-4 accent-brand" checked={selected.has(source.id)}
                 onChange={event => setSelected(previous => { const next = new Set(previous); if (event.target.checked) next.add(source.id); else next.delete(source.id); return next })} /> : <span />}
               <div className="flex min-w-0 items-center gap-2"><GitBranch className="size-4 shrink-0 text-app-muted" /><span className="truncate text-sm font-medium">{source.name}</span>{source.private && <LockKeyhole className="size-3 shrink-0 text-app-subtle" />}</div>
+              <div className="flex min-w-0 items-center gap-1"><span className="text-xs text-app-subtle md:sr-only">{t('repositories.columns.branch')}</span><ScanBranchLabel source={source} />{canManage && source.installation_id && source.uid && <ScanBranchEdit source={source} ref={editButton(source.id)} expanded={editingBranch === source.id} onEdit={() => setEditingBranch(current => current === source.id ? null : source.id)} />}</div>
               <span className="text-xs text-app-muted">{source.account ?? source.provider.toUpperCase()}</span>
               <span className="text-xs text-app-muted">{last ? formatDay(last.created_at, { dateStyle: 'short' }) : t('repositories.not_scanned')}</span>
               <Button variant="outline" size="sm" onClick={() => onScan?.(source.id)} className="w-fit border-app-line bg-app-soft">{t('repositories.scan')}</Button>
+              {editingBranch === source.id && <ScanBranchEditor source={source} onClose={() => closeBranchEditor(source.id)} onSaved={() => reload()} />}
             </div>
           })}
           {data && !data.sources.length && !loading && <p className="p-6 text-center text-sm text-app-muted">{t('repositories.no_match')}</p>}

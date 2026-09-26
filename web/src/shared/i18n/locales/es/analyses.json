@@ -196,8 +196,9 @@
       "advisory_watch_one": "aviso nuevo", "advisory_watch_other": "avisos nuevos",
       "candidates_one": "candidato", "candidates_other": "candidatos"
     },
-    "trigger_branch": "· automático: cambió la rama principal",
-    "trigger_branch_sha": "· automático: cambió la rama principal ({{sha}})",
+    "trigger_branch": "· automático: cambió la rama",
+    "trigger_branch_sha": "· automático: cambió la rama ({{sha}})",
+    "on_branch": "· rama {{branch}}",
     "trigger_advisories": "· automático: publicados después del último análisis",
     "severity_letter": { "critical": "C", "high": "A", "medium": "M", "low": "B" },
     "severity_count": "{{severity}}: {{value}}",

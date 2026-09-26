@@ -36,6 +36,7 @@ from tamandua.shared.i18n import msg
 from tamandua.modules.intel import data_sources
 from tamandua.modules.intel.advisories import compare_versions, cvss3_base_score, prioritize, severity_from_score
 from tamandua.modules.intel.advisories import fingerprint as sca_fingerprint
+from tamandua.modules.scanning import secret_rules
 
 RULES_DIR = paths.RULES_DIR
 IMAGES = {
@@ -150,13 +151,22 @@ def cause(completed: subprocess.CompletedProcess | None) -> str:
     if completed is None:
         return ""
     lines = [line.strip() for line in _ANSI.sub("", completed.stderr or "").splitlines() if line.strip()]
-    if not lines:
-        return ""
-    text = _TOKENS.sub("[token]", lines[-1])
+    return _clean_cause(lines[-1]) if lines else ""
+
+
+def _clean_cause(line: str) -> str:
+    text = _TOKENS.sub("[token]", line)
     host = os.environ.get("TAMANDUA_HOST_DATA_DIR", "")
     if len(host) > 1:
         text = text.replace(host, "<datos>")
     return " ".join(text.split())[:240]
+
+
+def config_cause(completed: subprocess.CompletedProcess) -> str:
+    """Why an engine rejected its configuration: the first error line (a Go panic ends with its stack, not its cause)."""
+    lines = [line.strip() for line in _ANSI.sub("", completed.stderr or "").splitlines() if line.strip()]
+    first = next((line for line in lines if re.search(r"panic:|FTL|FATAL|error", line, re.IGNORECASE)), None)
+    return _clean_cause(first) if first else cause(completed)
 
 
 def with_cause(message, completed: subprocess.CompletedProcess | None):
@@ -548,9 +558,11 @@ def _trivy_misconfiguration(entry: dict, target: str) -> dict:
     return finding
 
 
-def _trivy_secret(entry: dict, target: str) -> dict:
+def _trivy_secret(entry: dict, target: str, custom: dict | None = None) -> dict:
     line = int(entry.get("StartLine") or 1)
     rule = str(entry.get("RuleID") or "secret")
+    if rule in (custom or {}):
+        return _custom_secret(custom[rule], rule, target, line, tool="trivy", confidence=8)
     severity = SEVERITY_LABEL.get(str(entry.get("Severity", "")).upper(), "high")
     # Nunca se guarda el valor: Trivy ya lo redacta, y aquí ni siquiera se lee.
     category = entry.get("Category")
@@ -600,7 +612,7 @@ def trivy_packages(payload: dict, *, system: bool = False) -> list[dict]:
     return packages
 
 
-def parse_trivy(payload: dict, feeds: dict) -> list[dict]:
+def parse_trivy(payload: dict, feeds: dict, custom: dict | None = None) -> list[dict]:
     findings = []
     for result in payload.get("Results", []) or []:
         target = _relative(str(result.get("Target", "")))
@@ -612,7 +624,7 @@ def parse_trivy(payload: dict, feeds: dict) -> list[dict]:
             if str(entry.get("Status", "FAIL")).upper() == "FAIL":
                 findings.append(_trivy_misconfiguration(entry, target))
         for entry in result.get("Secrets") or []:
-            findings.append(_trivy_secret(entry, target))
+            findings.append(_trivy_secret(entry, target, custom))
     seen, unique = set(), []
     for finding in findings:
         if finding["fingerprint"] not in seen:
@@ -621,17 +633,37 @@ def parse_trivy(payload: dict, feeds: dict) -> list[dict]:
     return unique
 
 
-def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
+def _trivy_fs(snapshot: Path, cache_dir: Path, scanners: str, config_dir: Path | None) -> subprocess.CompletedProcess:
+    # Con las dependencias de desarrollo (marcadas como tales) y la lista de paquetes para saber cuáles son.
+    secret_config = ["--secret-config", "/cfg/trivy-secret.yaml"] if config_dir else []
+    return _run("trivy", ["fs", "--scanners", scanners, *secret_config, "--include-dev-deps", "--list-all-pkgs",
+                          "--cache-dir", "/cache", "--format", "json", "--quiet",
+                          "--timeout", "14m", "/src"], snapshot, network=True,
+                mounts=["-v", f"{host_path(cache_dir)}:/cache",
+                        *(["-v", f"{host_path(config_dir)}:/cfg:ro"] if config_dir else [])])
+
+
+def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict, secret_settings: dict | None = None) -> dict:
+    """`secret_settings`: the organization's secret detection settings (secret_rules), applied through
+    `--secret-config`. If Trivy rejects them, it runs again without secret detection so dependencies and IaC are
+    still analyzed, and the step says secrets were not covered by Trivy."""
     started = time.time()
     if not docker_available():
         return _result("trivy", "not_tested", msg("scanning.trivy.no_docker"))
     cache_dir = writable_cache(cache_dir)
+    rejected = None
     try:
-        # Con las dependencias de desarrollo (marcadas como tales) y la lista de paquetes para saber cuáles son.
-        completed = _run("trivy", ["fs", "--scanners", "vuln,misconfig,secret", "--include-dev-deps", "--list-all-pkgs",
-                                   "--cache-dir", "/cache", "--format", "json", "--quiet",
-                                   "--timeout", "14m", "/src"], snapshot, network=True,
-                         mounts=["-v", f"{host_path(cache_dir)}:/cache"])
+        with tempfile.TemporaryDirectory(prefix="trivy-config-", dir=snapshot.parent) as folder:
+            config_dir = None
+            if secret_settings:
+                config_dir = Path(folder)
+                (config_dir / "trivy-secret.yaml").write_text(secret_rules.trivy_secret_config(secret_settings), encoding="utf-8")
+            completed = _trivy_fs(snapshot, cache_dir, "vuln,misconfig,secret", config_dir)
+        if config_dir and completed.returncode != 0 and not completed.stdout.strip() and "secret config" in completed.stderr.lower():
+            reason = config_cause(completed)
+            rejected = msg("scanning.trivy.secret_config_rejected_cause", cause=reason) if reason \
+                else msg("scanning.trivy.secret_config_rejected")
+            completed = _trivy_fs(snapshot, cache_dir, "vuln,misconfig", None)
         if completed.returncode != 0 and not completed.stdout.strip():
             failure = msg("scanning.trivy.failed_download") if "download" in completed.stderr.lower() \
                 else msg("scanning.engines.failed_early", engine="Trivy")
@@ -641,7 +673,7 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
         return _result("trivy", "inconclusive", msg("scanning.trivy.timeout"), started=started)
     except (OSError, ValueError):
         return _result("trivy", "inconclusive", msg("scanning.engines.unreadable", engine="Trivy"), started=started)
-    findings = parse_trivy(payload, feeds)
+    findings = parse_trivy(payload, feeds, secret_rules.custom_rules(secret_settings))
     kinds = {"sca": 0, "iac": 0, "secrets": 0}
     for finding in findings:
         kinds[finding["scanner"]] = kinds.get(finding["scanner"], 0) + 1
@@ -653,7 +685,9 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
     detail = msg("scanning.trivy.detail_dev", dev=dev, **counts) if dev else msg("scanning.trivy.detail", **counts)
     if not feeds.get("kev") or not feeds.get("epss"):
         detail = joined([detail, msg("scanning.trivy.no_feeds")], "scanning.join.sentences")
-    return {**_result("trivy", "completed", detail, findings, started), "packages": trivy_packages(payload)}
+    if rejected:
+        detail = joined([detail, rejected], "scanning.join.sentences")
+    return {**_result("trivy", "partial" if rejected else "completed", detail, findings, started), "packages": trivy_packages(payload)}
 
 
 # --- OSV-Scanner ---------------------------------------------------------------------
@@ -749,7 +783,15 @@ def secret_title(rule: str) -> dict:
     return SECRET_TITLES.get(rule) or msg("scanning.secrets.exposed_rule", rule=rule)
 
 
-def parse_gitleaks(payload: list) -> list[dict]:
+def _custom_secret(rule: dict, rule_id: str, path: str, line: int, *, tool: str, confidence: int) -> dict:
+    """A finding from an organization rule: its description (as written, one language) and its severity."""
+    return _base("secrets", rule_id, rule["description"], path, line, rule["severity"], tool=tool,
+                 reason=msg("scanning.secrets.custom_reason", rule=rule["id"], path=path, line=line),
+                 remediation=msg("scanning.secrets.rotate"), cwe=[798], owasp="A04:2025", confidence=confidence,
+                 digest=_stable("secrets", rule_id, path, str(line)))
+
+
+def parse_gitleaks(payload: list, custom: dict | None = None) -> list[dict]:
     findings = []
     for entry in payload or []:
         if not isinstance(entry, dict):
@@ -758,6 +800,9 @@ def parse_gitleaks(payload: list) -> list[dict]:
         path = _relative(str(entry.get("File", "")))
         line = int(entry.get("StartLine") or 1)
         entropy = float(entry.get("Entropy") or 0)
+        if rule in (custom or {}):
+            findings.append(_custom_secret(custom[rule], rule, path, line, tool="gitleaks", confidence=8 if entropy >= 3.5 else 6))
+            continue
         severity = "medium" if rule.startswith("generic") else "high"
         # El valor nunca se lee: gitleaks corre con --redact y aquí solo se toman regla, archivo y línea.
         findings.append(_base("secrets", rule, secret_title(rule), path, line, severity, tool="gitleaks",
@@ -768,17 +813,34 @@ def parse_gitleaks(payload: list) -> list[dict]:
     return findings
 
 
-def run_gitleaks(snapshot: Path) -> dict:
+def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
+    """`settings`: the organization's secret detection settings (secret_rules). With them, Gitleaks gets a generated
+    `--config` mounted read-only; if it rejects it, the step is inconclusive, never clean."""
     started = time.time()
     if not docker_available():
         return _result("gitleaks", "not_tested", msg("scanning.gitleaks.no_docker"))
     # El reporte se escribe junto al snapshot: es la única carpeta que ambos contenedores ven.
-    with tempfile.TemporaryDirectory(prefix="gitleaks-", dir=snapshot.parent) as output:
+    # The settings go in a separate folder, mounted read-only.
+    with tempfile.TemporaryDirectory(prefix="gitleaks-", dir=snapshot.parent) as output, \
+            tempfile.TemporaryDirectory(prefix="gitleaks-config-", dir=snapshot.parent) as config:
+        arguments = ["dir", "/src", "--report-format", "json", "--report-path", "/out/report.json",
+                     "--no-banner", "--exit-code", "0", "--redact"]
+        mounts = ["-v", f"{host_path(Path(output))}:/out"]
+        if settings:
+            (Path(config) / "gitleaks.toml").write_text(secret_rules.gitleaks_toml(settings), encoding="utf-8")
+            arguments[2:2] = ["--config", "/cfg/gitleaks.toml"]
+            mounts += ["-v", f"{host_path(Path(config))}:/cfg:ro"]
         try:
-            completed = _run("gitleaks", ["dir", "/src", "--report-format", "json", "--report-path", "/out/report.json",
-                                          "--no-banner", "--exit-code", "0", "--redact"], snapshot,
-                             mounts=["-v", f"{host_path(Path(output))}:/out"], timeout=600)
+            completed = _run("gitleaks", arguments, snapshot, mounts=mounts, timeout=600)
             report = Path(output) / "report.json"
+            # Without settings, a missing report keeps its old meaning; with them it may be the settings' fault.
+            if settings and (completed.returncode != 0 or not report.is_file()):
+                if "config" not in (completed.stderr or "").lower():
+                    return _result("gitleaks", "inconclusive", with_cause(msg("scanning.engines.failed", engine="Gitleaks"), completed),
+                                   started=started)
+                reason = config_cause(completed)
+                failure = msg("scanning.gitleaks.config_failed_cause", cause=reason) if reason else msg("scanning.gitleaks.config_failed")
+                return _result("gitleaks", "inconclusive", failure, started=started)
             payload = json.loads(report.read_text(encoding="utf-8") or "[]") if report.is_file() else []
         except subprocess.TimeoutExpired:
             return _result("gitleaks", "inconclusive", msg("scanning.engines.timeout", engine="Gitleaks"), started=started)
@@ -786,8 +848,10 @@ def run_gitleaks(snapshot: Path) -> dict:
             return _result("gitleaks", "inconclusive", msg("scanning.gitleaks.unreadable"), started=started)
     if completed.returncode not in (0, 1):
         return _result("gitleaks", "inconclusive", with_cause(msg("scanning.engines.failed", engine="Gitleaks"), completed), started=started)
-    findings = parse_gitleaks(payload)
-    return _result("gitleaks", "completed", msg("scanning.gitleaks.detail", secrets=len(findings)), findings, started)
+    findings = parse_gitleaks(payload, secret_rules.custom_rules(settings))
+    detail = msg("scanning.gitleaks.detail_configured", secrets=len(findings), **secret_rules.counts(settings)) if settings \
+        else msg("scanning.gitleaks.detail", secrets=len(findings))
+    return _result("gitleaks", "completed", detail, findings, started)
 
 
 def merge_secrets(*groups: list[dict]) -> list[dict]:

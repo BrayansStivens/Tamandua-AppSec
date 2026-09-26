@@ -76,12 +76,25 @@
       "repository": "Repositorio",
       "origin": "Origen",
       "last_scan": "Último análisis",
-      "action": "Acción"
+      "action": "Acción",
+      "branch": "Rama"
     },
     "loading": "Cargando repositorios",
     "not_scanned": "Sin analizar",
     "scan": "Analizar",
-    "no_match": "No hay repositorios que coincidan."
+    "no_match": "No hay repositorios que coincidan.",
+    "branch": {
+      "default": "{{branch}} · predeterminada",
+      "default_unknown": "Rama predeterminada",
+      "edit": "Cambiar la rama que se analiza en {{name}}",
+      "input_label": "Rama que se analiza en {{name}}",
+      "placeholder": "p. ej. develop",
+      "reset": "Usar la rama predeterminada",
+      "help": "Todos los análisis de este repositorio leen esta rama: manuales, por lote y de reverificación. Déjala vacía para usar {{branch}}, la rama predeterminada.",
+      "help_unknown": "Todos los análisis de este repositorio leen esta rama: manuales, por lote y de reverificación. Déjala vacía para usar la rama predeterminada.",
+      "invalid": "Ese no es un nombre de rama válido. Usa letras, números y . _ / -, sin espacios ni \"..\".",
+      "saving": "Guardando la rama…"
+    }
   },
   "search": {
     "label": "Buscar repositorio",

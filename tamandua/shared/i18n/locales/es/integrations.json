@@ -69,7 +69,9 @@
       "failed": "La conexión con GitHub falló",
       "available": "Instalación disponible",
       "available_detail": "Vuelve al panel, haz clic en «Buscar instalaciones» y elige la cuenta que quieres conectar."
-    }
+    },
+    "branch_not_found": "La rama {{branch}} no existe en este repositorio",
+    "invalid_branch_name": "\"{{branch}}\" no es un nombre de rama válido: usa letras, números y . _ / - (hasta 200 caracteres)"
   },
   "jira": {
     "invalid_site": "Sitio de Jira inválido",
@@ -147,7 +149,7 @@
       "advisory_watch": "avisos publicados después del último análisis",
       "image_scan": "análisis de la imagen",
       "full_scan": "análisis completo del repositorio",
-      "branch": "reanálisis automático tras un cambio en la rama principal"
+      "branch": "reanálisis automático tras un cambio en una rama vigilada"
     },
     "findings_title_one": "1 hallazgo nuevo en {{asset}}",
     "findings_title_other": "{{count}} hallazgos nuevos en {{asset}}",

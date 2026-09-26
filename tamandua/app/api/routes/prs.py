@@ -14,8 +14,8 @@ from tamandua.app.api.routes.sources import paging
 from tamandua.shared.i18n import msg
 
 
-def _repository(request: Request, source_id) -> tuple[int, str, str] | None:
-    """Solo repositorios que la instalación cubre. Devuelve instalación, nombre e identidad estable."""
+def _lookup(request: Request, source_id) -> tuple[int, dict] | None:
+    """Solo repositorios que la instalación cubre: su instalación y su fila."""
     if not isinstance(source_id, str) or not re.fullmatch(r"github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", source_id):
         return None
     for installation in github_installations(request.data_dir):
@@ -24,19 +24,26 @@ def _repository(request: Request, source_id) -> tuple[int, str, str] | None:
         except GitHubAppError:
             continue
         if entry:
-            return installation, entry["name"], entry["uid"]
+            return installation, entry
     return None
+
+
+def _repository(request: Request, source_id) -> tuple[int, str, str] | None:
+    """Instalación, nombre e identidad estable de un repositorio de la instalación."""
+    found = _lookup(request, source_id)
+    return (found[0], found[1]["name"], found[1]["uid"]) if found else None
 
 
 @route("GET", "/api/pull-requests")
 def pulls(request: Request):
     source_id = request.arg("source_id")
-    target = _repository(request, source_id)
-    if target is None:
+    found = _lookup(request, source_id)
+    if found is None:
         return request.json(400, {"error": msg("pulls.errors.pick_repository")})
-    installation, repository, uid = target
+    installation, entry = found
+    repository, uid = entry["name"], entry["uid"]
     settings = {**pr_watch.settings(request.data_dir, uid), "branch_scan": pr_watch.branch_state(request.data_dir, uid),
-                "branch_min_minutes": pr_watch.branch_min_seconds() // 60}
+                "branch_min_minutes": pr_watch.branch_min_seconds() // 60, "uid": uid, "default_branch": entry.get("branch")}
     try:
         rows = open_pull_requests(installation, repository)
     except GitHubAppError as exc:
@@ -57,7 +64,7 @@ def pulls(request: Request):
 def _row(item: dict, state: dict) -> dict:
     return {"id": item["id"], "uid": item["uid"], "name": item["name"], "private": item.get("private"),
             **pr_watch.DEFAULTS, **state["repositories"].get(item["uid"], {}), "reviewed": len(state["reviewed"].get(item["uid"], {})),
-            "branch_scan": state["branches"].get(item["uid"])}
+            "branch_scan": pr_watch.latest_scan(state["branches"].get(item["uid"])), "default_branch": item.get("branch")}
 
 
 @route("GET", "/api/pull-requests/watch")
@@ -145,10 +152,11 @@ def review_now(request: Request):
     if (not isinstance(payload, dict) or set(payload) != {"source_id", "number"}
             or not isinstance(payload["number"], int) or isinstance(payload["number"], bool)):
         return request.json(400, {"error": msg("pulls.errors.invalid_pull")})
-    target = _repository(request, payload["source_id"])
-    if target is None:
+    found = _lookup(request, payload["source_id"])
+    if found is None:
         return request.json(400, {"error": msg("pulls.errors.repo_not_in_app")})
-    installation, repository, uid = target
+    installation, entry = found
+    repository, uid = entry["name"], entry["uid"]
     try:
         pull = pull_request(installation, repository, payload["number"])
     except GitHubAppError as exc:
@@ -158,5 +166,6 @@ def review_now(request: Request):
     if request.state.jobs.pending() >= 20:
         return request.json(429, {"error": msg("api.queue_full")})
     queued = request.state.jobs.enqueue_pr_review(source_id=payload["source_id"], uid=uid, pull=pull, installation_id=installation,
-                                                  requested_by=request.user["username"])
+                                                  requested_by=request.user["username"],
+                                                  default_branch=entry.get("branch"))
     return request.json(202, {"run": queued})

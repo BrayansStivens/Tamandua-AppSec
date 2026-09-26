@@ -35,10 +35,10 @@
     "below_hint": "Revísalos antes de mergear. No bloquean el PR.",
     "clean": "**Este PR no introduce hallazgos** en el código que cambia (commit {{commit}}). No hay nada que hacer aquí.",
     "attention": "### Requieren atención ({{count}})",
-    "preexisting_one": "1 hallazgo preexistente en el código que toca este PR, ya presente en la rama principal",
-    "preexisting_other": "{{count}} hallazgos preexistentes en el código que toca este PR, ya presentes en la rama principal",
-    "basis_baseline": "comparado con el último escaneo de la rama principal",
-    "basis_none": "sin escaneo previo de la rama principal: cuenta todo lo que cae en líneas cambiadas",
+    "preexisting_one": "1 hallazgo preexistente en el código que toca este PR, ya presente en {{branch}}",
+    "preexisting_other": "{{count}} hallazgos preexistentes en el código que toca este PR, ya presentes en {{branch}}",
+    "basis_baseline": "comparado con el último análisis de {{branch}}",
+    "basis_none": "sin análisis previo de {{branch}}: cuenta todo lo que cae en líneas cambiadas",
     "where_link": "[en el panel]({{url}})",
     "where_plain": "en el panel de Tamandua",
     "footer": "<sub>Commit {{commit}} · {{basis}} · bloquea desde severidad {{gate}}{{engines}}. Detalle, triage y exportación a Jira {{where}} (ejecución `{{run}}`). Los secretos se citan por regla y ubicación; su valor nunca se publica.</sub>"
@@ -69,6 +69,7 @@
     "not_in_app": "Hay repositorios que no están en la GitHub App conectada",
     "invalid_pull": "Pull request inválido",
     "repo_not_in_app": "Repositorio no disponible en la GitHub App conectada",
-    "no_head": "GitHub no devolvió el commit de cabeza del PR"
+    "no_head": "GitHub no devolvió el commit de cabeza del PR",
+    "too_many_branches": "Elige como máximo {{max}} ramas de destino"
   }
 }

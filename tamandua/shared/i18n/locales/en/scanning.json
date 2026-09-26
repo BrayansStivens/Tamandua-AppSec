@@ -101,7 +101,8 @@
       "pypi_upload_token": "Exposed PyPI token",
       "azure_ad_client_secret": "Exposed Azure AD client secret",
       "heroku_api_key": "Exposed Heroku API key"
-    }
+    },
+    "custom_reason": "Your organization's rule {{rule}} matched in {{path}}:{{line}}; value redacted."
   },
   "trivy": {
     "no_docker": "Docker isn't available: dependencies, IaC and secrets with Trivy didn't run.",
@@ -109,7 +110,9 @@
     "timeout": "Trivy exceeded the time limit; dependencies and IaC didn't finish.",
     "detail": "Examined {{manifests}} dependency manifests and {{configs}} infrastructure files: {{sca}} dependency advisories, {{iac}} misconfigurations, {{secrets}} secrets.",
     "detail_dev": "Examined {{manifests}} dependency manifests and {{configs}} infrastructure files: {{sca}} dependency advisories ({{dev}} in development dependencies, with lower priority), {{iac}} misconfigurations, {{secrets}} secrets.",
-    "no_feeds": "KEV/EPSS unavailable; priority uses CVSS only."
+    "no_feeds": "KEV/EPSS unavailable; priority uses CVSS only.",
+    "secret_config_rejected": "Trivy rejected your organization's secret detection settings: it analyzed dependencies and IaC, but not secrets.",
+    "secret_config_rejected_cause": "Trivy rejected your organization's secret detection settings: it analyzed dependencies and IaC, but not secrets. Cause: {{cause}}"
   },
   "osv": {
     "no_docker": "Docker isn't available: dependencies with OSV-Scanner didn't run.",
@@ -121,7 +124,10 @@
   "gitleaks": {
     "no_docker": "Docker isn't available: secret detection with Gitleaks didn't run.",
     "unreadable": "Gitleaks didn't return a readable report.",
-    "detail": "Gitleaks rules over the snapshot: {{secrets}} secrets; values redacted."
+    "detail": "Gitleaks rules over the snapshot: {{secrets}} secrets; values redacted.",
+    "detail_configured": "Gitleaks rules over the snapshot, with your organization's settings ({{rules}} custom rules, {{disabled}} built-in rules turned off, {{allowlist}} allowlist entries): {{secrets}} secrets; values redacted.",
+    "config_failed": "Gitleaks rejected your organization's secret detection settings, so it didn't analyze secrets. Review them under Findings → Secret detection.",
+    "config_failed_cause": "Gitleaks rejected your organization's secret detection settings, so it didn't analyze secrets. Review them under Findings → Secret detection. Cause: {{cause}}"
   },
   "checkov": {
     "image_reason": "Checkov ({{rule}}) on the Dockerfile rebuilt from the image history.",
@@ -455,5 +461,46 @@
     "not_analyzed": "Not analyzed: {{item}}",
     "incomplete": "the analysis didn't finish: this doesn't mean «no findings»",
     "verdict_line": "{{verdict}} · threshold: {{threshold}} · {{detail}}"
+  },
+  "secret_rules": {
+    "errors": {
+      "not_settings": "The secret detection settings aren't valid.",
+      "not_text": "Enter text.",
+      "not_list": "Expected a list.",
+      "not_rule": "Each custom rule needs an ID, a description, a regular expression and a severity.",
+      "too_long": "Use at most {{max}} characters.",
+      "control_characters": "Remove line breaks, tabs and other control characters.",
+      "too_many_entries": "Add at most {{max}} entries to each allowlist.",
+      "too_many_rules": "You can have at most {{max}} custom rules.",
+      "too_many_keywords": "Use at most {{max}} keywords per rule.",
+      "rule_id": "The rule ID “{{id}}” isn't valid: use 1 to 60 lowercase letters, digits or hyphens.",
+      "duplicate_rule": "There are two rules with the ID {{id}}.",
+      "description_required": "Describe what rule {{id}} detects (at least 3 characters).",
+      "regex_required": "Enter a regular expression.",
+      "triple_quote": "The expression “{{pattern}}” can't contain three single quotes in a row (''').",
+      "regex_unsupported": "The expression “{{pattern}}” uses {{construct}}, which Gitleaks and Trivy don't support.",
+      "regex_invalid": "The expression “{{pattern}}” isn't a valid regular expression.",
+      "regex_empty": "The expression “{{pattern}}” matches empty text, so it would flag every line. Make it require at least one character.",
+      "allow_everything": "The expression “{{pattern}}” matches empty text, so it would silence every secret. Make it more specific.",
+      "keyword_invalid": "The keyword “{{keyword}}” isn't valid: use letters, digits and _ . : = @ / + -.",
+      "severity_invalid": "Choose a severity for rule {{id}}: critical, high, medium or low.",
+      "path_invalid": "The path “{{pattern}}” isn't valid: use letters, digits, _ . - / and the wildcards * and ?.",
+      "path_not_relative": "The path “{{pattern}}” must be relative to the repository root, without . or ..",
+      "path_everything": "The path “{{pattern}}” would cover the whole repository.",
+      "stopword_invalid": "The stopword “{{word}}” isn't valid: use 3 to 60 letters, digits or _ . -.",
+      "unknown_rule": "{{rule}} isn't a built-in Gitleaks rule.",
+      "reason_required": "Explain why you're changing the settings (at least 5 characters)."
+    },
+    "constructs": {
+      "lookaround": "a lookahead or lookbehind",
+      "backreference": "a backreference",
+      "atomic": "an atomic group",
+      "possessive": "a possessive quantifier",
+      "conditional": "a conditional group",
+      "group": "a group syntax only Python understands",
+      "escape": "an escape only Python understands (\\Z, \\u, \\N…)",
+      "nested_class": "a character class inside another",
+      "repeat": "a repetition count that's missing its minimum or exceeds 1000"
+    }
   }
 }

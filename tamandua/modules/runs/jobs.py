@@ -24,7 +24,8 @@ from tamandua.modules.findings import registry as findings_registry
 from tamandua.shared import log as logging_setup
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, snapshot_source
-from tamandua.modules.sources.assets import asset_key
+from tamandua.modules.sources.assets import asset_key, scan_branch
+from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.runs import queue
 from tamandua.modules.runs.store import list_runs, load_run, save_record, save_repository_scan
 from tamandua.shared import vault
@@ -112,11 +113,17 @@ class ScanJobs:
 
     def enqueue_repository_scan(self, *, source_id: str, source_name: str, allow_osv_upload: bool,
                                 context: str, tokens: dict[str, str], installation_id: int | None, uid: str | None = None,
-                                requested_by: str | None = None, trigger: dict | None = None) -> dict:
+                                requested_by: str | None = None, trigger: dict | None = None,
+                                branch: str | None = None, commit: str | None = None) -> dict:
+        """`branch` and `commit` pin what to scan (branch watch); otherwise the worker resolves the repository's scan
+        branch (or the default one) and its latest commit when the job runs."""
         run_id = uuid.uuid4().hex
+        source = {"id": source_id, "uid": uid, "name": source_name, "provider": source_id.partition(":")[0]}
+        planned = branch or (scan_branch(self.data_dir, uid) if uid else None)
+        if planned:
+            source["branch"] = planned
         record = {"schema_version": "0.3.0", "id": run_id, "type": "repository_scan", "status": "queued",
-                  "created_at": _now(), "target": source_name, "variant": "code",
-                  "source": {"id": source_id, "uid": uid, "name": source_name, "provider": source_id.partition(":")[0]},
+                  "created_at": _now(), "target": source_name, "variant": "code", "source": source,
                   "context": " ".join(context.split())[:400], "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
                   "progress": [_event("info", msg("runs.progress.queued"))]}
@@ -129,11 +136,13 @@ class ScanJobs:
         # Los tokens de código no se guardan en claro en la cola: van sellados con la clave maestra.
         queue.enqueue(self.data_dir, "repository_scan", {"source_id": source_id, "allow_osv_upload": allow_osv_upload, "context": context,
                                                          "tokens": vault.seal(tokens, "job-tokens") if tokens else None,
-                                                         "installation_id": installation_id}, run_id=run_id)
+                                                         "installation_id": installation_id, "uid": uid,
+                                                         "branch": branch, "commit": commit}, run_id=run_id)
         log.info("escaneo encolado", extra={"run_id": run_id, "path": source_id})
         return {"id": run_id, "status": "queued"}
 
-    def enqueue_pr_review(self, *, source_id: str, pull: dict, installation_id: int, requested_by: str, uid: str | None = None) -> dict:
+    def enqueue_pr_review(self, *, source_id: str, pull: dict, installation_id: int, requested_by: str, uid: str | None = None,
+                          default_branch: str | None = None) -> dict:
         """Revisión del commit de cabeza de un PR. Se marca como revisado al encolar para no duplicar."""
         from tamandua.modules.pullrequests import watch as pr_watch
         run_id = uuid.uuid4().hex
@@ -147,7 +156,8 @@ class ScanJobs:
                   "progress": [_event("info", msg("runs.progress.queued_pr", number=pull["number"], sha=pull["head_sha"][:7]))]}
         self._save(record)
         pr_watch.mark(self.data_dir, uid or source_id, pull["number"], pull["head_sha"], run_id)
-        queue.enqueue(self.data_dir, "pr_review", {"source_id": source_id, "pull": pull, "installation_id": installation_id}, run_id=run_id)
+        queue.enqueue(self.data_dir, "pr_review", {"source_id": source_id, "pull": pull, "installation_id": installation_id,
+                                                   "default_branch": default_branch}, run_id=run_id)
         log.info("revisión de PR encolada", extra={"run_id": run_id, "path": f"{source_id}#{pull['number']}"})
         return {"id": run_id, "status": "queued"}
 
@@ -244,12 +254,18 @@ class ScanJobs:
             self._save(record)
             log.info(text(message, "en"), extra={"run_id": run_id, "step": level})
 
-        progress("info", msg("runs.progress.downloading_snapshot"))
         work = self.data_dir / "work"
         work.mkdir(parents=True, exist_ok=True)
         try:
+            branch, commit = self._revision(job, record)
+            if branch and commit:
+                record["source"] = {**(record.get("source") or {}), "branch": branch, "commit": commit}
+                progress("info", msg("runs.progress.branch_commit", branch=branch, sha=commit[:7]))
+            progress("info", msg("runs.progress.downloading_snapshot"))
             with TemporaryDirectory(prefix="snapshot-", dir=work) as temporary:
-                root, source = snapshot_source(job["source_id"], Path(temporary), tokens, job["installation_id"], progress=progress)
+                root, source = snapshot_source(job["source_id"], Path(temporary), tokens, job["installation_id"], ref=commit, progress=progress)
+                if branch and commit:
+                    source = {**source, "branch": branch, "commit": commit}
                 snapshot = source.get("snapshot") or {}
                 skipped = snapshot.get("skipped_not_analyzable")
                 progress("ok", msg("runs.progress.snapshot_ready_skipped", count=source.get("files", 0), skipped=skipped) if skipped
@@ -265,7 +281,7 @@ class ScanJobs:
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
             log.info("escaneo terminado", extra={"run_id": run_id, "status": final["status"]})
-        except SourceError as exc:
+        except (SourceError, GitHubAppError) as exc:
             self._fail(record, msg("runs.failure.source", reason=_reason(exc)))
         except Exception as exc:  # noqa: BLE001
             log.error("escaneo fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
@@ -301,11 +317,37 @@ class ScanJobs:
             self._fail(record, msg("runs.failure.image_internal"))
             del exc
 
-    def _baseline(self, source_id: str, uid: str | None = None) -> dict | None:
-        """Último escaneo completo del repositorio: lo que ya estaba antes del PR."""
+    def _revision(self, job: dict, record: dict) -> tuple[str | None, str | None]:
+        """Branch and commit a GitHub App scan reads: the pinned ones, else the repository's scan branch, else its
+        default branch, at its latest commit. (None, None) outside the GitHub App: the provider serves its default."""
+        from tamandua.modules.integrations.github import branch_head, installation_repository
+        source_id, installation = job["source_id"], job.get("installation_id")
+        if not source_id.startswith("github:") or installation is None:
+            return None, None
+        uid = job.get("uid") or (record.get("source") or {}).get("uid")
+        branch = job.get("branch") or (scan_branch(self.data_dir, uid) if uid else None)
+        if branch and job.get("commit"):
+            return branch, job["commit"]
+        if branch:
+            return branch, branch_head(installation, source_id.removeprefix("github:"), branch)
+        # Default branch: if GitHub can't tell which one or its head right now, the tarball still serves it unpinned.
+        try:
+            branch = (installation_repository(installation, source_id) or {}).get("branch")
+            return (branch, branch_head(installation, source_id.removeprefix("github:"), branch)) if branch else (None, None)
+        except GitHubAppError:
+            return None, None
+
+    def _baseline(self, source_id: str, uid: str | None = None, *, branch: str | None = None,
+                  default_branch: str | None = None) -> dict | None:
+        """Latest full scan of the PR's base branch: what was already there before the PR.
+
+        Scans that don't record their branch read the default branch."""
         for row in list_runs(self.data_dir):
             if (row["type"] == "repository_scan" and row["status"] in ("completed", "incomplete")
                     and asset_key(row) in {source_id, uid}):
+                scanned = (row.get("source") or {}).get("branch") or default_branch
+                if branch and scanned and scanned != branch:
+                    continue
                 try:
                     return load_run(self.data_dir, row["id"])
                 except (ValueError, OSError):
@@ -343,7 +385,15 @@ class ScanJobs:
             scan = apply_to_record(self.data_dir, scan, asset_key(record))
             if (scan.get("excluded") or {}).get("findings"):
                 progress("info", msg("runs.progress.pr_excluded", count=scan["excluded"]["findings"]))
-            baseline = self._baseline(source_id, (record.get("source") or {}).get("uid"))
+            default_branch = job.get("default_branch")
+            if default_branch is None:
+                from tamandua.modules.integrations.github import installation_repository
+                try:
+                    default_branch = (installation_repository(installation, source_id) or {}).get("branch")
+                except GitHubAppError:
+                    default_branch = None
+            baseline = self._baseline(source_id, (record.get("source") or {}).get("uid"), branch=pull.get("base_ref"),
+                                      default_branch=default_branch)
             prints = {item["fingerprint"] for item in baseline["findings"]} if baseline else None
             outcome = pr_review.classify(scan["findings"], changed, prints)
             outcome["verdict"] = pr_review.verdict(outcome["introduced"], config["gate"])

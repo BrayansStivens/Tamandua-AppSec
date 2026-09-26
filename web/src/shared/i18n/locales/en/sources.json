@@ -76,12 +76,25 @@
       "repository": "Repository",
       "origin": "Source",
       "last_scan": "Last scan",
-      "action": "Action"
+      "action": "Action",
+      "branch": "Branch"
     },
     "loading": "Loading repositories",
     "not_scanned": "Not scanned",
     "scan": "Scan",
-    "no_match": "No repositories match."
+    "no_match": "No repositories match.",
+    "branch": {
+      "default": "{{branch}} · default",
+      "default_unknown": "Default branch",
+      "edit": "Change the branch scanned in {{name}}",
+      "input_label": "Branch to scan in {{name}}",
+      "placeholder": "e.g. develop",
+      "reset": "Use the default branch",
+      "help": "Every scan of this repository reads this branch: manual, batch and re-verification. Leave it empty to use {{branch}}, the default branch.",
+      "help_unknown": "Every scan of this repository reads this branch: manual, batch and re-verification. Leave it empty to use the default branch.",
+      "invalid": "That isn't a valid branch name. Use letters, digits and . _ / -, without spaces or \"..\".",
+      "saving": "Saving the branch…"
+    }
   },
   "search": {
     "label": "Search for a repository",

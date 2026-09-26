@@ -179,7 +179,7 @@ def install_url() -> str:
     return f"{WEB}/apps/{settings['slug']}/installations/new"
 
 
-def _get(url: str, token: str, *, jwt: bool = False, forbidden: dict | None = None) -> dict | list:
+def _get(url: str, token: str, *, jwt: bool = False, forbidden: dict | None = None, missing: dict | None = None) -> dict | list:
     request = Request(url, headers={
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}",
         "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
@@ -187,6 +187,8 @@ def _get(url: str, token: str, *, jwt: bool = False, forbidden: dict | None = No
         with build_opener(_NoRedirect).open(request, timeout=15) as response:
             return json.loads(response.read(2_000_000))
     except HTTPError as exc:
+        if missing and exc.code == 404:
+            raise GitHubAppError(missing) from exc
         if forbidden and exc.code in (403, 404):
             raise GitHubAppError(forbidden) from exc
         raise GitHubAppError(msg("integrations.github.rejected_app", code=exc.code) if jwt
@@ -675,12 +677,31 @@ def open_pull_requests(installation_id: int, repository: str) -> list[dict]:
     return [_pull(item) for item in rows if isinstance(item, dict)]
 
 
+BRANCH_PATTERN = re.compile(r"[A-Za-z0-9._/-]{1,200}")
+
+
+def valid_branch(branch) -> bool:
+    """Branch names we accept anywhere: letters, digits and `._/-`, never a path trick or an option."""
+    return (isinstance(branch, str) and BRANCH_PATTERN.fullmatch(branch) is not None and not branch.startswith(("-", "/"))
+            and ".." not in branch and "//" not in branch)
+
+
+class BranchNotFound(GitHubAppError):
+    """The branch doesn't exist in the repository (GitHub answered 404)."""
+
+
 def branch_head(installation_id: int, repository: str, branch: str) -> str:
-    """Último commit de una rama (la predeterminada, para saber si hay cambios que reanalizar)."""
-    from urllib.parse import quote
-    if not isinstance(branch, str) or not branch or len(branch) > 255 or ".." in branch:
+    """Latest commit of a branch."""
+    if not valid_branch(branch):
         raise GitHubAppError(msg("integrations.github.invalid_branch"))
-    payload = _get(f"{API}/repos/{_repo(repository)}/branches/{quote(branch, safe='')}", installation_token(installation_id))
+    missing = msg("integrations.github.branch_not_found", branch=branch)
+    try:
+        payload = _get(f"{API}/repos/{_repo(repository)}/branches/{quote(branch, safe='')}", installation_token(installation_id),
+                       missing=missing)
+    except GitHubAppError as exc:
+        if exc.message == missing:
+            raise BranchNotFound(missing) from exc
+        raise
     sha = ((payload.get("commit") or {}).get("sha") if isinstance(payload, dict) else None)
     if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise GitHubAppError(msg("integrations.github.no_branch_head"))
@@ -787,7 +808,7 @@ def repository_tree(installation_id: int, repository: str, branch: str) -> list[
     """Ficheros del repositorio (ruta, sha, tamaño) sin descargarlos. GitHub corta en ~100 000 entradas."""
     token = installation_token(installation_id)
     repository = _repo(repository)
-    if not isinstance(branch, str) or not re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", branch) or ".." in branch:
+    if not valid_branch(branch):
         raise GitHubAppError(msg("integrations.github.invalid_branch"))
     tree = _get(f"{API}/repos/{repository}/git/trees/{quote(branch, safe='')}?recursive=1", token)
     entries = tree.get("tree") if isinstance(tree, dict) else None

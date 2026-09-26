@@ -69,7 +69,9 @@
       "failed": "The connection with GitHub failed",
       "available": "Installation available",
       "available_detail": "Go back to the panel, click \"Find installations\" and choose the account you want to connect."
-    }
+    },
+    "branch_not_found": "Branch {{branch}} doesn't exist in this repository",
+    "invalid_branch_name": "\"{{branch}}\" isn't a valid branch name: use letters, digits and . _ / - (up to 200 characters)"
   },
   "jira": {
     "invalid_site": "Invalid Jira site",
@@ -147,7 +149,7 @@
       "advisory_watch": "advisories published after the last analysis",
       "image_scan": "image analysis",
       "full_scan": "full repository analysis",
-      "branch": "automatic re-analysis after a change on the main branch"
+      "branch": "automatic re-analysis after a change on a watched branch"
     },
     "findings_title_one": "1 new finding in {{asset}}",
     "findings_title_other": "{{count}} new findings in {{asset}}",

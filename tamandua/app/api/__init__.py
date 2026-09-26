@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from tamandua.app.api import compliance, findings, intel, reporting, routing, system
+from tamandua.app.api import compliance, findings, intel, pullrequests, reporting, repositories, routing, scanning, system
 from tamandua.app.api.deps import ApiError
 from tamandua.app.api.routes import auth, cra, prs, runs, sources, threats  # noqa: F401 — registran sus rutas
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
@@ -26,7 +26,7 @@ from tamandua.shared.i18n import localize, msg, negotiate
 from tamandua.shared.vault import VaultError
 from tamandua.version import VERSION
 
-ROUTERS = (system, reporting, intel, findings, compliance)
+ROUTERS = (system, reporting, intel, findings, compliance, pullrequests, repositories, scanning)
 
 
 def _security_headers(response, port: int) -> None:
@@ -39,6 +39,23 @@ def _security_headers(response, port: int) -> None:
     headers.setdefault("permissions-policy", "camera=(), microphone=(), geolocation=(), payment=()")
     if public_url(port).startswith("https://"):
         headers.setdefault("strict-transport-security", "max-age=31536000; includeSubDomains")
+
+
+# FastAPI reads a typed route's body before its guard runs: cap it here, by the declared length, before anything
+# is read (the server never reads more than Content-Length). Each route then applies its own, smaller limit.
+MAX_BODY = 1_000_000
+
+
+def _body_problem(request: Request) -> int | None:
+    if request.method in ("GET", "HEAD", "OPTIONS"):
+        return None
+    declared = request.headers.get("content-length")
+    if declared is None:
+        return 411 if request.headers.get("transfer-encoding") else None
+    try:
+        return 413 if int(declared) > MAX_BODY else None
+    except ValueError:
+        return 400
 
 
 def _error(request: Request, message, **extra) -> dict:
@@ -60,6 +77,8 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
         started = time.time()
         if not host_allowed(port, request.headers.get("host")):
             response = JSONResponse(_error(request, msg("api.host_not_allowed")), status_code=403)
+        elif (oversized := _body_problem(request)) is not None:
+            response = JSONResponse(_error(request, msg("api.invalid_request")), status_code=oversized)
         else:
             response = await call_next(request)
         _security_headers(response, port)
