@@ -2,23 +2,27 @@
 and who may change them."""
 
 import json
+import re
 import subprocess
 import tempfile
 import tomllib
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
+from tamandua.app import wiring
 from tamandua.modules.identity.auth import Users
 from tamandua.modules.scanning import engines
 from tamandua.modules.runs.store import save_repository_scan
 from tamandua.modules.scanning import secret_rules as sr
-from tamandua.modules.sources import assets
+from tamandua.modules.runs import assets
 from tamandua.shared import documents
 from tamandua.shared.i18n import text
 from test_auth import ORIGIN, PASSWORD, HttpCase
 from test_dashboard import _scan
+
+wiring.configure()  # like every Tamandua process: domain events and injected readers
 
 ADMIN = {"username": "operadora", "role": "admin"}
 RULE = {"id": "acme-token", "description": "ACME internal token", "regex": r"ACME-TOKEN-[0-9a-f]{32}",
@@ -547,3 +551,207 @@ class AssetSecretApiTests(HttpCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _Engines:
+    """Fake Gitleaks and Trivy that honour the generated settings like the real engines: an allowlisted or disabled
+    match is dropped without a trace. `secrets`: (rule, path, line, value) in the code."""
+
+    def __init__(self, secrets, *, fail_reference=False):
+        self.secrets, self.fail_reference, self.calls = list(secrets), fail_reference, []
+
+    def __call__(self, key, arguments, snapshot, *, mounts=None, network=False, **kwargs):
+        mounted = _mounts(mounts or [])
+        folder = Path(mounted["/cfg"][0]) if "/cfg" in mounted else None
+        if key == "gitleaks":
+            config = tomllib.loads((folder / "gitleaks.toml").read_text()) if folder else {}
+            allow = (config.get("allowlists") or [{}])[0]
+            paths = [pattern.removeprefix("^/src/") for pattern in allow.get("paths", [])]
+            regexes, stopwords = allow.get("regexes", []), allow.get("stopwords", [])
+            disabled = set((config.get("extend") or {}).get("disabledRules") or [])
+        else:
+            config = json.loads((folder / "trivy-secret.yaml").read_text()) if folder else {}
+            allow = config.get("allow-rules") or []
+            paths = [rule["path"].removeprefix("^") for rule in allow if "path" in rule]
+            regexes, stopwords = [rule["regex"] for rule in allow if "regex" in rule], []
+            disabled = set(config.get("disable-rules") or [])
+        custom = {rule["id"] for rule in config.get("rules") or []}
+        filtered = bool(paths or regexes or stopwords or disabled)
+        self.calls.append({"key": key, "arguments": arguments, "config": config, "network": network, "filtered": filtered})
+        if self.fail_reference and not filtered:
+            return subprocess.CompletedProcess(arguments, 2, "", "boom")
+        seen = [(rule, path, line) for rule, path, line, value in self.secrets
+                if (not rule.startswith("tamandua-") or rule in custom) and rule not in disabled
+                and not any(re.match(pattern, path) for pattern in paths)
+                and not any(re.search(pattern, value) for pattern in regexes)
+                and not any(word in value.lower() for word in stopwords)]
+        if key == "gitleaks":
+            (Path(mounted["/out"][0]) / "report.json").write_text(json.dumps(
+                [{"RuleID": rule, "File": f"/src/{path}", "StartLine": line, "Entropy": 4.2} for rule, path, line in seen]))
+            return subprocess.CompletedProcess(arguments, 0, "", "")
+        if "secret" not in arguments[arguments.index("--scanners") + 1].split(","):
+            seen = []
+        return subprocess.CompletedProcess(arguments, 0, json.dumps({"Results": [
+            {"Target": path, "Class": "secret", "Secrets": [{"RuleID": rule, "StartLine": line, "Title": rule}]}
+            for rule, path, line in seen]}), "")
+
+
+class WithheldSecretsTests(unittest.TestCase):
+    """An allowlisted secret or one matched only by a disabled rule is silenced, not fixed: it is recorded as excluded."""
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.data_dir = Path(self.folder.name)
+        self.snapshot = self.data_dir / "snapshot"
+        self.snapshot.mkdir()
+        docker = patch.dict(engines._docker_state, {"ok": True})
+        docker.start()
+        self.addCleanup(docker.stop)
+        self.clock = datetime.now(timezone.utc)
+
+    def gitleaks(self, secrets, applied, **options):
+        fake = _Engines(secrets, **options)
+        with patch.object(engines, "_run", side_effect=fake):
+            return engines.run_gitleaks(self.snapshot, applied), fake.calls
+
+    def test_no_second_run_without_an_allowlist_or_disabled_rules(self):
+        secrets = [("github-pat", "app/a.py", 1, "ghp_x"), ("tamandua-acme-token", "app/b.py", 2, "ACME")]
+        for applied in (None, sr.normalize(settings(rules=[RULE]))):
+            result, calls = self.gitleaks(secrets, applied)
+            self.assertEqual(len(calls), 1)
+            self.assertNotIn("withheld", result)
+        fake = _Engines(secrets)
+        with patch.object(engines, "_run", side_effect=fake):
+            result = engines.run_trivy(self.snapshot, self.data_dir / "cache", {}, sr.normalize(settings(rules=[RULE])))
+        self.assertEqual(len(fake.calls), 1)
+        self.assertNotIn("withheld", result)
+
+    def test_allowlisted_secrets_are_withheld_with_the_reason_and_stable_fingerprints(self):
+        applied = sr.normalize(settings(rules=[RULE], allowlist={"paths": ["fixtures/"], "regexes": ["EXAMPLE-[0-9]+"], "stopwords": []}))
+        secrets = [("github-pat", "fixtures/key.py", 1, "ghp_fixture"), ("generic-api-key", "app/config.py", 4, "EXAMPLE-123"),
+                   ("tamandua-acme-token", "fixtures/acme.py", 2, "ACME-TOKEN-1"), ("github-pat", "app/real.py", 9, "ghp_real")]
+        result, calls = self.gitleaks(secrets, applied)
+        self.assertEqual([call["filtered"] for call in calls], [True, False])
+        reference = calls[1]
+        self.assertIn("--redact", reference["arguments"])
+        self.assertEqual([rule["id"] for rule in reference["config"]["rules"]], ["tamandua-acme-token"])  # custom rules still apply
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual([item["path"] for item in result["findings"]], ["app/real.py"])
+        withheld = {item["path"]: item for item in result["withheld"]}
+        self.assertEqual(set(withheld), {"fixtures/key.py", "app/config.py", "fixtures/acme.py"})
+        self.assertEqual(withheld["fixtures/key.py"]["fingerprint"], engines._stable("secrets", "github-pat", "fixtures/key.py", "1"))
+        self.assertEqual(withheld["fixtures/acme.py"]["fingerprint"], engines._stable("secrets", "tamandua-acme-token", "fixtures/acme.py", "2"))
+        self.assertEqual(withheld["fixtures/acme.py"]["title"], "ACME internal token")
+        reason = withheld["fixtures/key.py"]["excluded_reason"]
+        self.assertEqual((reason["$t"], reason["params"]["path"]), ("scanning.secret_rules.withheld.path", "fixtures/**"))
+        self.assertEqual(withheld["app/config.py"]["excluded_reason"]["$t"], "scanning.secret_rules.withheld.entry")
+        self.assertIn("fixtures/**", text(reason, "en"))
+        self.assertIn("not fixed", text(reason, "en"))
+        self.assertIn("no remediado", text(reason, "es"))
+        # Same code, same settings: same fingerprints.
+        again, _ = self.gitleaks(secrets, applied)
+        self.assertEqual([item["fingerprint"] for item in again["withheld"]], [item["fingerprint"] for item in result["withheld"]])
+
+    def test_disabled_rules_are_withheld_too_in_both_engines(self):
+        applied = sr.normalize(settings(disabled_rules=["jwt"]))
+        secrets = [("jwt", "app/token.py", 3, "eyJ"), ("jwt-token", "app/token.py", 3, "eyJ")]
+        result, calls = self.gitleaks(secrets[:1], applied)
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("--config", calls[1]["arguments"])  # only the engine defaults: no config at all
+        self.assertEqual(result["findings"], [])
+        reason = result["withheld"][0]["excluded_reason"]
+        self.assertEqual((reason["$t"], reason["params"]["rule"]), ("scanning.secret_rules.withheld.rule_disabled", "jwt"))
+        fake = _Engines(secrets[1:])
+        with patch.object(engines, "_run", side_effect=fake):
+            trivy = engines.run_trivy(self.snapshot, self.data_dir / "cache", {}, applied)
+        reference = fake.calls[1]
+        self.assertEqual(reference["arguments"][reference["arguments"].index("--scanners") + 1], "secret")
+        self.assertFalse(reference["network"])
+        self.assertNotIn("--secret-config", reference["arguments"])
+        self.assertEqual(trivy["findings"], [])
+        self.assertEqual(trivy["withheld"][0]["excluded_reason"]["params"]["rule"], "jwt")  # named as the user turned it off
+
+    def test_a_failed_reference_run_is_partial_never_silent(self):
+        applied = sr.normalize(settings(allowlist={"paths": ["fixtures/"]}))
+        result, _ = self.gitleaks([("github-pat", "fixtures/key.py", 1, "x")], applied, fail_reference=True)
+        self.assertEqual((result["status"], result["withheld"]), ("partial", None))
+        self.assertIn("incomplete", text(result["detail"], "en"))
+
+    def scan(self, secrets, **options):
+        from tamandua.modules.scanning import repository
+        fake = _Engines(secrets, **options)
+        with patch.object(engines, "_run", side_effect=fake), \
+                patch.object(repository, "docker_available", return_value=True), \
+                patch.object(repository, "run_opengrep", return_value=_tool("opengrep")), \
+                patch.object(repository, "run_osv_scanner", return_value=_tool("osv-scanner")), \
+                patch.object(repository, "run_checkov", return_value=_tool("checkov")), \
+                patch.object(repository, "run_zizmor", return_value=_tool("zizmor")), \
+                patch.object(repository, "host_mount_problem", return_value=None), \
+                patch.object(repository, "load_feeds", return_value={"kev": {}, "epss": {}}):
+            scan = repository.scan_repository(self.snapshot, {"id": "github:org/app", "uid": KEY, "name": "org/app", "provider": "github"},
+                                              data_dir=self.data_dir)
+        self.clock += timedelta(hours=1)
+        return save_repository_scan(self.data_dir, scan, created_at=self.clock.isoformat()), fake.calls
+
+    def test_the_registry_shows_an_allowlisted_secret_as_excluded_never_fixed(self):
+        from tamandua.modules.findings import registry
+        leak, real = ("github-pat", "fixtures/key.py", 1, "ghp_fixture"), ("github-pat", "app/real.py", 9, "ghp_real")
+        digest = engines._stable("secrets", "github-pat", "fixtures/key.py", "1")
+
+        def entry():
+            return registry.load(self.data_dir, KEY)["findings"][digest]
+        record, calls = self.scan([leak, real])
+        self.assertEqual(len(calls), 2)  # one Gitleaks, one Trivy: nothing to diff
+        self.assertEqual(entry()["status"], "open")
+
+        sr.save(self.data_dir, settings(allowlist={"paths": ["fixtures/"]}), reason="Test fixtures", user=ADMIN, asset=KEY)
+        record, calls = self.scan([leak, real])
+        self.assertEqual(len(calls), 4)
+        self.assertEqual(record["status"], "completed")
+        self.assertEqual([item["path"] for item in record["findings"]], ["app/real.py"])
+        self.assertEqual([item["fingerprint"] for item in record["excluded_findings"]], [digest])  # both engines, one finding
+        self.assertTrue(any(item["$t"] == "scanning.secret_rules.withheld.limitation" for item in record["limitations"]))
+        state = entry()
+        self.assertEqual(state["status"], "excluded")
+        self.assertNotIn("fixed", state)
+        self.assertNotIn("excluded_reason", state["finding"])
+        reason = text(state["excluded"]["reason"], "en")
+        self.assertIn("fixtures/**", reason)
+        self.assertIn("this repository's own entries", reason)
+        lifecycle = registry.summarize(self.data_dir, KEY)
+        self.assertEqual((lifecycle["open"], lifecycle["excluded"], lifecycle["fixed"]), (1, 1, 0))
+        view = registry.view(self.data_dir, KEY, status="excluded")
+        self.assertEqual(view["findings"][0]["lifecycle"]["excluded"]["reason"]["$t"], "scanning.secret_rules.withheld.path")
+        # Saving the excluded paths doesn't reopen what the secret settings withhold.
+        self.assertEqual(registry.apply_exclusions(self.data_dir, KEY, [], when=self.clock.isoformat()), {"excluded": 0, "reopened": 0})
+
+        # Without the allowlist it's open again.
+        sr.save(self.data_dir, settings(), reason="Fixtures cleaned up", user=ADMIN, asset=KEY)
+        self.scan([leak, real])
+        self.assertEqual(entry()["status"], "open")
+        self.assertNotIn("excluded", entry())
+
+        # Allowlisted again, then a failed unfiltered run: the scan is incomplete and nothing is fixed.
+        sr.save(self.data_dir, settings(allowlist={"paths": ["fixtures/"]}), reason="Test fixtures", user=ADMIN, asset=KEY)
+        record, _ = self.scan([real], fail_reference=True)
+        self.assertEqual(record["status"], "incomplete")
+        self.assertEqual(entry()["status"], "open")
+        self.scan([leak, real])
+        self.assertEqual(entry()["status"], "excluded")
+        # Removed from the code: not even the unfiltered run sees it, so it's fixed.
+        self.scan([real])
+        self.assertEqual(entry()["status"], "fixed")
+        self.assertNotIn("excluded", entry())
+
+    def test_origins_name_where_the_filter_comes_from(self):
+        sr.save(self.data_dir, settings(disabled_rules=["jwt"], allowlist={"stopwords": ["example"]}), reason="Organization defaults", user=ADMIN)
+        sr.save(self.data_dir, settings(disabled_rules=["jwt"], allowlist={"paths": ["samples/"]}), reason="Samples", user=ADMIN, asset=KEY)
+        applied = sr.for_scan(self.data_dir, KEY)
+        self.assertEqual(applied["origins"], {"paths": {"samples/**": "repository"}, "disabled_rules": {"jwt": "defaults"}, "entries": "defaults"})
+
+        def reason(rule, path):
+            return sr.withheld({"rule_id": rule, "path": path}, applied)["excluded_reason"]
+        self.assertEqual(reason("jwt", "samples/a.py")["params"]["scope"]["$t"], "scanning.secret_rules.withheld.scopes.defaults")
+        self.assertEqual(reason("github-pat", "samples/a.py")["params"]["scope"]["$t"], "scanning.secret_rules.withheld.scopes.repository")
+        self.assertEqual(reason("github-pat", "app/a.py")["$t"], "scanning.secret_rules.withheld.entry")

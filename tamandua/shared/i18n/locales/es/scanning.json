@@ -494,6 +494,19 @@
       "unknown_rule": "{{rule}} no es una regla integrada de Gitleaks.",
       "reason_required": "Explica por qué cambias la configuración (al menos 5 caracteres)."
     },
+    "withheld": {
+      "path": "Permitido por la configuración de detección de secretos ({{scope}}): la ruta {{path}} está permitida. El secreto sigue ahí: queda excluido, no remediado.",
+      "entry": "Permitido por la configuración de detección de secretos ({{scope}}): coincide con un secreto permitido o una palabra de exclusión. El secreto sigue ahí: queda excluido, no remediado.",
+      "rule_disabled": "La regla {{rule}} está desactivada en la configuración de detección de secretos ({{scope}}). El secreto sigue ahí: queda excluido, no remediado.",
+      "unknown": "No se pudo comprobar qué secretos retienen la lista de permitidos y las reglas desactivadas, así que el análisis queda incompleto y ningún secreto se marca como remediado.",
+      "limitation_one": "La configuración de detección de secretos retiene {{count}} secreto (lista de permitidos o una regla desactivada). Sigue en el código: lo puedes ver en Hallazgos → Excluidos.",
+      "limitation_other": "La configuración de detección de secretos retiene {{count}} secretos (lista de permitidos o reglas desactivadas). Siguen en el código: los puedes ver en Hallazgos → Excluidos.",
+      "scopes": {
+        "defaults": "valores predeterminados de la organización",
+        "repository": "entradas propias de este repositorio",
+        "either": "valores predeterminados de la organización o entradas propias de este repositorio"
+      }
+    },
     "constructs": {
       "lookaround": "una aserción de anticipación o retrospección (lookahead/lookbehind)",
       "backreference": "una referencia hacia atrás",

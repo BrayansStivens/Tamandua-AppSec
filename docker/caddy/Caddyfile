@@ -1,0 +1,48 @@
+# Caddy in front of Tamandua (compose.prod.yaml). Automatic HTTPS for TAMANDUA_DOMAIN: certificate from
+# Let's Encrypt (ZeroSSL as fallback), renewed on its own, and HTTP redirected to HTTPS.
+# The app sets the security headers (CSP, HSTS, nosniff, frame, referrer): none are repeated here.
+{
+	servers {
+		timeouts {
+			read_header 10s
+			# Request bodies are small (the app accepts at most 1 MB).
+			read_body 30s
+			# Long enough for the largest PDF or export.
+			write 5m
+			idle 2m
+		}
+	}
+}
+
+{$TAMANDUA_DOMAIN} {
+	# Above the app's own limit (1 MB), which answers with a precise error; this only stops abuse earlier.
+	request_body {
+		max_size 2MB
+	}
+
+	# Only the panel's static files: API responses are not compressed (they can carry secrets next to
+	# user-controlled text, which is what compression side channels need).
+	@assets path /assets/*
+	encode @assets zstd gzip
+
+	reverse_proxy api:8766 {
+		transport http {
+			dial_timeout 5s
+			response_header_timeout 5m
+			# Below the app's keep-alive (5 s): Caddy never reuses a connection the app is about to close.
+			keepalive 4s
+		}
+	}
+
+	# Don't advertise the proxy software.
+	header {
+		-Server
+		-Via
+	}
+
+	# Access log to stdout (rotated by Docker). Caddy redacts Cookie and Authorization.
+	log {
+		output stdout
+		format json
+	}
+}

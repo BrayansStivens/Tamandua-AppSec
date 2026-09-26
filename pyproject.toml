@@ -24,6 +24,22 @@ layers = [
 ]
 
 [[tool.importlinter.contracts]]
+name = "Contexts: each one imports only the contexts below it; siblings joined by | never import each other"
+type = "layers"
+containers = ["tamandua.modules"]
+exhaustive = true
+layers = [
+    "compliance | threats",  # consumers
+    "reporting",
+    "runs",                  # orchestration
+    "pullrequests",
+    "scanning | findings",   # domain
+    "sources",               # base
+    "integrations",
+    "intel | identity",
+]
+
+[[tool.importlinter.contracts]]
 name = "El negocio no depende del framework web: FastAPI y Starlette solo en la composición"
 type = "forbidden"
 source_modules = ["tamandua.modules", "tamandua.shared"]

@@ -7,6 +7,7 @@
   "internal_error": "Internal server error",
   "csrf_denied": "Origin or action not allowed",
   "login_required": "Sign in to continue",
+  "metrics_token_required": "Send the metrics token as a bearer token (Authorization: Bearer …)",
   "totp_required": "Turn on two-factor authentication to continue",
   "admin_only": "Only an administrator can do this",
   "save_failed": "Couldn't save the change",

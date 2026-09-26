@@ -17,7 +17,6 @@
 - **Panel.** By feature in `web/src/{app,pages,features,shared}` (a layer never imports from the layers above;
   `tests/test_web_layers.py`). Server data with TanStack Query (`shared/api/queries.ts`), no loose `setInterval` or
   `fetch` for new code.
-- **API.** New routes in FastAPI (`tamandua/app/api/<context>.py`) with Pydantic schemas and `guard(Policy(...))`; table
-  routes (`app/api/routes/*.py`, `@route`) don't grow: when touching one deeply, make it typed. After changing a route:
+- **API.** New routes in FastAPI (`tamandua/app/api/<context>.py`) with Pydantic schemas and `guard(Policy(...))`. After changing a route:
   `make openapi` (the panel uses the generated types in `web/src/shared/api/`; CI checks they are current).
 - **Checks.** `make test` and `make arch` (backend) and `cd web && npx tsc -b && npx oxlint src` (panel).

@@ -27,6 +27,7 @@ from tamandua.modules.sources.repositories import SourceError, snapshot_source
 from tamandua.modules.sources.assets import asset_key, scan_branch
 from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.runs import queue
+from tamandua.modules.runs import registry as run_registry
 from tamandua.modules.runs.store import list_runs, load_run, save_record, save_repository_scan
 from tamandua.shared import vault
 from tamandua.shared.i18n import msg, text
@@ -81,7 +82,7 @@ class ScanJobs:
         batches.release_taken(self.data_dir)
         # El registro de hallazgos se deriva de las ejecuciones: si está vacío y hay ejecuciones, se reconstruye.
         if findings_registry.is_empty(self.data_dir) and list_runs(self.data_dir):
-            findings_registry.rebuild(self.data_dir)
+            run_registry.rebuild(self.data_dir)
 
     def stop(self) -> None:
         self._stop.set()

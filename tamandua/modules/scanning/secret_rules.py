@@ -19,6 +19,7 @@ import re
 import unicodedata
 import warnings
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from tamandua.modules.scanning.secret_builtin_rules import GITLEAKS_DEFAULT_RULES, TRIVY_EQUIVALENTS
@@ -120,10 +121,23 @@ def for_scan(data_dir: Path | None, asset: str | None = None) -> dict | None:
     if data_dir is None:
         return None
     try:
-        settings = merged(get(data_dir), get(data_dir, asset) if asset else None)
+        defaults, own = get(data_dir), get(data_dir, asset) if asset else None
     except db.DatabaseNotConfigured:
         return None
-    return settings if configured(settings) else None
+    settings = merged(defaults, own)
+    return {**settings, "origins": _origins(defaults, own)} if configured(settings) else None
+
+
+def _origins(defaults: dict, own: dict | None) -> dict:
+    """Where each filter comes from, to name it when it withholds a secret. A filter in both applies as a default."""
+    own = own or empty()
+    entries = [scope for scope, source in (("defaults", defaults), ("repository", own))
+               if source["allowlist"]["regexes"] or source["allowlist"]["stopwords"]]
+    return {"paths": {path: "defaults" if path in defaults["allowlist"]["paths"] else "repository"
+                      for path in own["allowlist"]["paths"] + defaults["allowlist"]["paths"]},
+            "disabled_rules": {rule: "defaults" if rule in defaults["disabled_rules"] else "repository"
+                               for rule in own["disabled_rules"] + defaults["disabled_rules"]},
+            "entries": entries[0] if len(entries) == 1 else "either"}
 
 
 def forget(data_dir: Path, asset: str) -> None:
@@ -472,3 +486,42 @@ def trivy_secret_config(settings: dict) -> str:
     if disabled:
         config["disable-rules"] = disabled
     return json.dumps(config, ensure_ascii=False, indent=2) + "\n"
+
+
+# --- Withheld secrets ------------------------------------------------------------------
+# The engines drop what the allowlist or a disabled rule filters without a trace, so a secret that stops appearing
+# could have been removed or merely silenced. When the settings filter anything, the secret engines run once more
+# without the filters (same images, sandbox and --redact); what only that run sees was withheld by the settings and is
+# recorded as excluded, never as fixed. Only our own glob-derived regexes run here, never a user regex.
+
+def filters(settings: dict | None) -> bool:
+    return bool(settings) and bool(settings["disabled_rules"] or any(settings["allowlist"][name] for name in LISTS))
+
+
+def unfiltered(settings: dict) -> dict | None:
+    """The same detectors without allowlist or disabled rules; None when that is just the engine defaults."""
+    return {**empty(), "rules": list(settings["rules"])} if settings["rules"] else None
+
+
+@lru_cache(maxsize=256)
+def _allowed_path(pattern: str) -> re.Pattern:
+    return re.compile(_glob_body(pattern))
+
+
+def withheld(finding: dict, settings: dict) -> dict:
+    """A secret only the unfiltered run saw, as an excluded finding that says which setting withheld it."""
+    origins = settings.get("origins") or {}
+
+    def scope(value: str | None) -> dict:
+        return msg(f"scanning.secret_rules.withheld.scopes.{value or 'either'}")
+    rule, path = finding.get("rule_id"), str(finding.get("path") or "")
+    disabled = next((item for item in settings["disabled_rules"] if rule in (item, TRIVY_EQUIVALENTS.get(item))), None)
+    allowed = next((item for item in settings["allowlist"]["paths"] if _allowed_path(item).match(path)), None)
+    if disabled:
+        reason = msg("scanning.secret_rules.withheld.rule_disabled", rule=disabled,
+                     scope=scope((origins.get("disabled_rules") or {}).get(disabled)))
+    elif allowed:
+        reason = msg("scanning.secret_rules.withheld.path", path=allowed, scope=scope((origins.get("paths") or {}).get(allowed)))
+    else:
+        reason = msg("scanning.secret_rules.withheld.entry", scope=scope(origins.get("entries")))
+    return {**finding, "excluded_reason": reason}

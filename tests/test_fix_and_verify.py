@@ -97,7 +97,7 @@ class ReverifyTests(HttpCase):
 
     def test_reverify_rescans_once_and_reports_the_outcome(self):
         source = {"id": "github:org/api", "name": "org/api", "installation_id": 7, "uid": None}
-        with patch("tamandua.app.api.routes.runs.find_source", return_value=source), \
+        with patch("tamandua.app.api.findings.find_source", return_value=source), \
                 patch("tamandua.modules.runs.jobs.ScanJobs.enqueue_repository_scan", return_value={"id": "f" * 32, "status": "queued"}) as enqueue:
             status, body, _ = self.reverify("a" * 64)
         self.assertEqual((status, body["joined"], enqueue.call_args.kwargs["trigger"]), (202, False, {"kind": "reverify"}))

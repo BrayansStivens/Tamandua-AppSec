@@ -17,7 +17,7 @@ from urllib.parse import quote
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tamandua.modules.intel.advisory_watch import purl as build_purl
+from tamandua.modules.scanning.dependency_merge import purl as build_purl
 from tamandua.modules.reporting.design import coverage_gaps
 from tamandua.shared.i18n import default_locale, t
 
@@ -148,7 +148,7 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale
 def latest_scan(data_dir: Path, key: str) -> dict | None:
     """El último análisis completo de un activo: de él sale el SBOM del estado actual."""
     from tamandua.modules.sources.assets import asset_key
-    from tamandua.modules.runs.kinds import FULL_SCANS
+    from tamandua.modules.findings.kinds import FULL_SCANS
     from tamandua.modules.runs.store import list_runs, load_run
     for row in list_runs(data_dir):  # de más reciente a más antiguo
         if row["type"] in FULL_SCANS and row["status"] == "completed" and asset_key(row) == key:

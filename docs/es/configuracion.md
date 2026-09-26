@@ -27,6 +27,20 @@ Todas las variables son opcionales y se ponen en `.env` (copia de `.env.example`
 | `TAMANDUA_TLS_CERT` / `_KEY` | — | TLS sin proxy. |
 | `GITHUB_APP_ID` + `GITHUB_APP_SLUG` + `GITHUB_APP_PRIVATE_KEY_FILE` | — | Alternativa al formulario: montar la App como secreto del despliegue. Manda sobre el almacén. |
 | `TAMANDUA_HOST_CONFIG_DIR` | `./config` | Carpeta del host con los secretos cifrados. |
+| `TAMANDUA_FORWARDED_ALLOW_IPS` | vacío | Detrás de un proxy inverso que sea el único camino hasta la API: las direcciones del proxy cuyo `X-Forwarded-For` se cree (`*` = cualquiera). Sin ella, el límite de intentos de inicio de sesión y los logs ven la dirección del proxy para todo el mundo. `compose.prod.yaml` la pone para Caddy. |
+| `TAMANDUA_METRICS_TOKEN` | vacío (apagado) | Activa `/api/metrics` (Prometheus) para peticiones con `Authorization: Bearer <token>`. Mínimo 32 caracteres: `openssl rand -hex 32`. |
+
+**Servidor con dominio** ([despliegue-vps.md](despliegue-vps.md)). Las lee Compose, no la app; `make setup DOMAIN=… [PREBUILT=1]` las escribe.
+
+| Variable | Por defecto | Para qué |
+| --- | --- | --- |
+| `TAMANDUA_DOMAIN` | — | Dominio para el que Caddy pide el certificado (`compose.prod.yaml`). La URL pública y los orígenes permitidos pasan a ser `https://<dominio>`. |
+| `COMPOSE_FILE` | `compose.yaml` | Ficheros de Compose que usan todos los comandos, p. ej. `compose.yaml:compose.prod.yaml:compose.images.yaml`. |
+| `TAMANDUA_IMAGE` | — | Imagen publicada que se ejecuta en lugar de construirla (`compose.images.yaml`), p. ej. `ghcr.io/brayansstivens/tamandua`. |
+| `TAMANDUA_IMAGE_TAG` | la versión del código | Etiqueta de esa imagen; admite digest (`0.9@sha256:…`). |
+| `COMPOSE_PROFILES` | — | `backup` activa el servicio de copias programadas. |
+| `TAMANDUA_BACKUP_DIR` | `./backups` | Dónde escribe el servicio de copias. |
+| `TAMANDUA_BACKUP_INTERVAL_HOURS` / `_KEEP_DAYS` | `24` / `14` | Cada cuánto copia y cuántos días guarda sus propias copias. |
 
 **Concesión consciente:** para no instalar nada más que Docker, la app lanza los motores como contenedores hermanos por el socket de Docker, y eso equivale a root en el host. Si vas a abrir el panel a más gente, ponlo detrás de un socket-proxy o de un runner aparte.
 

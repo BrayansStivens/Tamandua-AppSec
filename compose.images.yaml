@@ -1,0 +1,32 @@
+# Run from the published images (built and signed by .github/workflows/release.yml) instead of building on the server.
+# An overlay on compose.yaml (usually with compose.prod.yaml too):
+#
+#   make setup DOMAIN=tamandua.example.com PREBUILT=1   # TAMANDUA_IMAGE=ghcr.io/brayansstivens/tamandua
+#
+# The tag is the version of the code you checked out (TAMANDUA_VERSION, from tamandua/version.py through make), so
+# the compose files, rules and images always match. To pin by digest, in .env: TAMANDUA_IMAGE_TAG=0.9@sha256:…
+# Check the signatures before the first start: make verify-images
+#
+# The Opengrep engine is published as <TAMANDUA_IMAGE>-opengrep. The worker starts it by its local name
+# (localhost/tamandua/opengrep:<version>), so the `opengrep` service gives the published image that name: a one-line build
+# with no steps of its own.
+
+# `build: !reset` has to sit in each service: inside a merged anchor Compose doesn't apply it.
+x-published: &published
+  image: "${TAMANDUA_IMAGE:?TAMANDUA_IMAGE is missing in .env (e.g. ghcr.io/brayansstivens/tamandua)}:${TAMANDUA_IMAGE_TAG:-${TAMANDUA_VERSION:-0.9}}"
+  pull_policy: missing
+
+services:
+  api:
+    <<: *published
+    build: !reset null
+
+  worker:
+    <<: *published
+    build: !reset null
+
+  opengrep:
+    build: !override
+      context: docker/engines/opengrep
+      dockerfile_inline: |
+        FROM ${TAMANDUA_IMAGE:?TAMANDUA_IMAGE is missing in .env}-opengrep:1.30.0

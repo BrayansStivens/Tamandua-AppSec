@@ -65,9 +65,28 @@ if [ -f .env ]; then
   uid=$(sed -n 's/^TAMANDUA_UID=//p' .env | tail -n1); gid=$(sed -n 's/^TAMANDUA_GID=//p' .env | tail -n1)
   if [ "${uid:-}" = "$(id -u)" ] && [ "${gid:-}" = "$(id -g)" ]; then pass "TAMANDUA_UID/GID match your user"; else note "TAMANDUA_UID/GID in .env ($uid/$gid) are not yours ($(id -u)/$(id -g))" "Fix them in .env, or delete .env and run 'make setup'."; fi
   port=$(sed -n 's/^TAMANDUA_HOST_PORT=//p' .env | tail -n1)
+  domain=$(sed -n 's/^TAMANDUA_DOMAIN=//p' .env | tail -n1)
 fi
 port=${port:-8766}
-if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx tamandua; then
+if [ -n "${domain:-}" ]; then
+  # Server mode (compose.prod.yaml): Caddy takes 80 and 443 and the API publishes no port.
+  if command -v getent >/dev/null 2>&1; then
+    address=$(getent ahosts "$domain" 2>/dev/null | awk 'NR==1 {print $1}')
+    if [ -n "$address" ]; then pass "$domain resolves to $address"; else bad "$domain does not resolve" "Create an A (and AAAA, if the server has IPv6) record pointing at this server's public IP."; fi
+  fi
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx tamandua-caddy; then
+    pass "Caddy is already running (80 and 443)"
+  else
+    for web in 80 443; do
+      if command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 "$web" 2>/dev/null; then
+        bad "port $web is in use by another program" "Caddy needs 80 and 443 for the certificate and HTTPS: stop that program (another web server?)."
+      else
+        pass "port $web free"
+      fi
+    done
+  fi
+  grep -q '^COMPOSE_FILE=.*compose.prod.yaml' .env || note "COMPOSE_FILE in .env doesn't include compose.prod.yaml" "Run 'make setup DOMAIN=$domain' so every command uses the HTTPS overlay."
+elif command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx tamandua; then
   pass "Tamandua is already running (port $port)"
 elif (command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 "$port" 2>/dev/null); then
   bad "port $port is in use by another program" "Change TAMANDUA_HOST_PORT, TAMANDUA_PUBLIC_URL and TAMANDUA_ALLOWED_ORIGINS in .env."

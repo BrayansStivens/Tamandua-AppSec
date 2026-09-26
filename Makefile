@@ -11,6 +11,14 @@ URL := $(if $(PUBLIC_URL),$(PUBLIC_URL),http://127.0.0.1:$(HOST_PORT))
 PYTHON ?= python3
 DIR ?=
 ARGS ?=
+# make setup DOMAIN=… [PREBUILT=1]: server mode (see scripts/init-env.sh). make restore FROM=backups/<date>.
+DOMAIN ?=
+PREBUILT ?=
+FROM ?=
+SERVICE ?= api
+# Who signs the published images (cosign keyless, GitHub OIDC): the repository whose release workflow built them.
+SIGNER ?= BrayansStivens/appsec-agent
+OPENGREP_VERSION := $(shell sed -n 's/^ARG OPENGREP_VERSION=//p' docker/engines/opengrep/Dockerfile)
 VENV := .venv
 export TAMANDUA_VERSION := $(VERSION)
 # Docker socket group on Linux and WSL with native Docker (on macOS, Docker Desktop uses 0).
@@ -30,29 +38,29 @@ export DOCKER_SOCKET_GID
 ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' tamandua/modules/scanning/engines.py
 
 .DEFAULT_GOAL := help
-.PHONY: arch openapi help doctor setup build up down restart status logs ps setup-code engines scan demo update backup shell cli \
-        clean purge dev-setup dev test lint web check
+.PHONY: arch openapi help doctor setup build up down restart status logs ps setup-code engines scan demo update backup restore \
+        verify-images shell cli clean purge dev-setup dev test lint web check
 
 ## —— Usage —————————————————————————————————————————————————————————————
 
 help: ## Show this help
 	@printf 'Tamandua %s · usage: make <target>\n\n' "$(VERSION)"
-	@awk 'BEGIN {FS = ":.*## "} /^## ——/ {sub(/^## /, ""); printf "\n\033[1m%s\033[0m\n", $$0} /^[a-z-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^## ——/ {sub(/^## /, ""); printf "\n\033[1m%s\033[0m\n", $$0} /^[a-z-]+:.*## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@printf '\nFirst time:  make up\n'
 
 doctor: ## Check requirements (Docker, Compose, disk, port, permissions)
 	@sh scripts/doctor.sh
 
-setup: ## Create .env with your UID/GID and the data/ and config/ folders
-	@sh scripts/init-env.sh
+setup: ## Create .env and the folders. On a server: make setup DOMAIN=tamandua.example.com [PREBUILT=1]
+	@DOMAIN="$(DOMAIN)" PREBUILT="$(PREBUILT)" sh scripts/init-env.sh
 
 build: setup ## Build the images (app and verified Opengrep engine)
 	$(COMPOSE) build
 
-up: setup ## Build if needed, pull missing engines, start and show the URL
+up: setup ## Build if needed (or pull the published images), start, pull missing engines and show the URL
 	$(COMPOSE) up --build -d
 	@printf 'Waiting for the panel to respond'
-	@i=0; until [ "$$(docker inspect -f '{{.State.Health.Status}}' tamandua 2>/dev/null)" = healthy ]; do \
+	@i=0; until [ "$$(docker inspect -f '{{.State.Health.Status}}' "$$($(COMPOSE) ps -q api)" 2>/dev/null)" = healthy ]; do \
 	  i=$$((i + 1)); if [ $$i -gt 60 ]; then echo; echo 'It did not start within 2 minutes: make logs'; exit 1; fi; printf '.'; sleep 2; done; echo
 	@$(MAKE) --no-print-directory engines || echo 'Warning: some engines are missing; the panel works, retry with make engines.'
 	@echo "Panel: $(URL)"
@@ -71,14 +79,11 @@ status: ## Status of the containers and the engines
 
 ps: status
 
-logs: ## Follow the app logs (Ctrl+C to exit)
-	$(COMPOSE) logs -f --tail 100 api
+logs: ## Follow the app logs (Ctrl+C to exit). Another service: make logs SERVICE=caddy
+	$(COMPOSE) logs -f --tail 100 $(SERVICE)
 
 setup-code: ## Show the code to create the first administrator
-	@code=$$($(COMPOSE) logs api 2>/dev/null | grep -oE '(^|[| ])[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){2} *$$' | tail -n1 | tr -d ' |'); \
-	if [ -n "$$code" ] && curl -fsS -H "Host: 127.0.0.1:$(HOST_PORT)" "http://127.0.0.1:$(HOST_PORT)/api/auth/session" 2>/dev/null | grep -q '"setup_required": true'; then \
-	  echo "Setup code: $$code  (create the administrator at $(URL))"; \
-	else echo "An administrator already exists: sign in with your user."; fi
+	@sh scripts/setup-code.sh "$(URL)"
 
 engines: ## Pull the missing engine images (Trivy, OSV-Scanner, Gitleaks, Grype, Checkov, zizmor), with progress
 	@images=$$($(ENGINE_IMAGES)); \
@@ -99,12 +104,28 @@ demo: ## Demo data: scans the vulnerable examples and imports a threat model (IM
 	@$(COMPOSE) run --rm -T -v "$(abspath fixtures)":/demo/fixtures:ro -v "$(abspath web/src/examples/threat-models)":/demo/models:ro \
 		worker python -m tamandua --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
 
-update: ## Update the code (git pull) and rebuild
-	git pull --ff-only
+update: ## Back up, update the code (git pull), pull or rebuild the images and restart (migrates on start)
+	@if git symbolic-ref -q HEAD >/dev/null; then git pull --ff-only; \
+	else echo "On $$(git describe --tags --always) (a fixed version): not pulling. Check out the version you want first."; fi
+	@sh scripts/backup.sh
+	$(COMPOSE) pull --ignore-buildable --policy always --quiet
 	$(MAKE) --no-print-directory up
 
-backup: ## Copy data/ and config/ to backups/<date>/ (FORCE=1 if scans are running)
+backup: ## Database, data/ and config/ to backups/<date>/ (FORCE=1 if scans are running)
 	@sh scripts/backup.sh
+
+restore: ## Restore a backup: make restore FROM=backups/<date> CONFIRM=restore (saves the current state first)
+	@CONFIRM="$(CONFIRM)" sh scripts/restore.sh "$(FROM)"
+
+verify-images: ## Check the cosign signatures of the published images (TAMANDUA_IMAGE in .env; needs cosign)
+	@image=$$(sed -n 's/^TAMANDUA_IMAGE=//p' .env 2>/dev/null | tail -n1); \
+	[ -n "$$image" ] || { echo 'There is no TAMANDUA_IMAGE in .env: this server builds its own images.'; exit 2; }; \
+	command -v cosign >/dev/null || { echo 'Install cosign first: https://docs.sigstore.dev/cosign/system_config/installation/'; exit 2; }; \
+	for ref in "$$image:$(VERSION)" "$$image-opengrep:$(OPENGREP_VERSION)"; do \
+	  cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+	    --certificate-identity-regexp '^https://github\.com/$(SIGNER)/\.github/workflows/release\.yml@refs/tags/v' "$$ref" >/dev/null \
+	    && echo "Signed by $(SIGNER): $$ref" || { echo "NOT verified: $$ref"; exit 1; }; \
+	done
 
 shell: ## Open a shell inside the container
 	$(COMPOSE) exec api sh

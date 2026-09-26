@@ -8,6 +8,7 @@ normaliza todo eso para reconocer el mismo aviso sobre el mismo paquete y la mis
 from __future__ import annotations
 
 import re
+from urllib.parse import quote
 
 from tamandua.modules.intel.advisories import fingerprint
 
@@ -42,6 +43,27 @@ def package_name(ecosystem: str, name: str) -> str:
     """PyPI no distingue `-`, `_` ni `.` (PEP 503); los demás, solo mayúsculas en la práctica."""
     value = (name or "").strip().lower()
     return re.sub(r"[-_.]+", "-", value) if family(ecosystem) == "pypi" else value
+
+
+# Package family → purl type (https://github.com/package-url/purl-spec).
+PURL_TYPE = {"npm": "npm", "pypi": "pypi", "go": "golang", "cargo": "cargo", "composer": "composer",
+             "rubygems": "gem", "maven": "maven", "nuget": "nuget", "pub": "pub", "hex": "hex"}
+
+
+def purl(dependency: dict) -> str | None:
+    kind = PURL_TYPE.get(family(dependency.get("ecosystem") or ""))
+    name, version = str(dependency.get("name") or ""), str(dependency.get("version") or "")
+    if not kind or not name or not version:
+        return None
+    if kind == "maven" and ":" in name:
+        group, artifact = name.split(":", 1)
+        path = f"{quote(group, safe='')}/{quote(artifact, safe='')}"
+    elif kind in ("npm", "composer", "golang") and "/" in name:
+        # npm con ámbito (@org/nombre), composer (vendor/nombre) y módulos de Go conservan sus segmentos.
+        path = "/".join(quote(part, safe="") for part in name.split("/"))
+    else:
+        path = quote(name, safe="")
+    return f"pkg:{kind}/{path}@{quote(version, safe='')}"
 
 
 def canonical_id(identifiers: set[str], fallback: str) -> str:

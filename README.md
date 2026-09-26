@@ -55,6 +55,7 @@ The panel follows your browser's language and has a language switch in the sideb
 | --- | --- |
 | [Quickstart](docs/quickstart.md) | From zero to your first verified fix, and what to set up next |
 | [Installation](docs/installation.md) | Requirements, first run, upgrades, backups, uninstalling |
+| [Deploy on a VPS](docs/deploy-vps.md) | Your own server with a domain: HTTPS, backups, upgrades, monitoring, Coolify and Dokploy |
 | [Connect GitHub](docs/github-app.md) | Create the GitHub App step by step and review PRs |
 | [Terminal and CI](docs/cli.md) | `scan`: check a folder or just what a change introduces, with SARIF output and exit codes for CI |
 | [Skills for coding assistants](skills/README.md) | Claude Code, Cursor or Codex fix what Tamandua finds and verify it, or wire it into your CI |
@@ -78,22 +79,16 @@ The panel follows your browser's language and has a language switch in the sideb
 
 To report a vulnerability: [SECURITY.md](SECURITY.md).
 
-## Use it from another machine (HTTPS)
+## Run it on a server (HTTPS)
 
-Put [Caddy](https://caddyserver.com) in front (it obtains and renews the certificate for you):
-
-```caddyfile
-appsec.your-domain.com {
-    reverse_proxy 127.0.0.1:8766
-}
-```
-
-and in `.env`:
+Tamandua is meant to live on its own VPS (Hetzner, DigitalOcean, Hostinger…) under your domain. With the DNS record pointing at the server:
 
 ```bash
-TAMANDUA_PUBLIC_URL=https://appsec.your-domain.com
-TAMANDUA_ALLOWED_ORIGINS=https://appsec.your-domain.com
+make setup DOMAIN=appsec.your-domain.com PREBUILT=1   # Caddy with automatic HTTPS + the published, signed images
+make up
 ```
+
+The API is then reachable only through Caddy, HTTP redirects to HTTPS and the certificate renews itself. The guide covers sizing, OS and firewall, backups offsite and restore, upgrades, Prometheus metrics, and Coolify and Dokploy: [docs/deploy-vps.md](docs/deploy-vps.md).
 
 ## Contributing
 

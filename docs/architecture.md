@@ -43,23 +43,55 @@ A modular monolith (`tamandua/`) whose layers are checked by import-linter on ev
 ```
 tamandua/
   cli/          command line (scan for CI, demo, users…)
-  app/          composition: API (api/: typed routes per context and table routes in api/routes/), worker,
-                migrations (Alembic and data), demo data, panel static files
-  modules/      the business logic, one package per context; never imports from app/ or cli/
-    identity/       users, sessions, TOTP
-    sources/        repositories, assets (stable identity), domains
-    scanning/       engines (engines, config_engines), plan, inventory, repository, image and local scans, OWASP
-    runs/           runs, scan queue and batches
-    findings/       registry and lifecycle, triage, exclusions, fix guides, re-verification, due dates (SLA)
-    intel/          advisories, KEV/EPSS, local NVD copy, EUVD, sources and licenses
+  app/          composition: API (api/: typed FastAPI routes, one module per context), worker,
+                migrations (Alembic and data), demo data, panel static files, wiring (event subscribers and
+                injected readers), integrity checks that span contexts
+  modules/      the business logic, one package per context, top layer first; never imports from app/ or cli/
     compliance/     SBOM, VEX, CRA kit
-    reporting/      PDF/Markdown reports, shared design, Overview
-    integrations/   GitHub App, Jira, notifications (Slack/Teams/webhook), AI keys
-    pullrequests/   PR review and watching
     threats/        threat modeling, diagram and report
-  shared/       cross-cutting code with no business logic: logs, encrypted store, paths, i18n (en/es catalogs);
-                never imports from modules/
+    reporting/      PDF/Markdown reports, shared report design, Overview
+    runs/           runs (store, Markdown/SARIF), queue and jobs, batches, local scan (CLI), advisory watch,
+                    assets through their runs (overview, reconciliation, purge), registry rebuild
+    pullrequests/   PR review and watching
+    scanning/       engines (engines, config_engines), plan, inventory, repository and image scans, OWASP
+    findings/       run kinds, registry and lifecycle, triage, exclusions, Jira links, fix guides, re-verification,
+                    due dates (SLA)
+    sources/        repositories, assets (stable identity, scan branch, retirement), domains
+    integrations/   GitHub App, Jira client, notifications (Slack/Teams/webhook), AI keys
+    intel/          advisories, KEV/EPSS, local NVD copy, EUVD, sources and licenses
+    identity/       users, sessions, TOTP
+  shared/       cross-cutting code with no business logic: logs, encrypted store, paths, i18n (en/es catalogs),
+                in-process events; never imports from modules/
 ```
+
+The contexts are layered too, and import-linter checks it (`make arch`, exhaustive: a new context has to be placed):
+
+```
+compliance | threats      consumers: read everything below, nobody imports them
+reporting
+runs                      orchestration: jobs, the queue and the flows that touch several contexts
+pullrequests
+scanning | findings       domain: engines → findings list; the registry and everything decided about a finding
+sources                   base: what gets scanned, the external clients, advisory knowledge, users
+integrations
+intel | identity
+```
+
+A context imports only the ones below it, and siblings joined by `|` never import each other (function-local imports
+count). When a lower context needs something from a higher one, it doesn't import it: the composition root
+(`app/wiring.py`, run once per process by the API, the worker and the CLI before anything else) wires it in. Two
+tools, in this order: injecting a reader (findings get the run reader that tells how a re-verification went) and
+in-process domain events (`shared/events.py`) for "something happened". Events are synchronous and run their
+subscribers in order inside the publisher's call; an error stops the rest and reaches the publisher, and an event
+nobody subscribed to is an error, so a process that wasn't wired fails instead of losing data. Today:
+
+- `AssetPurged` (runs): a repository gone from GitHub for longer than the grace period. Runs deletes its runs first,
+  then triage, the registry, Jira links, PR watching, the repository registry, exclusions and secret detection settings
+  forget it, in that order. An interrupted purge leaves rows without runs, which `tamandua integrity` cleans up.
+- `RepositoriesListed` (pullrequests): the PR watcher read the complete repository list of the installations (never a
+  partial one); runs reconciles the analysed repositories with it and purges the ones past the grace period.
+
+A finished run updates the registry and sends notifications directly: runs sits above findings and integrations.
 
 The panel (`web/src`) follows the same idea, organized by feature (a light Feature-Sliced Design), with layers checked
 by `tests/test_web_layers.py`: a layer never imports from the layers above it.
@@ -76,7 +108,7 @@ Server data goes through TanStack Query (`shared/api/queries.ts`): a cache share
 something is running. Types for the migrated routes come from the OpenAPI schema (`make openapi`).
 
 API security lives in one place (`app/api/security.py`): allowed host → CSRF (Origin + action header) → session →
-second factor → role → body size. Typed routes (`deps.guard`) and table routes (`routing.mount`) apply it the same way.
+second factor → role → body size. Every route applies it through `deps.guard(Policy(...))`.
 Handlers never read headers or cookies on their own; an unhandled error returns a 500 with no stack trace.
 The React + TypeScript panel (`web/`) is built into `tamandua/app/static/`.
 

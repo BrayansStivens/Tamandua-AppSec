@@ -189,7 +189,7 @@ La revisión de código corre cinco motores externos, cada uno en su contenedor 
 | --- | --- | --- | --- |
 | **Trivy 0.74.0** | dependencias de cualquier ecosistema, configuración de infraestructura (Dockerfile, Kubernetes, Terraform) y secretos | solo para bajar su base de vulnerabilidades, cacheada en `data/trivy-cache/`; no envía nada del repositorio | `aquasec/trivy@sha256:62b1e65e…` |
 | **Gitleaks 8.30.1** | secretos, alta precisión, valores redactados | ninguna | `ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0…` |
-| **Opengrep 1.30.0** | SAST con **reglas propias** (`rules/`, MIT) para JavaScript, TypeScript, Python, Java, Go, PHP, Ruby y C# | ninguna | `tamandua/opengrep:1.30.0`, construida localmente |
+| **Opengrep 1.30.0** | SAST con **reglas propias** (`rules/`, MIT) para JavaScript, TypeScript, Python, Java, Go, PHP, Ruby y C# | ninguna | `localhost/tamandua/opengrep:1.30.0`, construida localmente |
 | **Checkov 3.3.19** | infraestructura como código (Terraform, CloudFormation, Kubernetes, Helm, Kustomize, ARM, Bicep, Serverless, OpenAPI, Ansible, Dockerfile) y pipelines (GitHub Actions, GitLab CI, Bitbucket, Azure Pipelines, CircleCI, Argo) | ninguna (`--skip-download`, sin módulos externos) | `bridgecrew/checkov@sha256:d3e96ada…` |
 | **zizmor 1.30.1** | GitHub Actions a fondo: inyección en plantillas, disparadores peligrosos (`pull_request_target`), permisos del token, acciones sin fijar por SHA o archivadas, credenciales que persisten tras `checkout` | ninguna (`--offline`) | `ghcr.io/zizmorcore/zizmor@sha256:a2eb396d…` |
 

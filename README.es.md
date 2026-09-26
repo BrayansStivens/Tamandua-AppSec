@@ -55,6 +55,7 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 | --- | --- |
 | [Inicio rápido](docs/es/inicio-rapido.md) | De cero al primer hallazgo corregido, y qué configurar después |
 | [Instalación](docs/es/instalacion.md) | Requisitos, primer arranque, actualizar, copias de seguridad, desinstalar |
+| [Desplegar en un VPS](docs/es/despliegue-vps.md) | Tu propio servidor con dominio: HTTPS, copias, actualizaciones, monitorización, Coolify y Dokploy |
 | [Conectar GitHub](docs/es/github-app.md) | Crear la GitHub App paso a paso y revisar PRs |
 | [Terminal y CI](docs/es/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos para CI |
 | [Skills para asistentes](skills/README.md) | Claude Code, Cursor o Codex corrigen lo que encuentra Tamandua y lo verifican, o lo montan en tu CI |
@@ -78,22 +79,16 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 
 Para reportar una vulnerabilidad: [SECURITY.es.md](SECURITY.es.md).
 
-## Usarlo desde otra máquina (HTTPS)
+## Llevarlo a un servidor (HTTPS)
 
-Pon [Caddy](https://caddyserver.com) delante (obtiene y renueva el certificado solo):
-
-```caddyfile
-appsec.tu-dominio.com {
-    reverse_proxy 127.0.0.1:8766
-}
-```
-
-y en `.env`:
+Tamandua está pensado para vivir en su propio VPS (Hetzner, DigitalOcean, Hostinger…) con tu dominio. Con el registro DNS apuntando al servidor:
 
 ```bash
-TAMANDUA_PUBLIC_URL=https://appsec.tu-dominio.com
-TAMANDUA_ALLOWED_ORIGINS=https://appsec.tu-dominio.com
+make setup DOMAIN=appsec.tu-dominio.com PREBUILT=1   # Caddy con HTTPS automático + las imágenes publicadas y firmadas
+make up
 ```
+
+A partir de ahí solo se llega a la API a través de Caddy, HTTP redirige a HTTPS y el certificado se renueva solo. La guía cubre dimensionado, sistema y cortafuegos, copias fuera del servidor y restauración, actualizaciones, métricas para Prometheus, y Coolify y Dokploy: [docs/es/despliegue-vps.md](docs/es/despliegue-vps.md).
 
 ## Contribuir
 

@@ -42,22 +42,60 @@ Monolito modular (`tamandua/`), con capas que comprueba import-linter en cada PR
 ```
 tamandua/
   cli/          línea de comandos (scan para CI, demo, usuarios…)
-  app/          composición: API (api/: rutas tipadas por contexto y rutas de tabla en api/routes/), worker,
-                migraciones (Alembic y de datos), datos de demostración, estáticos del panel
-  modules/      el negocio, un paquete por contexto; no importa de app/ ni de cli/
-    identity/       usuarios, sesiones, TOTP
-    sources/        repositorios, activos (identidad estable), dominios
-    scanning/       motores (engines, config_engines), plan, inventario, análisis de repositorio, imagen y local, OWASP
-    runs/           ejecuciones, cola de análisis y lotes
-    findings/       registro y ciclo de vida, triage, exclusiones, guía de corrección, reverificación, plazos (SLA)
-    intel/          avisos, KEV/EPSS, copia local de NVD, EUVD, fuentes y licencias
+  app/          composición: API (api/: rutas FastAPI tipadas, un módulo por contexto), worker,
+                migraciones (Alembic y de datos), datos de demostración, estáticos del panel, cableado (suscriptores
+                de eventos y lectores inyectados), comprobaciones de integridad entre contextos
+  modules/      el negocio, un paquete por contexto, de la capa de arriba a la de abajo; no importa de app/ ni de cli/
     compliance/     SBOM, VEX, kit CRA
-    reporting/      informes PDF/Markdown, diseño común, Resumen
-    integrations/   GitHub App, Jira, avisos (Slack/Teams/webhook), claves de IA
-    pullrequests/   revisión de PR y vigilancia
     threats/        modelado de amenazas, diagrama e informe
-  shared/       transversal sin negocio: logs, almacén cifrado, rutas, i18n (catálogos en/es); no importa de modules/
+    reporting/      informes PDF/Markdown, diseño común de los informes, Resumen
+    runs/           ejecuciones (almacén, Markdown/SARIF), cola y trabajos, lotes, análisis local (CLI), vigilancia
+                    de avisos, activos vistos desde sus ejecuciones (resumen, reconciliación, purga),
+                    reconstrucción del registro
+    pullrequests/   revisión de PR y vigilancia
+    scanning/       motores (engines, config_engines), plan, inventario, análisis de repositorio e imagen, OWASP
+    findings/       tipos de ejecución, registro y ciclo de vida, triage, exclusiones, vínculos con Jira, guía de
+                    corrección, reverificación, plazos (SLA)
+    sources/        repositorios, activos (identidad estable, rama de análisis, retirada), dominios
+    integrations/   GitHub App, cliente de Jira, avisos (Slack/Teams/webhook), claves de IA
+    intel/          avisos, KEV/EPSS, copia local de NVD, EUVD, fuentes y licencias
+    identity/       usuarios, sesiones, TOTP
+  shared/       transversal sin negocio: logs, almacén cifrado, rutas, i18n (catálogos en/es), eventos en proceso;
+                no importa de modules/
 ```
+
+Los contextos también van por capas, y import-linter lo comprueba (`make arch`, exhaustivo: un contexto nuevo hay que
+colocarlo en alguna):
+
+```
+compliance | threats      consumidores: leen todo lo de abajo y nadie los importa
+reporting
+runs                      orquestación: trabajos, cola y los flujos que tocan varios contextos
+pullrequests
+scanning | findings       dominio: motores → lista de hallazgos; el registro y todo lo que se decide sobre un hallazgo
+sources                   base: qué se analiza, los clientes externos, el conocimiento de avisos, los usuarios
+integrations
+intel | identity
+```
+
+Cada contexto importa solo los de debajo, y los hermanos unidos por `|` no se conocen entre sí (también cuentan los
+imports dentro de una función). Si un contexto de abajo necesita algo de uno de arriba, no lo importa: se lo conecta la
+raíz de composición (`app/wiring.py`, que la API, el worker y la CLI ejecutan una vez por proceso antes que nada). Hay
+dos herramientas, por este orden: inyectarle un lector (findings recibe el de ejecuciones, que dice cómo acabó una
+reverificación) y los eventos de dominio en proceso (`shared/events.py`) para avisar de que «algo pasó». Son síncronos:
+los suscriptores corren en orden dentro de la llamada de quien publica; un error detiene a los demás y le llega a quien
+publicó, y publicar un evento sin suscriptores es un error, así que un proceso sin cablear falla en vez de perder datos.
+Hoy hay dos:
+
+- `AssetPurged` (runs): un repositorio que desapareció de GitHub y superó el margen. Runs borra primero sus
+  ejecuciones; después lo olvidan, en este orden, el triage, el registro, los vínculos con Jira, la vigilancia de PR,
+  el registro de repositorios, las exclusiones y los ajustes de detección de secretos. Una purga interrumpida deja filas
+  sin ejecuciones, y `tamandua integrity` las limpia.
+- `RepositoriesListed` (pullrequests): el vigilante de PR leyó la lista completa de repositorios de las instalaciones
+  (nunca una parcial); runs la contrasta con lo analizado y purga lo que ya superó el margen.
+
+Una ejecución terminada actualiza el registro y manda los avisos con llamadas directas: runs está por encima de findings
+y de integrations.
 
 El panel (`web/src`) sigue la misma idea, por funcionalidad (Feature-Sliced Design ligero), con capas que comprueba
 `tests/test_web_layers.py`: una capa no importa de las de arriba.
@@ -74,8 +112,8 @@ Los datos del servidor van con TanStack Query (`shared/api/queries.ts`): caché 
 mientras hay algo en marcha. Los tipos de las rutas migradas salen del OpenAPI (`make openapi`).
 
 La seguridad de la API está en un solo sitio (`app/api/security.py`): host permitido → CSRF (Origin + cabecera de
-acción) → sesión → segundo factor → rol → tamaño del cuerpo. La aplican igual las rutas tipadas (`deps.guard`) y las de
-tabla (`routing.mount`). Los manejadores no leen cabeceras ni cookies por su cuenta; un error no controlado responde
+acción) → sesión → segundo factor → rol → tamaño del cuerpo. Todas las rutas la aplican con
+`deps.guard(Policy(...))`. Los manejadores no leen cabeceras ni cookies por su cuenta; un error no controlado responde
 500 sin traza.
 El panel React + TypeScript (`web/`) se compila a `tamandua/app/static/`.
 

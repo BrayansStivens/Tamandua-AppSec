@@ -27,6 +27,6 @@ chmod 600 "$target"/*.tgz "$target/database.dump"
 
 [ -n "$running" ] && docker compose start api >/dev/null
 echo "Backup in $target/"
-echo "  database.dump  runs, findings and triage (PostgreSQL; restore with pg_restore)"
-echo "  data.tgz       users, settings and the rest of data/ (no secrets)"
+echo "  database.dump  users, settings, runs, findings and triage (restore with make restore FROM=$target)"
+echo "  data.tgz       data/ without the caches: logs and the session signing key (no secrets)"
 echo "  config.tgz     ENCRYPTED SECRETS + MASTER KEY: keep it off this machine and protected"

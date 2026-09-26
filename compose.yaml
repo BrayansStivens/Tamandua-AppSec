@@ -6,7 +6,11 @@
 # Without make:  cp .env.example .env && mkdir -p data config && docker compose up --build -d
 #
 # Services: `api` (panel and API, no Docker), `worker` (runs scans and periodic tasks),
-# `postgres` (data) and `opengrep` (only builds the engine image).
+# `postgres` (data), `opengrep` (only builds the engine image) and, optionally, `backup` (profile `backup`).
+#
+# On a server with a domain, add the HTTPS overlay (Caddy) and, if you use the published images, the images one:
+#   docker compose -f compose.yaml -f compose.prod.yaml [-f compose.images.yaml] up -d
+# `make setup DOMAIN=…` writes that list in .env (COMPOSE_FILE) so every command uses it. See docs/deploy-vps.md.
 #
 # The analysis engines (Trivy, Gitleaks, Opengrep) are sibling containers the WORKER starts through the Docker
 # socket: that's why only it mounts the socket, and why the data folder is shared at the SAME absolute host path
@@ -22,7 +26,7 @@ x-app: &app
     dockerfile: docker/app/Dockerfile
     args:
       VERSION: ${TAMANDUA_VERSION:-0.9}
-  image: tamandua/app:${TAMANDUA_VERSION:-0.9}
+  image: localhost/tamandua/app:${TAMANDUA_VERSION:-0.9}
   init: true
   # Your UID/GID so the files in ./data and ./config are yours (see .env.example).
   user: "${TAMANDUA_UID:-10001}:${TAMANDUA_GID:-10001}"
@@ -86,7 +90,8 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/api/health', headers={'Host':'127.0.0.1:8766'}), timeout=4).status == 200 else 1)"]
+      # Host = the first allowed origin's, so it also passes behind a proxy (compose.prod.yaml: only the domain).
+      test: ["CMD", "python", "-c", "import os,sys,urllib.parse as p,urllib.request as r; h=p.urlsplit((os.environ.get('TAMANDUA_ALLOWED_ORIGINS') or 'http://127.0.0.1:8766').split(',')[0].strip()).netloc; sys.exit(0 if r.urlopen(r.Request('http://127.0.0.1:8766/api/health', headers={'Host': h}), timeout=4).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -148,11 +153,59 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Optional scheduled backups (profile `backup`): every TAMANDUA_BACKUP_INTERVAL_HOURS a pg_dump plus config/ and
+  # data/ (without caches) into TAMANDUA_BACKUP_DIR/auto-<date>/, keeping TAMANDUA_BACKUP_KEEP_DAYS days. Same layout
+  # as `make backup`, so `make restore` takes either. Turn it on with COMPOSE_PROFILES=backup in .env.
+  # It only gets the database password, not the rest of .env; config/ and data/ are mounted read-only.
+  backup:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    profiles: [backup]
+    init: true
+    user: "${TAMANDUA_UID:-10001}:${TAMANDUA_GID:-10001}"
+    entrypoint: ["/bin/sh", "/opt/tamandua/backup-service.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: tamandua
+      PGDATABASE: tamandua
+      PGPASSWORD: "${TAMANDUA_DB_PASSWORD:?TAMANDUA_DB_PASSWORD is missing in .env (run make setup)}"
+      BACKUP_INTERVAL_HOURS: "${TAMANDUA_BACKUP_INTERVAL_HOURS:-24}"
+      BACKUP_KEEP_DAYS: "${TAMANDUA_BACKUP_KEEP_DAYS:-14}"
+    volumes:
+      - ./scripts/backup-service.sh:/opt/tamandua/backup-service.sh:ro
+      - ./data:/source/data:ro
+      - ${TAMANDUA_HOST_CONFIG_DIR:-./config}:/source/config:ro
+      - ${TAMANDUA_BACKUP_DIR:-./backups}:/backups
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/opt/tamandua/backup-service.sh", "--check"]
+      interval: 10m
+      timeout: 10s
+      start_period: 30m
+      retries: 1
+    # After the api is healthy: by then the migrations have run, so even the first backup is a complete one.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Only builds the SAST engine image (with its SHA-256-verified binary) and checks that it
   # starts; the app runs it later for each scan. It exits right away: that's expected.
   opengrep:
     build: docker/engines/opengrep
-    image: tamandua/opengrep:1.30.0
+    image: localhost/tamandua/opengrep:1.30.0
     command: ["--version"]
     network_mode: none
     restart: "no"

@@ -25,4 +25,4 @@ Every rule carries its finding title and its fix in both languages; the engine s
 
 User-authored custom rules are a separate, future feature managed from the panel; they don't live in this folder.
 
-Validate: `docker run --rm --network none -v "$PWD/rules:/rules:ro" tamandua/opengrep:1.30.0 scan --validate --config /rules /rules`
+Validate: `docker run --rm --network none -v "$PWD/rules:/rules:ro" localhost/tamandua/opengrep:1.30.0 scan --validate --config /rules /rules`

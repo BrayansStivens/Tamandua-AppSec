@@ -13,6 +13,7 @@ from tempfile import TemporaryDirectory
 from tamandua.modules.identity.auth import PASSWORD_MIN, AuthError, Sessions, Users
 from tamandua.modules.integrations.github import GitHubAppError, config as github_config
 from tamandua.modules.integrations.installations import github_installations
+from tamandua.app import wiring
 from tamandua.app.data_migrations import DataTooNew, upgrade as upgrade_data
 from tamandua.modules.integrations.ai_providers import PROVIDERS, check_provider, provider_status
 from tamandua.modules.scanning.repository import scan_repository
@@ -37,7 +38,7 @@ def _json(value) -> str:
 
 
 def _scan_command(args) -> int:
-    from tamandua.modules.scanning.local import EXIT_ERROR, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, render_json, render_sarif, render_text, run
+    from tamandua.modules.runs.local import EXIT_ERROR, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, render_json, render_sarif, render_text, run
 
     def progress(level: str, message: str) -> None:
         # Progress goes to stderr so stdout stays clean for JSON or SARIF.
@@ -121,6 +122,8 @@ def build_parser() -> argparse.ArgumentParser:
         action.add_argument("--username", required=True)
         if name == "reset-password":
             action.add_argument("--password-stdin", action="store_true")
+    integrity = commands.add_parser("integrity", help="Check the database for orphan rows (reads only, unless --fix)")
+    integrity.add_argument("--fix", action="store_true", help="Delete the orphan rows that are leftovers and print a summary")
     worker = commands.add_parser("worker", help="Run queued analyses and periodic tasks (the compose `worker` service)")
     worker.add_argument("--check", action="store_true", help="Health: 0 if this worker showed signs of life recently (healthcheck)")
     panel = commands.add_parser("serve", help="Open the web panel")
@@ -130,6 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    wiring.configure()
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "scan":
@@ -208,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if all(row["ready"] for row in rows) else 3
         if args.command == "user":
             return _user_command(args)
+        if args.command == "integrity":
+            return _integrity_command(args)
         if args.command == "ai-check":
             result = check_provider(args.provider)
             print(_json(result))
@@ -216,6 +222,31 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except (SourceError, GitHubAppError, VaultError, FileNotFoundError, ValueError) as exc:
         parser.exit(1, t("cli.error", detail=_detail(exc)) + "\n")
+
+
+INTEGRITY_RELATIONS = {"registry_without_runs": "cli.integrity.registry_without_runs",
+                    "triage_without_runs": "cli.integrity.triage_without_runs",
+                    "runs_without_registry": "cli.integrity.runs_without_registry"}
+
+
+def _integrity_command(args) -> int:
+    from tamandua.app import integrity
+    removed = integrity.fix(args.data_dir) if args.fix else {}
+    found = integrity.check(args.data_dir)
+    print(t("cli.integrity.title"))
+    for relation, key in INTEGRITY_RELATIONS.items():
+        line = f"  {t(key)}: {found[relation]}"
+        if relation in removed:
+            line += f"  ({t('cli.integrity.removed', count=removed[relation])})"
+        elif relation in integrity.REPORTED and found[relation]:
+            line += f"  ({t('cli.integrity.not_fixable')})"
+        print(line)
+    fixable = sum(found[relation] for relation in integrity.FIXABLE)
+    if not any(found.values()):
+        print(t("cli.integrity.clean"))
+    elif fixable:
+        print(t("cli.integrity.run_fix", count=fixable))
+    return 0 if not any(found.values()) else 3
 
 
 def _read_password(from_stdin: bool) -> str:

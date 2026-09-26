@@ -7,6 +7,7 @@ from pathlib import Path
 
 from tamandua.modules.findings import registry
 from tamandua.modules.findings import triage
+from tamandua.modules.runs import registry as run_registry
 from tamandua.modules.runs.store import save_repository_scan
 from test_dashboard import _finding, _scan
 from tamandua.shared.i18n import text
@@ -104,7 +105,7 @@ class RegistryTests(unittest.TestCase):
         self.run_([_finding(A), _finding(B)])
         self.run_([_finding(A)])
         before = self.status()
-        registry.rebuild(self.data_dir)
+        run_registry.rebuild(self.data_dir)
         self.assertEqual(self.status(), before)
 
 

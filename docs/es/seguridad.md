@@ -34,7 +34,7 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 - **Contraseñas** con scrypt (N=2¹⁵, r=8, p=1), mínimo 12 caracteres. Un usuario inexistente cuesta lo mismo que uno real, así que el tiempo de respuesta no delata cuáles existen.
 - **Segundo factor** TOTP (RFC 6238) obligatorio para administradores por defecto, con 8 códigos de respaldo de un solo uso. Un código ya usado no vale dos veces.
 - **Sesiones** del lado del servidor, con cookie `HttpOnly`, `SameSite=Strict` y `Secure` con HTTPS. Cambiar la contraseña, activar TOTP o que un administrador restablezca credenciales cierra las demás sesiones.
-- **Límite de intentos** por usuario y por dirección: tras 5 fallos, bloqueo progresivo de 30 s a 15 min. También en el alta inicial y en la vuelta de GitHub.
+- **Límite de intentos** por usuario y por dirección: tras 5 fallos, bloqueo progresivo de 30 s a 15 min. También en el alta inicial y en la vuelta de GitHub. Detrás de un proxy inverso, la dirección sale de `X-Forwarded-For` solo si la petición llega de un proxy de `TAMANDUA_FORWARDED_ALLOW_IPS` (`compose.prod.yaml` la pone para Caddy); si no, todo el mundo compartiría la dirección del proxy.
 - **CSRF**: cada POST exige un `Origin` permitido y una cabecera de acción propia de su ruta.
 - **Roles**: `admin` conecta integraciones, gestiona usuarios y acepta riesgos; `member` analiza y triagea.
 

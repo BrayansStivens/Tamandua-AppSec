@@ -9,8 +9,8 @@
 * Una incidencia por trabajo de remediación: los avisos de un mismo paquete van
   juntos, con la versión que los cierra todos; el código y los secretos, uno a uno.
 * Idempotente: cada incidencia lleva la etiqueta ``appsec-<huella>`` de cada hallazgo que cubre. Antes de
-  crear se busca por esa etiqueta, y los vínculos se recuerdan por activo y
-  huella en ``data/jira-links.json``; exportar dos veces no duplica.
+  crear se busca por esa etiqueta, y los vínculos que ya se conocen (por activo y huella, en
+  ``findings/tickets.py``) no se vuelven a crear; exportar dos veces no duplica.
 * Jira Server/Data Center queda fuera a propósito: exigiría aceptar hosts
   arbitrarios de la red del cliente.
 """
@@ -21,16 +21,12 @@ import base64
 import json
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from tamandua.shared import documents
-from tamandua.modules.runs.kinds import FINDING_RUNS
 from tamandua.shared import log as logging_setup
 from tamandua.modules.intel.advisories import compare_versions
-from tamandua.modules.findings.triage import asset_key
 from tamandua.shared.i18n import default_locale, msg, t, text
 from tamandua.version import USER_AGENT
 
@@ -170,29 +166,6 @@ def _http(credentials: dict, method: str, path: str, body: dict | None = None) -
 
 # ------------------------------------------------------ incidencias
 
-def load_links(data_dir: Path) -> dict:
-    payload = documents.load(data_dir, "jira-links", {})
-    return payload if isinstance(payload, dict) else {}
-
-
-def _remember(data_dir: Path, asset: str, fingerprint: str, link: dict) -> None:
-    with documents.lock(data_dir, "jira-links"):
-        links = load_links(data_dir)
-        links.setdefault(asset, {})[fingerprint] = link
-        documents.save(data_dir, "jira-links", links)
-
-
-def annotate(data_dir: Path, record: dict) -> dict:
-    """Añade a cada hallazgo el ticket ya creado, si lo hay."""
-    if record.get("type") not in (*FINDING_RUNS, "asset_state"):
-        return record
-    links = load_links(data_dir).get(asset_key(record), {})
-    if not links:
-        return record
-    return {**record, "findings": [{**item, "ticket": links[item["fingerprint"]]} if item["fingerprint"] in links else item
-                                   for item in record.get("findings", [])]}
-
-
 def _adf(text: str) -> dict:
     """Atlassian Document Format mínimo: un párrafo por línea, los títulos en negrita."""
     content = []
@@ -213,10 +186,12 @@ def label_for(fingerprint: str) -> str:
     return f"appsec-{fingerprint[:16]}"
 
 
-def export(data_dir: Path, record: dict, tickets: list[dict], fingerprints: list, *, by: str, http=None, locale: str | None = None) -> dict:
+def export(tickets: list[dict], fingerprints: list, known: dict, remember, *, by: str, run_id: str, http=None,
+           locale: str | None = None) -> dict:
     """Crea en Jira las incidencias de los tickets pedidos. Devuelve creadas, existentes y fallos.
 
-    The issues are read by the whole team, so they speak TAMANDUA_DEFAULT_LOCALE unless told otherwise."""
+    `known`: the links already recorded for these findings (fingerprint → link); `remember(fingerprint, link)` records a
+    new one. The issues are read by the whole team, so they speak TAMANDUA_DEFAULT_LOCALE unless told otherwise."""
     locale = locale or default_locale()
     credentials = _load()
     if not credentials:
@@ -229,8 +204,6 @@ def export(data_dir: Path, record: dict, tickets: list[dict], fingerprints: list
     if missing:
         raise JiraError(msg("integrations.jira.not_pending"))
     client = http or _http
-    asset = asset_key(record)
-    known = load_links(data_dir).get(asset, {})
     base = f"https://{credentials['site']}/browse/"
     created, existing, failed = [], [], []
     state = {"priority": True}
@@ -249,18 +222,18 @@ def export(data_dir: Path, record: dict, tickets: list[dict], fingerprints: list
             if link is not None:
                 for item in prints:
                     if item not in known:
-                        _remember(data_dir, asset, item, link)
+                        remember(item, link)
                 existing.extend({"fingerprint": item, **link} for item in prints)
                 continue
             result = _create(client, credentials, _issue_fields(credentials, group, locale), state)
             link = {"key": result["key"], "url": base + result["key"], "linked_at": _stamp(), "by": by}
             for item in prints:
-                _remember(data_dir, asset, item, link)
+                remember(item, link)
             created.extend({"fingerprint": item, **link} for item in prints)
         except (JiraError, KeyError, TypeError) as exc:
             message = exc.message if isinstance(exc, JiraError) else msg("integrations.jira.unexpected")
             failed.extend({"fingerprint": item, "error": message} for item in prints)
-    _log.info("jira_export", extra={"user": by, "run_id": record["id"],
+    _log.info("jira_export", extra={"user": by, "run_id": run_id,
                                     "reason": f"{len(created)} creadas, {len(existing)} ya existían, {len(failed)} fallos"})
     return {"created": created, "existing": existing, "failed": failed}
 

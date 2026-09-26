@@ -15,7 +15,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
-from tamandua.app import data_migrations
+from tamandua.app import data_migrations, wiring
 from tamandua.modules.runs.jobs import ScanJobs
 from tamandua.shared import db
 from tamandua.shared import log as logging_setup
@@ -27,7 +27,7 @@ LEADER_KEY = int.from_bytes(hashlib.sha256(b"tamandua:worker-leader").digest()[:
 def start_periodic(data_dir: Path, jobs: ScanJobs) -> list:
     """Arranca las tareas periódicas (hilos). Las usan el worker líder y el modo de un solo proceso."""
     from tamandua.modules.integrations.installations import github_installations
-    from tamandua.modules.intel.advisory_watch import Watcher as AdvisoryWatcher
+    from tamandua.modules.runs.advisory_watch import Watcher as AdvisoryWatcher
     from tamandua.modules.intel.cve_db import Syncer
     from tamandua.modules.pullrequests.watch import Watcher
     tasks = [Watcher(data_dir, jobs, lambda: github_installations(data_dir)), Syncer(data_dir),
@@ -83,6 +83,7 @@ def _lead(data_dir: Path, jobs: ScanJobs, stop: threading.Event) -> None:
 
 
 def run(data_dir: Path) -> None:
+    wiring.configure()
     data_migrations.upgrade(data_dir)
     logging_setup.configure(data_dir)
     jobs = ScanJobs(data_dir, worker=False)

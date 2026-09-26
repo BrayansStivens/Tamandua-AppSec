@@ -168,7 +168,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             progress(level, message)
 
     files = sorted(path for path in root.rglob("*") if path.is_file() and not path.is_symlink())
-    findings = []
+    findings, withheld = [], []
     snapshot = source.get("snapshot") or {}
     skipped = (snapshot.get("skipped", 0) + snapshot.get("skipped_not_analyzable", 0)
                + snapshot.get("skipped_too_large", 0) + snapshot.get("skipped_over_budget", 0))
@@ -222,6 +222,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         findings.extend(sast["findings"])
         trivy_secrets = [item for item in trivy["findings"] if item["scanner"] == "secrets"]
         findings.extend(merge_secrets(secrets_gitleaks["findings"], trivy_secrets))
+        withheld = merge_secrets(secrets_gitleaks.get("withheld") or [], trivy.get("withheld") or [])
         # Trivy manda (sus huellas sostienen el triage ya hecho); OSV-Scanner suma lo que Trivy no ve y
         # confirma lo que coincide, sin repetir el aviso aunque lo nombre con otro identificador.
         dependencies_found, dependency_merge = merge_dependencies([item for item in trivy["findings"] if item["scanner"] == "sca"],
@@ -266,6 +267,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             seen.add(item["fingerprint"])
             unique.append(item)
     findings = unique
+    withheld = [item for item in withheld if item["fingerprint"] not in seen]
     sast_count = sum(item["scanner"] == "sast" for item in findings)
     secret_count = sum(item["scanner"] == "secrets" for item in findings)
     engine_sca = [tool["name"] for tool in tools if tool["tool"] in ("trivy", "osv-scanner") and tool["status"] == "completed"]
@@ -360,7 +362,9 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     return {"type": "repository_scan",
             # Sin Docker no corrió ningún motor: las reglas internas no bastan para dar el repositorio por revisado.
             "status": "incomplete" if not engines or sca_status == "inconclusive" or truncated or misconfigured or any(
-                tool["tool"] in ("opengrep", "gitleaks", "trivy", "osv-scanner") and tool["status"] == "inconclusive" for tool in tools) else "completed",
+                tool["tool"] in ("opengrep", "gitleaks", "trivy", "osv-scanner") and tool["status"] == "inconclusive" for tool in tools)
+                # Allowlisted secrets not identified: one that stopped appearing may only be silenced.
+                or any("withheld" in tool and tool["withheld"] is None for tool in tools) else "completed",
             "source": source, "target": source["name"], "variant": "code", "context": declared,
             "steps": steps, "findings": findings,
             "owasp_coverage": coverage, "inventory": collect_inventory(root), "unused_dependencies": unused_dependencies(root),
@@ -383,5 +387,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                               msg("scanning.repository.limitations.sast_rules") if engines
                               else msg("scanning.repository.limitations.no_docker"),
                               msg("scanning.repository.limitations.sca_cap"), msg("scanning.repository.limitations.osv_not_exploit"),
-                              msg("scanning.repository.limitations.no_ai_dast")],
+                              msg("scanning.repository.limitations.no_ai_dast")]
+                           + ([msg("scanning.secret_rules.withheld.limitation", count=len(withheld))] if withheld else []),
+            **({"excluded_findings": withheld} if withheld else {}),
             "scanned_at": datetime.now(timezone.utc).isoformat()}

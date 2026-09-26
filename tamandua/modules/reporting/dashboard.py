@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.findings import sla
-from tamandua.modules.runs.kinds import FULL_SCANS
+from tamandua.modules.findings.kinds import FULL_SCANS
 from tamandua.modules.intel.advisories import load_feeds, load_recent_cves
 from tamandua.modules.sources.assets import asset_key
 from tamandua.modules.runs.store import list_runs, load_run

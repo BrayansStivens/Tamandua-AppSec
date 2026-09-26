@@ -1,9 +1,9 @@
 """La tubería de seguridad del panel, en un solo sitio para todas las rutas.
 
     host permitido (middleware) → CSRF en POST (Origin + cabecera de acción) → sesión → segundo factor
-    → política TOTP → rol → límites de cuerpo (routing)
+    → política TOTP → rol → límites de cuerpo (deps.guard)
 
-Las rutas tipadas la aplican con `deps.guard(Policy)` y las de la tabla `@route` con `routing.mount`: las dos llaman a
+Todas las rutas la aplican con `deps.guard(Policy)`, que llama a
 `authorize`, así que no hay dos criterios.
 """
 
@@ -57,7 +57,7 @@ class Denied:
 
 def authorize(state: State, entry, *, method: str, port: int, origin: str | None, action: str | None,
               cookie: str | None) -> tuple[dict | None, dict | None] | Denied:
-    """`entry` es una `routing.Route` o una `deps.Policy` (public, admin, enrolment, action)."""
+    """`entry` is a `deps.Policy` (public, admin, enrolment, action)."""
     if method == "POST":
         # CSRF antes que nada: un POST de otro origen no llega ni a mirar la sesión.
         if origin not in allowed_origins(port) or action != entry.action:

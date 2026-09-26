@@ -53,11 +53,10 @@ La copia local de NVD para el CVE tracker se descarga sola en segundo plano: una
 ## Actualizar
 
 ```bash
-make backup
 make update
 ```
 
-`data/`, `config/` y la base de datos se conservan. Si la versión nueva cambia el formato de algún dato, lo convierte sola al arrancar, una sola vez y tras guardar una copia de lo que toca en `data/backups/`: no hay que hacer nada a mano. Antes de actualizar conviene hacer una copia (ver abajo) y comprobar que no hay análisis en marcha en **Análisis**: un reinicio marca como fallidos los que estuvieran corriendo.
+`make update` hace antes una copia (`make backup`), trae el código y reinicia. `data/`, `config/` y la base de datos se conservan. Si la versión nueva cambia el formato de algún dato, lo convierte sola al arrancar, una sola vez y tras guardar una copia de lo que toca en `data/backups/`: no hay que hacer nada a mano. Antes de actualizar conviene hacer una copia (ver abajo) y comprobar que no hay análisis en marcha en **Análisis**: un reinicio marca como fallidos los que estuvieran corriendo.
 
 ## Copias de seguridad
 
@@ -71,19 +70,20 @@ make update
 make backup        # backups/<fecha>/database.dump, data.tgz y config.tgz
 ```
 
-La app se detiene unos segundos para que la copia sea coherente, y el comando se niega si hay análisis en curso (`FORCE=1` para forzarlo). `config.tgz` contiene los secretos cifrados **y** la clave maestra: guárdalo fuera de la máquina y protegido. Para restaurar, con la app parada, descomprime `data.tgz` y `config.tgz` en la raíz del repositorio y vuelca la base:
+La app se detiene unos segundos para que la copia sea coherente, y el comando se niega si hay análisis en curso (`FORCE=1` para forzarlo). `config.tgz` contiene los secretos cifrados **y** la clave maestra: guárdalo fuera de la máquina y protegido. Para restaurar:
 
 ```bash
-docker compose up -d postgres
-docker compose exec -T postgres pg_restore -U tamandua -d tamandua --clean --if-exists < backups/<fecha>/database.dump
+make restore FROM=backups/<fecha> CONFIRM=restore   # antes guarda el estado actual en backups/pre-restore-<fecha>/
 make up
 ```
+
+Copias programadas (un servicio de Compose con retención), cron y copias fuera del servidor: [despliegue-vps.md](despliegue-vps.md#copias-de-seguridad).
 
 Si pierdes `config/master.key` (o cambias `TAMANDUA_MASTER_KEY`), los secretos guardados no se pueden descifrar: tendrás que volver a conectar la GitHub App y las claves de IA y Jira. El resto de datos no se pierde.
 
 ## Exponerlo en tu red o en internet
 
-Por defecto el puerto solo se publica en `127.0.0.1`. Para abrirlo desde otras máquinas necesitas HTTPS: el servidor **se niega a arrancar** si `TAMANDUA_PUBLIC_URL` no es loopback y no empieza por `https://`. La forma más sencilla es Caddy delante; está explicado en el [README](../../README.es.md#usarlo-desde-otra-máquina-https).
+Por defecto el puerto solo se publica en `127.0.0.1`. Para abrirlo desde otras máquinas necesitas HTTPS: el servidor **se niega a arrancar** si `TAMANDUA_PUBLIC_URL` no es loopback y no empieza por `https://`. En un servidor con dominio, `make setup DOMAIN=tamandua.example.com` añade Caddy con certificados automáticos: la guía completa (dimensionado, cortafuegos, copias, actualizaciones, monitorización, Coolify y Dokploy) está en [despliegue-vps.md](despliegue-vps.md).
 
 Aunque uses HTTPS, ten en cuenta que la app controla Docker a través de su socket, lo que equivale a root en el host. Expón el panel solo a personas de confianza.
 

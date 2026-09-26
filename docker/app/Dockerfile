@@ -7,7 +7,8 @@
 # Base images are pinned by digest.
 
 # ---------- 1. web panel ----------
-FROM node:22-alpine@sha256:b6f26b36c8ff49624cfdac716b8ea1138d606df02586a77d364bb5536a634f85 AS web
+# Static files are the same on every architecture: build them natively (no emulation in multi-arch builds).
+FROM --platform=$BUILDPLATFORM node:22-alpine@sha256:b6f26b36c8ff49624cfdac716b8ea1138d606df02586a77d364bb5536a634f85 AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -44,6 +45,7 @@ RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin tamandua \
 USER tamandua
 VOLUME ["/data", "/config"]
 EXPOSE 8766
+# The Host header is the first allowed origin's: behind a proxy (public domain only) 127.0.0.1 is refused.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/api/health', headers={'Host':'127.0.0.1:8766'}), timeout=4).status == 200 else 1)"]
+  CMD ["python", "-c", "import os,sys,urllib.parse as p,urllib.request as r; h=p.urlsplit((os.environ.get('TAMANDUA_ALLOWED_ORIGINS') or 'http://127.0.0.1:8766').split(',')[0].strip()).netloc; sys.exit(0 if r.urlopen(r.Request('http://127.0.0.1:8766/api/health', headers={'Host': h}), timeout=4).status == 200 else 1)"]
 CMD ["python", "-m", "tamandua", "--data-dir", "/data", "serve", "--port", "8766"]

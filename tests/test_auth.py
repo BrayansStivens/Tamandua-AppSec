@@ -4,10 +4,13 @@ import base64
 import io
 import json
 import os
+import re
 import stat
 import tempfile
 import time
 import unittest
+from dataclasses import asdict
+from types import SimpleNamespace
 
 import asgi
 from pathlib import Path
@@ -19,7 +22,8 @@ NEW_PASSWORD = "-".join(("otra", "frase", "muy", "larga", "99"))
 from tamandua.modules.identity import auth
 from tamandua.modules.identity.auth import AuthError, Authenticator, Locked, Users, totp_code
 from tamandua.cli.main import main as cli
-from tamandua.app.api.routing import PREFIXES, ROUTES
+from fastapi.routing import APIRoute
+from tamandua.app.api import ROUTERS
 from tamandua.app.api.server import build_state
 
 PASSWORD = "correcto-caballo-bateria"
@@ -136,6 +140,16 @@ def stored_identity(data_dir) -> str:
     return json.dumps(rows, default=str)
 
 
+def routes_with_policy() -> list[SimpleNamespace]:
+    """Every API route with the policy its guard applies (method, path, public, admin, action)."""
+    def policy(dependant):
+        found = getattr(dependant.call, "policy", None)
+        return found or next((item for item in map(policy, dependant.dependencies) if item), None)
+    return [SimpleNamespace(method=method, path=route.path, **asdict(found))
+            for module in ROUTERS for route in module.router.routes if isinstance(route, APIRoute) and (found := policy(route.dependant))
+            for method in sorted(route.methods)]
+
+
 class HttpCase(unittest.TestCase):
     """Servidor sin socket sobre un directorio temporal, con helpers de petición."""
 
@@ -217,10 +231,10 @@ class GateTests(HttpCase):
         Users(self.data_dir).create("analista", PASSWORD)
         _, _, cookies = self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})
         member = cookies[0].split("; ")[0]
-        entries = list(ROUTES.values()) + PREFIXES
+        entries = routes_with_policy()
         self.assertGreater(len(entries), 30)
         for entry in entries:
-            path = entry.path + ("x" if entry.prefix else "")
+            path = re.sub(r"\{[^}]+\}", "x", entry.path)
             if entry.method == "POST":
                 self.assertTrue(entry.action, entry.path)
                 call = lambda cookie=None: self.post(path, entry.action, {}, cookie)

@@ -565,7 +565,8 @@ class Authenticator:
         given = str(code or "").strip().upper().replace(" ", "")
         if not hmac.compare_digest(given.encode(), expected.encode()):
             raise AuthError(msg("auth.errors.wrong_setup_code"))
-        user = self.users.create_first_admin(username, password, display_name)
+        created = self.users.create_first_admin(username, password, display_name)
+        user = self.users.by_id(created["id"])  # the stored record: the session must carry its password_changed_at
         self._setup = None
         self.throttle.succeeded("setup")
         _log.info("first_admin_created", extra={"user": user["username"], "client": client})

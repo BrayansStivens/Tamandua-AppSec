@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 
+from tamandua.app import wiring
 from tamandua.modules.identity.auth import Users
 from tamandua.modules.integrations import github
 from tamandua.modules.integrations.github import BranchNotFound, branch_head, valid_branch
@@ -16,12 +17,15 @@ from tamandua.modules.pullrequests import watch as pr_watch
 from tamandua.modules.runs.jobs import ScanJobs
 from tamandua.modules.runs.store import save_repository_scan
 from tamandua.modules.scanning.repository import scan_repository
+from tamandua.modules.runs import assets as run_assets
 from tamandua.modules.sources import assets
 from tamandua.shared.i18n import msg, text
 
 from fake_github import fake_github
 from test_auth import ORIGIN, PASSWORD, HttpCase
 from test_jobs import _wait
+
+wiring.configure()  # like every Tamandua process: domain events and injected readers
 
 REPOS = {7: [(1, "acme/api"), (2, "acme/web")]}
 ACCOUNTS = {7: ("acme", "selected")}
@@ -207,7 +211,7 @@ class PurgeTests(unittest.TestCase):
             assets.set_scan_branch(data_dir, "github#1", "develop", name="acme/api", source_id="github:acme/api", by="admin")
             pr_watch.set_base_branches(data_dir, "github#1", ["develop"], default_branch="main", by="admin")
             pr_watch.mark_branch(data_dir, "github#1", "d" * 40, "0" * 32, "develop")
-            assets.purge(data_dir, "github#1")
+            run_assets.purge(data_dir, "github#1")
             self.assertIsNone(assets.scan_branch(data_dir, "github#1"))
             self.assertNotIn("github#1", assets.load_registry(data_dir))
             self.assertEqual(pr_watch.settings(data_dir, "github#1")["base_branches"], [])

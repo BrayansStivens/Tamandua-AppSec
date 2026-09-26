@@ -14,7 +14,7 @@ from tamandua.modules.findings.exclusions import ASSET_KEY
 from tamandua.modules.scanning import secret_rules
 from tamandua.modules.scanning.engines import IMAGES
 from tamandua.modules.scanning.secret_builtin_rules import GITLEAKS_DEFAULT_RULES, TRIVY_EQUIVALENTS
-from tamandua.modules.sources.assets import overview as assets_overview
+from tamandua.modules.runs.assets import overview as assets_overview
 from tamandua.shared.i18n import msg
 
 router = APIRouter(tags=["scanning"])

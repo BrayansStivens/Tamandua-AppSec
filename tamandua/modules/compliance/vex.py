@@ -17,7 +17,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from tamandua.modules.intel.advisory_watch import purl as build_purl
+from tamandua.modules.scanning.dependency_merge import purl as build_purl
 from tamandua.modules.compliance.sbom import PORTFOLIO_ASSETS, root_ref
 from tamandua.shared.i18n import default_locale, t, text
 

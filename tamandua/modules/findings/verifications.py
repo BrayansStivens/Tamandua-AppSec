@@ -18,9 +18,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
+
+from tamandua.shared import documents
 
 MAX_PER_ASSET = 500
-from tamandua.shared import documents
+_runs: Callable[[Path], list[dict]] | None = None
 
 
 def load(data_dir: Path) -> dict:
@@ -41,21 +44,17 @@ def record(data_dir: Path, key: str, fingerprint: str, run_id: str, *, by: str) 
     return entry
 
 
-def in_flight(data_dir: Path, key: str) -> dict | None:
-    """Un análisis completo de ese activo que aún no terminó, si lo hay."""
-    from tamandua.modules.sources.assets import asset_key
-    from tamandua.modules.runs.kinds import FULL_SCANS
-    from tamandua.modules.runs.store import list_runs
-    return next((row for row in list_runs(data_dir) if row["type"] in FULL_SCANS and row["status"] in ("queued", "running")
-                 and asset_key(row) == key), None)
+def use_runs(lookup: Callable[[Path], list[dict]]) -> None:
+    """Wired by the composition root (`tamandua/app/wiring.py`): how to read the run rows, whose status says how a
+    verification went. Findings sit below runs, so they are handed the reader instead of importing it."""
+    global _runs
+    _runs = lookup
 
 
-def latest_scan(data_dir: Path, key: str) -> dict | None:
-    """El último análisis completo del activo: de él sale cómo volver a analizarlo (repositorio o imagen)."""
-    from tamandua.modules.sources.assets import asset_key
-    from tamandua.modules.runs.kinds import FULL_SCANS
-    from tamandua.modules.runs.store import list_runs
-    return next((row for row in list_runs(data_dir) if row["type"] in FULL_SCANS and asset_key(row) == key), None)
+def _run_rows(data_dir: Path) -> list[dict]:
+    if _runs is None:
+        raise RuntimeError("verifications: no run reader wired in this process (see tamandua/app/wiring.py)")
+    return _runs(data_dir)
 
 
 def annotate(data_dir: Path, key: str, findings: list[dict]) -> list[dict]:
@@ -64,8 +63,7 @@ def annotate(data_dir: Path, key: str, findings: list[dict]) -> list[dict]:
     if not requested or not any(item.get("fingerprint") in requested for item in findings):
         return findings
     from tamandua.modules.findings.registry import load as registry
-    from tamandua.modules.runs.store import list_runs
-    runs = {row["id"]: row for row in list_runs(data_dir)}
+    runs = {row["id"]: row for row in _run_rows(data_dir)}
     entries = registry(data_dir, key).get("findings", {})
     for finding in findings:
         asked = requested.get(finding.get("fingerprint"))

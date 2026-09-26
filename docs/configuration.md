@@ -27,5 +27,19 @@ Every variable is optional and goes in `.env` (a copy of `.env.example`). After 
 | `TAMANDUA_TLS_CERT` / `_KEY` | — | TLS without a proxy. |
 | `GITHUB_APP_ID` + `GITHUB_APP_SLUG` + `GITHUB_APP_PRIVATE_KEY_FILE` | — | Alternative to the form: mount the App as a deployment secret. Takes precedence over the secret store. |
 | `TAMANDUA_HOST_CONFIG_DIR` | `./config` | Host folder holding the encrypted secrets. |
+| `TAMANDUA_FORWARDED_ALLOW_IPS` | empty | Behind a reverse proxy that is the only way to reach the API: the proxy addresses whose `X-Forwarded-For` is believed (`*` = any peer). Without it, sign-in throttling and the logs see the proxy's address for everybody. `compose.prod.yaml` sets it for Caddy. |
+| `TAMANDUA_METRICS_TOKEN` | empty (off) | Turns on `/api/metrics` (Prometheus) for requests with `Authorization: Bearer <token>`. At least 32 characters: `openssl rand -hex 32`. |
+
+**Server with a domain** ([deploy-vps.md](deploy-vps.md)). Read by Compose, not by the app; `make setup DOMAIN=… [PREBUILT=1]` writes them.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TAMANDUA_DOMAIN` | — | Domain Caddy gets the certificate for (`compose.prod.yaml`). The public URL and allowed origins become `https://<domain>`. |
+| `COMPOSE_FILE` | `compose.yaml` | Compose files every command uses, e.g. `compose.yaml:compose.prod.yaml:compose.images.yaml`. |
+| `TAMANDUA_IMAGE` | — | Published image to run instead of building (`compose.images.yaml`), e.g. `ghcr.io/brayansstivens/tamandua`. |
+| `TAMANDUA_IMAGE_TAG` | the code's version | Tag of that image; accepts a digest (`0.9@sha256:…`). |
+| `COMPOSE_PROFILES` | — | `backup` turns on the scheduled backups service. |
+| `TAMANDUA_BACKUP_DIR` | `./backups` | Where the backup service writes. |
+| `TAMANDUA_BACKUP_INTERVAL_HOURS` / `_KEEP_DAYS` | `24` / `14` | How often it backs up, and for how long it keeps its own copies. |
 
 **Deliberate trade-off:** so you don't have to install anything but Docker, the app launches the engines as sibling containers through the Docker socket, which is equivalent to root on the host. If you open the panel to more people, put it behind a socket proxy or a separate runner.

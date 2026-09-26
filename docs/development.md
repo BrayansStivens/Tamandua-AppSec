@@ -52,9 +52,8 @@ The tests need PostgreSQL: `make test` starts a throwaway one in Docker (data in
 
 New routes go in FastAPI, in `tamandua/app/api/<context>.py`: parameters and response as Pydantic models, security
 with `guard(Policy(public=…, admin=…, action=…))` (CSRF, session, second factor, role; see `app/api/security.py`) and
-the logic in the business module, never in the route. Older routes are still declared as a table with `@route` in
-`app/api/routes/<area>.py` (same pipeline, registered by `routing.mount`); when you change one substantially, move it
-to a typed route.
+the logic in the business module, never in the route. Request bodies are read after the guard with `deps.body(Model,
+invalid_message)`, so an unauthenticated request never reaches validation.
 
 Then `make openapi` regenerates the schema and the panel's TypeScript types (`web/src/shared/api/`), used through
 `apiGet('/api/…')`: if the API and the panel disagree, `tsc` fails. CI checks that the schema is up to date.

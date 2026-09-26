@@ -5,6 +5,575 @@
     "version": "0.9"
   },
   "paths": {
+    "/api/auth/session": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Session",
+        "operationId": "session_api_auth_session_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ActiveSession"
+                    },
+                    {
+                      "$ref": "#/components/schemas/NoSession"
+                    }
+                  ],
+                  "title": "Response Session Api Auth Session Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/setup": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Setup Admin",
+        "description": "First administrator from the web, with the one-time code the server printed.",
+        "operationId": "setup_admin_api_auth_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "title": "Code"
+                  },
+                  "username": {
+                    "type": "string",
+                    "title": "Username"
+                  },
+                  "password": {
+                    "type": "string",
+                    "title": "Password"
+                  },
+                  "display_name": {
+                    "type": "string",
+                    "title": "Display Name"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "code",
+                  "username",
+                  "password",
+                  "display_name"
+                ],
+                "title": "SetupIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login",
+        "operationId": "login_api_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "title": "Username"
+                  },
+                  "password": {
+                    "type": "string",
+                    "title": "Password"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "title": "LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SignedIn"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TotpStep"
+                    }
+                  ],
+                  "title": "Response Login Api Auth Login Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Second Factor",
+        "description": "An expired or unknown challenge is a 401 with `code: challenge_expired`: sign in again from the password.",
+        "operationId": "second_factor_api_auth_totp_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "challenge": {
+                    "type": "string",
+                    "title": "Challenge"
+                  },
+                  "code": {
+                    "type": "string",
+                    "title": "Code"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "challenge",
+                  "code"
+                ],
+                "title": "SecondFactorIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedIn"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout",
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Password",
+        "operationId": "change_password_api_auth_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "current": {
+                    "type": "string",
+                    "title": "Current"
+                  },
+                  "new": {
+                    "type": "string",
+                    "title": "New"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "current",
+                  "new"
+                ],
+                "title": "PasswordIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasswordChanged"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/setup": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Totp Setup",
+        "operationId": "totp_setup_api_auth_totp_setup_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {},
+                "additionalProperties": false,
+                "type": "object",
+                "title": "EmptyIn",
+                "description": "`{}`."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpEnrolment"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Totp Confirm",
+        "operationId": "totp_confirm_api_auth_totp_confirm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "title": "Code"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "title": "CodeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpEnabled"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/totp/disable": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Totp Disable",
+        "operationId": "totp_disable_api_auth_totp_disable_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "title": "Password"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "password"
+                ],
+                "title": "PasswordOnlyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpDisabled"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/link/check": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Link Check",
+        "operationId": "link_check_api_auth_link_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "title": "Token"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "title": "TokenIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LinkInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/link": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Link Accept",
+        "operationId": "link_accept_api_auth_link_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "title": "Token"
+                  },
+                  "password": {
+                    "type": "string",
+                    "title": "Password"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "token",
+                  "password"
+                ],
+                "title": "LinkIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SignedIn"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TotpStep"
+                    }
+                  ],
+                  "title": "Response Link Accept Api Auth Link Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Users",
+        "operationId": "list_users_api_users_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Manage Users",
+        "description": "Invitations and account administration.",
+        "operationId": "manage_users_api_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "invite",
+                      "reset",
+                      "role",
+                      "disable",
+                      "enable",
+                      "reset_totp"
+                    ],
+                    "title": "Action"
+                  },
+                  "username": {
+                    "type": "string",
+                    "title": "Username"
+                  },
+                  "display_name": {
+                    "type": "string",
+                    "title": "Display Name"
+                  },
+                  "role": {
+                    "type": "string",
+                    "title": "Role"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "title": "User Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "title": "UserChangeIn",
+                "description": "`invite` takes username, role and display_name; `role` takes user_id and role; the rest, only user_id."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UserLink"
+                    },
+                    {
+                      "$ref": "#/components/schemas/UserChanged"
+                    }
+                  ],
+                  "title": "Response Manage Users Api Users Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -28,6 +597,38 @@
           {},
           {
             "session": []
+          }
+        ]
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Prometheus",
+        "operationId": "prometheus_api_metrics_get",
+        "responses": {
+          "200": {
+            "description": "Prometheus text exposition format",
+            "content": {
+              "text/plain; version=0.0.4; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token"
+          },
+          "404": {
+            "description": "Metrics are off (TAMANDUA_METRICS_TOKEN is not set)"
+          }
+        },
+        "security": [
+          {
+            "metrics": []
           }
         ]
       }
@@ -84,6 +685,140 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports/audit": {
+      "post": {
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Audit Report",
+        "description": "Audit evidence of a run or an asset's state, with the chosen findings (`fingerprints`; all of the scope without it).\n\nSame access as seeing that run or asset.",
+        "operationId": "audit_report_api_reports_audit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "run_id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{32}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Run Id"
+                  },
+                  "asset": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Asset"
+                  },
+                  "account": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Account"
+                  },
+                  "assets": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "maxItems": 500,
+                        "minItems": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Assets"
+                  },
+                  "status": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "open",
+                          "fixed",
+                          "all"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Status"
+                  },
+                  "fingerprints": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "maxItems": 5000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Fingerprints"
+                  },
+                  "options": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": true,
+                        "type": "object"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Options"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "AuditReportIn",
+                "description": "Exactly one scope: a run, an asset's state, an organization (`account`) or a selection of assets."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Audit evidence (PDF)",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "maxLength": 50000000,
+                  "format": "binary"
                 }
               }
             }
@@ -362,6 +1097,50 @@
         }
       }
     },
+    "/api/cves": {
+      "get": {
+        "tags": [
+          "intel"
+        ],
+        "summary": "Recent",
+        "description": "Search in what is local: KEV, EPSS and the last week's CVEs according to NVD.",
+        "operationId": "recent_api_cves_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecentCves"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sla": {
       "get": {
         "tags": [
@@ -377,6 +1156,219 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SlaPolicy"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Change Policy",
+        "description": "Days per severity (all four; null: no due date). Answers the new policy.",
+        "operationId": "change_policy_api_sla_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "days": {
+                    "properties": {
+                      "critical": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "high": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "medium": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "low": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "critical",
+                      "high",
+                      "medium",
+                      "low"
+                    ],
+                    "title": "Days"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "days"
+                ],
+                "title": "SlaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SlaPolicy"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/findings/triage": {
+      "post": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Triage Findings",
+        "operationId": "triage_findings_api_findings_triage_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "run_id": {
+                    "type": "string",
+                    "title": "Run Id"
+                  },
+                  "fingerprints": {
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "type": "array",
+                    "maxItems": 500,
+                    "minItems": 1,
+                    "title": "Fingerprints"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "in_progress",
+                      "false_positive",
+                      "accepted",
+                      "fixed"
+                    ],
+                    "title": "Status"
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 500,
+                    "title": "Reason"
+                  },
+                  "note": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 1000,
+                    "title": "Note"
+                  },
+                  "expires_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date",
+                    "title": "Expires At"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "run_id",
+                  "fingerprints",
+                  "status"
+                ],
+                "title": "TriageIn",
+                "description": "`run_id`: a run, or an asset's state (asset:<key>); the triage is the same."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriageResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/findings/reverify": {
+      "post": {
+        "tags": [
+          "findings"
+        ],
+        "summary": "Reverify Finding",
+        "description": "Scans the finding's asset again (or joins the scan in progress) to see whether it is still there.",
+        "operationId": "reverify_finding_api_findings_reverify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "run_id": {
+                    "type": "string",
+                    "title": "Run Id"
+                  },
+                  "fingerprint": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{16,64}$",
+                    "title": "Fingerprint"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "run_id",
+                  "fingerprint"
+                ],
+                "title": "ReverifyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reverification"
                 }
               }
             }
@@ -1007,6 +1999,220 @@
         }
       }
     },
+    "/api/pull-requests": {
+      "get": {
+        "tags": [
+          "pull-requests"
+        ],
+        "summary": "Pulls",
+        "operationId": "pulls_api_pull_requests_get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullListing"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pull-requests/watch": {
+      "get": {
+        "tags": [
+          "pull-requests"
+        ],
+        "summary": "Watch Overview",
+        "description": "One page (`per_page` 1-100, 25 by default) of the installation's repositories with their watch settings.",
+        "operationId": "watch_overview_api_pull_requests_watch_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Per Page"
+            }
+          },
+          {
+            "name": "only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`enabled`: only the watched repositories",
+              "title": "Only"
+            },
+            "description": "`enabled`: only the watched repositories"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pull-requests/settings": {
+      "post": {
+        "tags": [
+          "pull-requests"
+        ],
+        "summary": "Watch Settings",
+        "description": "Configures one repository (and answers its settings), several, or all of them (and answers how many).",
+        "operationId": "watch_settings_api_pull_requests_settings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "source_id": {
+                    "type": "string",
+                    "title": "Source Id"
+                  },
+                  "source_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 200,
+                    "title": "Source Ids"
+                  },
+                  "all": {
+                    "type": "boolean",
+                    "title": "All"
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "Enabled"
+                  },
+                  "post_comment": {
+                    "type": "boolean",
+                    "title": "Post Comment"
+                  },
+                  "gate": {
+                    "type": "string",
+                    "enum": [
+                      "critical",
+                      "high",
+                      "medium",
+                      "never"
+                    ],
+                    "title": "Gate"
+                  },
+                  "branch": {
+                    "type": "boolean",
+                    "title": "Branch"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "WatchSettingsIn",
+                "description": "Exactly one of `source_id`, `source_ids` (1-200) or `all`; with `all`, only `enabled`."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WatchUpdated"
+                    },
+                    {
+                      "$ref": "#/components/schemas/WatchConfig"
+                    }
+                  ],
+                  "title": "Response Watch Settings Api Pull Requests Settings Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/repositories/branch": {
       "post": {
         "tags": [
@@ -1042,6 +2248,242 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repositories/plan": {
+      "get": {
+        "tags": [
+          "repositories"
+        ],
+        "summary": "Plan",
+        "description": "What the scan will do, worked out from the repository's real tree and the available engines.",
+        "operationId": "plan_api_repositories_plan_get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Plan Api Repositories Plan Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repositories/scans": {
+      "post": {
+        "tags": [
+          "repositories"
+        ],
+        "summary": "Repository Scan",
+        "operationId": "repository_scan_api_repositories_scans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "source_id": {
+                    "type": "string",
+                    "title": "Source Id"
+                  },
+                  "allow_osv_upload": {
+                    "type": "boolean",
+                    "title": "Allow Osv Upload"
+                  },
+                  "context": {
+                    "type": "string",
+                    "title": "Context",
+                    "default": ""
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "source_id",
+                  "allow_osv_upload"
+                ],
+                "title": "RepositoryScanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedScan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repositories/batches": {
+      "get": {
+        "tags": [
+          "repositories"
+        ],
+        "summary": "List Batches",
+        "description": "The running batch, if any, and the latest finished ones (repositories and images).",
+        "operationId": "list_batches_api_repositories_batches_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batches"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "repositories"
+        ],
+        "summary": "Create Batch",
+        "description": "Several repositories at once: a selection (up to 100) or a whole organization (administration).",
+        "operationId": "create_batch_api_repositories_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "source_ids": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array",
+                        "maxItems": 100,
+                        "minItems": 1
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Source Ids"
+                  },
+                  "account": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Account"
+                  },
+                  "allow_osv_upload": {
+                    "type": "boolean",
+                    "title": "Allow Osv Upload",
+                    "default": false
+                  },
+                  "context": {
+                    "type": "string",
+                    "title": "Context",
+                    "default": ""
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "BatchIn",
+                "description": "A selection (`source_ids`, any member) or a whole organization (`account`, administrators); one of the two."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repositories/batches/cancel": {
+      "post": {
+        "tags": [
+          "repositories"
+        ],
+        "summary": "Cancel Batch",
+        "description": "Whoever started it, or an administrator.",
+        "operationId": "cancel_batch_api_repositories_batches_cancel_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "title": "Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "title": "CancelBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummary"
                 }
               }
             }
@@ -1216,10 +2658,2163 @@
           }
         }
       }
+    },
+    "/api/sources": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Sources",
+        "description": "A page of repositories (`q`, `account`, `provider`, `page` from 1, `per_page` 1–100) or one of them (`id`).",
+        "operationId": "sources_api_sources_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Page"
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Per Page"
+            }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Refresh"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Sources Api Sources Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/code": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Connect Code",
+        "description": "Connects a GitHub or GitLab token (kept in memory only), or disconnects it with `disconnect: true`.",
+        "operationId": "connect_code_api_integrations_code_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "github",
+                          "gitlab"
+                        ],
+                        "title": "Provider"
+                      },
+                      "token": {
+                        "title": "Token"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "provider",
+                      "token"
+                    ],
+                    "title": "CodeTokenIn"
+                  },
+                  {
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": [
+                          "github",
+                          "gitlab"
+                        ],
+                        "title": "Provider"
+                      },
+                      "disconnect": {
+                        "title": "Disconnect"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "provider",
+                      "disconnect"
+                    ],
+                    "title": "CodeDisconnectIn"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Connect Code Api Integrations Code Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/domains": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Domains",
+        "operationId": "domains_api_domains_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Domains Api Domains Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Add Domain",
+        "operationId": "add_domain_api_domains_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "title": "Url"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "title": "Kind",
+                    "default": "web"
+                  },
+                  "context": {
+                    "type": "string",
+                    "title": "Context",
+                    "default": ""
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "title": "DomainIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Add Domain Api Domains Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/domains/verify": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Verify",
+        "operationId": "verify_api_domains_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "domain_id": {
+                    "type": "string",
+                    "title": "Domain Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "domain_id"
+                ],
+                "title": "DomainIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Verify Api Domains Verify Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/domains/check": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Reachability",
+        "operationId": "reachability_api_domains_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "title": "Url"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "url"
+                ],
+                "title": "DomainUrlIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Reachability Api Domains Check Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/providers": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Providers",
+        "operationId": "providers_api_providers_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Providers Api Providers Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/providers/keys": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Provider Keys",
+        "description": "Saves (after checking it with the provider) or removes the workspace's own key; the key never comes back.",
+        "operationId": "provider_keys_api_providers_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "provider": {
+                    "title": "Provider"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "save",
+                      "remove"
+                    ],
+                    "title": "Action"
+                  },
+                  "api_key": {
+                    "title": "Api Key",
+                    "default": ""
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "provider",
+                  "action"
+                ],
+                "title": "ProviderKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Provider Keys Api Providers Keys Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/providers/check": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Provider Check",
+        "operationId": "provider_check_api_providers_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "provider": {
+                    "title": "Provider"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "provider"
+                ],
+                "title": "ProviderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Provider Check Api Providers Check Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/github": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Github",
+        "operationId": "github_api_integrations_github_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Github Api Integrations Github Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Github Action",
+        "operationId": "github_action_api_integrations_github_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "install",
+                      "detect",
+                      "connect",
+                      "disconnect",
+                      "forget_app"
+                    ],
+                    "title": "Action"
+                  },
+                  "installation_id": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0.0,
+                    "title": "Installation Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "action"
+                ],
+                "title": "GitHubActionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Github Action Api Integrations Github Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/github/app": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Github App Credentials",
+        "description": "App ID and private key pasted by an administrator: checked with GitHub and stored encrypted.",
+        "operationId": "github_app_credentials_api_integrations_github_app_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "app_id": {
+                    "title": "App Id"
+                  },
+                  "private_key": {
+                    "title": "Private Key"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "app_id",
+                  "private_key"
+                ],
+                "title": "GitHubAppIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Github App Credentials Api Integrations Github App Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/oauth/callback": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Github Callback",
+        "operationId": "github_callback_oauth_callback_get",
+        "parameters": [
+          {
+            "name": "installation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Installation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {}
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira": {
+      "get": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Jira Status",
+        "operationId": "jira_status_api_integrations_jira_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Jira Status Api Integrations Jira Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Jira Configure",
+        "operationId": "jira_configure_api_integrations_jira_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "save",
+                        "title": "Action"
+                      },
+                      "site": {
+                        "title": "Site"
+                      },
+                      "email": {
+                        "title": "Email"
+                      },
+                      "token": {
+                        "title": "Token"
+                      },
+                      "project": {
+                        "title": "Project"
+                      },
+                      "issue_type": {
+                        "title": "Issue Type",
+                        "default": "Task"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "site",
+                      "email",
+                      "token",
+                      "project"
+                    ],
+                    "title": "JiraSaveIn"
+                  },
+                  {
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "const": "remove",
+                        "title": "Action"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "title": "JiraRemoveIn"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Jira Configure Api Integrations Jira Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/issues": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Jira Export",
+        "operationId": "jira_export_api_integrations_jira_issues_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "run_id": {
+                    "type": "string",
+                    "title": "Run Id"
+                  },
+                  "fingerprints": {
+                    "title": "Fingerprints"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "run_id",
+                  "fingerprints"
+                ],
+                "title": "JiraExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Jira Export Api Integrations Jira Issues Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models": {
+      "get": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Models",
+        "operationId": "models_api_threat_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Models Api Threat Models Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Save Model",
+        "operationId": "save_model_api_threat_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "title": "Id"
+                  },
+                  "model": {
+                    "title": "Model"
+                  },
+                  "suggest": {
+                    "title": "Suggest"
+                  },
+                  "name": {
+                    "title": "Name"
+                  },
+                  "methodology": {
+                    "title": "Methodology"
+                  },
+                  "custom_modules": {
+                    "title": "Custom Modules"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "ThreatModelIn",
+                "description": "A model to save (`model`, with `id` to update it) or a new one proposed from repositories (`suggest`)."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Save Model Api Threat Models Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models/{model_id}": {
+      "get": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Model Detail",
+        "operationId": "model_detail_api_threat_models__model_id__get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Model Detail Api Threat Models  Model Id  Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models/{model_id}/{artifact}": {
+      "get": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Model Export",
+        "description": "The model in another format: Threat Dragon, pytm, Markdown or PDF report, SVG diagram or the portable JSON.",
+        "operationId": "model_export_api_threat_models__model_id___artifact__get",
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "artifact",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {},
+              "text/x-python": {},
+              "text/markdown": {},
+              "application/pdf": {},
+              "image/svg+xml": {}
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models/import": {
+      "post": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Import Model",
+        "description": "Creates a model from the portable format (model.json).",
+        "operationId": "import_model_api_threat_models_import_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Import Model Api Threat Models Import Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models/validate": {
+      "post": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Validate Import",
+        "description": "Checks the portable format without creating or changing a model.",
+        "operationId": "validate_import_api_threat_models_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Validate Import Api Threat Models Validate Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models/propose": {
+      "post": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Propose",
+        "description": "Components proposed from repositories, merged into the draft being edited. Saves nothing.",
+        "operationId": "propose_api_threat_models_propose_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "model": {
+                    "title": "Model"
+                  },
+                  "repositories": {
+                    "title": "Repositories"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "model",
+                  "repositories"
+                ],
+                "title": "ProposeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Propose Api Threat Models Propose Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models/decide": {
+      "post": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Decide",
+        "operationId": "decide_api_threat_models_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "title": "Id"
+                  },
+                  "threat": {
+                    "title": "Threat"
+                  },
+                  "status": {
+                    "title": "Status"
+                  },
+                  "reason": {
+                    "title": "Reason"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id",
+                  "threat",
+                  "status"
+                ],
+                "title": "DecisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Decide Api Threat Models Decide Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/threat-models/delete": {
+      "post": {
+        "tags": [
+          "threats"
+        ],
+        "summary": "Remove",
+        "operationId": "remove_api_threat_models_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "title": "Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "title": "ModelIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Remove Api Threat Models Delete Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Runs",
+        "description": "Every run's row, newest first (the panel pages with /api/runs/page).",
+        "operationId": "runs_api_runs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/page": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Runs Page",
+        "description": "`type` accepts several kinds separated by commas. Paging values out of range are clamped.",
+        "operationId": "runs_page_api_runs_page_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "25",
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "0",
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Type"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Asset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Run Detail",
+        "operationId": "run_detail_api_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Run Detail Api Runs  Run Id  Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{run_id}/{artifact}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Run Artifact",
+        "description": "`title` names a compliance profile report (report-<profile>.md|pdf).",
+        "operationId": "run_artifact_api_runs__run_id___artifact__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "artifact",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact"
+            }
+          },
+          {
+            "name": "title",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Title"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file: Markdown or PDF report, SARIF, CycloneDX SBOM, OpenVEX or Jira tickets (JSON)",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 50000000
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 50000000
+                }
+              },
+              "application/sarif+json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 100000000
+                }
+              },
+              "application/vnd.cyclonedx+json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 100000000
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found, or that format isn't available for it"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Assets",
+        "description": "Analyzed repositories and images, grouped by stable identity, with their current state. `limit` is clamped to 1–200.",
+        "operationId": "assets_api_assets_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "50",
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "0",
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/state": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Asset State",
+        "description": "An asset's findings registry (scans and PRs): open, fixed, excluded or all.",
+        "operationId": "asset_state_api_assets_state_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "open",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Asset State Api Assets State Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/export": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Asset Export",
+        "description": "An export of the current state (there is no run ID for this view). `artifact` also accepts record.json.",
+        "operationId": "asset_export_api_assets_export_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "open",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "artifact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Artifact"
+            }
+          },
+          {
+            "name": "title",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Title"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file: Markdown or PDF report, SARIF, CycloneDX SBOM, OpenVEX or Jira tickets (JSON)",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 50000000
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 50000000
+                }
+              },
+              "application/sarif+json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 100000000
+                }
+              },
+              "application/vnd.cyclonedx+json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary",
+                  "maxLength": 100000000
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Run not found, or that format isn't available for it"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/exclusions": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Asset Exclusions",
+        "description": "A repository's excluded paths: anyone sees them; only an administrator changes them.",
+        "operationId": "asset_exclusions_api_assets_exclusions_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Asset Exclusions Api Assets Exclusions Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Save Asset Exclusions",
+        "description": "Replaces the excluded paths; findings under them move to excluded, and the ones no longer covered reopen.",
+        "operationId": "save_asset_exclusions_api_assets_exclusions_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Save Asset Exclusions Api Assets Exclusions Post"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "key": {
+                    "maxLength": 200,
+                    "pattern": "^[A-Za-z0-9#:_./@+-]{1,200}$",
+                    "title": "Key",
+                    "type": "string"
+                  },
+                  "patterns": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 50,
+                    "title": "Patterns",
+                    "type": "array"
+                  },
+                  "reason": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Reason"
+                  }
+                },
+                "required": [
+                  "key",
+                  "patterns"
+                ],
+                "title": "ExclusionsIn",
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/scans": {
+      "post": {
+        "tags": [
+          "images"
+        ],
+        "summary": "Image Scan",
+        "description": "Queues the scan of a container image, pulled from its registry.",
+        "operationId": "image_scan_api_images_scans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "reference": {
+                    "type": "string",
+                    "title": "Reference"
+                  },
+                  "context": {
+                    "type": "string",
+                    "title": "Context",
+                    "default": ""
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "reference"
+                ],
+                "title": "ImageScanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedImageScan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/images/batches": {
+      "post": {
+        "tags": [
+          "images"
+        ],
+        "summary": "Image Batch",
+        "description": "Several images at once (up to 100), in a batch that moves on when the server is free.",
+        "operationId": "image_batch_api_images_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "references": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 100,
+                    "title": "References"
+                  },
+                  "context": {
+                    "type": "string",
+                    "title": "Context",
+                    "default": ""
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "references"
+                ],
+                "title": "ImageBatchIn",
+                "description": "Blank and repeated references are dropped before counting."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/registries": {
+      "get": {
+        "tags": [
+          "images"
+        ],
+        "summary": "Registry List",
+        "description": "Registries with saved credentials (never the token), and whether private addresses are allowed.",
+        "operationId": "registry_list_api_registries_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Registry List Api Registries Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "images"
+        ],
+        "summary": "Registry Save",
+        "description": "Read-only credentials of a private registry: stored encrypted, never sent back to the browser.",
+        "operationId": "registry_save_api_registries_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "save",
+                      "remove"
+                    ],
+                    "title": "Action"
+                  },
+                  "registry": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "title": "Registry"
+                  },
+                  "username": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Username"
+                  },
+                  "token": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Token"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "action",
+                  "registry"
+                ],
+                "title": "RegistryIn",
+                "description": "`save` needs `username` and `token`; `remove` only the registry."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Registry Save Api Registries Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Channel List",
+        "operationId": "channel_list_api_notifications_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Channels"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Channel Change",
+        "description": "`save` answers the channel and, for a webhook, its signing secret (shown once); `remove` the channels left;\n`test` whether the delivery worked, with its detail (also a 200 when it fails) and the updated channels.",
+        "operationId": "channel_change_api_notifications_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "const": "save",
+                        "title": "Op"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "slack",
+                          "teams",
+                          "webhook"
+                        ],
+                        "title": "Kind"
+                      },
+                      "name": {
+                        "type": "string",
+                        "maxLength": 60,
+                        "title": "Name"
+                      },
+                      "url": {
+                        "type": "string",
+                        "maxLength": 2048,
+                        "title": "Url"
+                      },
+                      "events": {
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "findings",
+                            "batches"
+                          ]
+                        },
+                        "type": "array",
+                        "maxItems": 2,
+                        "minItems": 1,
+                        "title": "Events"
+                      },
+                      "threshold": {
+                        "type": "string",
+                        "enum": [
+                          "critical",
+                          "high",
+                          "medium"
+                        ],
+                        "title": "Threshold"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "kind",
+                      "name",
+                      "url",
+                      "events",
+                      "threshold"
+                    ],
+                    "title": "ChannelSaveIn"
+                  },
+                  {
+                    "properties": {
+                      "op": {
+                        "type": "string",
+                        "enum": [
+                          "remove",
+                          "test"
+                        ],
+                        "title": "Op"
+                      },
+                      "id": {
+                        "type": "string",
+                        "title": "Id"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "op",
+                      "id"
+                    ],
+                    "title": "ChannelIn"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Channel Change Api Notifications Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/onboarding": {
+      "get": {
+        "tags": [
+          "onboarding"
+        ],
+        "summary": "Onboarding",
+        "operationId": "onboarding_api_onboarding_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Onboarding"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ActiveSession": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "const": true,
+            "title": "Authenticated"
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicUser"
+          },
+          "mfa": {
+            "type": "boolean",
+            "title": "Mfa"
+          },
+          "totp_required": {
+            "type": "boolean",
+            "title": "Totp Required"
+          },
+          "totp_policy": {
+            "type": "string",
+            "title": "Totp Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authenticated",
+          "user",
+          "mfa",
+          "totp_required",
+          "totp_policy"
+        ],
+        "title": "ActiveSession"
+      },
       "AffectedAsset": {
         "properties": {
           "asset": {
@@ -1330,6 +4925,39 @@
           "verdict"
         ],
         "title": "AssessIn"
+      },
+      "AssetPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AssetPage"
       },
       "AssetSecretConfig": {
         "properties": {
@@ -1463,6 +5091,132 @@
         ],
         "title": "AssetSecretConfigIn"
       },
+      "BatchSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "critical": {
+            "type": "integer",
+            "title": "Critical"
+          },
+          "high": {
+            "type": "integer",
+            "title": "High"
+          },
+          "eta_seconds": {
+            "type": "integer",
+            "title": "Eta Seconds"
+          },
+          "failed_items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Failed Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "status",
+          "created_at",
+          "by",
+          "total",
+          "pending",
+          "running",
+          "done",
+          "failed",
+          "critical",
+          "high",
+          "eta_seconds",
+          "failed_items"
+        ],
+        "title": "BatchSummary",
+        "description": "Progress worked out from the batch's real runs, with the estimated time left."
+      },
+      "Batches": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BatchSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/BatchSummary"
+            },
+            "type": "array",
+            "maxItems": 5,
+            "title": "Recent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active",
+          "recent"
+        ],
+        "title": "Batches"
+      },
       "BuiltinRule": {
         "properties": {
           "id": {
@@ -1514,6 +5268,55 @@
           "rules"
         ],
         "title": "BuiltinRules"
+      },
+      "Channels": {
+        "properties": {
+          "channels": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Channels"
+          },
+          "kinds": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Kinds"
+          },
+          "events": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Events"
+          },
+          "thresholds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Thresholds"
+          },
+          "links": {
+            "type": "boolean",
+            "title": "Links"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channels",
+          "kinds",
+          "events",
+          "thresholds",
+          "links"
+        ],
+        "title": "Channels",
+        "description": "Never the channel's URL nor its signing secret: the host and what it is sent."
       },
       "CraAssessment": {
         "properties": {
@@ -2903,6 +6706,29 @@
         ],
         "title": "Health"
       },
+      "LinkInfo": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "display_name",
+          "purpose"
+        ],
+        "title": "LinkInfo"
+      },
       "MarkIn": {
         "properties": {
           "op": {
@@ -2938,6 +6764,81 @@
           "sent"
         ],
         "title": "MarkIn"
+      },
+      "NoSession": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "const": false,
+            "title": "Authenticated"
+          },
+          "setup_required": {
+            "type": "boolean",
+            "title": "Setup Required"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authenticated",
+          "setup_required"
+        ],
+        "title": "NoSession"
+      },
+      "Onboarding": {
+        "properties": {
+          "mfa": {
+            "type": "boolean",
+            "title": "Mfa"
+          },
+          "github": {
+            "type": "boolean",
+            "title": "Github"
+          },
+          "analyzed": {
+            "type": "boolean",
+            "title": "Analyzed"
+          },
+          "demo": {
+            "type": "boolean",
+            "title": "Demo"
+          },
+          "watching": {
+            "type": "boolean",
+            "title": "Watching"
+          },
+          "alerts": {
+            "type": "boolean",
+            "title": "Alerts"
+          },
+          "admin": {
+            "type": "boolean",
+            "title": "Admin"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mfa",
+          "github",
+          "analyzed",
+          "demo",
+          "watching",
+          "alerts",
+          "admin"
+        ],
+        "title": "Onboarding"
+      },
+      "PasswordChanged": {
+        "properties": {
+          "changed": {
+            "type": "boolean",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changed"
+        ],
+        "title": "PasswordChanged"
       },
       "PortfolioEvidenceIn": {
         "properties": {
@@ -3003,6 +6904,320 @@
         ],
         "title": "ProductIn"
       },
+      "PublicUser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "totp_enabled": {
+            "type": "boolean",
+            "title": "Totp Enabled"
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "last_login_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Login At"
+          },
+          "has_password": {
+            "type": "boolean",
+            "title": "Has Password"
+          },
+          "pending_link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "role",
+          "totp_enabled",
+          "disabled",
+          "created_at",
+          "last_login_at",
+          "has_password",
+          "pending_link"
+        ],
+        "title": "PublicUser"
+      },
+      "PullListing": {
+        "properties": {
+          "settings": {
+            "$ref": "#/components/schemas/RepositoryWatch"
+          },
+          "pulls": {
+            "items": {
+              "$ref": "#/components/schemas/PullRow"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Pulls"
+          },
+          "pulls_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pulls Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "settings",
+          "pulls"
+        ],
+        "title": "PullListing",
+        "description": "`pulls_error` (and no pulls) when GitHub doesn't let the App read them: the settings can still be changed."
+      },
+      "PullReview": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "head_sha": {
+            "type": "string",
+            "title": "Head Sha"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "new": {
+            "type": "integer",
+            "title": "New"
+          },
+          "severities": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Severities"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "head_sha",
+          "created_at",
+          "current",
+          "new",
+          "severities"
+        ],
+        "title": "PullReview"
+      },
+      "PullRow": {
+        "properties": {
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "draft": {
+            "type": "boolean",
+            "title": "Draft"
+          },
+          "head_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Sha"
+          },
+          "head_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Ref"
+          },
+          "base_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Ref"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "merged": {
+            "type": "boolean",
+            "title": "Merged"
+          },
+          "closed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed At"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PullReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "number",
+          "title",
+          "url",
+          "author",
+          "draft",
+          "head_sha",
+          "head_ref",
+          "base_ref",
+          "updated_at",
+          "state",
+          "merged",
+          "closed_at",
+          "review"
+        ],
+        "title": "PullRow"
+      },
+      "QueuedImageScan": {
+        "properties": {
+          "run": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Run"
+          },
+          "image": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "image"
+        ],
+        "title": "QueuedImageScan"
+      },
       "QueuedRun": {
         "properties": {
           "id": {
@@ -3020,6 +7235,54 @@
           "status"
         ],
         "title": "QueuedRun"
+      },
+      "QueuedScan": {
+        "properties": {
+          "run": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Run"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run"
+        ],
+        "title": "QueuedScan"
+      },
+      "RecentCves": {
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "sources": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "query",
+          "items",
+          "total",
+          "sources"
+        ],
+        "title": "RecentCves"
       },
       "ReopenIn": {
         "properties": {
@@ -3041,6 +7304,98 @@
           "event"
         ],
         "title": "ReopenIn"
+      },
+      "RepositoryWatch": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "post_comment": {
+            "type": "boolean",
+            "title": "Post Comment"
+          },
+          "gate": {
+            "type": "string",
+            "title": "Gate"
+          },
+          "branch": {
+            "type": "boolean",
+            "title": "Branch"
+          },
+          "base_branches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Base Branches"
+          },
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "branch_scan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Scan"
+          },
+          "branch_min_minutes": {
+            "type": "integer",
+            "title": "Branch Min Minutes"
+          },
+          "default_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Branch"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "enabled",
+          "post_comment",
+          "gate",
+          "branch",
+          "base_branches",
+          "uid",
+          "branch_scan",
+          "branch_min_minutes",
+          "default_branch"
+        ],
+        "title": "RepositoryWatch"
+      },
+      "Reverification": {
+        "properties": {
+          "run": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Run"
+          },
+          "joined": {
+            "type": "boolean",
+            "title": "Joined"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run",
+          "joined"
+        ],
+        "title": "Reverification"
       },
       "ReviewIn": {
         "properties": {
@@ -3076,6 +7431,39 @@
           "run"
         ],
         "title": "ReviewQueued"
+      },
+      "RunPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "RunPage"
       },
       "ScanBranch": {
         "properties": {
@@ -3504,6 +7892,37 @@
         ],
         "title": "SecretRuleView"
       },
+      "SignedIn": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "const": "done",
+            "title": "Step"
+          },
+          "user": {
+            "$ref": "#/components/schemas/PublicUser"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "user"
+        ],
+        "title": "SignedIn"
+      },
+      "SignedOut": {
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "title": "Authenticated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "authenticated"
+        ],
+        "title": "SignedOut"
+      },
       "SlaDays": {
         "properties": {
           "critical": {
@@ -3688,6 +8107,93 @@
         ],
         "title": "TargetBranchesIn"
       },
+      "TotpDisabled": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled"
+        ],
+        "title": "TotpDisabled"
+      },
+      "TotpEnabled": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "backup_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Backup Codes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "backup_codes"
+        ],
+        "title": "TotpEnabled"
+      },
+      "TotpEnrolment": {
+        "properties": {
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "secret",
+          "uri"
+        ],
+        "title": "TotpEnrolment"
+      },
+      "TotpStep": {
+        "properties": {
+          "step": {
+            "type": "string",
+            "const": "totp",
+            "title": "Step"
+          },
+          "challenge": {
+            "type": "string",
+            "title": "Challenge"
+          }
+        },
+        "type": "object",
+        "required": [
+          "step",
+          "challenge"
+        ],
+        "title": "TotpStep",
+        "description": "The password was right; the account has TOTP: send the code with this challenge to /api/auth/totp."
+      },
+      "TriageResult": {
+        "properties": {
+          "summary": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary"
+        ],
+        "title": "TriageResult"
+      },
       "UnproductIn": {
         "properties": {
           "op": {
@@ -3708,6 +8214,264 @@
           "key"
         ],
         "title": "UnproductIn"
+      },
+      "UserChanged": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/PublicUser"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "user"
+        ],
+        "title": "UserChanged"
+      },
+      "UserLink": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/PublicUser"
+          },
+          "link": {
+            "type": "string",
+            "title": "Link"
+          },
+          "expires_in_hours": {
+            "type": "integer",
+            "title": "Expires In Hours"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user",
+          "link",
+          "expires_in_hours"
+        ],
+        "title": "UserLink",
+        "description": "The one-time link to hand to the person (invitation or password reset)."
+      },
+      "UserList": {
+        "properties": {
+          "users": {
+            "items": {
+              "$ref": "#/components/schemas/PublicUser"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Users"
+          },
+          "totp_policy": {
+            "type": "string",
+            "title": "Totp Policy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "users",
+          "totp_policy"
+        ],
+        "title": "UserList"
+      },
+      "WatchConfig": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "post_comment": {
+            "type": "boolean",
+            "title": "Post Comment"
+          },
+          "gate": {
+            "type": "string",
+            "title": "Gate"
+          },
+          "branch": {
+            "type": "boolean",
+            "title": "Branch"
+          },
+          "base_branches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Base Branches"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "enabled",
+          "post_comment",
+          "gate",
+          "branch",
+          "base_branches"
+        ],
+        "title": "WatchConfig",
+        "description": "A repository's watch settings (with who changed them last, once changed)."
+      },
+      "WatchPage": {
+        "properties": {
+          "repositories": {
+            "items": {
+              "$ref": "#/components/schemas/WatchRow"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Repositories"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "per_page": {
+            "type": "integer",
+            "title": "Per Page"
+          },
+          "partial": {
+            "type": "boolean",
+            "title": "Partial"
+          },
+          "interval": {
+            "type": "integer",
+            "title": "Interval"
+          },
+          "enabled": {
+            "type": "integer",
+            "title": "Enabled"
+          },
+          "branch_min_minutes": {
+            "type": "integer",
+            "title": "Branch Min Minutes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "repositories",
+          "total",
+          "page",
+          "per_page",
+          "partial",
+          "interval",
+          "enabled",
+          "branch_min_minutes"
+        ],
+        "title": "WatchPage"
+      },
+      "WatchRow": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "post_comment": {
+            "type": "boolean",
+            "title": "Post Comment"
+          },
+          "gate": {
+            "type": "string",
+            "title": "Gate"
+          },
+          "branch": {
+            "type": "boolean",
+            "title": "Branch"
+          },
+          "base_branches": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Base Branches"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "private": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Private"
+          },
+          "reviewed": {
+            "type": "integer",
+            "title": "Reviewed"
+          },
+          "branch_scan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Scan"
+          },
+          "default_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Branch"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "enabled",
+          "post_comment",
+          "gate",
+          "branch",
+          "base_branches",
+          "id",
+          "uid",
+          "name",
+          "private",
+          "reviewed",
+          "branch_scan",
+          "default_branch"
+        ],
+        "title": "WatchRow"
+      },
+      "WatchUpdated": {
+        "properties": {
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "updated"
+        ],
+        "title": "WatchUpdated"
       },
       "Error": {
         "title": "Error",
@@ -3730,6 +8494,11 @@
         "in": "cookie",
         "name": "tamandua_session",
         "description": "Session signed in to the panel."
+      },
+      "metrics": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "TAMANDUA_METRICS_TOKEN (Prometheus scraper)."
       }
     }
   },

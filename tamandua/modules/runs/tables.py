@@ -1,7 +1,7 @@
 """Tablas de ejecuciones. La fila del listado (`row`) y el registro completo (`record`) se guardan tal cual en JSONB
 (el formato que ya usa la aplicación); las columnas tipadas sirven para filtrar, ordenar y paginar en la base."""
 
-from sqlalchemy import Boolean, Column, DateTime, Index, Integer, String, Table, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKeyConstraint, Index, Integer, String, Table, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 
 from tamandua.shared.db import TENANT, metadata
@@ -13,6 +13,7 @@ runs = Table(
     Column("type", Text, nullable=False),
     Column("status", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False),
+    # No foreign key to registry_assets: a queued, failed or non-finding run has no registry row (see migration 0003).
     Column("asset_key", Text),
     Column("row", JSONB, nullable=False),
     Column("record", JSONB, nullable=False),
@@ -40,8 +41,11 @@ jobs = Table(
     Column("error", Text),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("finished_at", DateTime(timezone=True)),
+    # A job only exists to fill its run: when the run goes (repository purge), so does the job.
+    ForeignKeyConstraint(["tenant_id", "run_id"], ["runs.tenant_id", "runs.id"], name="fk_jobs_run", ondelete="CASCADE"),
 )
 Index("ix_jobs_claim", jobs.c.tenant_id, jobs.c.status, jobs.c.created_at)
+Index("ix_jobs_run", jobs.c.tenant_id, jobs.c.run_id)
 
 # Latido de cada worker: la salud del API dice si hay uno vivo y si puede lanzar los motores (Docker).
 workers = Table(

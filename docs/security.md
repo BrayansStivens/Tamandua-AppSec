@@ -34,7 +34,7 @@ Tamandua reads your repositories' code and stores GitHub, AI and Jira credential
 - **Passwords** hashed with scrypt (N=2¹⁵, r=8, p=1), 12 characters minimum. A nonexistent user costs the same as a real one, so response times don't reveal which users exist.
 - **Two-factor authentication** with TOTP (RFC 6238), required for administrators by default, with 8 single-use backup codes. A code that was already used doesn't work twice.
 - **Server-side sessions**, with an `HttpOnly`, `SameSite=Strict` cookie that is also `Secure` over HTTPS. Changing your password, turning on TOTP or having an administrator reset your credentials signs out your other sessions.
-- **Rate limiting** per user and per address: after 5 failures, a progressive lockout from 30 s to 15 min. It also applies to the initial setup and to the return from GitHub.
+- **Rate limiting** per user and per address: after 5 failures, a progressive lockout from 30 s to 15 min. It also applies to the initial setup and to the return from GitHub. Behind a reverse proxy, the address comes from `X-Forwarded-For` only when the request comes from a proxy listed in `TAMANDUA_FORWARDED_ALLOW_IPS` (`compose.prod.yaml` sets it for Caddy); otherwise everybody would share the proxy's address.
 - **CSRF**: every POST requires an allowed `Origin` and an action header specific to its route.
 - **Roles**: `admin` connects integrations, manages users and accepts risks; `member` scans and triages.
 

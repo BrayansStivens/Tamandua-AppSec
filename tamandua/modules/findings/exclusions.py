@@ -203,6 +203,8 @@ def apply_to_record(data_dir: Path, record: dict, key: str) -> dict:
         reason = _recount(row.get("reason") or "", count)
         coverage.append({**row, "findings": count, "reason": reason})
     limitation = msg("findings.exclusions.limitation", patterns=", ".join(active), count=total)
+    # Secrets withheld by the secret detection settings (scanning) may already be there.
     return {**record, "findings": kept, "summary": summary, "owasp_coverage": coverage or record.get("owasp_coverage"),
-            "excluded": {"patterns": active, "findings": total, "by_pattern": dropped}, "excluded_findings": removed,
+            "excluded": {"patterns": active, "findings": total, "by_pattern": dropped},
+            "excluded_findings": [*(record.get("excluded_findings") or []), *removed],
             "limitations": [*(record.get("limitations") or []), limitation]}

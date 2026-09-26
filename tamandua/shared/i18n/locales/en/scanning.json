@@ -494,6 +494,19 @@
       "unknown_rule": "{{rule}} isn't a built-in Gitleaks rule.",
       "reason_required": "Explain why you're changing the settings (at least 5 characters)."
     },
+    "withheld": {
+      "path": "Allowlisted by the secret detection settings ({{scope}}): the path {{path}} is allowed. The secret is still there: it's excluded, not fixed.",
+      "entry": "Allowlisted by the secret detection settings ({{scope}}): an allowed secret or stopword matches it. The secret is still there: it's excluded, not fixed.",
+      "rule_disabled": "The rule {{rule}} is turned off in the secret detection settings ({{scope}}). The secret is still there: it's excluded, not fixed.",
+      "unknown": "Couldn't check which secrets the allowlist and the turned-off rules withhold, so the analysis is incomplete and no secret is marked as fixed.",
+      "limitation_one": "The secret detection settings withhold {{count}} secret (allowlist or a turned-off rule). It's still in the code: you can see it in Findings → Excluded.",
+      "limitation_other": "The secret detection settings withhold {{count}} secrets (allowlist or turned-off rules). They're still in the code: you can see them in Findings → Excluded.",
+      "scopes": {
+        "defaults": "organization defaults",
+        "repository": "this repository's own entries",
+        "either": "organization defaults or this repository's own entries"
+      }
+    },
     "constructs": {
       "lookaround": "a lookahead or lookbehind",
       "backreference": "a backreference",

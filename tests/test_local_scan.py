@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tamandua.modules.scanning import local as local_scan
-from tamandua.modules.scanning.local import EXIT_BLOCKED, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, merge_base, parse_diff, run
+from tamandua.modules.runs import local as local_scan
+from tamandua.modules.runs.local import EXIT_BLOCKED, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, merge_base, parse_diff, run
 
 GIT = shutil.which("git")
 

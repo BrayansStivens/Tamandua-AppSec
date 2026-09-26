@@ -38,5 +38,17 @@
     "password_repeat": "Repite la contraseña: ",
     "next_steps": "Inicia sesión en el panel y activa el TOTP desde Cuenta.",
     "sessions_closed": "Sesiones cerradas: {{count}}"
+  },
+  "integrity": {
+    "title": "Coherencia de la base de datos (filas huérfanas por relación)",
+    "registry_without_runs": "Estado de hallazgos de repositorios sin ejecuciones",
+    "triage_without_runs": "Decisiones de triage de repositorios sin ejecuciones",
+    "runs_without_registry": "Ejecuciones terminadas que faltan en el registro de hallazgos",
+    "removed_one": "1 borrada",
+    "removed_other": "{{count}} borradas",
+    "not_fixable": "no se borran: el próximo análisis completo del repositorio completa el registro",
+    "clean": "Todo en orden: no hay filas huérfanas.",
+    "run_fix_one": "Se puede borrar 1 fila huérfana: ejecuta tamandua integrity --fix.",
+    "run_fix_other": "Se pueden borrar {{count}} filas huérfanas: ejecuta tamandua integrity --fix."
   }
 }

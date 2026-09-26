@@ -11,7 +11,7 @@ from pathlib import Path
 
 def catalog(data_dir: Path) -> list[dict]:
     """Analyzed assets, most recent first: key, latest name, kind and when each last finished a complete scan."""
-    from tamandua.modules.runs.kinds import FINDING_RUNS, FULL_SCANS
+    from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS
     from tamandua.modules.runs.store import list_runs
     from tamandua.modules.sources.assets import asset_key
     rows: dict[str, dict] = {}
@@ -58,7 +58,7 @@ def complete_scans(data_dir: Path) -> tuple[list[dict], int]:
     """The latest completed full scan of each asset, most recent first and at most `sbom.PORTFOLIO_ASSETS`, as
     `{"key", "ref", "scan"}` with a ref unique in the portfolio; and how many assets have one."""
     from tamandua.modules.compliance import sbom
-    from tamandua.modules.runs.kinds import FULL_SCANS
+    from tamandua.modules.findings.kinds import FULL_SCANS
     from tamandua.modules.runs.store import list_runs, load_run
     from tamandua.modules.sources.assets import asset_key
     latest: dict[str, dict] = {}

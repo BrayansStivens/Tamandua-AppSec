@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from tamandua.shared import log as logging_setup
-from tamandua.app import data_migrations as migrations
+from tamandua.app import data_migrations as migrations, wiring
 from tamandua.app.api.security import State, public_url
 from tamandua.modules.identity.auth import Authenticator
 from tamandua.modules.runs.jobs import ScanJobs
@@ -21,6 +21,7 @@ def embedded_worker() -> bool:
 
 
 def build_state(data_dir: Path, *, watch_pull_requests: bool = False, worker: bool | None = None) -> State:
+    wiring.configure()
     migrations.upgrade(data_dir)  # antes de que nada lea: una actualización convierte los datos viejos una sola vez
     embedded = embedded_worker() if worker is None else worker
     state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir, worker=embedded),
@@ -51,6 +52,17 @@ def transport_check(port: int) -> str | None:
     return t("cli.server.insecure_http", url=url)
 
 
+def proxy_settings() -> dict:
+    """Uvicorn settings for the client address. Direct (default): the TCP peer, X-Forwarded-* ignored.
+
+    Behind a reverse proxy every request comes from the proxy: sign-in throttling per client and the audit log would
+    see one address for everybody (one attacker could lock everyone out). `TAMANDUA_FORWARDED_ALLOW_IPS` lists the
+    proxies whose X-Forwarded-For is believed; set it only when the API is reachable through that proxy alone.
+    """
+    trusted = os.environ.get("TAMANDUA_FORWARDED_ALLOW_IPS", "").strip()
+    return {"proxy_headers": True, "forwarded_allow_ips": trusted} if trusted else {"proxy_headers": False}
+
+
 def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
     if port < 0 or port > 65535:
         raise ValueError(t("cli.server.port_out_of_range"))
@@ -70,8 +82,8 @@ def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
         # Directo a la consola y no al log en fichero: solo quien ve la consola del servidor puede reclamarlo.
         print("\n" + "=" * 64 + f"\n  {t('cli.server.setup_code')}\n      {code}\n  {t('cli.server.setup_code_hint')}\n" + "=" * 64 + "\n",
               flush=True)
-    # Sin cabecera Server, sin confiar en X-Forwarded-* (el host permitido lo decide TAMANDUA_ALLOWED_ORIGINS)
-    # y con los mismos límites de TLS que antes (1.2 como mínimo).
-    uvicorn.run(app, host=address, port=port, log_level="warning", access_log=False, server_header=False, proxy_headers=False,
+    # No Server header; X-Forwarded-For only from trusted proxies (the allowed Host is always decided by
+    # TAMANDUA_ALLOWED_ORIGINS, never by forwarded headers); same TLS floor as before (1.2).
+    uvicorn.run(app, host=address, port=port, log_level="warning", access_log=False, server_header=False, **proxy_settings(),
                 ssl_certfile=cert or None, ssl_keyfile=key or None, timeout_keep_alive=5)
     print(t("cli.server.stopped"), flush=True)

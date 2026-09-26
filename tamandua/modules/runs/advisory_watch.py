@@ -21,18 +21,19 @@ import tempfile
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote
 
+from tamandua.modules.findings import registry
+from tamandua.modules.findings.kinds import FULL_SCANS
+from tamandua.modules.intel.advisories import load_feeds
+from tamandua.modules.runs.store import list_runs, load_run, save_repository_scan
+from tamandua.modules.scanning import engines
+from tamandua.modules.scanning.dependency_merge import family, identifiers, package_name, purl
+from tamandua.modules.sources.assets import asset_key
 from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import INLINE, MARK, msg
-from tamandua.modules.scanning.dependency_merge import family, identifiers, package_name
 
 _log = logging_setup.get("advisory_watch")
-
-# Familia de paquete → tipo de purl (https://github.com/package-url/purl-spec).
-PURL_TYPE = {"npm": "npm", "pypi": "pypi", "go": "golang", "cargo": "cargo", "composer": "composer",
-             "rubygems": "gem", "maven": "maven", "nuget": "nuget", "pub": "pub", "hex": "hex"}
 
 
 def hours() -> int:
@@ -41,22 +42,6 @@ def hours() -> int:
         return max(0, int(os.environ.get("TAMANDUA_ADVISORY_WATCH_HOURS", "24") or 24))
     except ValueError:
         return 24
-
-
-def purl(dependency: dict) -> str | None:
-    kind = PURL_TYPE.get(family(dependency.get("ecosystem") or ""))
-    name, version = str(dependency.get("name") or ""), str(dependency.get("version") or "")
-    if not kind or not name or not version:
-        return None
-    if kind == "maven" and ":" in name:
-        group, artifact = name.split(":", 1)
-        path = f"{quote(group, safe='')}/{quote(artifact, safe='')}"
-    elif kind in ("npm", "composer", "golang") and "/" in name:
-        # npm con ámbito (@org/nombre), composer (vendor/nombre) y módulos de Go conservan sus segmentos.
-        path = "/".join(quote(part, safe="") for part in name.split("/"))
-    else:
-        path = quote(name, safe="")
-    return f"pkg:{kind}/{path}@{quote(version, safe='')}"
 
 
 def sbom(dependencies: list[dict]) -> dict:
@@ -80,9 +65,6 @@ def _save_state(data_dir: Path, state: dict) -> None:
 
 def latest_complete(data_dir: Path) -> list[dict]:
     """El último análisis completo de cada repositorio o imagen que guarda sus dependencias."""
-    from tamandua.modules.sources.assets import asset_key
-    from tamandua.modules.runs.kinds import FULL_SCANS
-    from tamandua.modules.runs.store import list_runs, load_run
     seen, result = set(), []
     for row in list_runs(data_dir):  # de más reciente a más antiguo
         if row["type"] not in FULL_SCANS or row["status"] != "completed":
@@ -102,9 +84,8 @@ def latest_complete(data_dir: Path) -> list[dict]:
 
 def known(data_dir: Path, key: str) -> set[tuple[str, str, str, str]]:
     """(familia, paquete, versión, identificador) de todo lo que el registro ya conoce, en cualquier estado."""
-    from tamandua.modules.findings.registry import load
     result = set()
-    for entry in load(data_dir, key).get("findings", {}).values():
+    for entry in registry.load(data_dir, key).get("findings", {}).values():
         finding = entry.get("finding") or {}
         package = finding.get("package") or {}
         if finding.get("scanner") != "sca" or not package.get("name"):
@@ -137,22 +118,21 @@ def _repath(value, old: str, new: str):
 
 def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] | None:
     """Avisos de OSV-Scanner (sin conexión) para las dependencias guardadas de un análisis. None si no se pudo."""
-    from tamandua.modules.scanning.engines import _run, docker_available, host_path, parse_osv_scanner, writable_cache
     document = sbom(record.get("dependencies") or [])
     if not document["components"]:
         return []
-    if run is None and not docker_available():
+    if run is None and not engines.docker_available():
         return None
     with tempfile.TemporaryDirectory(prefix="advisory-watch-") as folder:
         root = Path(folder)
         (root / "bom.cdx.json").write_text(json.dumps(document), encoding="utf-8")
-        cache_dir = writable_cache(data_dir / "osv-cache")
+        cache_dir = engines.writable_cache(data_dir / "osv-cache")
         arguments = ["scan", "source", "-L", "/src/bom.cdx.json", "--format", "json", "--offline-vulnerabilities",
                      "--download-offline-databases", "--no-resolve"]
         try:
-            completed = (run or _run)("osv-scanner", arguments, root, network=True, timeout=1800,
+            completed = (run or engines._run)("osv-scanner", arguments, root, network=True, timeout=1800,
                                       env={"OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY": "/cache"},
-                                      mounts=["-v", f"{host_path(cache_dir)}:/cache"])
+                                      mounts=["-v", f"{engines.host_path(cache_dir)}:/cache"])
         except (subprocess.TimeoutExpired, OSError):
             return None
         if completed.returncode not in (0, 1):
@@ -163,7 +143,7 @@ def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] 
             payload = json.loads(completed.stdout)
         except ValueError:
             return None
-    findings = parse_osv_scanner(payload, feeds)
+    findings = engines.parse_osv_scanner(payload, feeds)
     # El SBOM es un archivo temporal: cada aviso vuelve al manifiesto donde se declaró el paquete.
     where = {}
     for item in record.get("dependencies") or []:
@@ -182,9 +162,6 @@ def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] 
 
 def check(data_dir: Path, *, run=None, now: datetime | None = None) -> dict:
     """Una pasada sobre todos los activos. Devuelve cuántos se revisaron y cuántos avisos nuevos se abrieron."""
-    from tamandua.modules.intel.advisories import load_feeds
-    from tamandua.modules.sources.assets import asset_key
-    from tamandua.modules.runs.store import save_repository_scan
     now = now or datetime.now(timezone.utc)
     feeds = load_feeds(data_dir)
     checked = opened = failed = 0

@@ -7,7 +7,7 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tamandua.modules.intel import advisory_watch
+from tamandua.modules.runs import advisory_watch
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.runs.store import list_runs, save_repository_scan
 from test_dashboard import _finding, _scan

@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tamandua.modules.integrations import jira
+from tamandua.modules.findings import tickets as jira_links
 from tamandua.modules.findings import triage
 from tamandua.modules.runs.store import render_tickets, save_repository_scan
 from test_dashboard import _finding, _scan
@@ -79,22 +80,22 @@ class JiraTests(unittest.TestCase):
         self.configure()
         fake = FakeJira(existing_label=jira.label_for(FP_B))
         tickets = render_tickets(triage.annotate(self.data_dir, self.record))
-        result = jira.export(self.data_dir, self.record, tickets, [FP_A, FP_B], by="analista", http=fake)
+        result = jira_links.export(self.data_dir, self.record, tickets, [FP_A, FP_B], by="analista", http=fake)
         self.assertEqual([item["key"] for item in result["created"]], ["SEC-101"])
         self.assertEqual([item["key"] for item in result["existing"]], ["SEC-7"])
         issue = next(body for method, path, body in fake.calls if path == "/rest/api/3/issue")
         self.assertIn(jira.label_for(FP_A), issue["fields"]["labels"])
         self.assertEqual(issue["fields"]["description"]["type"], "doc")
-        again = jira.export(self.data_dir, self.record, tickets, [FP_A, FP_B], by="analista", http=fake)
+        again = jira_links.export(self.data_dir, self.record, tickets, [FP_A, FP_B], by="analista", http=fake)
         self.assertEqual((len(again["created"]), len(again["existing"]), fake.created), (0, 2, 1))
-        annotated = jira.annotate(self.data_dir, self.record)
+        annotated = jira_links.annotate(self.data_dir, self.record)
         self.assertEqual({item["ticket"]["key"] for item in annotated["findings"]}, {"SEC-101", "SEC-7"})
 
     def test_priority_is_dropped_when_the_project_does_not_accept_it(self):
         self.configure()
         fake = FakeJira(priority_field=False)
         tickets = render_tickets(self.record)
-        result = jira.export(self.data_dir, self.record, tickets, [FP_A, FP_B], by="analista", http=fake)
+        result = jira_links.export(self.data_dir, self.record, tickets, [FP_A, FP_B], by="analista", http=fake)
         self.assertEqual(len(result["created"]), 2)
         self.assertEqual(result["failed"], [])
 
@@ -104,7 +105,7 @@ class JiraTests(unittest.TestCase):
                       user={"username": "analista", "role": "member"})
         tickets = render_tickets(triage.annotate(self.data_dir, self.record))
         with self.assertRaises(jira.JiraError):
-            jira.export(self.data_dir, self.record, tickets, [FP_A], by="analista", http=FakeJira())
+            jira_links.export(self.data_dir, self.record, tickets, [FP_A], by="analista", http=FakeJira())
 
     def test_advisories_of_one_package_become_one_issue(self):
         self.configure()
@@ -112,7 +113,7 @@ class JiraTests(unittest.TestCase):
         second["package"] = {**second["package"], "fixed_version": "1.2.0"}
         record = save_repository_scan(self.data_dir, _scan("org/web", [_finding(FP_A), second], datetime.now(timezone.utc).isoformat()))
         fake = FakeJira()
-        result = jira.export(self.data_dir, record, render_tickets(record), [FP_A, "c" * 64], by="analista", http=fake)
+        result = jira_links.export(self.data_dir, record, render_tickets(record), [FP_A, "c" * 64], by="analista", http=fake)
         self.assertEqual((fake.created, {item["key"] for item in result["created"]}), (1, {"SEC-101"}))
         issue = next(body for method, path, body in fake.calls if path == "/rest/api/3/issue")["fields"]
         self.assertEqual(issue["summary"], "[CRITICAL] Actualizar axios 1.0.0 a 1.2.0 · 2 avisos")

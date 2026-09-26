@@ -1,0 +1,78 @@
+# Server with a public domain: Caddy in front with automatic HTTPS. An overlay on compose.yaml:
+#
+#   make setup DOMAIN=tamandua.example.com     # writes COMPOSE_FILE=compose.yaml:compose.prod.yaml in .env
+#   make up
+#
+# or by hand: docker compose -f compose.yaml -f compose.prod.yaml up -d
+#
+# What changes:
+# - `caddy` publishes 80 and 443 (TCP, and UDP for HTTP/3), gets and renews the certificate for TAMANDUA_DOMAIN and
+#   redirects HTTP to HTTPS. Its configuration is docker/caddy/Caddyfile.
+# - `api` publishes no port: only Caddy reaches it, over the `edge` network. TAMANDUA_PUBLIC_URL and
+#   TAMANDUA_ALLOWED_ORIGINS are derived from the domain (https://<domain>), for the api and the worker alike.
+# - The api believes X-Forwarded-For (the real client address, for sign-in throttling and the logs) because nothing
+#   but Caddy, the worker and PostgreSQL can reach it; Caddy replaces any X-Forwarded-For a client sends.
+# The security headers (CSP, HSTS, nosniff, frame, referrer) stay the app's: Caddy doesn't add a second set.
+# Needs Compose v2.24+ (`!reset`). Guide: docs/deploy-vps.md
+
+x-public-env: &public-env
+  TAMANDUA_PUBLIC_URL: "https://${TAMANDUA_DOMAIN:?TAMANDUA_DOMAIN is missing in .env (make setup DOMAIN=tamandua.example.com)}"
+  TAMANDUA_ALLOWED_ORIGINS: "https://${TAMANDUA_DOMAIN:?TAMANDUA_DOMAIN is missing in .env}"
+
+services:
+  api:
+    ports: !reset []
+    environment:
+      <<: *public-env
+      TAMANDUA_FORWARDED_ALLOW_IPS: "*"
+    networks:
+      - default
+      - edge
+
+  worker:
+    environment:
+      <<: *public-env
+
+  caddy:
+    image: caddy:2.11.4-alpine@sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b
+    container_name: tamandua-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      TAMANDUA_DOMAIN: "${TAMANDUA_DOMAIN:?TAMANDUA_DOMAIN is missing in .env}"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and the ACME account: keep them across restarts (Let's Encrypt limits reissuing).
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+    depends_on:
+      api:
+        condition: service_started
+    # Root inside its container only to bind 80/443: every other capability dropped, read-only filesystem.
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+networks:
+  # Caddy ↔ api only. PostgreSQL and the worker stay on `default`, which Caddy can't reach.
+  edge: {}
+
+volumes:
+  caddy-data:
+  caddy-config:

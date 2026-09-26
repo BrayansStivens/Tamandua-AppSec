@@ -86,7 +86,7 @@ class ServerTests(unittest.TestCase):
 
     def test_unexpected_error_does_not_leak_a_trace(self):
         client = asgi.TestClient(self.client.app, base_url=str(self.client.base_url), raise_server_exceptions=False)
-        with patch("tamandua.app.api.routes.runs.list_runs", side_effect=RuntimeError("secreto interno")):
+        with patch("tamandua.app.api.runs.list_runs", side_effect=RuntimeError("secreto interno")):
             response = asgi.request(client, "GET", "/api/runs", headers={"Cookie": self.cookie})
         self.assertEqual((response.status_code, response.json()), (500, {"error": "Error interno del servidor"}))
         self.assertEqual(response.headers["x-content-type-options"], "nosniff")
@@ -137,7 +137,7 @@ class ServerTests(unittest.TestCase):
     def test_provider_endpoint_never_starts_a_lab_scan_or_exposes_keys(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "server-secret", "ANTHROPIC_API_KEY": "",
                                        "TAMANDUA_BOOTSTRAP": "1"}), \
-                patch("tamandua.app.api.routes.sources.check_provider", return_value={"status": "connected"}) as check:
+                patch("tamandua.app.api.sources.check_provider", return_value={"status": "connected"}) as check:
             status, payload = self.request("GET", "/api/providers")
             self.assertEqual(status, 200)
             self.assertNotIn(b"server-secret", payload)
@@ -177,7 +177,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 400)
         source = {"id": "github:acme/api", "name": "acme/api", "provider": "github"}
         with tempfile.TemporaryDirectory() as temporary, \
-                patch("tamandua.app.api.routes.runs.find_source", return_value=source), \
+                patch("tamandua.app.api.repositories.find_source", return_value=source), \
                 patch("tamandua.modules.runs.jobs.snapshot_source") as snapshot, \
                 patch("tamandua.modules.scanning.repository._query_osv", side_effect=AssertionError("OSV llamado")):
             root = Path(temporary)

@@ -1,7 +1,7 @@
 """API HTTP sobre FastAPI: rutas tipadas por contexto (`<contexto>.py`) y rutas declaradas en tabla (`routes/`).
 
 Toda petición pasa por el mismo control (ver `security.py`): host permitido (middleware) → CSRF, sesión, segundo
-factor y rol (`security.authorize`, vía `deps.guard` o `routing.mount`) → límites de cuerpo. Las respuestas llevan
+factor y rol (`security.authorize`, vía `deps.guard`) → límites de cuerpo. Las respuestas llevan
 las mismas cabeceras de seguridad (CSP, nosniff, frame, HSTS si hay HTTPS). No se publica la documentación
 interactiva ni el OpenAPI: el esquema se genera con `make openapi`.
 """
@@ -17,16 +17,15 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from tamandua.app.api import compliance, findings, intel, pullrequests, reporting, repositories, routing, scanning, system
+from tamandua.app.api import assets, auth, compliance, findings, images, intel, metrics, notifications, onboarding, pullrequests, reporting, repositories, runs, scanning, sources, static, system, threats
 from tamandua.app.api.deps import ApiError
-from tamandua.app.api.routes import auth, prs, runs, sources, threats  # noqa: F401 — registran sus rutas
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
 from tamandua.modules.identity.auth import COOKIE_NAME
 from tamandua.shared.i18n import localize, msg, negotiate
 from tamandua.shared.vault import VaultError
 from tamandua.version import VERSION
 
-ROUTERS = (system, reporting, intel, findings, compliance, pullrequests, repositories, scanning)
+ROUTERS = (auth, system, metrics, reporting, intel, findings, compliance, pullrequests, repositories, scanning, sources, threats, runs, assets, images, notifications, onboarding, static)
 
 
 def _security_headers(response, port: int) -> None:
@@ -116,7 +115,6 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
 
     for module in ROUTERS:
         app.include_router(module.router)
-    routing.mount(app)  # después de las tipadas: sus prefijos (/api/runs/…) no deben tapar a ninguna
     return app
 
 
@@ -146,6 +144,7 @@ def openapi_document(data_dir: Path | None = None) -> str:
     # Cómo se autentica la API: la cookie de sesión (HttpOnly) en todo, salvo lo que cada ruta declare como público.
     # Los POST exigen además Origin y la cabecera X-Tamandua-Action (CSRF), que la cookie sola no cubre.
     document.setdefault("components", {})["securitySchemes"] = {
-        "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Session signed in to the panel."}}
+        "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Session signed in to the panel."},
+        "metrics": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_METRICS_TOKEN (Prometheus scraper)."}}
     document["security"] = [{"session": []}]
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"

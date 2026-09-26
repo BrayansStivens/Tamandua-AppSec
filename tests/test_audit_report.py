@@ -67,7 +67,7 @@ class RouteTests(HttpCase):
         from fake_github import fake_github
         from tamandua.modules.integrations.installations import save_github
         save_github(self.data_dir, 7, {"account": "org", "repository_selection": "all"}, "admin")
-        with patch("tamandua.app.api.routes.runs.render_portfolio_pdf", wraps=__import__("tamandua.modules.reporting.audit", fromlist=["x"]).render_portfolio_pdf) as render, \
+        with patch("tamandua.app.api.reporting.render_portfolio_pdf", wraps=__import__("tamandua.modules.reporting.audit", fromlist=["x"]).render_portfolio_pdf) as render, \
                 fake_github({7: [(1, "org/api"), (2, "org/web"), (3, "org/infra")]}, {7: ("org", "all")}):
             status, pdf, _ = self.report({"account": "org", "options": {"framework": "iso27001"}})
         self.assertEqual(status, 200, pdf)

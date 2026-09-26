@@ -1,7 +1,7 @@
 """Usuarios, sesiones y retos de segundo factor. El registro completo de cada usuario (hash scrypt, TOTP cifrado,
 enlaces de un solo uso) va en JSONB con la forma de siempre; las columnas sirven para buscar y ordenar."""
 
-from sqlalchemy import Column, DateTime, Float, Index, Integer, Table, Text, UniqueConstraint, func
+from sqlalchemy import Column, DateTime, Float, ForeignKeyConstraint, Index, Integer, Table, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 
 from tamandua.shared.db import TENANT, metadata
@@ -25,6 +25,7 @@ sessions = Table(
     Column("user_id", Text, nullable=False),
     Column("expires_at", Float, nullable=False),
     Column("record", JSONB, nullable=False),
+    ForeignKeyConstraint(["tenant_id", "user_id"], ["users.tenant_id", "users.id"], name="fk_sessions_user", ondelete="CASCADE"),
 )
 Index("ix_sessions_user", sessions.c.tenant_id, sessions.c.user_id)
 
@@ -37,4 +38,5 @@ auth_challenges = Table(
     Column("client", Text, nullable=False),
     Column("failures", Integer, nullable=False, server_default="0"),
     Column("created_at", Float, nullable=False),
+    ForeignKeyConstraint(["tenant_id", "user_id"], ["users.tenant_id", "users.id"], name="fk_auth_challenges_user", ondelete="CASCADE"),
 )

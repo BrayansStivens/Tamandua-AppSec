@@ -13,7 +13,7 @@ router = APIRouter(tags=["system"])
 
 
 class Health(BaseModel):
-    status: str
+    status: str                  # ok · degraded (signed in only: no worker heartbeat, so nothing gets scanned)
     version: str
     docker: bool | None = None   # algún worker vivo puede lanzar los motores
     workers: int | None = None   # workers con latido reciente
@@ -29,5 +29,6 @@ def health(context: Context = Depends(guard(Policy(public=True, enrolment=True))
         return Health(status="ok", version=VERSION)
     # Los motores los lanza el worker (el API puede no tener Docker): la salud sale de su latido.
     alive = queue.workers_alive(context.data_dir)
-    return Health(status="ok", version=VERSION, docker=any(worker["docker"] for worker in alive), workers=len(alive),
-                  queued=context.state.jobs.pending())
+    # Still 200: the API itself works (the container healthcheck restarts only a dead API, not one waiting for a worker).
+    return Health(status="ok" if alive else "degraded", version=VERSION, docker=any(worker["docker"] for worker in alive),
+                  workers=len(alive), queued=context.state.jobs.pending())

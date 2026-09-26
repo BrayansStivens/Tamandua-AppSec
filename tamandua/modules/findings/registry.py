@@ -11,6 +11,9 @@ sigue abierto. Se actualiza solo al terminar cada ejecución:
   que abre y actualiza pero nunca remedia.
 * **Rutas excluidas** (`exclusions`): lo que cae en ellas queda **excluido**, ni abierto ni
   remediado. Si la ruta deja de estar excluida, el siguiente escaneo lo vuelve a abrir.
+* **Secrets withheld by the secret detection settings** (allowlist, disabled rule): excluded with the reason, never
+  fixed. They reopen when the settings stop withholding them, and are fixed only once a complete scan no longer
+  sees them even without the filters.
 * **Revisión de PR**: lo que introduce el PR queda abierto con origen «PR #n»; lo que
   ese mismo PR había introducido y ya no está en su commit nuevo queda remediado.
   Un PR cerrado sin merge retira sus hallazgos; uno mergeado los deja a la espera
@@ -32,7 +35,7 @@ from tamandua.modules.findings.tables import registry_assets, registry_findings
 from tamandua.shared import db
 from tamandua.shared.db import TENANT
 
-from tamandua.modules.runs.kinds import FINDING_RUNS, FULL_SCANS
+from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import msg, text
 from tamandua.modules.findings import sla
@@ -94,7 +97,17 @@ def is_empty(data_dir: Path) -> bool:
 
 
 def _clean(finding: dict) -> dict:
-    return {key: value for key, value in finding.items() if key not in ("triage", "ticket", "lifecycle")}
+    return {key: value for key, value in finding.items() if key not in ("triage", "ticket", "lifecycle", "excluded_by", "excluded_reason")}
+
+
+def _exclusion(finding: dict, stamp: str) -> dict:
+    reason = finding.get("excluded_reason")
+    return {"pattern": finding.get("excluded_by"), "at": stamp, **({"reason": reason} if reason else {})}
+
+
+def _withheld(entry: dict) -> bool:
+    """Excluded by the secret detection settings (it carries their reason), not by an excluded path."""
+    return entry.get("status") == "excluded" and bool((entry.get("excluded") or {}).get("reason"))
 
 
 def _reopen_manual(data_dir: Path, record: dict, fingerprints: set[str]) -> None:
@@ -142,18 +155,23 @@ def apply(data_dir: Path, record: dict) -> dict:
             entry.update(status="open", finding=_clean(finding), last_seen=stamp, last_run=record["id"])
             entry.pop("fixed", None)
             entry.pop("excluded", None)
+        excluded_now = set()
         if record["type"] in FULL_SCANS:
             for finding in record.get("excluded_findings") or []:
                 digest = finding["fingerprint"]
                 if digest in present:
                     continue
+                excluded_now.add(digest)
                 entry = entries.setdefault(digest, {"first_seen": stamp, "first_run": record["id"], "origin": {"kind": "scan"}})
-                entry.update(status="excluded", finding=_clean({k: v for k, v in finding.items() if k != "excluded_by"}),
-                             excluded={"pattern": finding.get("excluded_by"), "at": stamp}, last_seen=stamp, last_run=record["id"])
+                entry.update(status="excluded", finding=_clean(finding), excluded=_exclusion(finding, stamp),
+                             last_seen=stamp, last_run=record["id"])
         # Un escaneo incompleto no puede demostrar que algo desapareció: no remedia nada.
         complete = record.get("status") == "completed"
         for digest, entry in entries.items():
-            if entry["status"] != "open" or digest in present or not complete:
+            if digest in present or not complete:
+                continue
+            # A withheld secret that a complete scan no longer sees, even without the filters, is gone.
+            if entry["status"] != "open" and not (record["type"] in FULL_SCANS and _withheld(entry) and digest not in excluded_now):
                 continue
             origin = entry.get("origin") or {}
             # Un aviso nuevo afecta a la rama principal: el siguiente análisis completo sin él lo da por corregido.
@@ -164,6 +182,7 @@ def apply(data_dir: Path, record: dict) -> dict:
             else:
                 continue
             entry.update(status="fixed", fixed={"at": stamp, "run_id": record["id"], "how": how, "auto": True})
+            entry.pop("excluded", None)
             fixed += 1
         state["applied"] = state["applied"][-500:] + [record["id"]]
         _save(data_dir, state)
@@ -183,7 +202,7 @@ def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) 
             if entry.get("status") == "open" and pattern:
                 entry.update(status="excluded", excluded={"pattern": pattern, "at": when})
                 moved["excluded"] += 1
-            elif entry.get("status") == "excluded" and not pattern:
+            elif entry.get("status") == "excluded" and not pattern and not _withheld(entry):
                 entry["status"] = "open"
                 entry.pop("excluded", None)
                 moved["reopened"] += 1
@@ -210,20 +229,11 @@ def pull_closed(data_dir: Path, key: str, number: int, *, merged: bool, when: st
     return changed
 
 
-def rebuild(data_dir: Path) -> int:
-    """Reconstruye todos los registros desde las ejecuciones, en orden cronológico."""
-    from tamandua.modules.runs.store import list_runs, load_run
+def reset(data_dir: Path) -> None:
+    """Empties every asset's registry, before rebuilding it from the runs (`runs/registry.py`)."""
     with db.transaction(data_dir) as connection:
         connection.execute(delete(registry_findings).where(registry_findings.c.tenant_id == TENANT))
         connection.execute(delete(registry_assets).where(registry_assets.c.tenant_id == TENANT))
-    applied = 0
-    for row in sorted(list_runs(data_dir), key=lambda item: item.get("finished_at") or item["created_at"]):
-        try:
-            apply(data_dir, load_run(data_dir, row["id"]))
-            applied += 1
-        except (ValueError, OSError):
-            continue
-    return applied
 
 
 def view(data_dir: Path, key: str, *, status: str = "open") -> dict:
@@ -278,14 +288,6 @@ def summarize(data_dir: Path, key: str) -> dict:
             if (entry.get("origin") or {}).get("kind") == "pr":
                 counts["from_pr"] += 1
     return counts
-
-
-def resolve(data_dir: Path, run_id: str) -> dict:
-    """Una ejecución por su id, o el estado de un repositorio por `asset:<clave>`."""
-    from tamandua.modules.runs.store import load_run
-    if isinstance(run_id, str) and run_id.startswith(VIEW_PREFIX):
-        return view(data_dir, run_id[len(VIEW_PREFIX):], status="all")
-    return load_run(data_dir, run_id)
 
 
 PACKAGES_SHOWN = 5  # per affected repository in the CVE tracker

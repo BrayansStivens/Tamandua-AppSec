@@ -31,7 +31,7 @@ from tamandua.shared import db
 from tamandua.shared.db import TENANT
 from tamandua.shared.i18n import is_msg, msg
 
-from tamandua.modules.runs.kinds import FINDING_RUNS
+from tamandua.modules.findings.kinds import FINDING_RUNS
 from tamandua.modules.sources.assets import asset_key
 
 

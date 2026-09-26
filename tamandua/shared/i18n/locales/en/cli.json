@@ -38,5 +38,17 @@
     "password_repeat": "Repeat the password: ",
     "next_steps": "Sign in to the panel and turn on TOTP from Account.",
     "sessions_closed": "Sessions closed: {{count}}"
+  },
+  "integrity": {
+    "title": "Database consistency (orphan rows per relation)",
+    "registry_without_runs": "Repository finding state with no runs left",
+    "triage_without_runs": "Triage decisions of repositories with no runs left",
+    "runs_without_registry": "Finished runs missing from the findings registry",
+    "removed_one": "1 deleted",
+    "removed_other": "{{count}} deleted",
+    "not_fixable": "not deleted: the repository's next full analysis fills in the registry",
+    "clean": "All consistent: no orphan rows.",
+    "run_fix_one": "1 orphan row can be deleted: run tamandua integrity --fix.",
+    "run_fix_other": "{{count}} orphan rows can be deleted: run tamandua integrity --fix."
   }
 }

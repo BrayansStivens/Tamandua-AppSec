@@ -13,7 +13,7 @@ from tamandua.app.api.deps import ApiError, Context, Policy, guard
 from tamandua.app.api.paging import Page, Paging, paging
 from tamandua.modules.compliance import cra, evidence
 from tamandua.modules.reporting.audit import FRAMEWORKS, ReportError, render_portfolio_pdf, validate_options
-from tamandua.modules.sources.assets import overview as assets_overview
+from tamandua.modules.runs.assets import overview as assets_overview
 from tamandua.shared.i18n import msg, text
 from tamandua.version import VERSION
 

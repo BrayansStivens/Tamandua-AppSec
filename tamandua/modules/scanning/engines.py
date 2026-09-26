@@ -47,7 +47,7 @@ IMAGES = {
                     "image": "ghcr.io/google/osv-scanner@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa"},
     "gitleaks": {"name": "Gitleaks", "version": "8.30.1",
                  "image": "ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"},
-    "opengrep": {"name": "Opengrep", "version": "1.30.0", "image": "tamandua/opengrep:1.30.0"},
+    "opengrep": {"name": "Opengrep", "version": "1.30.0", "image": "localhost/tamandua/opengrep:1.30.0"},
     # Segunda opinión en imágenes de contenedor: discrepa con Trivy sobre todo en paquetes del sistema.
     "grype": {"name": "Grype", "version": "0.119.0",
               "image": "anchore/grype@sha256:8c2c9234a345577a6d321a4753aa3ee1276d8975c8452d2344a56b57733ecad3"},
@@ -320,6 +320,8 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
     command = [shutil.which("docker"), "run", "--rm", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                *engine_user(), "--pids-limit", "512", "--memory", "3g", "--cpus", "2",
                "--network", "bridge" if network else "none",
+               # An image built here has no digest: never let Docker fetch that name from a registry instead.
+               *([] if "@sha256:" in IMAGES[key]["image"] else ["--pull", "never"]),
                *source, *environment, *(mounts or []), IMAGES[key]["image"], *arguments]
     process_env = {**os.environ, **(secret_env or {})} if secret_env else None
     return subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=process_env)
@@ -637,12 +639,13 @@ def parse_trivy(payload: dict, feeds: dict, custom: dict | None = None) -> list[
     return unique
 
 
-def _trivy_fs(snapshot: Path, cache_dir: Path, scanners: str, config_dir: Path | None) -> subprocess.CompletedProcess:
+def _trivy_fs(snapshot: Path, cache_dir: Path, scanners: str, config_dir: Path | None, *,
+              network: bool = True) -> subprocess.CompletedProcess:
     # Con las dependencias de desarrollo (marcadas como tales) y la lista de paquetes para saber cuáles son.
     secret_config = ["--secret-config", "/cfg/trivy-secret.yaml"] if config_dir else []
     return _run("trivy", ["fs", "--scanners", scanners, *secret_config, "--include-dev-deps", "--list-all-pkgs",
                           "--cache-dir", "/cache", "--format", "json", "--quiet",
-                          "--timeout", "14m", "/src"], snapshot, network=True,
+                          "--timeout", "14m", "/src"], snapshot, network=network,
                 mounts=["-v", f"{host_path(cache_dir)}:/cache",
                         *(["-v", f"{host_path(config_dir)}:/cfg:ro"] if config_dir else [])])
 
@@ -691,7 +694,40 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict, secret_settings: dic
         detail = joined([detail, msg("scanning.trivy.no_feeds")], "scanning.join.sentences")
     if rejected:
         detail = joined([detail, rejected], "scanning.join.sentences")
-    return {**_result("trivy", "partial" if rejected else "completed", detail, findings, started), "packages": trivy_packages(payload)}
+    result = {**_result("trivy", "partial" if rejected else "completed", detail, findings, started), "packages": trivy_packages(payload)}
+    return _withhold(result, secret_settings, lambda reference: _trivy_secrets(snapshot, cache_dir, reference))
+
+
+def _trivy_secrets(snapshot: Path, cache_dir: Path, settings: dict | None) -> list[dict] | None:
+    """Secret detection alone, for the unfiltered run. Without network: it needs no vulnerability database."""
+    try:
+        with tempfile.TemporaryDirectory(prefix="trivy-config-", dir=snapshot.parent) as folder:
+            config_dir = None
+            if settings:
+                config_dir = Path(folder)
+                (config_dir / "trivy-secret.yaml").write_text(secret_rules.trivy_secret_config(settings), encoding="utf-8")
+            completed = _trivy_fs(snapshot, cache_dir, "secret", config_dir, network=False)
+        if completed.returncode != 0 and not completed.stdout.strip():
+            return None
+        payload = json.loads(completed.stdout or "{}")
+    except (subprocess.TimeoutExpired, OSError, ValueError):
+        return None
+    return parse_trivy(payload, {}, secret_rules.custom_rules(settings)) if isinstance(payload, dict) else None
+
+
+def _withhold(result: dict, settings: dict | None, reference) -> dict:
+    """With settings that filter, adds `withheld`: the secrets only an unfiltered run (`reference`) sees
+    (secret_rules.withheld). If that run fails, `withheld` is None and the step partial: the scan is then incomplete,
+    so a secret that stopped appearing is never taken as fixed."""
+    if result["status"] != "completed" or not secret_rules.filters(settings):
+        return result
+    unfiltered = reference(secret_rules.unfiltered(settings))
+    if unfiltered is None:
+        return {**result, "status": "partial", "withheld": None,
+                "detail": joined([result["detail"], msg("scanning.secret_rules.withheld.unknown")], "scanning.join.sentences")}
+    kept = {finding["fingerprint"] for finding in result["findings"]}
+    return {**result, "withheld": [secret_rules.withheld(finding, settings) for finding in unfiltered
+                                   if finding["scanner"] == "secrets" and finding["fingerprint"] not in kept]}
 
 
 # --- OSV-Scanner ---------------------------------------------------------------------
@@ -816,12 +852,9 @@ def parse_gitleaks(payload: list, custom: dict | None = None) -> list[dict]:
     return findings
 
 
-def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
-    """`settings`: the organization's secret detection settings (secret_rules). With them, Gitleaks gets a generated
-    `--config` mounted read-only; if it rejects it, the step is inconclusive, never clean."""
-    started = time.time()
-    if not docker_available():
-        return _result("gitleaks", "not_tested", msg("scanning.gitleaks.no_docker"))
+def _gitleaks_report(snapshot: Path, settings: dict | None, started: float, *, strict: bool = False) -> tuple[list | None, dict | None]:
+    """(report, None), or (None, the step's result) when Gitleaks couldn't produce it. `strict`: a missing report is
+    a failure even without settings."""
     # El reporte se escribe junto al snapshot: es la única carpeta que ambos contenedores ven.
     # The settings go in a separate folder, mounted read-only.
     with tempfile.TemporaryDirectory(prefix="gitleaks-", dir=snapshot.parent) as output, \
@@ -837,24 +870,40 @@ def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
             completed = _run("gitleaks", arguments, snapshot, mounts=mounts, timeout=600)
             report = Path(output) / "report.json"
             # Without settings, a missing report keeps its old meaning; with them it may be the settings' fault.
-            if settings and (completed.returncode != 0 or not report.is_file()):
+            if (settings or strict) and (completed.returncode != 0 or not report.is_file()):
                 if "config" not in (completed.stderr or "").lower():
-                    return _result("gitleaks", "inconclusive", with_cause(msg("scanning.engines.failed", engine="Gitleaks"), completed),
-                                   started=started)
+                    return None, _result("gitleaks", "inconclusive", with_cause(msg("scanning.engines.failed", engine="Gitleaks"), completed),
+                                         started=started)
                 reason = config_cause(completed)
                 failure = msg("scanning.gitleaks.config_failed_cause", cause=reason) if reason else msg("scanning.gitleaks.config_failed")
-                return _result("gitleaks", "inconclusive", failure, started=started)
+                return None, _result("gitleaks", "inconclusive", failure, started=started)
             payload = json.loads(report.read_text(encoding="utf-8") or "[]") if report.is_file() else []
         except subprocess.TimeoutExpired:
-            return _result("gitleaks", "inconclusive", msg("scanning.engines.timeout", engine="Gitleaks"), started=started)
+            return None, _result("gitleaks", "inconclusive", msg("scanning.engines.timeout", engine="Gitleaks"), started=started)
         except (OSError, ValueError):
-            return _result("gitleaks", "inconclusive", msg("scanning.gitleaks.unreadable"), started=started)
+            return None, _result("gitleaks", "inconclusive", msg("scanning.gitleaks.unreadable"), started=started)
     if completed.returncode not in (0, 1):
-        return _result("gitleaks", "inconclusive", with_cause(msg("scanning.engines.failed", engine="Gitleaks"), completed), started=started)
+        return None, _result("gitleaks", "inconclusive", with_cause(msg("scanning.engines.failed", engine="Gitleaks"), completed), started=started)
+    return (payload if isinstance(payload, list) else []), None
+
+
+def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
+    """`settings`: the organization's secret detection settings (secret_rules). With them, Gitleaks gets a generated
+    `--config` mounted read-only; if it rejects it, the step is inconclusive, never clean."""
+    started = time.time()
+    if not docker_available():
+        return _result("gitleaks", "not_tested", msg("scanning.gitleaks.no_docker"))
+    payload, failure = _gitleaks_report(snapshot, settings, started)
+    if failure:
+        return failure
     findings = parse_gitleaks(payload, secret_rules.custom_rules(settings))
     detail = msg("scanning.gitleaks.detail_configured", secrets=len(findings), **secret_rules.counts(settings)) if settings \
         else msg("scanning.gitleaks.detail", secrets=len(findings))
-    return _result("gitleaks", "completed", detail, findings, started)
+
+    def reference(unfiltered: dict | None) -> list[dict] | None:
+        report, failed = _gitleaks_report(snapshot, unfiltered, started, strict=True)
+        return None if failed else parse_gitleaks(report, secret_rules.custom_rules(unfiltered))
+    return _withhold(_result("gitleaks", "completed", detail, findings, started), settings, reference)
 
 
 def merge_secrets(*groups: list[dict]) -> list[dict]:

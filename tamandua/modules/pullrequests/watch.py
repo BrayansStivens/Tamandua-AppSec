@@ -18,10 +18,12 @@ from __future__ import annotations
 
 import os
 import threading
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from tamandua.shared import documents
+from tamandua.shared import events
 from tamandua.shared import log as logging_setup
 from tamandua.modules.pullrequests.review import GATES
 from tamandua.shared.i18n import msg, text
@@ -31,6 +33,15 @@ DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": Tr
 MAX_BASE_BRANCHES = 10
 BRANCH_PER_POLL = 3     # reanálisis de rama principal encolados por vuelta, como mucho
 BRANCH_QUEUE_LIMIT = 2  # solo si en la cola hay menos que esto
+
+
+@dataclass(frozen=True)
+class RepositoriesListed:
+    """The COMPLETE repository list of the connected installations was read (a partial one is never published):
+    what's missing from it can be retired. `active_accounts`: the accounts still connected (None: all)."""
+    data_dir: Path
+    repositories: list[dict]
+    active_accounts: set[str] | None
 
 
 class WatchError(ValueError):
@@ -240,7 +251,6 @@ class Watcher:
             _log.info("pr_closed", extra={"reason": f"{repository}#{number} {'mergeado' if pull['merged'] else 'cerrado sin merge'}"})
 
     def poll(self) -> int:
-        from tamandua.modules.sources.assets import reconcile
         from tamandua.modules.integrations.github import GitHubAppError, installation_repositories, open_pull_requests
         configured = self.installation_for()
         installations = [configured] if isinstance(configured, int) else configured or []
@@ -263,7 +273,7 @@ class Watcher:
         from tamandua.modules.integrations.installations import github_connections
         accounts = {row["account"].casefold() for row in github_connections(self.data_dir)
                     if isinstance(row.get("account"), str)}
-        reconcile(self.data_dir, repositories, active_accounts=accounts or None)
+        events.publish(RepositoriesListed(self.data_dir, repositories, accounts or None))
         by_uid = {item["uid"]: item for item in repositories}
         queued = 0
         for key, config in load(self.data_dir)["repositories"].items():

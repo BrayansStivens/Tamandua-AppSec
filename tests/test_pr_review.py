@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from tamandua.app import wiring
 from tamandua.modules.pullrequests import review as pr_review
 from tamandua.modules.pullrequests import watch as pr_watch
 from tamandua.modules.runs.jobs import ScanJobs
@@ -19,6 +20,8 @@ from tamandua.modules.reporting.pdf import render_pdf
 from tamandua.shared.i18n import text
 from fake_github import fake_github
 from test_auth import ORIGIN, PASSWORD, HttpCase
+
+wiring.configure()  # like every Tamandua process: domain events and injected readers
 
 SHA = "c" * 40
 APP = "import subprocess\n\ndef old(cmd):\n    return subprocess.run(cmd, shell=True)\n\n\ndef new(user):\n    return eval(user)\n"
@@ -330,10 +333,9 @@ class RouteTests(HttpCase):
             Users(self.data_dir).create("operadora", PASSWORD, role="admin")
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
             cookie = cookies[0].split("; ")[0]
-            with patch("tamandua.app.api.routes.prs.github_installations", return_value=[7]), \
-                    patch("tamandua.app.api.pullrequests.github_installations", return_value=[7]), \
+            with patch("tamandua.app.api.pullrequests.github_installations", return_value=[7]), \
                     fake_github({7: [(1, "org/api"), (2, "org/web")]}, {7: ("org", "selected")}), \
-                    patch("tamandua.app.api.routes.prs.open_pull_requests", side_effect=GitHubAppError(PULLS_FORBIDDEN)):
+                    patch("tamandua.app.api.pullrequests.open_pull_requests", side_effect=GitHubAppError(PULLS_FORBIDDEN)):
                 status, body, _ = self.call("GET", "/api/pull-requests?source_id=github:org/api", headers={"Cookie": cookie})
                 self.assertEqual((status, body["pulls"], body["settings"]["gate"]), (200, [], "high"))
                 self.assertIn("Pull requests", body["pulls_error"])

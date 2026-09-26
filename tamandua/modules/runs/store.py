@@ -125,7 +125,7 @@ def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = Non
     # Rutas excluidas por un administrador: salen del informe, del SARIF y del panel, contadas en los límites.
     from tamandua.modules.sources.assets import asset_key
     from tamandua.modules.findings.exclusions import apply_to_record
-    from tamandua.modules.runs.kinds import FINDING_RUNS
+    from tamandua.modules.findings.kinds import FINDING_RUNS
     if record.get("type") in FINDING_RUNS:
         record = apply_to_record(data_dir, record, asset_key(record))
     saved = _persist(data_dir, record, render_repository_report(record), render_repository_sarif(record),

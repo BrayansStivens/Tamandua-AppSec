@@ -53,11 +53,10 @@ The local NVD copy for the CVE tracker downloads in the background: a few hours 
 ## Upgrade
 
 ```bash
-make backup
 make update
 ```
 
-`data/`, `config/` and the database are kept. If the new version changes the format of any data, it converts it on startup, once, after saving a copy of what it touches in `data/backups/`: there's nothing to do by hand. Before upgrading, take a backup (see below) and check under **Scans** that nothing is running: a restart marks any running scan as failed.
+`make update` takes a backup first (`make backup`), then pulls the code and restarts. `data/`, `config/` and the database are kept. If the new version changes the format of any data, it converts it on startup, once, after saving a copy of what it touches in `data/backups/`: there's nothing to do by hand. Before upgrading, take a backup (see below) and check under **Scans** that nothing is running: a restart marks any running scan as failed.
 
 ## Backups
 
@@ -71,19 +70,20 @@ make update
 make backup        # backups/<date>/database.dump, data.tgz and config.tgz
 ```
 
-The app pauses for a few seconds so the backup is consistent, and the command refuses to run while scans are in progress (`FORCE=1` overrides it). `config.tgz` holds the encrypted secrets **and** the master key: keep it off the machine and protected. To restore, with the app stopped, extract `data.tgz` and `config.tgz` at the repository root and load the database:
+The app pauses for a few seconds so the backup is consistent, and the command refuses to run while scans are in progress (`FORCE=1` overrides it). `config.tgz` holds the encrypted secrets **and** the master key: keep it off the machine and protected. To restore:
 
 ```bash
-docker compose up -d postgres
-docker compose exec -T postgres pg_restore -U tamandua -d tamandua --clean --if-exists < backups/<date>/database.dump
+make restore FROM=backups/<date> CONFIRM=restore   # saves the current state in backups/pre-restore-<date>/ first
 make up
 ```
+
+Scheduled backups (a Compose service with retention), cron and offsite copies: [deploy-vps.md](deploy-vps.md#backups).
 
 If you lose `config/master.key` (or change `TAMANDUA_MASTER_KEY`), the stored secrets can't be decrypted: you'll have to reconnect the GitHub App and re-enter the AI and Jira keys. No other data is lost.
 
 ## Expose it on your network or the internet
 
-By default the port is only published on `127.0.0.1`. To reach it from other machines you need HTTPS: the server **refuses to start** if `TAMANDUA_PUBLIC_URL` isn't loopback and doesn't start with `https://`. The simplest option is Caddy in front; see the [README](../README.md#use-it-from-another-machine-https).
+By default the port is only published on `127.0.0.1`. To reach it from other machines you need HTTPS: the server **refuses to start** if `TAMANDUA_PUBLIC_URL` isn't loopback and doesn't start with `https://`. For a server with a domain, `make setup DOMAIN=tamandua.example.com` adds Caddy with automatic certificates: the full guide (sizing, firewall, backups, upgrades, monitoring, Coolify and Dokploy) is [deploy-vps.md](deploy-vps.md).
 
 Even with HTTPS, keep in mind that the app controls Docker through its socket, which is equivalent to root on the host. Only expose the panel to people you trust.
 

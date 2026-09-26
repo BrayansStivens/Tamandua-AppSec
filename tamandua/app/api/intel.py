@@ -1,4 +1,4 @@
-"""CVE tracker: búsqueda paginada en la copia local de NVD, con KEV, EPSS y EUVD."""
+"""CVE tracker: búsqueda paginada en la copia local de NVD, con KEV, EPSS y EUVD; y la búsqueda rápida en lo reciente."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from tamandua.app.api.deps import ApiError, Context, guard
 from tamandua.app.api.paging import MAX_LIMIT, MAX_OFFSET, Page, Paging, paging
 from tamandua.modules.findings.registry import PACKAGES_SHOWN, assets_with_cve, open_cves
 from tamandua.modules.intel import cve_db, euvd
+from tamandua.modules.intel.advisories import load_feeds, load_recent_cves
 from tamandua.shared.i18n import msg
 
 router = APIRouter(tags=["intel"])
@@ -122,3 +123,38 @@ def affected(id: str = "", page: Paging = Depends(paging(10)),  # noqa: A002 —
              context: Context = Depends(guard())) -> dict:
     """Your repositories with a finding that cites this CVE (open or fixed), one page at a time."""
     return context.render(assets_with_cve(context.data_dir, _cve_id(id), limit=page.limit, offset=page.offset))
+
+
+RECENT_SHOWN = 50
+RECENT_QUERY = re.compile(r"[A-Za-z0-9 .:_\-]{0,80}")
+
+
+class RecentCves(BaseModel):
+    query: str
+    items: list[dict[str, Any]] = Field(max_length=RECENT_SHOWN)
+    total: int
+    sources: dict[str, Any]
+
+
+@router.get("/api/cves", response_model=RecentCves)
+def recent(q: str = "", context: Context = Depends(guard())) -> dict:
+    """Search in what is local: KEV, EPSS and the last week's CVEs according to NVD."""
+    needle = q.strip()[:80]
+    if not RECENT_QUERY.fullmatch(needle):
+        raise ApiError(400, msg("api.invalid_query"))
+    feeds = load_feeds(context.data_dir)
+    latest = load_recent_cves(context.data_dir, 7)
+    lowered = needle.lower()
+    results = [{**item, "source": "nvd", "kev": item["cve"] in feeds["kev"], "epss": (feeds["epss"].get(item["cve"]) or (None, None))[0]}
+               for item in latest["items"]
+               if not lowered or lowered in item["cve"].lower() or lowered in item["description"].lower()]
+    if re.fullmatch(r"(?i)cve-\d{4}-\d{4,}", needle):
+        upper = needle.upper()
+        entry, epss = feeds["kev"].get(upper), feeds["epss"].get(upper)
+        if all(result["cve"] != upper for result in results) and (entry or epss):
+            results.insert(0, {"cve": upper, "published": None, "score": None, "severity": None,
+                               "description": (entry or {}).get("name") or msg("api.no_local_description"),
+                               "source": "kev" if entry else "epss", "kev": bool(entry), "epss": epss[0] if epss else None})
+    return context.render({"query": needle, "items": results[:RECENT_SHOWN], "total": len(results),
+                           "sources": {"kev": (feeds["kev"].get("__meta__") or {}).get("version"),
+                                       "epss": bool(feeds["epss"]), "nvd_recent": (latest.get("__meta__") or {}).get("total")}})

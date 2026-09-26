@@ -5,11 +5,14 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from tamandua.modules.sources import assets
+from tamandua.app import wiring
+from tamandua.modules.runs import assets
 from tamandua.modules.pullrequests import watch as pr_watch
 from tamandua.modules.findings import triage
 from tamandua.modules.runs.store import list_runs, page_runs, save_repository_scan
 from test_dashboard import _finding, _scan
+
+wiring.configure()  # like every Tamandua process: domain events and injected readers
 
 
 def scan(name, uid, findings, when):

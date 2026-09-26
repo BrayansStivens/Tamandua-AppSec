@@ -22,7 +22,11 @@ class FirstRunTests(HttpCase):
         self.assertIn("consola", body["error"])
         status, body, cookies = self.post("/api/auth/setup", "setup-admin", self.setup_body(code.lower()))
         self.assertEqual((status, body["user"]["role"]), (200, "admin"))
+        self.assertTrue(body["user"]["has_password"])
         self.assertIn("HttpOnly", cookies[0])
+        # The cookie from setup is a real session: the admin lands signed in (and goes on to enrol TOTP).
+        session = self.call("GET", "/api/auth/session", headers={"Cookie": cookies[0].split(";")[0]})[1]
+        self.assertTrue(session["authenticated"], session)
         # Ya hay administrador: el código muere y no se puede crear otro por esta vía.
         self.assertIsNone(auth.setup_code())
         status, _, _ = self.post("/api/auth/setup", "setup-admin", self.setup_body(code, "otro"))

@@ -52,9 +52,8 @@ Las pruebas necesitan PostgreSQL: `make test` arranca uno efímero en Docker (da
 
 Las rutas nuevas van en FastAPI, en `tamandua/app/api/<contexto>.py`: parámetros y respuesta con modelos Pydantic,
 seguridad con `guard(Policy(public=…, admin=…, action=…))` (CSRF, sesión, segundo factor, rol; ver
-`app/api/security.py`) y la lógica en el módulo de negocio, nunca en la ruta. Las rutas anteriores siguen declaradas
-en tabla con `@route` en `app/api/routes/<área>.py` (misma tubería, registradas por `routing.mount`); al tocar una a
-fondo, conviene pasarla a tipada.
+`app/api/security.py`) y la lógica en el módulo de negocio, nunca en la ruta. El cuerpo de la petición se lee después
+de la protección con `deps.body(Modelo, mensaje_inválido)`, así una petición sin sesión nunca llega a validarse.
 
 Después, `make openapi` regenera el esquema y los tipos TypeScript del panel (`web/src/shared/api/`), que se usan con
 `apiGet('/api/…')`: si la API y el panel no cuadran, falla `tsc`. El CI comprueba que el esquema está al día.
