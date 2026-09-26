@@ -79,6 +79,17 @@ class QueueTests(unittest.TestCase):
         with self.assertRaises(vault.VaultError):  # sellado para otra cosa: no se abre
             vault.unseal(json.loads(stored)["tokens"], "otra-cosa")
 
+    def test_only_the_leader_feeds_batches(self):
+        follower = ScanJobs(self.data_dir, worker=False)
+        self.assertFalse(follower.leader)
+        with patch.object(follower, "_feed_batch") as feed, patch.object(queue, "claim", return_value=None), \
+                patch.object(queue, "heartbeat"), patch.object(queue, "touch"):
+            follower.idle_poll = 0.01
+            threading.Timer(0.1, follower.stop).start()
+            follower.run_worker()
+        feed.assert_not_called()
+        self.assertTrue(ScanJobs(self.data_dir, worker=True).leader)  # un solo proceso: siempre líder
+
     def test_only_one_worker_leads_the_periodic_tasks(self):
         from tamandua.app.worker import LEADER_KEY
         first, second = db.engine().connect(), db.engine().connect()

@@ -69,7 +69,8 @@ def _lead(data_dir: Path, jobs: ScanJobs, stop: threading.Event) -> None:
         try:
             if connection.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": LEADER_KEY}).scalar():
                 connection.commit()
-                log.info("worker_leader", extra={"reason": "este worker corre las tareas periódicas"})
+                log.info("worker_leader", extra={"reason": "este worker corre las tareas periódicas y avanza los lotes"})
+                jobs.leader = True
                 start_periodic(data_dir, jobs)
                 stop.wait()  # mientras viva el proceso, la conexión abierta conserva el cerrojo
                 return

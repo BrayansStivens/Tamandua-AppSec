@@ -49,6 +49,9 @@ class ScanJobs:
         self.idle_poll = 3.0
         self._stop = threading.Event()
         self._thread = None
+        # Solo el líder avanza los lotes (con varios workers, dos podrían tomar el mismo repositorio). En un solo
+        # proceso siempre es líder; el proceso worker lo activa al ganar el cerrojo de líder.
+        self.leader = worker
         if worker:
             self.prepare(embedded=True)
             self._thread = threading.Thread(target=self.run_worker, name="appsec-scans", daemon=True)
@@ -195,8 +198,9 @@ class ScanJobs:
                 self._stop.wait(self.idle_poll)
                 continue
             if job is None:
-                # Sin nada pendiente, el siguiente repositorio del lote activo (si lo hay).
-                self._feed_batch()
+                # Sin nada pendiente, el siguiente repositorio del lote activo (si lo hay); solo el líder.
+                if self.leader:
+                    self._feed_batch()
                 self._stop.wait(self.idle_poll)
                 continue
             error = None
