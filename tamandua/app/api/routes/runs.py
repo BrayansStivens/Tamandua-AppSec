@@ -13,7 +13,7 @@ from tamandua.modules.runs import batches
 from tamandua.modules.findings import exclusions
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.integrations import jira
-from tamandua.modules.compliance import sbom
+from tamandua.modules.compliance import evidence, sbom
 from tamandua.modules.findings import sla
 from tamandua.modules.findings import triage
 from tamandua.modules.compliance import vex
@@ -227,16 +227,7 @@ def _portfolio_report(request: Request, payload: dict):
     status = payload.get("status", "all")
     if status not in ("open", "all"):
         return request.json(400, {"error": msg("api.invalid_status")})
-    latest: dict[str, dict] = {}
-    for row in list_runs(request.data_dir):  # del más reciente al más antiguo
-        if row["type"] in FULL_SCANS:
-            from tamandua.modules.sources.assets import asset_key
-            entry = latest.setdefault(asset_key(row), {"complete": None, "status": row["status"]})
-            if row["status"] == "completed" and entry["complete"] is None:
-                entry["complete"] = row["created_at"]
-    items = [{"name": row.get("name") or row["key"], "findings": findings_registry.view(request.data_dir, row["key"], status=status)["findings"],
-              "last_complete": (latest.get(row["key"]) or {}).get("complete"), "last_status": (latest.get(row["key"]) or {}).get("status")}
-             for row in chosen]
+    items = evidence.portfolio(request.data_dir, chosen, status=status)
     try:
         options = validate_options(payload.get("options"), default_by=request.user.get("display_name") or request.user["username"])
         pdf = render_portfolio_pdf(items, options, version=VERSION, scope_label=scope, coverage=coverage, locale=request.locale)

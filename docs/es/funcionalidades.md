@@ -80,7 +80,7 @@ política y los vencidos ordenados por retraso: lo que piden SOC 2 e ISO 27001 c
 
 ## Cumplimiento: SBOM, VEX, paquetes maliciosos y CRA
 
-- **SBOM (CycloneDX 1.6).** En **Hallazgos → Más formatos → SBOM**, de cada análisis o del estado actual de un repositorio
+- **SBOM (CycloneDX 1.6).** En **Cumplimiento → Evidencias** (o **Hallazgos → Más formatos → SBOM**), de cada análisis o del estado actual de un repositorio
   o imagen (sale del último análisis completo). Lleva purl, versión, licencias cuando Trivy las da, si la dependencia es
   directa y, en imágenes, los paquetes del sistema. No inventa lo que no sabe (proveedor, hash por componente). Válido
   contra el esquema oficial; es la base que piden el CRA (Anexo I) y la guía BSI TR-03183-2.
@@ -90,11 +90,18 @@ política y los vencidos ordenados por retraso: lo que piden SOC 2 e ISO 27001 c
   ya», con la corrección real: eliminar el paquete y rotar los secretos de donde se instaló. Nunca «actualiza a…».
 - **Marcos del informe de auditoría.** Además de SOC 2 e ISO 27001: PCI DSS 4.0.1, CRA, Brasil (Res. CMN 4.893/5.274),
   Chile (Ley 21.663) y Colombia (SFC, CE 007/2018). La relación con cada control es orientativa.
-- **Kit CRA (vista Cumplimiento).** Un administrador marca qué repositorios o imágenes son productos bajo el Reglamento de
-  Ciberresiliencia. Si uno tiene un CVE del catálogo CISA KEV, corren los plazos del artículo 14 (alerta temprana en 24 h
-  y notificación en 72 h desde que se supo; informe final 14 días después de la corrección), con un borrador para
-  ENISA y el registro de quién marcó cada etapa como enviada. Tamandua no notifica por ti. Un falso positivo
-  («no afecta») no abre plazos.
+- **Evidencias (vista Cumplimiento).** Eliges un repositorio o una imagen y descargas en un clic su SBOM, su VEX, el
+  informe técnico o la evidencia de auditoría del marco elegido; o la evidencia de auditoría consolidada de todos los
+  activos analizados. Son las mismas exportaciones que en Hallazgos.
+- **Kit CRA (vista Cumplimiento, opcional).** Solo para fabricantes que venden en la UE productos con software: un
+  administrador lo activa en **Políticas** («Vendemos productos con software en la UE (CRA)», desactivado por defecto,
+  con un motivo que queda en el historial; desactivarlo conserva los datos). Luego un administrador marca qué
+  repositorios o imágenes son productos. Un CVE del catálogo CISA KEV en un producto abre un evento **por evaluar**, sin
+  plazos: KEV solo dice que se explota en algún sitio. Un administrador registra «no afecta a nuestro producto» (con
+  motivo; el evento se cierra y se puede reabrir) o «se explota activamente en nuestro producto»: solo entonces corren
+  los plazos del artículo 14 desde ese momento (alerta temprana en 24 h y notificación en 72 h; informe final 14 días
+  después de la corrección), con un borrador para ENISA y el registro de quién marcó cada etapa como enviada. Tamandua
+  no notifica por ti. Un falso positivo en el triage no abre evento.
 
 ## CVE tracker
 

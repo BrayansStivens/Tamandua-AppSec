@@ -19,7 +19,7 @@ from tamandua.shared.i18n import localize, text
 from tamandua.modules.reporting.audit import FRAMEWORKS, render_audit_pdf, validate_options
 from tamandua.modules.identity.auth import Users
 from tamandua.modules.runs.store import save_repository_scan
-from test_auth import PASSWORD, HttpCase
+from test_auth import ORIGIN, PASSWORD, HttpCase
 from test_cve_db import nvd_entry
 from test_dashboard import _finding, _scan
 
@@ -184,7 +184,7 @@ class EuvdRouteTests(HttpCase):
 
 
 class CraTests(unittest.TestCase):
-    """Relojes del art. 14: desde que se sabe que se explota; el informe final, 14 días tras la corrección."""
+    """Art. 14: a KEV match is only a signal; the clocks start when an admin records it is exploited in the product."""
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -195,25 +195,96 @@ class CraTests(unittest.TestCase):
                  "finished_at": "2026-09-18T10:00:00+00:00"}
         first["source"]["uid"] = "github#9"
         self.run = save_repository_scan(self.data_dir, first, created_at="2026-09-18T10:00:00+00:00")
+        cra.set_policy(self.data_dir, True, reason="Vendemos el portal en la UE", user=ADMIN)
         cra.set_product(self.data_dir, "github#9", name="Portal ACME", support_until="2031-12-31", user=ADMIN)
+        self.event_id = "github#9|CVE-2026-1111"
 
     def tearDown(self):
         self.directory.cleanup()
 
-    def test_clocks_start_when_both_facts_are_known(self):
-        now = datetime(2026, 9, 21, 12, tzinfo=timezone.utc)
-        (event,) = cra.events(self.data_dir, now=now)  # el hallazgo sin KEV no abre evento
-        self.assertEqual((event["cve"], event["product"], event["aware_at"][:10]), ("CVE-2026-1111", "Portal ACME", "2026-09-20"))
-        self.assertEqual([(stage["id"], stage["state"]) for stage in event["stages"]],
-                         [("early_warning", "overdue"), ("notification", "pending"), ("final_report", "waiting")])
+    def exploited(self, at: datetime):
+        with patch.object(cra, "_now", return_value=at.isoformat()):
+            cra.assess(self.data_dir, self.event_id, "exploited", reason=None, user=ADMIN)
+
+    def test_off_by_default_opens_nothing_and_turning_it_off_keeps_the_data(self):
+        with tempfile.TemporaryDirectory() as other:
+            self.assertEqual((cra.policy(Path(other))["enabled"], cra.events(Path(other))), (False, []))
+        self.exploited(datetime(2026, 9, 21, tzinfo=timezone.utc))
+        with self.assertRaises(cra.CraError):  # the change needs a reason, like the other policies
+            cra.set_policy(self.data_dir, False, reason=" ", user=ADMIN)
+        policy = cra.set_policy(self.data_dir, False, reason="Ya no vendemos en la UE", user=ADMIN)
+        self.assertEqual((policy["enabled"], [entry["enabled"] for entry in policy["history"]], policy["history"][0]["by"]), (False, [False, True], "ana"))
+        self.assertEqual(cra.events(self.data_dir), [])
+        self.assertIn("github#9", cra.load(self.data_dir)["products"])
+        cra.set_policy(self.data_dir, True, reason="Volvemos a vender en la UE", user=ADMIN)
+        (event,) = cra.events(self.data_dir)
+        self.assertEqual(event["state"], "exploited")  # the assessment survived
+
+    def test_a_kev_match_is_to_assess_with_no_clock_running(self):
+        (event,) = cra.events(self.data_dir, now=datetime(2026, 9, 30, tzinfo=timezone.utc))  # the finding without KEV opens nothing
+        self.assertEqual((event["cve"], event["product"], event["state"], event["signal_at"][:10]), ("CVE-2026-1111", "Portal ACME", "to_assess", "2026-09-20"))
+        self.assertEqual((event["stages"], event["aware_at"], event["assessment"], event["done"]), ([], None, None, False))
+        self.assertIsNone(cra.with_draft(event)["draft"])
+        self.assertEqual(cra.overview(self.data_dir)["counts"]["to_assess"], 1)
+        with self.assertRaises(cra.CraError):  # nothing to mark as sent before the assessment
+            cra.mark(self.data_dir, self.event_id, "early_warning", sent=True, user=ADMIN)
+
+    def test_exploited_starts_the_clocks_from_the_awareness_time(self):
+        aware = datetime(2026, 9, 25, 9, tzinfo=timezone.utc)
+        self.exploited(aware)
+        (event,) = cra.events(self.data_dir, now=aware + timedelta(hours=25))
+        self.assertEqual((event["state"], event["aware_at"], event["assessment"]["by"]), ("exploited", aware.isoformat(), "ana"))
+        self.assertEqual([(stage["id"], stage["due"], stage["state"]) for stage in event["stages"]],
+                         [("early_warning", (aware + timedelta(hours=24)).isoformat(), "overdue"),
+                          ("notification", (aware + timedelta(hours=72)).isoformat(), "pending"), ("final_report", None, "waiting")])
         cra.mark(self.data_dir, event["id"], "early_warning", sent=True, user=ADMIN)
-        (event,) = cra.events(self.data_dir, now=now)
+        (event,) = cra.events(self.data_dir, now=aware + timedelta(hours=25))
         self.assertEqual((event["stages"][0]["state"], event["stages"][0]["sent"]["by"]), ("sent", "ana"))
         self.assertIn("ransomware", cra.draft(event))
+        self.assertIn("2026-09-25 09:00", cra.draft(event))
         with self.assertRaises(cra.CraError):
             cra.mark(self.data_dir, event["id"], "otra", sent=True, user=ADMIN)
+        with self.assertRaises(cra.CraError):  # exploited can't be undone: its clocks stay on record
+            cra.reopen(self.data_dir, self.event_id, user=ADMIN)
+        with self.assertRaises(cra.CraError):
+            cra.assess(self.data_dir, self.event_id, "not_affected", reason="Nos equivocamos", user=ADMIN)
+
+    def test_not_affected_needs_a_reason_closes_the_event_and_can_be_reopened(self):
+        for reason in (None, "  no ", "x" * 501, "Motivo\x00oculto"):
+            with self.assertRaises(cra.CraError, msg=reason):
+                cra.assess(self.data_dir, self.event_id, "not_affected", reason=reason, user=ADMIN)
+        cra.assess(self.data_dir, self.event_id, "not_affected", reason="No usamos la función afectada de lodash", user=ADMIN)
+        (event,) = cra.events(self.data_dir)
+        self.assertEqual((event["state"], event["done"], event["stages"], event["assessment"]["reason"]),
+                         ("not_affected", True, [], "No usamos la función afectada de lodash"))
+        self.assertEqual(cra.overview(self.data_dir)["counts"]["pending"], 0)
+        with self.assertRaises(cra.CraError):
+            cra.assess(self.data_dir, self.event_id, "exploited", reason=None, user=ADMIN)
+        cra.reopen(self.data_dir, self.event_id, user=ADMIN)
+        (event,) = cra.events(self.data_dir)
+        self.assertEqual(event["state"], "to_assess")
+        history = cra.load(self.data_dir)["reports"][self.event_id]["history"]
+        self.assertEqual([entry["state"] for entry in history], ["not_affected", "reopened"])
+        for bad in ("github#9|CVE-2026-2222", "github#1|CVE-2026-1111", "x", "a" * 400):  # not a KEV event of a product
+            with self.assertRaises(cra.CraError, msg=bad):
+                cra.assess(self.data_dir, bad, "exploited", reason=None, user=ADMIN)
+
+    def test_events_reported_before_assessments_read_as_exploited_from_the_signal(self):
+        from tamandua.shared import documents
+        state = documents.load(self.data_dir, "cra", {})
+        state["reports"] = {self.event_id: {"early_warning": {"at": "2026-09-20T12:00:00+00:00", "by": "luis"}}}
+        documents.save(self.data_dir, "cra", state)
+        noon = datetime(2026, 9, 21, 12, tzinfo=timezone.utc)
+        (event,) = cra.events(self.data_dir, now=noon)
+        self.assertEqual((event["state"], event["assessment"]["legacy"], event["assessment"]["by"], event["aware_at"][:10]),
+                         ("exploited", True, "luis", "2026-09-20"))
+        self.assertEqual([stage["state"] for stage in event["stages"]], ["sent", "pending", "waiting"])
+        cra.mark(self.data_dir, self.event_id, "early_warning", sent=False, user=ADMIN)
+        (event,) = cra.events(self.data_dir, now=noon)
+        self.assertEqual((event["state"], event["stages"][0]["state"]), ("exploited", "overdue"))  # unmarking doesn't reopen it
 
     def test_fixed_starts_the_final_report_and_false_positive_closes_it(self):
+        self.exploited(datetime(2026, 9, 21, tzinfo=timezone.utc))
         fixed = {**_scan("org/api", [], "2026-09-23T10:00:00+00:00"), "finished_at": "2026-09-23T10:00:00+00:00"}
         fixed["source"]["uid"] = "github#9"
         save_repository_scan(self.data_dir, fixed, created_at="2026-09-23T10:00:00+00:00")
@@ -225,31 +296,78 @@ class CraTests(unittest.TestCase):
             cra.set_product(self.data_dir, "github#9", name=" ", support_until=None, user=ADMIN)
 
 
+JSON = {"Content-Type": "application/json"}
+
+
+def _send(case, path, action, body, cookie):
+    """A POST to a typed route, as the panel sends it."""
+    return case.call("POST", path, body, {"Origin": ORIGIN, "X-Tamandua-Action": action, "Cookie": cookie, **JSON})
+
+
+def _login(case, username, role="member"):
+    Users(case.data_dir).create(username, PASSWORD, role=role)
+    return case.post("/api/auth/login", "login", {"username": username, "password": PASSWORD})[2][0].split("; ")[0]
+
+
 class CraRouteTests(HttpCase):
-    def test_members_read_only_admins_change(self):
-        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
-            Users(self.data_dir).create("jefa", PASSWORD, role="admin")
-            Users(self.data_dir).create("miembro", PASSWORD)
-            admin = self.post("/api/auth/login", "login", {"username": "jefa", "password": PASSWORD})[2][0].split("; ")[0]
-            member = self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})[2][0].split("; ")[0]
-            save_repository_scan(self.data_dir, _scan("org/api", [], datetime.now(timezone.utc).isoformat()))
-            body = {"op": "product", "key": "github:org/api", "name": "API", "support_until": None}
-            self.assertEqual(self.call("GET", "/api/cra")[0], 401)
-            self.assertEqual(self.call("GET", "/api/cra", headers={"Cookie": member})[0], 200)
-            self.assertEqual(self.post("/api/cra", "cra", body, member)[0], 403)
-            status, state, _ = self.post("/api/cra", "cra", body, admin)
-            self.assertEqual((status, state["counts"]["products"], state["counts"]["candidates"]), (200, 1, 0))
-            _, page, _ = self.call("GET", "/api/cra/products", headers={"Cookie": member})
-            self.assertEqual((page["total"], page["items"][0]["name"], bool(page["items"][0]["last_complete"])), (1, "API", True))
-            for bad in ({**body, "key": "github:otro"}, {**body, "extra": 1}, {"op": "mark", "event": "x|y", "stage": "early_warning", "sent": "si"},
-                        {**body, "support_until": "mañana"}):
-                self.assertEqual(self.post("/api/cra", "cra", bad, admin)[0], 400, bad)
+    def test_off_answers_404_and_only_admins_turn_it_on_with_a_reason(self):
+        admin, member = _login(self, "jefa", "admin"), _login(self, "miembro")
+        save_repository_scan(self.data_dir, _scan("org/api", [], datetime.now(timezone.utc).isoformat()))
+        status, policy, _ = self.call("GET", "/api/policies/cra", headers={"Cookie": member})
+        self.assertEqual((status, policy["enabled"], policy["history"]), (200, False, []))
+        for path in ("/api/cra", "/api/cra/products", "/api/cra/events", "/api/cra/assets"):
+            status, body, _ = self.call("GET", path, headers={"Cookie": member, "Accept-Language": "en"})
+            self.assertEqual((status, body["error"]), (404, "CRA reporting is off. An admin can turn it on in Policies."), path)
+        product = {"op": "product", "key": "github:org/api", "name": "API", "support_until": None}
+        self.assertEqual(_send(self, "/api/cra", "cra", product, admin)[0], 404)
+        self.assertEqual(self.call("GET", "/api/policies/cra")[0], 401)
+        on = {"enabled": True, "reason": "Vendemos la API en la UE"}
+        self.assertEqual(_send(self, "/api/policies/cra", "cra-policy", on, member)[0], 403)
+        self.assertEqual(self.call("POST", "/api/policies/cra", on, {"Cookie": admin, "Origin": ORIGIN, **JSON})[0], 403)  # CSRF
+        for bad in ({**on, "reason": "no"}, {**on, "extra": 1}, {"enabled": "si", "reason": on["reason"]}, {"enabled": True}):
+            self.assertEqual(_send(self, "/api/policies/cra", "cra-policy", bad, admin)[0], 400, bad)
+        status, policy, _ = _send(self, "/api/policies/cra", "cra-policy", on, admin)
+        self.assertEqual((status, policy["enabled"], policy["by"], policy["reason"], len(policy["history"])), (200, True, "jefa", on["reason"], 1))
+        self.assertEqual(self.call("GET", "/api/cra", headers={"Cookie": member})[0], 200)
+
+    def test_members_read_only_admins_change_and_assess(self):
+        admin, member = _login(self, "jefa", "admin"), _login(self, "miembro")
+        cra.set_policy(self.data_dir, True, reason="Vendemos en la UE", user=ADMIN)
+        kev = {"date_added": "2026-09-20", "due_date": None, "ransomware": False, "name": "Exploited"}
+        save_repository_scan(self.data_dir, _scan("org/api", [{**_finding("a" * 64, "critical", kev=kev), "cve": ["CVE-2026-1111"]}],
+                                                  datetime.now(timezone.utc).isoformat()))
+        body = {"op": "product", "key": "github:org/api", "name": "API", "support_until": None}
+        self.assertEqual(self.call("GET", "/api/cra")[0], 401)
+        self.assertEqual(self.call("GET", "/api/cra", headers={"Cookie": member})[0], 200)
+        self.assertEqual(_send(self, "/api/cra", "cra", body, member)[0], 403)
+        self.assertEqual(self.call("POST", "/api/cra", body, {"Cookie": admin, "Origin": ORIGIN, **JSON})[0], 403)  # CSRF
+        status, state, _ = _send(self, "/api/cra", "cra", body, admin)
+        self.assertEqual((status, state["counts"]["products"], state["counts"]["candidates"], state["counts"]["to_assess"]), (200, 1, 0, 1))
+        _, page, _ = self.call("GET", "/api/cra/products", headers={"Cookie": member})
+        self.assertEqual((page["total"], page["items"][0]["name"], bool(page["items"][0]["last_complete"])), (1, "API", True))
+        event_id = "github:org/api|CVE-2026-1111"
+        for bad in ({**body, "key": "github:otro"}, {**body, "extra": 1}, {"op": "mark", "event": event_id, "stage": "early_warning", "sent": "si"},
+                    {**body, "support_until": "mañana"}, {"op": "borrar"},
+                    {"op": "mark", "event": event_id, "stage": "early_warning", "sent": True},  # not assessed yet
+                    {"op": "assess", "event": event_id, "verdict": "not_affected"},  # a reason is required
+                    {"op": "assess", "event": event_id, "verdict": "quizas", "reason": "No sabemos aún"},
+                    {"op": "assess", "event": "github:org/api|CVE-2026-9", "verdict": "exploited"}):
+            self.assertEqual(_send(self, "/api/cra", "cra", bad, admin)[0], 400, bad)
+        assess = {"op": "assess", "event": event_id, "verdict": "exploited"}
+        self.assertEqual(_send(self, "/api/cra", "cra", assess, member)[0], 403)
+        self.assertEqual(_send(self, "/api/cra", "cra", assess, admin)[0], 200)
+        _, events, _ = self.call("GET", "/api/cra/events", headers={"Cookie": member})
+        (event,) = events["items"]
+        self.assertEqual((event["state"], event["assessment"]["by"], len(event["stages"]), event["aware_at"] is not None), ("exploited", "jefa", 3, True))
+        self.assertIn("CVE-2026-1111", event["draft"])
+        self.assertEqual(_send(self, "/api/cra", "cra", {"op": "mark", "event": event_id, "stage": "early_warning", "sent": True}, admin)[0], 200)
 
 
 class CraPagingTests(HttpCase):
     def test_products_events_and_assets_are_paged_on_the_server(self):
         Users(self.data_dir).create("miembro", PASSWORD)
         cookie = {"Cookie": self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})[2][0].split("; ")[0]}
+        cra.set_policy(self.data_dir, True, reason="Vendemos en la UE", user=ADMIN)
         kev = {"date_added": "2026-09-20", "due_date": None, "ransomware": False, "name": "Exploited"}
         stamp = datetime.now(timezone.utc).isoformat()
         findings = {"org/a": [{**_finding("a" * 64, "critical", kev=kev, package="lodash"), "cve": ["CVE-2026-1111"]},
@@ -261,13 +379,14 @@ class CraPagingTests(HttpCase):
             cra.set_product(self.data_dir, f"github:{name}", name=name.upper(), support_until=None, user=ADMIN)
 
         status, overview, _ = self.call("GET", "/api/cra", headers=cookie)
-        self.assertEqual((status, overview["counts"]), (200, {"products": 2, "unscanned": 0, "events": 3, "pending": 3, "assets": 3, "candidates": 1}))
+        self.assertEqual((status, overview["counts"]), (200, {"products": 2, "unscanned": 0, "events": 3, "pending": 3, "to_assess": 3,
+                                                              "assets": 3, "candidates": 1}))
         _, first, _ = self.call("GET", "/api/cra/products?limit=1", headers=cookie)
         _, second, _ = self.call("GET", "/api/cra/products?limit=1&offset=1", headers=cookie)
         self.assertEqual((first["total"], first["limit"], [item["name"] for item in first["items"] + second["items"]]), (2, 1, ["ORG/A", "ORG/B"]))
         _, events, _ = self.call("GET", "/api/cra/events?limit=2", headers=cookie)
         self.assertEqual((events["total"], len(events["items"]), events["offset"]), (3, 2, 0))
-        self.assertIn("CVE-", events["items"][0]["draft"])  # rendered for the reader
+        self.assertEqual({(event["state"], event["draft"]) for event in events["items"]}, {("to_assess", None)})  # no draft before the assessment
         _, rest, _ = self.call("GET", "/api/cra/events?limit=2&offset=2", headers=cookie)
         self.assertEqual(len(rest["items"]), 1)
         self.assertEqual({event["cve"] for event in events["items"] + rest["items"]}, {"CVE-2026-1111", "CVE-2026-3333", "CVE-2026-4444"})
@@ -280,6 +399,50 @@ class CraPagingTests(HttpCase):
                 self.assertEqual(self.call("GET", f"{path}?{bad}", headers=cookie), (400, {"error": "Parámetros inválidos"}, []), (path, bad))
             self.assertEqual(self.call("GET", f"{path}?limit=500")[0], 401, path)
         self.assertEqual(self.call("GET", "/api/cra/assets?q=" + "a" * 101, headers=cookie)[0], 400)
+
+
+class EvidenceHubTests(HttpCase):
+    """The hub links to the existing exports; only the portfolio audit evidence has its own route."""
+
+    def test_asset_picker_existing_exports_and_portfolio_evidence(self):
+        member = _login(self, "miembro")
+        cookie = {"Cookie": member}
+        stamp = datetime.now(timezone.utc).isoformat()
+        save_repository_scan(self.data_dir, _scan("org/api", [_finding("a" * 64, "critical", package="lodash")], stamp), created_at=stamp)
+        incomplete = {**_scan("org/web", [], stamp), "status": "failed"}
+        save_repository_scan(self.data_dir, incomplete, created_at=stamp)
+
+        self.assertEqual(self.call("GET", "/api/evidence")[0], 401)
+        self.assertEqual(self.call("GET", "/api/evidence", headers=cookie)[1], {"assets": 2, "complete": 1})
+        status, page, _ = self.call("GET", "/api/evidence/assets", headers=cookie)
+        self.assertEqual((status, page["total"], {item["name"]: item["sbom"] for item in page["items"]}), (200, 2, {"org/api": True, "org/web": False}))
+        self.assertEqual({item["kind"] for item in page["items"]}, {"repository"})
+        self.assertEqual(self.call("GET", "/api/evidence/assets?q=API", headers=cookie)[1]["total"], 1)
+        for bad in ("limit=0", "limit=101", "q=" + "a" * 101):
+            self.assertEqual(self.call("GET", f"/api/evidence/assets?{bad}", headers=cookie)[0], 400, bad)
+
+        # The per-asset buttons are the existing exports, called exactly as the hub does.
+        for artifact, status_arg, kind in (("sbom.cdx.json", "all", "bomFormat"), ("vex.openvex.json", "all", "statements")):
+            status, body, _ = self.call("GET", f"/api/assets/export?key=github:org/api&status={status_arg}&artifact={artifact}", headers=cookie)
+            self.assertEqual(status, 200, artifact)
+            self.assertIn(kind, body)
+        status, body, _ = self.call("GET", "/api/assets/export?key=github:org/api&status=open&artifact=report.pdf", headers=cookie)
+        self.assertTrue((status, body[:5]) == (200, b"%PDF-"))
+        self.assertEqual(self.call("GET", "/api/assets/export?key=github:org/web&status=all&artifact=sbom.cdx.json", headers=cookie)[0], 404)
+        status, body, _ = self.post("/api/reports/audit", "audit-report", {"asset": "github:org/api", "status": "all", "options": {"framework": "iso27001"}}, member)
+        self.assertEqual((status, body[:5]), (200, b"%PDF-"))
+
+        for framework in FRAMEWORKS:
+            status, body, _ = _send(self, "/api/evidence/portfolio", "audit-report", {"framework": framework}, member)
+            self.assertEqual((status, body[:5]), (200, b"%PDF-"), framework)
+        self.assertEqual(self.call("POST", "/api/evidence/portfolio", {"framework": "soc2"}, {"Cookie": member, "Origin": ORIGIN, **JSON})[0], 403)  # CSRF
+        self.assertEqual(self.call("POST", "/api/evidence/portfolio", {"framework": "soc2"}, {"Origin": ORIGIN, "X-Tamandua-Action": "audit-report", **JSON})[0], 401)
+        for bad in ({"framework": "hipaa"}, {"framework": "soc2", "title": "x"}, {}):
+            self.assertEqual(_send(self, "/api/evidence/portfolio", "audit-report", bad, member)[0], 400, bad)
+
+    def test_portfolio_without_analyzed_assets_is_404(self):
+        member = _login(self, "miembro")
+        self.assertEqual(_send(self, "/api/evidence/portfolio", "audit-report", {"framework": "soc2"}, member)[0], 404)
 
 
 class FrameworkTests(unittest.TestCase):

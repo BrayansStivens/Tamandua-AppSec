@@ -82,7 +82,7 @@ policy and overdue findings sorted by delay: what SOC 2 and ISO 27001 ask for as
 
 ## Compliance: SBOM, VEX, malicious packages and CRA
 
-- **SBOM (CycloneDX 1.6).** In **Findings → More formats → SBOM**, for each scan or for the current state of a repository
+- **SBOM (CycloneDX 1.6).** In **Compliance → Evidence** (or **Findings → More formats → SBOM**), for each scan or for the current state of a repository
   or image (taken from the latest full scan). It includes purl, version, licenses when Trivy provides them, whether the
   dependency is direct and, for images, the system packages. It doesn't make up what it doesn't know (supplier,
   per-component hash). Valid against the official schema; it's the baseline required by the CRA (Annex I) and BSI TR-03183-2.
@@ -92,11 +92,18 @@ policy and overdue findings sorted by delay: what SOC 2 and ISO 27001 ask for as
   now", with the actual fix: remove the package and rotate the secrets from wherever it was installed. Never "update to…".
 - **Audit report frameworks.** Besides SOC 2 and ISO 27001: PCI DSS 4.0.1, CRA, Brazil (CMN Res. 4.893/5.274),
   Chile (Law 21.663) and Colombia (SFC, CE 007/2018). The mapping to each control is indicative.
-- **CRA kit (Compliance view).** An administrator marks which repositories or images are products under the Cyber
-  Resilience Act. If one has a CVE from the CISA KEV catalog, the Article 14 deadlines start running (early warning within
-  24 h and notification within 72 h of becoming aware; final report 14 days after the fix), with a draft for ENISA and a
-  record of who marked each stage as sent. Tamandua doesn't notify on your behalf. A false positive ("not affected")
-  doesn't start any deadline.
+- **Evidence hub (Compliance view).** Pick a repository or image and download its SBOM, VEX, technical report or
+  audit evidence for the chosen framework in one click; or the consolidated audit evidence of every analyzed asset.
+  The files are the same exports as in Findings.
+- **CRA kit (Compliance view, opt-in).** Only for manufacturers that sell products with software in the EU: an
+  administrator turns it on in **Policies** ("We sell products with software in the EU (CRA)", off by default, with a
+  reason kept in the history; turning it off keeps the data). Then an administrator marks which repositories or images
+  are products. A CVE from the CISA KEV catalog on a product opens an event **to assess**, with no deadline running: KEV
+  only says it's exploited somewhere. An administrator records "doesn't affect our product" (with a reason; the event
+  closes and can be reopened) or "actively exploited in our product": only then do the Article 14 deadlines start from
+  that moment (early warning within 24 h and notification within 72 h; final report 14 days after the fix), with a draft
+  for ENISA and a record of who marked each stage as sent. Tamandua doesn't notify on your behalf. A false positive in
+  triage doesn't open an event.
 
 ## CVE tracker
 

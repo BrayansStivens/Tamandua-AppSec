@@ -8,15 +8,25 @@
     "errors": {
       "product_name": "Pon el nombre comercial del producto (hasta {{max}} caracteres).",
       "support_date": "La fecha de fin del soporte debe ser AAAA-MM-DD.",
-      "invalid_stage": "Evento o etapa no válidos."
+      "invalid_stage": "Evento o etapa no válidos.",
+      "reason_required": "Indica un motivo de al menos {{min}} caracteres; queda registrado.",
+      "reason_too_long": "El motivo admite hasta {{max}} caracteres, sin caracteres de control.",
+      "unknown_event": "Ese evento no existe o ya no es una coincidencia KEV en un producto.",
+      "already_assessed": "Este evento ya está evaluado.",
+      "not_reopenable": "Solo se puede reabrir un evento marcado como que no afecta al producto.",
+      "not_exploited": "Registra que se explota activamente en tu producto antes de marcar lo enviado.",
+      "disabled": "La notificación CRA está desactivada. Un administrador puede activarla en Políticas."
     },
     "draft": {
-      "body": "Producto: {{product}}{{support}}\nVulnerabilidad: {{cve}}{{kev_name}}\nComponente afectado: {{packages}}\nExplotación activa: en el catálogo CISA KEV desde {{kev_date}}{{ransomware}}\nConocimiento por el fabricante: {{aware}} UTC\nNaturaleza general del exploit: [resume cómo se explota, sin detalles que faciliten el ataque]\nMedida correctora disponible: {{fixed}}\nMedidas que pueden tomar los usuarios: [p. ej. actualizar a la versión X, desactivar la función Y]\nEstados miembros donde se comercializa el producto: [lista]\nSensibilidad de la información: [indica si algo no debe compartirse]\n\nAntes de enviar: confirma que la vulnerabilidad afecta de verdad al producto (el hallazgo es un candidato del escáner).",
+      "body": "Producto: {{product}}{{support}}\nVulnerabilidad: {{cve}}{{kev_name}}\nComponente afectado: {{packages}}\nExplotación activa en el producto: confirmada por el fabricante (en el catálogo CISA KEV desde {{kev_date}}{{ransomware}})\nConocimiento por el fabricante: {{aware}} UTC\nNaturaleza general del exploit: [resume cómo se explota, sin detalles que faciliten el ataque]\nMedida correctora disponible: {{fixed}}\nMedidas que pueden tomar los usuarios: [p. ej. actualizar a la versión X, desactivar la función Y]\nEstados miembros donde se comercializa el producto: [lista]\nSensibilidad de la información: [indica si algo no debe compartirse]\n\nAntes de enviar: completa los campos entre corchetes.",
       "support": " (soporte hasta {{date}})",
       "no_component": "[componente afectado]",
       "ransomware": " · usada en campañas de ransomware",
       "fixed_since": "Sí, desde {{date}}",
       "not_fixed": "[aún no: describe la mitigación temporal]"
+    },
+    "policy": {
+      "migrated": "Activado automáticamente: ya había productos marcados antes de que existiera este ajuste."
     }
   },
   "vex": {

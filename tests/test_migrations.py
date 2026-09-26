@@ -63,5 +63,38 @@ class MigrationTests(unittest.TestCase):
             migrations.upgrade(self.data_dir)
 
 
+class CraOptInMigrationTests(unittest.TestCase):
+    """The CRA kit became opt-in: a workspace that already marked products keeps it on; the rest start off."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.data_dir = Path(self.directory.name) / "data"
+        self.data_dir.mkdir()
+        (self.data_dir / migrations.VERSION_FILE).write_text(json.dumps({"version": 0}))
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def test_marked_products_keep_the_kit_on_and_old_events_are_to_assess(self):
+        from tamandua.modules.compliance import cra
+        from tamandua.shared import documents
+        from tamandua.shared.i18n import localize
+        old = {"products": {"github#9": {"name": "Portal", "support_until": None, "by": "ana", "at": "2026-09-01T00:00:00+00:00"}},
+               "reports": {"github#9|CVE-2026-1111": {}}}
+        documents.save(self.data_dir, "cra", old)
+        self.assertIn("cra_opt_in", migrations.upgrade(self.data_dir))
+        policy = localize(cra.policy(self.data_dir), "en")
+        self.assertEqual((policy["enabled"], policy["by"], len(policy["history"])), (True, "tamandua", 1))
+        self.assertIn("products were already marked", policy["reason"])
+        state = documents.load(self.data_dir, "cra", {})
+        self.assertEqual((state["products"], state["reports"]), (old["products"], old["reports"]))  # nothing else rewritten
+        self.assertEqual(migrations._cra_opt_in(self.data_dir), 0)  # idempotent
+
+    def test_without_products_the_kit_stays_off(self):
+        from tamandua.modules.compliance import cra
+        migrations.upgrade(self.data_dir)
+        self.assertEqual((cra.enabled(self.data_dir), cra.policy(self.data_dir)["history"]), (False, []))
+
+
 if __name__ == "__main__":
     unittest.main()

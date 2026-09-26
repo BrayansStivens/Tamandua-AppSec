@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import type { SessionUser } from '@/features/auth/session'
 import { SlaPolicyRow } from '@/features/policies/sla-policy'
 import { SecretDefaultsRow } from '@/features/policies/secret-defaults'
+import { CraPolicyRow } from '@/features/policies/cra-policy'
 import { Card, CardContent } from '@/shared/ui/card'
 
 // Settings that apply to every repository. A repository's own settings (excluded paths, extra secret entries) are
@@ -13,6 +14,7 @@ export function Policies({ user }: { user: SessionUser }) {
     <Card className="border-app-line bg-panel"><CardContent className="divide-y divide-app-line p-0">
       <SlaPolicyRow canEdit={admin} />
       <SecretDefaultsRow canEdit={admin} />
+      <CraPolicyRow canEdit={admin} />
     </CardContent></Card>
     <details className="rounded-xl border border-app-line bg-inset px-4 py-3 text-sm">
       <summary className="min-h-6 cursor-pointer font-medium text-app-secondary">{t('help.title')}</summary>
@@ -21,6 +23,7 @@ export function Policies({ user }: { user: SessionUser }) {
         <li>{t('help.secrets')}</li>
         <li>{t('help.repository')}</li>
         <li>{t('help.critical')}</li>
+        <li>{t('help.cra')}</li>
         {!admin && <li>{t('help.admin_only')}</li>}
       </ul>
     </details>

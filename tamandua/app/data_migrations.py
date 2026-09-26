@@ -42,7 +42,24 @@ class Migration:
 # Migraciones de datos (en orden; nunca se reordena ni se borra una publicada). El esquema de las tablas lo llevan
 # las migraciones de Alembic; aquí van las transformaciones de datos que no son solo esquema. La lista empieza vacía
 # con la primera versión pública (PostgreSQL): no hay instalaciones anteriores que convertir.
-MIGRATIONS: tuple[Migration, ...] = ()
+
+
+def _cra_opt_in(data_dir: Path) -> int:
+    """The CRA kit became opt-in (off by default): a workspace that already marked products keeps it on, with a
+    history entry that says why. Events need no rewrite: their readers treat a missing assessment as `to_assess`."""
+    from tamandua.shared import documents
+    with documents.lock(data_dir, "cra"):
+        state = documents.load(data_dir, "cra", {})
+        if not isinstance(state, dict) or "policy" in state or not isinstance(state.get("products"), dict) or not state["products"]:
+            return 0
+        entry = {"enabled": True, "by": "tamandua", "at": datetime.now(timezone.utc).isoformat(), "reason": msg("compliance.cra.policy.migrated")}
+        documents.save(data_dir, "cra", {**state, "policy": {**entry, "history": [entry]}})
+    return 1
+
+
+MIGRATIONS: tuple[Migration, ...] = (
+    Migration("cra_opt_in", (), _cra_opt_in),
+)
 LATEST = len(MIGRATIONS)
 
 

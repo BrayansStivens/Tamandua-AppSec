@@ -19,12 +19,33 @@
     "engine_defaults": "Gitleaks and Trivy built-in rules",
     "view": "View"
   },
+  "cra": {
+    "title": "We sell products with software in the EU (CRA)",
+    "on": "On · CRA reporting kit in Compliance",
+    "off": "Off · no CRA reporting",
+    "changed": "{{by}}, {{date}}",
+    "turn_on": "Turn on",
+    "turn_off": "Turn off",
+    "dialog_on": "Turn on CRA reporting",
+    "dialog_off": "Turn off CRA reporting",
+    "help_on": "Compliance shows the CRA kit: mark your products, assess each KEV match and track the 24 h, 72 h and 14-day deadlines.",
+    "help_off": "The CRA kit is hidden and no events open. Products and decisions are kept for when you turn it back on.",
+    "reason": "Reason (kept in the history)",
+    "reason_placeholder": "e.g. we sell the mobile app in the EU",
+    "reason_short": "Give a reason of at least {{min}} characters.",
+    "history": "Recent changes",
+    "history_on": "Turned on by {{by}}, {{date}}",
+    "history_off": "Turned off by {{by}}, {{date}}",
+    "saved_on": "Saved. CRA reporting is on.",
+    "saved_off": "Saved. CRA reporting is off; its data is kept."
+  },
   "help": {
     "title": "How policies apply",
     "sla": "Deadlines apply to every repository, the Overview and reports. The clock runs on open findings; fixed ones and approved exceptions never come due.",
     "secrets": "Secret detection defaults apply to every repository scan and PR review. A repository's own .gitleaks.toml is ignored, so a PR can't weaken detection.",
     "repository": "A repository can add its own entries from Findings, never remove a default.",
     "critical": "An exposed secret is always critical.",
-    "admin_only": "Only an admin can change them."
+    "admin_only": "Only an admin can change them.",
+    "cra": "Turn on CRA reporting only if you sell products with software in the EU; it's off by default."
   }
 }

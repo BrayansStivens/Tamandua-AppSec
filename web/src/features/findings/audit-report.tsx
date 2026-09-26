@@ -6,27 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/se
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
 import { Input } from '@/shared/ui/input'
 import { api } from '@/shared/api/http'
+import { rememberFrameworkDetails, remembered, useAuditFrameworks, type Framework } from '@/features/findings/audit-frameworks'
 
-type Framework = 'soc2' | 'iso27001' | 'pci' | 'cra' | 'br-cmn' | 'cl-21663' | 'co-sfc' | 'general'
 type Detail = 'none' | 'high' | 'all'
 type Scope = 'selected' | 'filtered' | 'all'
 export type AuditTarget = { runId: string } | { asset: string; status: 'open' | 'fixed' | 'all' } | { account: string }
 
-// [id, name key, hint key]
-const FRAMEWORKS: [Framework, string, string][] = [
-  ['soc2', 'audit.frameworks.soc2.name', 'audit.frameworks.soc2.hint'],
-  ['iso27001', 'audit.frameworks.iso27001.name', 'audit.frameworks.iso27001.hint'],
-  ['pci', 'audit.frameworks.pci.name', 'audit.frameworks.pci.hint'],
-  ['cra', 'audit.frameworks.cra.name', 'audit.frameworks.cra.hint'],
-  ['br-cmn', 'audit.frameworks.br_cmn.name', 'audit.frameworks.br_cmn.hint'],
-  ['cl-21663', 'audit.frameworks.cl_21663.name', 'audit.frameworks.cl_21663.hint'],
-  ['co-sfc', 'audit.frameworks.co_sfc.name', 'audit.frameworks.co_sfc.hint'],
-  ['general', 'audit.frameworks.general.name', 'audit.frameworks.general.hint'],
-]
 const SCOPES: [Scope, string][] = [['selected', 'audit.scope.selected'], ['filtered', 'audit.scope.filtered'], ['all', 'common:state.all']]
-const MEMORY = 'tamandua-audit-report'
-// Lo que no cambia entre informes se recuerda en este navegador (solo comodidad; nada sale de aquí).
-const remembered = (): Partial<Record<string, string>> => { try { return JSON.parse(localStorage.getItem(MEMORY) ?? '{}') } catch { return {} } }
 const field = 'space-y-1.5'
 const label = 'text-xs font-medium text-app-secondary'
 
@@ -37,7 +23,9 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
 }) {
   const { t } = useTranslation('findings')
   const memory = remembered()
-  const [framework, setFramework] = useState<Framework>((memory.framework as Framework) || 'soc2')
+  const frameworks = useAuditFrameworks()
+  const [chosen, setFramework] = useState<Framework>((memory.framework as Framework) || 'soc2')
+  const framework: Framework = frameworks.some(([id]) => id === chosen) ? chosen : 'soc2'
   const [scope, setScope] = useState<Scope>(selected.length ? 'selected' : filtered.length < total ? 'filtered' : 'all')
   const [title, setTitle] = useState('')
   const [organization, setOrganization] = useState(memory.organization ?? '')
@@ -57,7 +45,7 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setBusy(true); setError('')
-    try { localStorage.setItem(MEMORY, JSON.stringify({ framework, organization, prepared_for: preparedFor, prepared_by: preparedBy })) } catch { /* sin almacenamiento */ }
+    rememberFrameworkDetails({ framework, organization, prepared_for: preparedFor, prepared_by: preparedBy })
     const fingerprints = portfolio ? undefined : scope === 'selected' ? selected : scope === 'filtered' ? filtered : undefined
     const where = 'runId' in target ? { run_id: target.runId } : 'account' in target ? { account: target.account } : { asset: target.asset, status: target.status }
     const body = { ...where, ...(fingerprints ? { fingerprints } : {}),
@@ -67,7 +55,7 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
 
-  const current = FRAMEWORKS.find(([id]) => id === framework)
+  const current = frameworks.find(([id]) => id === framework)
   return <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
     <DialogHeader><DialogTitle>{portfolio ? t('audit.title_portfolio', { name }) : t('audit.title')}</DialogTitle>
       <DialogDescription>{t('audit.description')}</DialogDescription></DialogHeader>
@@ -76,7 +64,7 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
       <div className="space-y-2"><label htmlFor="audit-framework" className={label}>{t('audit.framework')}</label>
         <Select value={framework} onValueChange={value => setFramework((value ?? 'general') as Framework)}>
           <SelectTrigger id="audit-framework" className="w-full border-app-line bg-inset">{current && t(current[1])}</SelectTrigger>
-          <SelectContent className="border border-app-line bg-panel p-1 text-app-fg shadow-xl">{FRAMEWORKS.map(([id, text]) => <SelectItem key={id} value={id}>{t(text)}</SelectItem>)}</SelectContent>
+          <SelectContent className="border border-app-line bg-panel p-1 text-app-fg shadow-xl">{frameworks.map(([id, text]) => <SelectItem key={id} value={id}>{t(text)}</SelectItem>)}</SelectContent>
         </Select>
         <p className="text-xs text-app-muted">{current && t(current[2])}.{framework === 'general' ? '' : ` ${t('audit.mapping_note')}`}</p></div>
 

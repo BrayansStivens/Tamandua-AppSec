@@ -13,6 +13,9 @@ export const keys = {
   cra: ['cra'] as const,
   craOverview: ['cra', 'overview'] as const,
   craAssets: ['cra', 'assets'] as const,
+  craPolicy: ['cra-policy'] as const,
+  evidence: ['evidence'] as const,
+  evidenceAssets: ['evidence', 'assets'] as const,
   secretRules: ['secret-rules'] as const,
   secretBuiltinRules: ['secret-rules', 'builtin'] as const,
   assetSecretsAll: ['secret-rules', 'asset'] as const,
@@ -41,6 +44,14 @@ export const craQuery = () => queryOptions({ queryKey: keys.craOverview, queryFn
 export const craAssetsQuery = (q: string) => queryOptions({
   queryKey: [...keys.craAssets, q], staleTime: 30_000,
   queryFn: ({ signal }) => apiGet('/api/cra/assets', { q: q || undefined, limit: 20 }, { signal }),
+})
+// Whether the workspace sells products in the EU: without it, no CRA UI anywhere.
+export const craPolicyQuery = () => queryOptions({ queryKey: keys.craPolicy, queryFn: ({ signal }) => apiGet('/api/policies/cra', undefined, { signal }), staleTime: 60_000 })
+export const evidenceQuery = () => queryOptions({ queryKey: keys.evidence, queryFn: ({ signal }) => apiGet('/api/evidence', undefined, { signal }) })
+// Analyzed assets for the evidence hub's picker, searched by name on the server.
+export const evidenceAssetsQuery = (q: string) => queryOptions({
+  queryKey: [...keys.evidenceAssets, q], staleTime: 30_000,
+  queryFn: ({ signal }) => apiGet('/api/evidence/assets', { q: q || undefined, limit: 20 }, { signal }),
 })
 export const secretRulesQuery = () => queryOptions({ queryKey: keys.secretRules, queryFn: ({ signal }) => apiGet('/api/secrets/config', undefined, { signal }) })
 // The built-in rule list only changes with the pinned Gitleaks image.

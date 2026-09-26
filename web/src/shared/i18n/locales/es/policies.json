@@ -19,12 +19,33 @@
     "engine_defaults": "Reglas integradas de Gitleaks y Trivy",
     "view": "Ver"
   },
+  "cra": {
+    "title": "Vendemos productos con software en la UE (CRA)",
+    "on": "Activado · kit de notificación CRA en Cumplimiento",
+    "off": "Desactivado · sin notificación CRA",
+    "changed": "{{by}}, {{date}}",
+    "turn_on": "Activar",
+    "turn_off": "Desactivar",
+    "dialog_on": "Activar la notificación CRA",
+    "dialog_off": "Desactivar la notificación CRA",
+    "help_on": "Cumplimiento muestra el kit CRA: marca tus productos, evalúa cada coincidencia KEV y sigue los plazos de 24 h, 72 h y 14 días.",
+    "help_off": "El kit CRA se oculta y no se abren eventos. Los productos y las decisiones se conservan para cuando lo vuelvas a activar.",
+    "reason": "Motivo (queda en el historial)",
+    "reason_placeholder": "p. ej. vendemos la app móvil en la UE",
+    "reason_short": "Indica un motivo de al menos {{min}} caracteres.",
+    "history": "Cambios recientes",
+    "history_on": "Activado por {{by}}, {{date}}",
+    "history_off": "Desactivado por {{by}}, {{date}}",
+    "saved_on": "Guardado. La notificación CRA está activada.",
+    "saved_off": "Guardado. La notificación CRA está desactivada; sus datos se conservan."
+  },
   "help": {
     "title": "Cómo se aplican las políticas",
     "sla": "Los plazos se aplican a todos los repositorios, al Resumen y a los informes. El reloj corre sobre lo abierto; lo remediado y las excepciones aprobadas nunca vencen.",
     "secrets": "La detección de secretos predeterminada se aplica en cada análisis de repositorio y revisión de PR. Se ignora el .gitleaks.toml del repositorio, así que un PR no puede debilitar la detección.",
     "repository": "Un repositorio puede sumar entradas propias desde Hallazgos, nunca quitar lo predeterminado.",
     "critical": "Un secreto expuesto siempre es crítico.",
-    "admin_only": "Solo un administrador las cambia."
+    "admin_only": "Solo un administrador las cambia.",
+    "cra": "Activa la notificación CRA solo si vendes productos con software en la UE; viene desactivada."
   }
 }

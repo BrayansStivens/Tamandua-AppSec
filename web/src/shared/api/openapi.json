@@ -384,6 +384,68 @@
         }
       }
     },
+    "/api/policies/cra": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Cra Policy",
+        "description": "Anyone can read it (the panel shows or hides the CRA kit with it); an administrator changes it.",
+        "operationId": "cra_policy_api_policies_cra_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CraPolicy"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Set Cra Policy",
+        "description": "Turns the CRA kit on or off, with a reason kept in the history. Off keeps products and decisions.",
+        "operationId": "set_cra_policy_api_policies_cra_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CraPolicyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CraPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/cra": {
       "get": {
         "tags": [
@@ -398,6 +460,73 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CraOverview"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Change",
+        "description": "Marks products, records the assessment of an event (only \"exploited in our product\" starts the clocks) and\nwhich stages were sent. Answers the new overview.",
+        "operationId": "change_api_cra_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ProductIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/UnproductIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MarkIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AssessIn"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ReopenIn"
+                  }
+                ],
+                "title": "Body",
+                "discriminator": {
+                  "propertyName": "op",
+                  "mapping": {
+                    "product": "#/components/schemas/ProductIn",
+                    "unproduct": "#/components/schemas/UnproductIn",
+                    "mark": "#/components/schemas/MarkIn",
+                    "assess": "#/components/schemas/AssessIn",
+                    "reopen": "#/components/schemas/ReopenIn"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CraOverview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -468,7 +597,7 @@
           "compliance"
         ],
         "summary": "Events",
-        "description": "Most urgent first. The ENISA draft is only built for the events on the page.",
+        "description": "Most urgent first. The ENISA draft is only built for the exploited events on the page.",
         "operationId": "events_api_cra_events_get",
         "parameters": [
           {
@@ -572,6 +701,140 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CraAssetPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Evidence Overview",
+        "operationId": "evidence_overview_api_evidence_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/assets": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Evidence Assets",
+        "description": "The asset picker: analyzed assets by name, with whether each has what an SBOM needs.",
+        "operationId": "evidence_assets_api_evidence_assets_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceAssetPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/evidence/portfolio": {
+      "post": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Portfolio Evidence",
+        "description": "Consolidated audit evidence of every analyzed asset (open, fixed and exceptions), for one framework.",
+        "operationId": "portfolio_evidence_api_evidence_portfolio_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioEvidenceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Audit evidence (PDF) of every analyzed asset",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "maxLength": 50000000,
+                  "format": "binary"
                 }
               }
             }
@@ -955,6 +1218,48 @@
         ],
         "title": "AffectedAssetPage"
       },
+      "AssessIn": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "assess",
+            "title": "Op"
+          },
+          "event": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Event"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "not_affected",
+              "exploited"
+            ],
+            "title": "Verdict"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "event",
+          "verdict"
+        ],
+        "title": "AssessIn"
+      },
       "AssetSecretConfig": {
         "properties": {
           "allowlist": {
@@ -1139,6 +1444,55 @@
         ],
         "title": "BuiltinRules"
       },
+      "CraAssessment": {
+        "properties": {
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "legacy": {
+            "type": "boolean",
+            "title": "Legacy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by",
+          "at",
+          "reason",
+          "legacy"
+        ],
+        "title": "CraAssessment"
+      },
       "CraAsset": {
         "properties": {
           "key": {
@@ -1207,6 +1561,10 @@
             "type": "integer",
             "title": "Pending"
           },
+          "to_assess": {
+            "type": "integer",
+            "title": "To Assess"
+          },
           "assets": {
             "type": "integer",
             "title": "Assets"
@@ -1222,6 +1580,7 @@
           "unscanned",
           "events",
           "pending",
+          "to_assess",
           "assets",
           "candidates"
         ],
@@ -1287,9 +1646,37 @@
             "title": "Packages"
           },
           "kev": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Kev"
+            "$ref": "#/components/schemas/CraKev"
+          },
+          "signal_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal At"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "to_assess",
+              "not_affected",
+              "exploited"
+            ],
+            "title": "State"
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CraAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "aware_at": {
             "anyOf": [
@@ -1304,6 +1691,10 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "open",
+              "fixed"
+            ],
             "title": "Status"
           },
           "fixed_at": {
@@ -1330,7 +1721,14 @@
             "title": "Done"
           },
           "draft": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Draft"
           }
         },
@@ -1345,6 +1743,9 @@
           "severity",
           "packages",
           "kev",
+          "signal_at",
+          "state",
+          "assessment",
           "aware_at",
           "status",
           "fixed_at",
@@ -1386,6 +1787,43 @@
         ],
         "title": "CraEventPage"
       },
+      "CraKev": {
+        "properties": {
+          "date_added": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Added"
+          },
+          "ransomware": {
+            "type": "boolean",
+            "title": "Ransomware"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_added",
+          "ransomware",
+          "name"
+        ],
+        "title": "CraKev"
+      },
       "CraOverview": {
         "properties": {
           "reporting_page": {
@@ -1402,6 +1840,133 @@
           "counts"
         ],
         "title": "CraOverview"
+      },
+      "CraPolicy": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/CraPolicyChange"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "History"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "by",
+          "at",
+          "reason",
+          "history"
+        ],
+        "title": "CraPolicy"
+      },
+      "CraPolicyChange": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "by",
+          "at",
+          "reason"
+        ],
+        "title": "CraPolicyChange"
+      },
+      "CraPolicyIn": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "enabled",
+          "reason"
+        ],
+        "title": "CraPolicyIn"
       },
       "CraProduct": {
         "properties": {
@@ -1508,6 +2073,11 @@
         "properties": {
           "id": {
             "type": "string",
+            "enum": [
+              "early_warning",
+              "notification",
+              "final_report"
+            ],
             "title": "Id"
           },
           "label": {
@@ -1527,6 +2097,12 @@
           },
           "state": {
             "type": "string",
+            "enum": [
+              "overdue",
+              "pending",
+              "waiting",
+              "sent"
+            ],
             "title": "State"
           },
           "sent": {
@@ -2111,6 +2687,100 @@
         ],
         "title": "Euvd"
       },
+      "EvidenceAsset": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "repository",
+              "image"
+            ],
+            "title": "Kind"
+          },
+          "last_complete": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Complete"
+          },
+          "sbom": {
+            "type": "boolean",
+            "title": "Sbom"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "kind",
+          "last_complete",
+          "sbom"
+        ],
+        "title": "EvidenceAsset"
+      },
+      "EvidenceAssetPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceAsset"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "EvidenceAssetPage"
+      },
+      "EvidenceOverview": {
+        "properties": {
+          "assets": {
+            "type": "integer",
+            "title": "Assets"
+          },
+          "complete": {
+            "type": "integer",
+            "title": "Complete"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets",
+          "complete"
+        ],
+        "title": "EvidenceOverview"
+      },
       "Health": {
         "properties": {
           "status": {
@@ -2162,6 +2832,106 @@
         ],
         "title": "Health"
       },
+      "MarkIn": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "mark",
+            "title": "Op"
+          },
+          "event": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Event"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "early_warning",
+              "notification",
+              "final_report"
+            ],
+            "title": "Stage"
+          },
+          "sent": {
+            "type": "boolean",
+            "title": "Sent"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "event",
+          "stage",
+          "sent"
+        ],
+        "title": "MarkIn"
+      },
+      "PortfolioEvidenceIn": {
+        "properties": {
+          "framework": {
+            "type": "string",
+            "enum": [
+              "soc2",
+              "iso27001",
+              "pci",
+              "cra",
+              "br-cmn",
+              "cl-21663",
+              "co-sfc",
+              "general"
+            ],
+            "title": "Framework"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "framework"
+        ],
+        "title": "PortfolioEvidenceIn"
+      },
+      "ProductIn": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "product",
+            "title": "Op"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Name"
+          },
+          "support_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Until"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "key",
+          "name",
+          "support_until"
+        ],
+        "title": "ProductIn"
+      },
       "QueuedRun": {
         "properties": {
           "id": {
@@ -2179,6 +2949,27 @@
           "status"
         ],
         "title": "QueuedRun"
+      },
+      "ReopenIn": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "reopen",
+            "title": "Op"
+          },
+          "event": {
+            "type": "string",
+            "maxLength": 300,
+            "title": "Event"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "event"
+        ],
+        "title": "ReopenIn"
       },
       "ReviewIn": {
         "properties": {
@@ -2825,6 +3616,27 @@
           "branches"
         ],
         "title": "TargetBranchesIn"
+      },
+      "UnproductIn": {
+        "properties": {
+          "op": {
+            "type": "string",
+            "const": "unproduct",
+            "title": "Op"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "op",
+          "key"
+        ],
+        "title": "UnproductIn"
       },
       "Error": {
         "title": "Error",

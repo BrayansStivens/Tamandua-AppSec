@@ -40,7 +40,7 @@
     "users": "Invita a tu equipo, asigna roles y retira accesos.",
     "pulls": "Cada PR se revisa por lo que introduce, no por lo que ya había.",
     "cves": "Todas las vulnerabilidades publicadas en NVD, con explotación activa (KEV) y probabilidad de explotación (EPSS), buscables en local.",
-    "compliance": "Plazos de notificación del Reglamento de Ciberresiliencia de la UE para tus productos, con el borrador listo. El SBOM y el VEX se exportan desde Hallazgos.",
+    "compliance": "Evidencias para auditorías y clientes y, si aplica, la notificación CRA de la UE.",
     "threats": "Modela el sistema con el enfoque que prefieras (STRIDE, LINDDUN, PASTA, árboles de ataque, ATT&CK) y contrasta las amenazas con los análisis.",
     "default": "Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles.",
     "policies": "Reglas que se aplican a todos los repositorios."

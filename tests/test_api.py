@@ -16,7 +16,8 @@ class OpenApiTests(unittest.TestCase):
     def test_document_lists_the_migrated_routes_and_matches_the_committed_copy(self):
         document = json.loads(openapi_document())
         self.assertTrue({"/api/health", "/api/dashboard", "/api/cve-db", "/api/cve-db/item", "/api/cve-db/affected", "/api/sla", "/api/cra",
-                         "/api/cra/products", "/api/cra/events", "/api/cra/assets"} <= set(document["paths"]))
+                         "/api/cra/products", "/api/cra/events", "/api/cra/assets", "/api/policies/cra", "/api/evidence",
+                         "/api/evidence/assets", "/api/evidence/portfolio"} <= set(document["paths"]))
         # El panel se genera de esta copia: si la API cambia, `make openapi` (el CI lo comprueba).
         self.assertEqual(openapi_document(), (ROOT / "web/src/shared/api/openapi.json").read_text())
 

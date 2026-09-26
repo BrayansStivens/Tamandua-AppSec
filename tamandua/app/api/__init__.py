@@ -19,7 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from tamandua.app.api import compliance, findings, intel, pullrequests, reporting, repositories, routing, scanning, system
 from tamandua.app.api.deps import ApiError
-from tamandua.app.api.routes import auth, cra, prs, runs, sources, threats  # noqa: F401 — registran sus rutas
+from tamandua.app.api.routes import auth, prs, runs, sources, threats  # noqa: F401 — registran sus rutas
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
 from tamandua.modules.identity.auth import COOKIE_NAME
 from tamandua.shared.i18n import localize, msg, negotiate

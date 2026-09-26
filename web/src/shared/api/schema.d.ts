@@ -129,6 +129,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/policies/cra": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Cra Policy
+         * @description Anyone can read it (the panel shows or hides the CRA kit with it); an administrator changes it.
+         */
+        get: operations["cra_policy_api_policies_cra_get"];
+        put?: never;
+        /**
+         * Set Cra Policy
+         * @description Turns the CRA kit on or off, with a reason kept in the history. Off keeps products and decisions.
+         */
+        post: operations["set_cra_policy_api_policies_cra_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cra": {
         parameters: {
             query?: never;
@@ -139,7 +163,12 @@ export interface paths {
         /** Overview */
         get: operations["overview_api_cra_get"];
         put?: never;
-        post?: never;
+        /**
+         * Change
+         * @description Marks products, records the assessment of an event (only "exploited in our product" starts the clocks) and
+         *     which stages were sent. Answers the new overview.
+         */
+        post: operations["change_api_cra_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -172,7 +201,7 @@ export interface paths {
         };
         /**
          * Events
-         * @description Most urgent first. The ENISA draft is only built for the events on the page.
+         * @description Most urgent first. The ENISA draft is only built for the exploited events on the page.
          */
         get: operations["events_api_cra_events_get"];
         put?: never;
@@ -197,6 +226,63 @@ export interface paths {
         get: operations["assets_api_cra_assets_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Evidence Overview */
+        get: operations["evidence_overview_api_evidence_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Evidence Assets
+         * @description The asset picker: analyzed assets by name, with whether each has what an SBOM needs.
+         */
+        get: operations["evidence_assets_api_evidence_assets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Portfolio Evidence
+         * @description Consolidated audit evidence of every analyzed asset (open, fixed and exceptions), for one framework.
+         */
+        post: operations["portfolio_evidence_api_evidence_portfolio_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -359,6 +445,23 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** AssessIn */
+        AssessIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "assess";
+            /** Event */
+            event: string;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "not_affected" | "exploited";
+            /** Reason */
+            reason?: string | null;
+        };
         /**
          * AssetSecretConfig
          * @description A repository's own entries, added to the defaults (`defaults` counts them) in its scans.
@@ -410,6 +513,17 @@ export interface components {
             /** Rules */
             rules: components["schemas"]["BuiltinRule"][];
         };
+        /** CraAssessment */
+        CraAssessment: {
+            /** By */
+            by: string | null;
+            /** At */
+            at: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Legacy */
+            legacy: boolean;
+        };
         /** CraAsset */
         CraAsset: {
             /** Key */
@@ -438,6 +552,8 @@ export interface components {
             events: number;
             /** Pending */
             pending: number;
+            /** To Assess */
+            to_assess: number;
             /** Assets */
             assets: number;
             /** Candidates */
@@ -461,14 +577,22 @@ export interface components {
             severity: string | null;
             /** Packages */
             packages: string[];
-            /** Kev */
-            kev: {
-                [key: string]: unknown;
-            };
+            kev: components["schemas"]["CraKev"];
+            /** Signal At */
+            signal_at: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "to_assess" | "not_affected" | "exploited";
+            assessment: components["schemas"]["CraAssessment"] | null;
             /** Aware At */
             aware_at: string | null;
-            /** Status */
-            status: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "fixed";
             /** Fixed At */
             fixed_at: string | null;
             /** Stages */
@@ -476,7 +600,7 @@ export interface components {
             /** Done */
             done: boolean;
             /** Draft */
-            draft: string;
+            draft: string | null;
         };
         /** CraEventPage */
         CraEventPage: {
@@ -489,11 +613,51 @@ export interface components {
             /** Offset */
             offset: number;
         };
+        /** CraKev */
+        CraKev: {
+            /** Date Added */
+            date_added: string | null;
+            /** Ransomware */
+            ransomware: boolean;
+            /** Name */
+            name: string | null;
+        };
         /** CraOverview */
         CraOverview: {
             /** Reporting Page */
             reporting_page: string;
             counts: components["schemas"]["CraCounts"];
+        };
+        /** CraPolicy */
+        CraPolicy: {
+            /** Enabled */
+            enabled: boolean;
+            /** By */
+            by: string | null;
+            /** At */
+            at: string | null;
+            /** Reason */
+            reason: string | null;
+            /** History */
+            history: components["schemas"]["CraPolicyChange"][];
+        };
+        /** CraPolicyChange */
+        CraPolicyChange: {
+            /** Enabled */
+            enabled: boolean;
+            /** By */
+            by: string | null;
+            /** At */
+            at: string | null;
+            /** Reason */
+            reason: string | null;
+        };
+        /** CraPolicyIn */
+        CraPolicyIn: {
+            /** Enabled */
+            enabled: boolean;
+            /** Reason */
+            reason: string;
         };
         /** CraProduct */
         CraProduct: {
@@ -525,14 +689,20 @@ export interface components {
         };
         /** CraStage */
         CraStage: {
-            /** Id */
-            id: string;
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "early_warning" | "notification" | "final_report";
             /** Label */
             label: string;
             /** Due */
             due: string | null;
-            /** State */
-            state: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "overdue" | "pending" | "waiting" | "sent";
             /** Sent */
             sent: {
                 [key: string]: string;
@@ -698,6 +868,40 @@ export interface components {
             /** Published */
             published: string | null;
         };
+        /** EvidenceAsset */
+        EvidenceAsset: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "repository" | "image";
+            /** Last Complete */
+            last_complete: string | null;
+            /** Sbom */
+            sbom: boolean;
+        };
+        /** EvidenceAssetPage */
+        EvidenceAssetPage: {
+            /** Items */
+            items: components["schemas"]["EvidenceAsset"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** EvidenceOverview */
+        EvidenceOverview: {
+            /** Assets */
+            assets: number;
+            /** Complete */
+            complete: number;
+        };
         /** Health */
         Health: {
             /** Status */
@@ -711,12 +915,61 @@ export interface components {
             /** Queued */
             queued?: number | null;
         };
+        /** MarkIn */
+        MarkIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "mark";
+            /** Event */
+            event: string;
+            /**
+             * Stage
+             * @enum {string}
+             */
+            stage: "early_warning" | "notification" | "final_report";
+            /** Sent */
+            sent: boolean;
+        };
+        /** PortfolioEvidenceIn */
+        PortfolioEvidenceIn: {
+            /**
+             * Framework
+             * @enum {string}
+             */
+            framework: "soc2" | "iso27001" | "pci" | "cra" | "br-cmn" | "cl-21663" | "co-sfc" | "general";
+        };
+        /** ProductIn */
+        ProductIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "product";
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Support Until */
+            support_until: string | null;
+        };
         /** QueuedRun */
         QueuedRun: {
             /** Id */
             id: string;
             /** Status */
             status: string;
+        };
+        /** ReopenIn */
+        ReopenIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "reopen";
+            /** Event */
+            event: string;
         };
         /** ReviewIn */
         ReviewIn: {
@@ -903,6 +1156,16 @@ export interface components {
             uid: string;
             /** Branches */
             branches: string[];
+        };
+        /** UnproductIn */
+        UnproductIn: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            op: "unproduct";
+            /** Key */
+            key: string;
         };
         /** Error */
         Error: {
@@ -1117,6 +1380,59 @@ export interface operations {
             };
         };
     };
+    cra_policy_api_policies_cra_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CraPolicy"];
+                };
+            };
+        };
+    };
+    set_cra_policy_api_policies_cra_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CraPolicyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CraPolicy"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     overview_api_cra_get: {
         parameters: {
             query?: never;
@@ -1133,6 +1449,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CraOverview"];
+                };
+            };
+        };
+    };
+    change_api_cra_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductIn"] | components["schemas"]["UnproductIn"] | components["schemas"]["MarkIn"] | components["schemas"]["AssessIn"] | components["schemas"]["ReopenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CraOverview"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -1221,6 +1570,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CraAssetPage"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    evidence_overview_api_evidence_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceOverview"];
+                };
+            };
+        };
+    };
+    evidence_assets_api_evidence_assets_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceAssetPage"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    portfolio_evidence_api_evidence_portfolio_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioEvidenceIn"];
+            };
+        };
+        responses: {
+            /** @description Audit evidence (PDF) of every analyzed asset */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
                 };
             };
             /** @description Invalid parameters */

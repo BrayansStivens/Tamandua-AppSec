@@ -8,15 +8,25 @@
     "errors": {
       "product_name": "Enter the product's commercial name (up to {{max}} characters).",
       "support_date": "The end-of-support date must be YYYY-MM-DD.",
-      "invalid_stage": "Invalid event or stage."
+      "invalid_stage": "Invalid event or stage.",
+      "reason_required": "Give a reason of at least {{min}} characters; it stays on record.",
+      "reason_too_long": "The reason can be up to {{max}} characters, with no control characters.",
+      "unknown_event": "That event doesn't exist or is no longer a KEV match on a product.",
+      "already_assessed": "This event is already assessed.",
+      "not_reopenable": "Only an event marked as not affecting the product can be reopened.",
+      "not_exploited": "Record that it's actively exploited in your product before marking what you sent.",
+      "disabled": "CRA reporting is off. An admin can turn it on in Policies."
     },
     "draft": {
-      "body": "Product: {{product}}{{support}}\nVulnerability: {{cve}}{{kev_name}}\nAffected component: {{packages}}\nActive exploitation: in the CISA KEV catalog since {{kev_date}}{{ransomware}}\nManufacturer became aware: {{aware}} UTC\nGeneral nature of the exploit: [summarize how it is exploited, without details that would help an attacker]\nCorrective measure available: {{fixed}}\nMeasures users can take: [e.g. update to version X, turn off feature Y]\nMember states where the product is sold: [list]\nSensitivity of the information: [say whether anything must not be shared]\n\nBefore you send it: confirm the vulnerability really affects the product (the finding is a scanner candidate).",
+      "body": "Product: {{product}}{{support}}\nVulnerability: {{cve}}{{kev_name}}\nAffected component: {{packages}}\nActive exploitation in the product: confirmed by the manufacturer (listed in CISA KEV since {{kev_date}}{{ransomware}})\nManufacturer became aware: {{aware}} UTC\nGeneral nature of the exploit: [summarize how it is exploited, without details that would help an attacker]\nCorrective measure available: {{fixed}}\nMeasures users can take: [e.g. update to version X, turn off feature Y]\nMember states where the product is sold: [list]\nSensitivity of the information: [say whether anything must not be shared]\n\nBefore you send it: fill in the bracketed fields.",
       "support": " (supported until {{date}})",
       "no_component": "[affected component]",
       "ransomware": " · used in ransomware campaigns",
       "fixed_since": "Yes, since {{date}}",
       "not_fixed": "[not yet: describe the temporary mitigation]"
+    },
+    "policy": {
+      "migrated": "Turned on automatically: products were already marked before this setting existed."
     }
   },
   "vex": {
