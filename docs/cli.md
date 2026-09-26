@@ -45,7 +45,7 @@ Los avisos de una misma dependencia salen en una línea con la versión que los 
 | `--fail-on` | Severidad desde la que falla: `critical`, `high` (por defecto), `medium`, `low` o `never` (solo informa). |
 | `--format` | `text` (por defecto), `json` o `sarif` (SARIF 2.1.0, con `security-severity` para GitHub code scanning). |
 | `--output FILE` | Escribe el resultado en un archivo; el resumen en texto sale igualmente por la salida de errores. |
-| `--exclude PATRÓN` | Ruta cuyos hallazgos no cuentan: glob relativo a la raíz (`fixtures/`, `**/testdata/**`; `*` no cruza `/`, `**` sí). Repetible. La salida dice cuántos se excluyeron. |
+| `--exclude PATRÓN` | Ruta cuyos hallazgos no cuentan: glob relativo a la raíz (`fixtures`, `**/testdata`, `docs/*.md`). Como en `.gitignore`, una carpeta excluye todo lo que tiene dentro; `*` no cruza `/` y `**` sí. Repetible. La salida dice cuántos se excluyeron. |
 | `--allow-incomplete` | No falla si un motor no pudo ejecutarse. Por defecto sí falla: un análisis que no terminó no equivale a «limpio». |
 | `--allow-osv-upload` | Autoriza consultas externas (nombres y versiones de dependencias a OSV y deps.dev para resolver transitivas). Por defecto no sale nada. |
 | `--name` | Nombre a mostrar (útil dentro de un contenedor, donde la carpeta se llama `/src`). |

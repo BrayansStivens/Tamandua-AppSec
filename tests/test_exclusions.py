@@ -30,7 +30,7 @@ def scan(findings, when):
 
 class PatternTests(unittest.TestCase):
     def test_hostile_or_overbroad_patterns_are_rejected(self):
-        for bad in (["../etc"], ["/abs"], ["**"], ["*"], ["*/**"], ["a;b"], ["x" * 300], ["fixtures", 3], "fixtures/**",
+        for bad in (["../etc"], ["/abs"], ["**"], ["*"], ["*/**"], ["?*"], ["**/*"], ["*?"], ["a;b"], ["x" * 300], ["fixtures", 3], "fixtures/**",
                     ["./a"], [f"d{index}/**" for index in range(51)]):
             with self.subTest(bad=bad), self.assertRaises(exclusions.ExclusionError):
                 exclusions.normalize(bad)
@@ -46,6 +46,11 @@ class PatternTests(unittest.TestCase):
         self.assertEqual(exclusions.excluded("testdata/x.json", active), "**/testdata/**")
         self.assertIsNone(exclusions.excluded("src/fixtures/app.py", active))
         self.assertEqual(exclusions.excluded(".github/workflows/ci.yml", [".github/**"]), ".github/**")
+        # Como en .gitignore: si el patrón coincide con una carpeta, todo lo que hay dentro queda excluido.
+        for pattern in ("fixtures/*", "fixtures", "fixtures/sast-*"):
+            self.assertEqual(exclusions.excluded("fixtures/sast-samples/index.php", [pattern]), pattern)
+        self.assertIsNone(exclusions.excluded("src/fixtures/app.py", ["fixtures/*"]))
+        self.assertIsNone(exclusions.excluded("docs/deep/intro.md", ["docs/*.md"]))
 
     def test_reason_is_mandatory_and_history_is_kept(self):
         with tempfile.TemporaryDirectory() as folder:

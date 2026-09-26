@@ -1,6 +1,6 @@
 """Rutas excluidas por repositorio: carpetas de pruebas, ejemplos vulnerables a propósito, código generado.
 
-Las decide un administrador en el panel y viven en el servidor (`data/exclusions.json`), no en un
+Las decide un administrador en el panel y viven en el servidor (en su base de datos), no en un
 fichero del repositorio: si vivieran en el repositorio, un PR podría excluirse a sí mismo. Cada
 cambio guarda quién, cuándo y por qué, y se conservan los últimos cambios como historial.
 
@@ -12,8 +12,10 @@ Qué pasa con lo excluido:
 * **Registro**: lo que estaba abierto en esas rutas pasa a **excluido**, no a remediado: no se
   arregló, se decidió no mirarlo. Si la ruta deja de estar excluida, vuelve a abierto.
 
-Patrones al estilo glob, relativos a la raíz del repositorio: `fixtures/**`, `docs/*.md`,
-`**/testdata/**`. `*` no cruza `/`; `**` sí. No se admiten patrones que lo excluyan todo.
+Patrones al estilo glob, relativos a la raíz del repositorio: `fixtures`, `fixtures/*`, `docs/*.md`,
+`**/testdata/**`. `*` no cruza `/`; `**` sí. Como en `.gitignore`, un patrón que coincide con una carpeta
+excluye todo lo que hay dentro: `fixtures` o `fixtures/*` excluyen también `fixtures/a/b.py`.
+No se admiten patrones que lo excluyan todo.
 """
 
 from __future__ import annotations
@@ -85,7 +87,9 @@ def normalize(raw) -> list[str]:
 
 
 def matches_everything(pattern: str) -> bool:
-    return all(part in ("*", "**") for part in pattern.split("/"))
+    """Solo comodines de nombre libre (`*`, `?*`, `**/*`…): coincide con cualquier carpeta de la raíz y, al excluir
+    carpetas enteras, con todo el repositorio."""
+    return all(part == "**" or ("*" in part and set(part) <= {"*", "?"}) for part in pattern.split("/"))
 
 
 @lru_cache(maxsize=512)
@@ -111,10 +115,12 @@ def _regex(pattern: str) -> re.Pattern:
 
 
 def excluded(path: str, active: list[str]) -> str | None:
-    """El primer patrón que excluye esta ruta, o None."""
-    clean = str(path or "").removeprefix("./").lstrip("/")
+    """El primer patrón que excluye esta ruta (o una de sus carpetas), o None."""
+    parts = str(path or "").removeprefix("./").lstrip("/").split("/")
+    candidates = ["/".join(parts[:end]) for end in range(len(parts), 0, -1)]  # el archivo y cada carpeta que lo contiene
     for pattern in active:
-        if _regex(pattern).match(clean):
+        regex = _regex(pattern)
+        if any(regex.match(candidate) for candidate in candidates):
             return pattern
     return None
 

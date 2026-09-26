@@ -54,9 +54,9 @@ export function ExclusionsCard({ assetKey, canEdit, onChanged }: { assetKey: str
     </div>
     {notice && <p className="mt-2 text-xs text-brand">{notice}</p>}
     {editing && <form onSubmit={save} className="mt-3 space-y-2">
-      <label className="block text-xs text-app-muted" htmlFor="exclusion-patterns">Una ruta por línea, relativa a la raíz: <code className="font-mono">fixtures/**</code>, <code className="font-mono">docs/*.md</code>, <code className="font-mono">**/testdata/**</code>. «*» no cruza carpetas; «**» sí.</label>
+      <label className="block text-xs text-app-muted" htmlFor="exclusion-patterns">Una ruta por línea, relativa a la raíz: <code className="font-mono">fixtures</code>, <code className="font-mono">docs/*.md</code>, <code className="font-mono">**/testdata</code>. Una carpeta excluye todo su contenido; «*» no cruza carpetas y «**» sí.</label>
       <textarea id="exclusion-patterns" value={text} onChange={event => setText(event.target.value)} rows={4} spellCheck={false}
-        className="w-full rounded-lg border border-app-line bg-app px-3 py-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-brand/40" placeholder="fixtures/**" />
+        className="w-full rounded-lg border border-app-line bg-app px-3 py-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-brand/40" placeholder="fixtures" />
       <Input value={reason} onChange={event => setReason(event.target.value)} maxLength={300} placeholder="Por qué (queda en el historial), p. ej. «Ejemplos vulnerables para probar las reglas»" aria-label="Motivo" />
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
       <div className="flex gap-2">
