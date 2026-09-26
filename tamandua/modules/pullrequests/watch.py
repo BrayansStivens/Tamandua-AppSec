@@ -22,11 +22,11 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
 from tamandua.modules.pullrequests.review import GATES
 
 _log = logging_setup.get("pr_watch")
-_lock = threading.Lock()
 DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": True}
 BRANCH_PER_POLL = 3     # reanálisis de rama principal encolados por vuelta, como mucho
 BRANCH_QUEUE_LIMIT = 2  # solo si en la cola hay menos que esto
@@ -37,10 +37,7 @@ def _path(data_dir: Path) -> Path:
 
 
 def load(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError, OSError):
-        return {"repositories": {}, "reviewed": {}, "branches": {}}
+    payload = documents.load(data_dir, "pr-watch", {})
     if not isinstance(payload, dict):
         return {"repositories": {}, "reviewed": {}, "branches": {}}
     payload.setdefault("repositories", {})
@@ -50,10 +47,7 @@ def load(data_dir: Path) -> dict:
 
 
 def _save(data_dir: Path, payload: dict) -> None:
-    target = _path(data_dir)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, "pr-watch", payload)
 
 
 def settings(data_dir: Path, source_id: str) -> dict:
@@ -69,7 +63,7 @@ def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_commen
     if gate is not None and gate not in GATES:
         raise ValueError("Umbral inválido")
     results = []
-    with _lock:
+    with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
         when = datetime.now(timezone.utc).isoformat(timespec="seconds")
         for key in dict.fromkeys(keys):
@@ -87,7 +81,7 @@ def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_commen
 
 
 def forget(data_dir: Path, key: str) -> None:
-    with _lock:
+    with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
         changed = payload["repositories"].pop(key, None) is not None
         changed = payload["reviewed"].pop(key, None) is not None or changed
@@ -99,7 +93,7 @@ def forget(data_dir: Path, key: str) -> None:
 def migrate(data_dir: Path, repositories: list[dict]) -> None:
     """Configuración antigua guardada por nombre (`github:owner/repo`) → identidad estable."""
     by_name = {item["id"]: item["uid"] for item in repositories if item.get("uid")}
-    with _lock:
+    with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
         changed = False
         for section in ("repositories", "reviewed"):
@@ -116,7 +110,7 @@ def reviewed(data_dir: Path, source_id: str) -> dict:
 
 
 def mark(data_dir: Path, source_id: str, number: int, head_sha: str, run_id: str) -> None:
-    with _lock:
+    with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
         payload["reviewed"].setdefault(source_id, {})[str(number)] = {"head_sha": head_sha, "run_id": run_id}
         _save(data_dir, payload)
@@ -127,7 +121,7 @@ def branch_state(data_dir: Path, key: str) -> dict | None:
 
 
 def mark_branch(data_dir: Path, key: str, head_sha: str, run_id: str) -> None:
-    with _lock:
+    with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
         payload["branches"][key] = {"head_sha": head_sha, "run_id": run_id,
                                     "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
@@ -143,7 +137,7 @@ def interval() -> int:
 
 
 def mark_closed(data_dir: Path, key: str, number: int) -> None:
-    with _lock:
+    with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)
         entry = payload["reviewed"].get(key, {}).get(str(number))
         if entry is not None:

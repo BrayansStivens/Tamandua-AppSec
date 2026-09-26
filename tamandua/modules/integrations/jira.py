@@ -28,6 +28,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from tamandua.shared import documents
 from tamandua.modules.runs.kinds import FINDING_RUNS
 from tamandua.shared import log as logging_setup
 from tamandua.modules.intel.advisories import compare_versions
@@ -38,7 +39,6 @@ PROJECT_PATTERN = re.compile(r"[A-Z][A-Z0-9_]{1,9}")
 MAX_BATCH = 50
 RESPONSE_LIMIT = 2_000_000
 _log = logging_setup.get("jira")
-_links_lock = threading.Lock()
 
 
 class JiraError(ValueError):
@@ -170,21 +170,15 @@ def _links_path(data_dir: Path) -> Path:
 
 
 def load_links(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_links_path(data_dir).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError, OSError):
-        return {}
+    payload = documents.load(data_dir, "jira-links", {})
     return payload if isinstance(payload, dict) else {}
 
 
 def _remember(data_dir: Path, asset: str, fingerprint: str, link: dict) -> None:
-    with _links_lock:
+    with documents.lock(data_dir, "jira-links"):
         links = load_links(data_dir)
         links.setdefault(asset, {})[fingerprint] = link
-        target = _links_path(data_dir)
-        temporary = target.with_suffix(".tmp")
-        temporary.write_text(json.dumps(links, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(temporary, target)
+        documents.save(data_dir, "jira-links", links)
 
 
 def annotate(data_dir: Path, record: dict) -> dict:

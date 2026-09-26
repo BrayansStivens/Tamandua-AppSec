@@ -14,6 +14,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
+from tamandua.shared import documents
 
 
 class DomainError(ValueError):
@@ -29,10 +30,7 @@ def _path(data_dir: Path) -> Path:
 
 
 def list_domains(data_dir: Path) -> list[dict]:
-    try:
-        rows = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return []
+    rows = documents.load(data_dir, "domains", [])
     if not isinstance(rows, list):
         raise DomainError("Registro de dominios inválido")
     return rows
@@ -70,11 +68,7 @@ def _declared_context(value) -> str:
 
 
 def _write(data_dir: Path, rows: list[dict]) -> None:
-    data_dir.mkdir(parents=True, exist_ok=True)
-    target = _path(data_dir)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, "domains", rows)
 
 
 def register_domain(data_dir: Path, url: str, kind: str = "web", context: str = "") -> dict:
@@ -165,3 +159,8 @@ def check_reachability(url: str) -> dict:
                 "detail": "No hubo respuesta HTTPS en el puerto 443."}
     return {"host": host, "reachable": True, "status": "reachable", "http_status": code,
             "detail": f"Respuesta HTTPS {code} desde {addresses[0]}."}
+
+
+def locked(data_dir: Path):
+    """Cerrojo del registro de dominios (entre procesos) para leer-modificar-guardar."""
+    return documents.lock(data_dir, "domains")

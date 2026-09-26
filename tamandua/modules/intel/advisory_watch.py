@@ -23,11 +23,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 
+from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
 from tamandua.modules.scanning.dependency_merge import family, identifiers, package_name
 
 _log = logging_setup.get("advisory_watch")
-_lock = threading.Lock()
 
 # Familia de paquete → tipo de purl (https://github.com/package-url/purl-spec).
 PURL_TYPE = {"npm": "npm", "pypi": "pypi", "go": "golang", "cargo": "cargo", "composer": "composer",
@@ -73,18 +73,12 @@ def _state_path(data_dir: Path) -> Path:
 
 
 def load_state(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_state_path(data_dir).read_text(encoding="utf-8"))
-        return payload if isinstance(payload, dict) else {}
-    except (FileNotFoundError, ValueError, OSError):
-        return {}
+    payload = documents.load(data_dir, "advisory-watch", {})
+    return payload if isinstance(payload, dict) else {}
 
 
 def _save_state(data_dir: Path, state: dict) -> None:
-    target = _state_path(data_dir)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(state, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, "advisory-watch", state)
 
 
 def latest_complete(data_dir: Path) -> list[dict]:
@@ -213,7 +207,7 @@ def check(data_dir: Path, *, run=None, now: datetime | None = None) -> dict:
             "summary": {"candidates": len(new), "sca": len(new), "files": 0, "dependencies": len(record.get("dependencies") or []),
                         "severities": severities, "kev": sum(1 for item in new if item.get("kev"))}})
         _log.info("advisory_watch_new", extra={"reason": f"{source.get('name')}: {len(new)} avisos nuevos"})
-    with _lock:
+    with documents.lock(data_dir, "advisory-watch"):
         state = load_state(data_dir)
         state.update(last_run=now.isoformat(timespec="seconds"), checked=checked, opened=opened, failed=failed)
         _save_state(data_dir, state)

@@ -22,12 +22,12 @@ import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from tamandua.shared import documents
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.shared import log as logging_setup
 from tamandua.modules.findings import triage
 
 _log = logging_setup.get("cra")
-_lock = threading.Lock()
 STAGES = (("early_warning", "Alerta temprana", timedelta(hours=24)), ("notification", "Notificación", timedelta(hours=72)),
           ("final_report", "Informe final", timedelta(days=14)))
 STAGE_IDS = tuple(stage for stage, _, _ in STAGES)
@@ -44,21 +44,14 @@ def _path(data_dir: Path) -> Path:
 
 
 def load(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError, OSError):
-        payload = {}
+    payload = documents.load(data_dir, "cra", {})
     payload = payload if isinstance(payload, dict) else {}
     return {"products": payload.get("products") if isinstance(payload.get("products"), dict) else {},
             "reports": payload.get("reports") if isinstance(payload.get("reports"), dict) else {}}
 
 
 def _save(data_dir: Path, payload: dict) -> None:
-    target = _path(data_dir)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, "cra", payload)
 
 
 def set_product(data_dir: Path, key: str, *, name: str, support_until: str | None, user: dict) -> dict:
@@ -70,7 +63,7 @@ def set_product(data_dir: Path, key: str, *, name: str, support_until: str | Non
             date.fromisoformat(support_until)
         except (TypeError, ValueError) as exc:
             raise CraError("La fecha de fin del soporte debe ser AAAA-MM-DD.") from exc
-    with _lock:
+    with documents.lock(data_dir, "cra"):
         state = load(data_dir)
         state["products"][key] = {"name": name, "support_until": support_until or None, "by": user["username"],
                                   "at": datetime.now(timezone.utc).isoformat()}
@@ -80,7 +73,7 @@ def set_product(data_dir: Path, key: str, *, name: str, support_until: str | Non
 
 
 def remove_product(data_dir: Path, key: str, *, user: dict) -> None:
-    with _lock:
+    with documents.lock(data_dir, "cra"):
         state = load(data_dir)
         if state["products"].pop(key, None) is not None:
             _save(data_dir, state)
@@ -90,7 +83,7 @@ def remove_product(data_dir: Path, key: str, *, user: dict) -> None:
 def mark(data_dir: Path, event_id: str, stage: str, *, sent: bool, user: dict) -> None:
     if stage not in STAGE_IDS or not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9#:_./@+|-]{3,300}", event_id):
         raise CraError("Evento o etapa no válidos.")
-    with _lock:
+    with documents.lock(data_dir, "cra"):
         state = load(data_dir)
         stages = state["reports"].setdefault(event_id, {})
         if sent:

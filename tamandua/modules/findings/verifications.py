@@ -22,8 +22,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-_lock = threading.Lock()
 MAX_PER_ASSET = 500
+from tamandua.shared import documents
 
 
 def _path(data_dir: Path) -> Path:
@@ -31,26 +31,20 @@ def _path(data_dir: Path) -> Path:
 
 
 def load(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-        return payload if isinstance(payload, dict) else {}
-    except (FileNotFoundError, ValueError, OSError):
-        return {}
+    payload = documents.load(data_dir, "verifications", {})
+    return payload if isinstance(payload, dict) else {}
 
 
 def record(data_dir: Path, key: str, fingerprint: str, run_id: str, *, by: str) -> dict:
     entry = {"run_id": run_id, "by": by, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    with _lock:
+    with documents.lock(data_dir, "verifications"):
         payload = load(data_dir)
         asset = payload.setdefault(key, {})
         asset[fingerprint] = entry
         if len(asset) > MAX_PER_ASSET:  # las más antiguas se olvidan
             for old in sorted(asset, key=lambda item: asset[item]["at"])[:len(asset) - MAX_PER_ASSET]:
                 del asset[old]
-        target = _path(data_dir)
-        temporary = target.with_suffix(".tmp")
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-        os.replace(temporary, target)
+        documents.save(data_dir, "verifications", payload)
     return entry
 
 

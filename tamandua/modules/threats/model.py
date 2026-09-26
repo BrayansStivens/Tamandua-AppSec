@@ -32,6 +32,7 @@ from tamandua.modules.threats import diagram as threat_diagram
 from tamandua.modules.threats import methods as threat_methods
 from tamandua.modules.threats import report as threat_report
 from tamandua.modules.findings import triage
+from tamandua.shared import documents
 
 
 class ModelError(ValueError):
@@ -55,7 +56,6 @@ ID = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 FOLDER = re.compile(r"[A-Za-z0-9_.\- /@+]{0,200}")
 CANVAS = 100_000  # coordenadas del lienzo: de sobra para cualquier diagrama
 LIMITS = {"components": 60, "flows": 150, "boundaries": 20}
-_lock = threading.Lock()
 
 
 def _now() -> str:
@@ -337,40 +337,28 @@ def _portable_sections(model: dict) -> set[str]:
 
 # ------------------------------------------------------------ almacén
 
-def _dir(data_dir: Path) -> Path:
-    return data_dir / "threat-models"
-
-
-def _path(data_dir: Path, model_id: str) -> Path:
+def _name(model_id: str) -> str:
     if not isinstance(model_id, str) or not re.fullmatch(r"[0-9a-f]{24}", model_id):
         raise ModelError("Modelo no encontrado")
-    return _dir(data_dir) / f"{model_id}.json"
+    return f"threat-models/{model_id}"
 
 
 def load(data_dir: Path, model_id: str) -> dict:
-    try:
-        return json.loads(_path(data_dir, model_id).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        raise ModelError("Modelo no encontrado") from None
+    model = documents.load(data_dir, _name(model_id))
+    if model is None:
+        raise ModelError("Modelo no encontrado")
+    return model
 
 
 def _write(data_dir: Path, model: dict) -> None:
-    target = _path(data_dir, model["id"])
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(model, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, _name(model["id"]), model)
 
 
 def list_models(data_dir: Path) -> list[dict]:
     rows = []
-    folder = _dir(data_dir)
-    if not folder.is_dir():
-        return rows
-    for path in sorted(folder.glob("*.json")):
-        try:
-            model = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+    for name in documents.names(data_dir, "threat-models/"):
+        model = documents.load(data_dir, name)
+        if not isinstance(model, dict):
             continue
         rows.append({key: model.get(key) for key in ("id", "name", "description", "updated_at", "updated_by", "created_at")}
                     | {"components": len(model.get("components", [])), "flows": len(model.get("flows", [])),
@@ -380,7 +368,7 @@ def list_models(data_dir: Path) -> list[dict]:
 
 
 def save(data_dir: Path, model: dict, *, by: str, model_id: str | None = None) -> dict:
-    with _lock:
+    with documents.lock(data_dir, "threat-models"):
         if model_id is None:
             stored = {"id": secrets.token_hex(12), "created_at": _now(), "created_by": by, "decisions": {}}
         else:
@@ -391,10 +379,8 @@ def save(data_dir: Path, model: dict, *, by: str, model_id: str | None = None) -
 
 
 def delete(data_dir: Path, model_id: str) -> None:
-    try:
-        _path(data_dir, model_id).unlink()
-    except FileNotFoundError:
-        raise ModelError("Modelo no encontrado") from None
+    load(data_dir, model_id)  # 404 si no existe
+    documents.delete(data_dir, _name(model_id))
 
 
 def decide(data_dir: Path, model_id: str, threat_id: str, status: str, reason, *, by: str) -> dict:
@@ -405,7 +391,7 @@ def decide(data_dir: Path, model_id: str, threat_id: str, status: str, reason, *
     reason = _text(reason, 500, "El motivo")
     if status != "open" and len(reason) < 10:
         raise ModelError("Explica el motivo (mínimo 10 caracteres): queda registrado")
-    with _lock:
+    with documents.lock(data_dir, "threat-models"):
         model = load(data_dir, model_id)
         if threat_id not in {item["id"] for item in threats(model)}:
             raise ModelError("La amenaza no pertenece a este modelo")

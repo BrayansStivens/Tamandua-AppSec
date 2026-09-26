@@ -19,12 +19,12 @@ import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from tamandua.shared import documents
 from tamandua.modules.runs.kinds import FINDING_RUNS, FULL_SCANS
 from tamandua.shared import log as logging_setup
 
 GRACE = timedelta(hours=24)
 _log = logging_setup.get("assets")
-_lock = threading.Lock()
 
 
 def asset_key(record: dict) -> str:
@@ -37,10 +37,7 @@ def _registry_path(data_dir: Path) -> Path:
 
 
 def load_registry(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_registry_path(data_dir).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError, OSError):
-        return {}
+    payload = documents.load(data_dir, "repo-registry", {})
     return payload if isinstance(payload, dict) else {}
 
 
@@ -71,20 +68,12 @@ def backfill(data_dir: Path, repositories: list[dict]) -> int:
         updated += 1
     for old_key, uid in moved.items():
         triage.rename_asset(data_dir, old_key, uid)
-    for name in ("jira-links.json",):
-        target = data_dir / name
-        try:
-            payload = json.loads(target.read_text(encoding="utf-8"))
-        except (FileNotFoundError, ValueError, OSError):
-            continue
-        changed = False
-        for old_key, uid in moved.items():
-            if old_key in payload:
-                merged = payload.pop(old_key)
-                payload[uid] = {**merged, **payload.get(uid, {})}
-                changed = True
-        if changed:
-            _write_json(target, payload)
+    if moved:
+        with documents.edit(data_dir, "jira-links", {}) as payload:
+            for old_key, uid in moved.items():
+                if old_key in payload:
+                    merged = payload.pop(old_key)
+                    payload[uid] = {**merged, **payload.get(uid, {})}
     if updated:
         _log.info("assets_backfilled", extra={"reason": f"{updated} ejecuciones con identidad estable"})
     return updated
@@ -101,7 +90,7 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
              if asset_key(row).startswith("github#")}
     analysed = set(names)
     purged, marked = [], []
-    with _lock:
+    with documents.lock(data_dir, "repo-registry"):
         registry = load_registry(data_dir)
         for uid in analysed | set(registry):
             known_name = (registry.get(uid) or {}).get("name") or names.get(uid)
@@ -122,7 +111,7 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
                 purged.append(uid)
         for uid in purged:
             registry.pop(uid, None)
-        _write_json(_registry_path(data_dir), registry)
+        documents.save(data_dir, "repo-registry", registry)
     for uid in purged:
         purge(data_dir, uid)
     return {"marked": marked, "purged": purged}
@@ -138,13 +127,8 @@ def purge(data_dir: Path, uid: str) -> int:
     removed = delete_runs(data_dir, [row["id"] for row in list_runs(data_dir) if asset_key(row) == uid])
     triage.forget_asset(data_dir, uid)
     findings_registry.forget_asset(data_dir, uid)
-    for path in (data_dir / "jira-links.json",):
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, ValueError, OSError):
-            continue
-        if payload.pop(uid, None) is not None:
-            _write_json(path, payload)
+    with documents.edit(data_dir, "jira-links", {}) as payload:
+        payload.pop(uid, None)
     pr_watch.forget(data_dir, uid)
     from tamandua.modules.findings.exclusions import forget as forget_exclusions
     forget_exclusions(data_dir, uid)

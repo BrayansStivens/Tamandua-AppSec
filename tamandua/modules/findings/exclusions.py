@@ -26,10 +26,10 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
+from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
 
 _log = logging_setup.get("exclusions")
-_lock = threading.Lock()
 MAX_PATTERNS = 50
 MAX_LENGTH = 200
 PATTERN = re.compile(r"[A-Za-z0-9_.\-/*?]+")
@@ -47,19 +47,12 @@ def _path(data_dir: Path) -> Path:
 
 
 def _load_all(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError, OSError):
-        return {}
+    payload = documents.load(data_dir, "exclusions", {})
     return payload if isinstance(payload, dict) else {}
 
 
 def _write(data_dir: Path, payload: dict) -> None:
-    target = _path(data_dir)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, "exclusions", payload)
 
 
 def get(data_dir: Path, key: str) -> dict:
@@ -139,7 +132,7 @@ def save(data_dir: Path, key: str, raw, *, reason: str | None, user: dict) -> di
     if active and len(note) < 5:
         raise ExclusionError("Explica en una frase por qué se excluyen estas rutas (queda en el historial).")
     stamp = datetime.now(timezone.utc).isoformat()
-    with _lock:
+    with documents.lock(data_dir, "exclusions"):
         payload = _load_all(data_dir)
         previous = payload.get(key) or {}
         history = (list(previous.get("history") or []) + [{"at": stamp, "by": user["username"], "patterns": active,
@@ -154,7 +147,7 @@ def save(data_dir: Path, key: str, raw, *, reason: str | None, user: dict) -> di
 
 
 def forget(data_dir: Path, key: str) -> None:
-    with _lock:
+    with documents.lock(data_dir, "exclusions"):
         payload = _load_all(data_dir)
         if payload.pop(key, None) is not None:
             _write(data_dir, payload)

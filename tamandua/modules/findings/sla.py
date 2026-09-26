@@ -16,11 +16,11 @@ import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
 from tamandua.modules.findings import triage
 
 _log = logging_setup.get("sla")
-_lock = threading.Lock()
 LEVELS = ("critical", "high", "medium", "low")
 DEFAULTS = {"critical": 7, "high": 30, "medium": 90, "low": 180}
 MAX_DAYS = 3650
@@ -45,10 +45,7 @@ def _clean_days(value) -> int | None:
 
 def policy(data_dir: Path) -> dict:
     """La política vigente. Tolerante: un nivel que falta o no es válido toma su valor por defecto."""
-    try:
-        stored = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError, OSError):
-        stored = {}
+    stored = documents.load(data_dir, "sla", {})
     stored = stored if isinstance(stored, dict) else {}
     raw = stored.get("days") if isinstance(stored.get("days"), dict) else {}
     days = {}
@@ -65,12 +62,7 @@ def save(data_dir: Path, days, *, user: dict) -> dict:
         raise SlaError("Indica el plazo de cada severidad: crítica, alta, media y baja.")
     clean = {level: _clean_days(days[level]) for level in LEVELS}
     payload = {"days": clean, "updated_by": user["username"], "updated_at": datetime.now(timezone.utc).isoformat()}
-    with _lock:
-        target = _path(data_dir)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = target.with_suffix(".tmp")
-        temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-        os.replace(temporary, target)
+    documents.save(data_dir, "sla", payload)
     _log.info("sla_updated", extra={"user": user["username"], "reason": ", ".join(f"{level}={clean[level]}" for level in LEVELS)})
     return policy(data_dir)
 

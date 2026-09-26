@@ -7,6 +7,8 @@ import tempfile
 import threading
 import time
 import unittest
+
+from tamandua.shared import documents
 from pathlib import Path
 from unittest.mock import patch
 
@@ -150,7 +152,7 @@ class GitHubAppTests(unittest.TestCase):
             self.assertEqual(github_installation(data_dir), 4242)
             self.assertEqual(record["repository_selection"], "selected")
             self.assertEqual(record["connected_by"], "brayanstivens")
-            raw = (data_dir / "integrations.json").read_text(encoding="utf-8")
+            raw = json.dumps(documents.load(data_dir, "integrations", {}))
             for secret in ("ghs_", "ghu_", "token", "secret", "PRIVATE KEY"):
                 self.assertNotIn(secret, raw)
             self.assertEqual(set(load(data_dir)), {"github"})

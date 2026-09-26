@@ -91,7 +91,7 @@ def add_domain(request: Request):
             or not isinstance(payload.get("url"), str) or not isinstance(payload.get("kind", "web"), str)
             or not isinstance(payload.get("context", ""), str)):
         return request.json(400, {"error": "Solicitud de dominio inválida"})
-    with request.state.domain_lock:
+    with domains.locked(request.data_dir):
         try:
             record = register_domain(request.data_dir, payload["url"], payload.get("kind", "web"), payload.get("context", ""))
         except DomainError as exc:
@@ -104,7 +104,7 @@ def verify(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"domain_id"} or not isinstance(payload["domain_id"], str):
         return request.json(400, {"error": "Solicitud de dominio inválida"})
-    with request.state.domain_lock:
+    with domains.locked(request.data_dir):
         try:
             record = verify_domain(request.data_dir, payload["domain_id"])
         except DomainError as exc:

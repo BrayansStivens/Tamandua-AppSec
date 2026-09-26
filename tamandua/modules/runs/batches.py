@@ -20,11 +20,11 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from tamandua.shared import documents
 
 MAX_SELECTED = 100      # selección a mano, cualquier miembro
 MAX_ITEMS = 5000        # organización entera (administración)
 ID = re.compile(r"[0-9a-f]{32}")
-_lock = threading.Lock()
 
 
 class BatchError(ValueError):
@@ -35,39 +35,26 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _dir(data_dir: Path) -> Path:
-    return data_dir / "batches"
-
-
-def _path(data_dir: Path, batch_id: str) -> Path:
+def _name(batch_id: str) -> str:
     if not ID.fullmatch(batch_id or ""):
         raise BatchError("Lote inválido")
-    return _dir(data_dir) / f"{batch_id}.json"
+    return f"batches/{batch_id}"
 
 
 def _write(data_dir: Path, batch: dict) -> None:
-    target = _path(data_dir, batch["id"])
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(batch, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, _name(batch["id"]), batch)
 
 
 def load(data_dir: Path, batch_id: str) -> dict:
-    try:
-        return json.loads(_path(data_dir, batch_id).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError) as exc:
-        raise BatchError("Lote no encontrado") from exc
+    batch = documents.load(data_dir, _name(batch_id))
+    if batch is None:
+        raise BatchError("Lote no encontrado")
+    return batch
 
 
 def all_batches(data_dir: Path) -> list[dict]:
-    rows = []
-    for path in sorted(_dir(data_dir).glob("*.json")) if _dir(data_dir).is_dir() else []:
-        try:
-            rows.append(json.loads(path.read_text(encoding="utf-8")))
-        except (OSError, ValueError):
-            continue
-    return sorted(rows, key=lambda row: row.get("created_at", ""), reverse=True)
+    rows = [documents.load(data_dir, name) for name in documents.names(data_dir, "batches/")]
+    return sorted((row for row in rows if isinstance(row, dict)), key=lambda row: row.get("created_at", ""), reverse=True)
 
 
 def active(data_dir: Path) -> dict | None:
@@ -81,7 +68,7 @@ def create(data_dir: Path, items: list[dict], *, by: str, label: str, allow_osv_
         raise BatchError("No hay nada que analizar")
     if len(items) > MAX_ITEMS:
         raise BatchError(f"Como mucho {MAX_ITEMS} elementos por lote")
-    with _lock:
+    with documents.lock(data_dir, "batches"):
         if active(data_dir):
             raise BatchError("Ya hay un lote en curso: espera a que termine o cancélalo")
         # Una imagen se identifica por su referencia completa (dos etiquetas del mismo repositorio son dos análisis).
@@ -97,7 +84,7 @@ def create(data_dir: Path, items: list[dict], *, by: str, label: str, allow_osv_
 
 
 def cancel(data_dir: Path, batch_id: str, *, by: str) -> dict:
-    with _lock:
+    with documents.lock(data_dir, "batches"):
         batch = load(data_dir, batch_id)
         if batch["status"] == "running":
             batch.update(status="cancelled", finished_at=_now(), cancelled_by=by)
@@ -108,7 +95,7 @@ def cancel(data_dir: Path, batch_id: str, *, by: str) -> dict:
 def take_next(data_dir: Path) -> tuple[dict, int] | None:
     """El siguiente repositorio pendiente del lote activo (y lo marca como tomado). None si no queda nada."""
     finished = None
-    with _lock:
+    with documents.lock(data_dir, "batches"):
         batch = active(data_dir)
         if batch is None:
             return None
@@ -128,7 +115,7 @@ def take_next(data_dir: Path) -> tuple[dict, int] | None:
 
 def release_taken(data_dir: Path) -> None:
     """Al arrancar: un repositorio tomado pero sin ejecución (el proceso murió entre medias) vuelve a la cola."""
-    with _lock:
+    with documents.lock(data_dir, "batches"):
         batch = active(data_dir)
         if batch and any(item.get("run_id") == "pending" for item in batch["items"]):
             for item in batch["items"]:
@@ -138,7 +125,7 @@ def release_taken(data_dir: Path) -> None:
 
 
 def attach(data_dir: Path, batch_id: str, index: int, *, run_id: str | None = None, error: str | None = None) -> None:
-    with _lock:
+    with documents.lock(data_dir, "batches"):
         batch = load(data_dir, batch_id)
         item = batch["items"][index]
         item["run_id"] = run_id

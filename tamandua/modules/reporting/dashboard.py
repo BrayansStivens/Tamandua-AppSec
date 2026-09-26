@@ -274,11 +274,12 @@ def _signature(data_dir: Path) -> tuple:
 
     from tamandua.modules.findings.tables import registry_findings, triage_decisions
     from tamandua.modules.runs.tables import runs
-    from tamandua.shared import db
+    from tamandua.shared import db, documents
     with db.transaction(data_dir) as connection:
         stored = tuple(connection.execute(select(func.count(), func.max(table.c.updated_at)).where(table.c.tenant_id == db.TENANT)).one()
                        for table in (runs, registry_findings, triage_decisions))
-    paths = [data_dir / "sla.json", data_dir / "exclusions.json"]
+    stored = (*stored, documents.signature(data_dir, "sla", "exclusions"))
+    paths = []
     feeds = data_dir / "feeds"
     if feeds.is_dir():
         paths += sorted(path for path in feeds.iterdir() if path.suffix == ".json")

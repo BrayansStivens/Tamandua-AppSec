@@ -4,6 +4,8 @@ import json
 import os
 import tempfile
 import unittest
+
+from tamandua.shared import documents
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -32,9 +34,9 @@ class PolicyTests(unittest.TestCase):
 
     def test_defaults_without_file_and_tolerant_with_broken_values(self):
         self.assertEqual(sla.policy(self.data_dir)["days"], sla.DEFAULTS)
-        (self.data_dir / "sla.json").write_text(json.dumps({"days": {"critical": 3, "high": "treinta", "low": None}}))
+        documents.save(self.data_dir, "sla", {"days": {"critical": 3, "high": "treinta", "low": None}})
         self.assertEqual(sla.policy(self.data_dir)["days"], {"critical": 3, "high": 30, "medium": 90, "low": None})
-        (self.data_dir / "sla.json").write_text("{roto")
+        documents.save(self.data_dir, "sla", ["no es un objeto"])
         self.assertEqual(sla.policy(self.data_dir)["days"], sla.DEFAULTS)
 
     def test_save_validates_every_level(self):

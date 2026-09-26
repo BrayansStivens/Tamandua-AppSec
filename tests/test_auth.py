@@ -61,14 +61,13 @@ class AuthenticatorTests(unittest.TestCase):
     def tearDown(self):
         self.directory.cleanup()
 
-    def test_files_are_private_and_hold_no_plain_secret(self):
+    def test_stored_data_holds_no_plain_secret(self):
+        """La clave de firma es privada (0600); en la base, ni la contraseña ni el identificador de sesión en claro."""
         result = self.auth.login("operadora", PASSWORD, "1.1.1.1")
-        for name in ("users.json", "sessions.json", "session.key"):
-            mode = stat.S_IMODE(os.stat(self.data_dir / "auth" / name).st_mode)
-            self.assertEqual(mode, 0o600, name)
-        stored = (self.data_dir / "auth" / "sessions.json").read_text()
+        self.assertEqual(stat.S_IMODE(os.stat(self.data_dir / "auth" / "session.key").st_mode), 0o600)
+        stored = stored_identity(self.data_dir)
         self.assertNotIn(result["session"].split(".")[0], stored)
-        self.assertNotIn(PASSWORD, (self.data_dir / "auth" / "users.json").read_text())
+        self.assertNotIn(PASSWORD, stored)
 
     def test_tampered_cookie_and_logout(self):
         cookie = self.auth.login("operadora", PASSWORD, "c")["session"]
@@ -124,6 +123,17 @@ class CliTests(unittest.TestCase):
             self.assertEqual((created["username"], created["role"]), ("brayan", "admin"))
             self.assertNotIn("password", created)
             self.assertTrue(auth.verify_password(Users(Path(directory)).get("brayan")["password"], PASSWORD))
+
+
+def stored_identity(data_dir) -> str:
+    """Todo lo que la base guarda de usuarios y sesiones, como texto (para comprobar que no hay secretos en claro)."""
+    import json
+    from sqlalchemy import select
+    from tamandua.modules.identity.tables import sessions, users
+    from tamandua.shared import db
+    with db.transaction(data_dir) as connection:
+        rows = [*connection.execute(select(users.c.record)).scalars(), *connection.execute(select(sessions.c.id, sessions.c.record)).all()]
+    return json.dumps(rows, default=str)
 
 
 class HttpCase(unittest.TestCase):
@@ -266,7 +276,7 @@ class PolicyAndUsersTests(HttpCase):
         self.assertEqual(status, 200)
         self.assertIn("/#link=", body["link"])
         token = body["link"].split("#link=", 1)[1]
-        self.assertNotIn(token, (self.data_dir / "auth" / "users.json").read_text())
+        self.assertNotIn(token, stored_identity(self.data_dir))
         # Sin contraseña todavía, nadie entra con esa cuenta.
         self.assertEqual(self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})[0], 401)
         status, found, _ = self.post("/api/auth/link/check", "check-link", {"token": token})

@@ -16,8 +16,10 @@ SCRIPTS = Path(__file__).resolve().parent / "alembic"
 def tables() -> None:
     """Registra todas las tablas en `db.metadata` (la fuente de las migraciones)."""
     import tamandua.modules.findings.tables  # noqa: F401
+    import tamandua.modules.identity.tables  # noqa: F401
     import tamandua.modules.integrations.tables  # noqa: F401
     import tamandua.modules.runs.tables  # noqa: F401
+    import tamandua.shared.documents  # noqa: F401
 
 
 def config() -> Config:

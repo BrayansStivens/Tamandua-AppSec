@@ -12,13 +12,13 @@ import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from tamandua.shared import documents
 
 
 class IntegrationError(ValueError):
     pass
 
 
-_lock = threading.Lock()
 
 
 def _path(data_dir: Path) -> Path:
@@ -26,21 +26,14 @@ def _path(data_dir: Path) -> Path:
 
 
 def load(data_dir: Path) -> dict:
-    try:
-        data = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
+    data = documents.load(data_dir, "integrations", {})
     if not isinstance(data, dict):
         raise IntegrationError("Registro de integraciones inválido")
     return data
 
 
 def _write(data_dir: Path, data: dict) -> None:
-    data_dir.mkdir(parents=True, exist_ok=True)
-    target = _path(data_dir)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    documents.save(data_dir, "integrations", data)
 
 
 def save_github(data_dir: Path, installation_id: int, details: dict, connected_by: str | None) -> dict:
@@ -52,7 +45,7 @@ def save_github(data_dir: Path, installation_id: int, details: dict, connected_b
               "permissions": details.get("permissions") or {},
               "connected_by": connected_by,
               "connected_at": datetime.now(timezone.utc).isoformat()}
-    with _lock:
+    with documents.lock(data_dir, "integrations"):
         data = load(data_dir)
         records = github_connections(data_dir)
         records = [item for item in records if item["installation_id"] != installation_id]
@@ -80,7 +73,7 @@ def github_installation(data_dir: Path) -> int | None:
 
 
 def clear_github(data_dir: Path, installation_id: int | None = None) -> None:
-    with _lock:
+    with documents.lock(data_dir, "integrations"):
         data = load(data_dir)
         if installation_id is None:
             changed = data.pop("github", None) is not None

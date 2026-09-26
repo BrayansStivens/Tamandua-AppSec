@@ -32,6 +32,14 @@ import time
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
+from contextlib import contextmanager
+
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert
+
+from tamandua.modules.identity.tables import auth_challenges, sessions, users
+from tamandua.shared import db
+from tamandua.shared.db import TENANT
 from urllib.parse import quote
 
 from tamandua.shared import log as logging_setup
@@ -145,22 +153,34 @@ def _hash_backup(code: str) -> str:
 # ------------------------------------------------------------------- usuarios
 
 class Users:
+    """Usuarios en PostgreSQL (tabla users). Los cambios van en transacción con cerrojo: dos altas o cambios a la vez,
+    desde el API o la CLI, no se pisan."""
+
     def __init__(self, data_dir: Path):
-        self.path = data_dir / "auth" / "users.json"
-        self._lock = threading.Lock()
-        self._first_lock = threading.Lock()
+        self.data_dir = data_dir
+
+    @contextmanager
+    def _locked(self):
+        with db.transaction(self.data_dir) as connection:
+            db.lock(connection, "users")
+            yield
 
     def _load(self) -> list[dict]:
-        try:
-            rows = json.loads(self.path.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            return []
-        if not isinstance(rows, list):
-            raise AuthError("Registro de usuarios inválido")
-        return rows
+        with db.transaction(self.data_dir) as connection:
+            return list(connection.execute(select(users.c.record).where(users.c.tenant_id == TENANT)
+                                           .order_by(users.c.position, users.c.id)).scalars())
 
     def _save(self, rows: list[dict]) -> None:
-        _write_private(self.path, rows)
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(delete(users).where(users.c.tenant_id == TENANT, users.c.id.not_in([row["id"] for row in rows])))
+            if rows:
+                statement = insert(users)
+                connection.execute(statement.on_conflict_do_update(
+                    index_elements=[users.c.tenant_id, users.c.id],
+                    set_={"username": statement.excluded.username, "position": statement.excluded.position,
+                          "record": statement.excluded.record, "updated_at": func.now()}),
+                    [{"tenant_id": TENANT, "id": row["id"], "username": row["username"], "position": index, "record": row}
+                     for index, row in enumerate(rows)])
 
     def any(self) -> bool:
         return bool(self._load())
@@ -184,7 +204,7 @@ class Users:
 
     def create_first_admin(self, username: str, password: str, display_name: str = "") -> dict:
         """Como `create`, pero solo si no hay nadie: dos altas simultáneas no crean dos administradores."""
-        with self._first_lock:
+        with self._locked():
             if self.any():
                 raise AuthError("Este workspace ya tiene administrador")
             return self.create(username, password, role="admin", display_name=display_name)
@@ -199,7 +219,7 @@ class Users:
         display_name = " ".join(str(display_name or "").split())
         if any(unicodedata.category(character) == "Cc" for character in display_name):
             raise AuthError("El nombre contiene caracteres de control")
-        with self._lock:
+        with self._locked():
             rows = self._load()
             if any(user["username"] == key for user in rows):
                 raise AuthError("El usuario ya existe")
@@ -213,7 +233,7 @@ class Users:
         return self.public(user)
 
     def _update(self, user_id: str, mutate, guard=None) -> dict:
-        with self._lock:
+        with self._locked():
             rows = self._load()
             user = next((row for row in rows if row["id"] == user_id), None)
             if user is None:
@@ -370,13 +390,12 @@ def normalize_username(value, *, strict: bool = True) -> str:
 # ------------------------------------------------------------------- sesiones
 
 class Sessions:
-    """Sesiones del lado del servidor con cookie firmada; el retén (`challenge`) cubre el paso TOTP."""
+    """Sesiones del lado del servidor (tabla sessions) con cookie firmada; el retén (`challenge`) cubre el paso TOTP.
+    Validar una cookie es una búsqueda por clave primaria (antes se leía el archivo entero en cada petición)."""
 
     def __init__(self, data_dir: Path):
-        self.path = data_dir / "auth" / "sessions.json"
+        self.data_dir = data_dir
         self.key_path = data_dir / "auth" / "session.key"
-        self._lock = threading.Lock()
-        self._challenges: dict[str, tuple[float, str, str]] = {}
         self._key = self._load_key()
 
     def _load_key(self) -> bytes:
@@ -390,28 +409,18 @@ class Sessions:
                 handle.write(base64.b64encode(key).decode("ascii"))
             return key
 
-    def _load(self) -> dict:
-        try:
-            rows = json.loads(self.path.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            return {}
-        return rows if isinstance(rows, dict) else {}
-
-    def _save(self, rows: dict) -> None:
-        _write_private(self.path, rows)
-
     def _sign(self, session_id: str) -> str:
         return hmac.new(self._key, session_id.encode("ascii"), hashlib.sha256).hexdigest()[:32]
 
     def issue(self, user: dict, *, mfa: bool) -> str:
         session_id = secrets.token_urlsafe(32)
         now = time.time()
-        with self._lock:
-            rows = {key: value for key, value in self._load().items() if value["expires_at"] > now}
-            rows[hashlib.sha256(session_id.encode("ascii")).hexdigest()] = {
-                "user_id": user["id"], "created_at": now, "expires_at": now + SESSION_TTL, "mfa": mfa,
-                "password_changed_at": user.get("password_changed_at")}
-            self._save(rows)
+        record = {"user_id": user["id"], "created_at": now, "expires_at": now + SESSION_TTL, "mfa": mfa,
+                  "password_changed_at": user.get("password_changed_at")}
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(delete(sessions).where(sessions.c.tenant_id == TENANT, sessions.c.expires_at <= now))
+            connection.execute(insert(sessions).values(tenant_id=TENANT, id=hashlib.sha256(session_id.encode("ascii")).hexdigest(),
+                                                       user_id=user["id"], expires_at=record["expires_at"], record=record))
         return f"{session_id}.{self._sign(session_id)}"
 
     def resolve(self, cookie_value: str | None) -> dict | None:
@@ -420,7 +429,9 @@ class Sessions:
         session_id, _, signature = cookie_value.rpartition(".")
         if not hmac.compare_digest(self._sign(session_id), signature):
             return None
-        row = self._load().get(hashlib.sha256(session_id.encode("ascii")).hexdigest())
+        with db.transaction(self.data_dir) as connection:
+            row = connection.execute(select(sessions.c.record).where(
+                sessions.c.tenant_id == TENANT, sessions.c.id == hashlib.sha256(session_id.encode("ascii")).hexdigest())).scalar_one_or_none()
         if row is None or row["expires_at"] <= time.time():
             return None
         return {**row, "session_hash": hashlib.sha256(session_id.encode("ascii")).hexdigest()}
@@ -429,19 +440,13 @@ class Sessions:
         session = self.resolve(cookie_value)
         if session is None:
             return
-        with self._lock:
-            rows = self._load()
-            rows.pop(session["session_hash"], None)
-            self._save(rows)
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(delete(sessions).where(sessions.c.tenant_id == TENANT, sessions.c.id == session["session_hash"]))
 
     def revoke_user(self, user_id: str, *, keep: str | None = None) -> int:
-        with self._lock:
-            rows = self._load()
-            removed = [key for key, value in rows.items() if value["user_id"] == user_id and key != keep]
-            for key in removed:
-                del rows[key]
-            self._save(rows)
-        return len(removed)
+        with db.transaction(self.data_dir) as connection:
+            return connection.execute(delete(sessions).where(sessions.c.tenant_id == TENANT, sessions.c.user_id == user_id,
+                                                             sessions.c.id != (keep or ""))).rowcount
 
     def cookie(self, value: str, *, secure: bool, clear: bool = False) -> str:
         attributes = [f"{COOKIE_NAME}={'' if clear else value}", "Path=/", "HttpOnly", "SameSite=Strict"]
@@ -454,38 +459,38 @@ class Sessions:
     def open_challenge(self, user_id: str, client: str) -> str:
         token = secrets.token_urlsafe(32)
         now = time.time()
-        with self._lock:
-            for key, (born, *_rest) in list(self._challenges.items()):
-                if born + CHALLENGE_TTL < now:
-                    del self._challenges[key]
-            if len(self._challenges) >= 200:
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(delete(auth_challenges).where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.created_at + CHALLENGE_TTL < now))
+            if connection.execute(select(func.count()).select_from(auth_challenges).where(auth_challenges.c.tenant_id == TENANT)).scalar_one() >= 200:
                 raise AuthError("Demasiados inicios de sesión en curso; inténtalo en unos minutos")
-            self._challenges[token] = (now, user_id, client, 0)
+            connection.execute(insert(auth_challenges).values(tenant_id=TENANT, id=_token_hash(token), user_id=user_id, client=client, created_at=now))
         return token
 
     def peek_challenge(self, token, client: str) -> str | None:
         if not isinstance(token, str) or len(token) > 64:
             return None
-        with self._lock:
-            entry = self._challenges.get(token)
-        if entry is None or entry[0] + CHALLENGE_TTL < time.time() or entry[2] != client:
+        with db.transaction(self.data_dir) as connection:
+            row = connection.execute(select(auth_challenges.c.user_id, auth_challenges.c.client, auth_challenges.c.created_at)
+                                     .where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.id == _token_hash(token))).first()
+        if row is None or row.created_at + CHALLENGE_TTL < time.time() or row.client != client:
             return None
-        return entry[1]
+        return row.user_id
 
     def close_challenge(self, token: str) -> None:
-        with self._lock:
-            self._challenges.pop(token, None)
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(delete(auth_challenges).where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.id == _token_hash(token)))
 
     def fail_challenge(self, token: str) -> None:
         """Tres códigos fallidos agotan el reto: hay que volver a la contraseña."""
-        with self._lock:
-            entry = self._challenges.get(token)
-            if entry is None:
-                return
-            if entry[3] + 1 >= CHALLENGE_FAILURES:
-                del self._challenges[token]
-            else:
-                self._challenges[token] = (*entry[:3], entry[3] + 1)
+        with db.transaction(self.data_dir) as connection:
+            failures = connection.execute(update(auth_challenges).where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.id == _token_hash(token))
+                                          .values(failures=auth_challenges.c.failures + 1).returning(auth_challenges.c.failures)).scalar_one_or_none()
+            if failures is not None and failures >= CHALLENGE_FAILURES:
+                connection.execute(delete(auth_challenges).where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.id == _token_hash(token)))
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def parse_cookie(header: str | None) -> str | None:
