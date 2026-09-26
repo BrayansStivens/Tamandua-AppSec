@@ -59,8 +59,10 @@
     "no_covered_language": "none with rules",
     "detail": "{{rulesets}} sets of Tamandua rules over {{languages}}; {{candidates}} candidates.",
     "uncovered": "No rules yet for: {{languages}}.",
-    "minified": "{{files}} compiled or minified files were left out of SAST (they're still searched for secrets).",
-    "errors": "{{files}} files couldn't be analyzed (syntax or size).",
+    "minified_one": "{{count}} compiled or minified file was left out of SAST (it's still searched for secrets).",
+    "minified_other": "{{count}} compiled or minified files were left out of SAST (they're still searched for secrets).",
+    "errors_one": "{{count}} file couldn't be analyzed (syntax or size).",
+    "errors_other": "{{count}} files couldn't be analyzed (syntax or size).",
     "reason": "`{{snippet}}` in {{path}}:{{line}}."
   },
   "sca": {

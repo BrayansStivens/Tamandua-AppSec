@@ -59,8 +59,10 @@
     "no_covered_language": "ninguno con reglas",
     "detail": "{{rulesets}} conjuntos de reglas de Tamandua sobre {{languages}}; {{candidates}} candidatos.",
     "uncovered": "Sin reglas todavía para: {{languages}}.",
-    "minified": "{{files}} archivos compilados o minificados quedaron fuera del SAST (siguen en la búsqueda de secretos).",
-    "errors": "{{files}} archivos no se pudieron analizar (sintaxis o tamaño).",
+    "minified_one": "{{count}} archivo compilado o minificado quedó fuera del SAST (sigue en la búsqueda de secretos).",
+    "minified_other": "{{count}} archivos compilados o minificados quedaron fuera del SAST (siguen en la búsqueda de secretos).",
+    "errors_one": "{{count}} archivo no se pudo analizar (sintaxis o tamaño).",
+    "errors_other": "{{count}} archivos no se pudieron analizar (sintaxis o tamaño).",
     "reason": "`{{snippet}}` en {{path}}:{{line}}."
   },
   "sca": {

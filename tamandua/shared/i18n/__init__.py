@@ -44,7 +44,8 @@ def catalog(locale: str) -> dict[str, str]:
 
 
 def _lookup(key: str, locale: str, count) -> str | None:
-    suffixes = ((f"{key}_one" if count == 1 else f"{key}_other"),) if count is not None else ()
+    # Without a count (e.g. a message stored before the key became plural) the plural form still beats a raw key.
+    suffixes = ((f"{key}_one" if count == 1 else f"{key}_other"),) if count is not None else (f"{key}_other",)
     for language in dict.fromkeys((locale, "en")):
         entries = catalog(language)
         for candidate in (*suffixes, key):

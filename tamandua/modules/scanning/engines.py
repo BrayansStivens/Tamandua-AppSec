@@ -482,9 +482,9 @@ def run_opengrep(snapshot: Path) -> dict:
     if uncovered:
         parts.append(msg("scanning.opengrep.uncovered", languages=uncovered))
     if compiled:
-        parts.append(msg("scanning.opengrep.minified", files=len(compiled)))
+        parts.append(msg("scanning.opengrep.minified", count=len(compiled)))
     if errors:
-        parts.append(msg("scanning.opengrep.errors", files=len(errors)))
+        parts.append(msg("scanning.opengrep.errors", count=len(errors)))
     detail = joined(parts, "scanning.join.sentences")
     status = "partial" if (errors or uncovered) else "completed"
     return _result("opengrep", status, detail, findings, started)
