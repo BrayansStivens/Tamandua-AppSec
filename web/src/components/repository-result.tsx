@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowDownToLine, ArrowRight, ChevronDown, ChevronRight, ExternalLink, FileCheck2, Flame, Search, ShieldCheck, SlidersHorizontal, Ticket, Wrench } from 'lucide-react'
+import { ArrowDownToLine, ArrowRight, ChevronDown, ChevronRight, Clock3, ExternalLink, FileCheck2, Flame, Search, ShieldCheck, SlidersHorizontal, Ticket, Wrench } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { SlaPill } from '@/components/sla'
+import { slaText, type Sla } from '@/lib/sla'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Menu, MenuContent, MenuGroup, MenuItem, MenuTrigger } from '@/components/ui/menu'
@@ -16,10 +18,10 @@ import { FixSection, Reverify, type FixGuide, type Verification } from '@/compon
 export type Priority = { action: 'act' | 'attend' | 'track'; factors: string[] }
 export type Package = { ecosystem: string; name: string; version: string; fixed_version: string | null; introduced: string | null; dev?: boolean; direct?: boolean | null }
 export type Advisory = { id: string; aliases: string[]; summary: string; details: string; cvss_vector: string | null; cvss_score: number | null; published: string | null; modified: string | null; references: string[] }
-export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; related_rules?: string[]; framework?: string; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle; source?: AdvisorySource | null; fix?: FixGuide | null; verification?: Verification | null }
+export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; related_rules?: string[]; framework?: string; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle; source?: AdvisorySource | null; fix?: FixGuide | null; verification?: Verification | null; sla?: Sla | null }
 // Base de la que sale el aviso y su licencia (appsec_agent/data_sources.py): se atribuye donde se muestra.
 export type AdvisorySource = { id: string; name: string; short?: string; url: string; license: string; terms: 'open' | 'attribution' | 'share-alike' | 'non-commercial' | 'unclear' }
-export type Lifecycle = { status: 'open' | 'fixed' | 'excluded'; excluded?: { pattern: string | null; at: string } | null; origin?: { kind: 'scan' | 'pr'; pr?: number; branch?: string; merged?: boolean }; first_seen?: string; last_seen?: string; fixed?: { at: string; how: string; auto: boolean } | null; reopened_at?: string | null }
+export type Lifecycle = { status: 'open' | 'fixed' | 'excluded'; excluded?: { pattern: string | null; at: string } | null; origin?: { kind: 'scan' | 'pr' | 'advisory'; pr?: number; branch?: string; merged?: boolean }; first_seen?: string; last_seen?: string; fixed?: { at: string; how: string; auto: boolean } | null; reopened_at?: string | null }
 export type ScanStep = { id: string; name: string; status: string; detail: string }
 export type PullReview = { baseline_run: string | null; gate: string; verdict: { state: 'success' | 'failure'; description: string; blocking: number }; delivery: { comment?: string; status?: string } }
 export type RepositoryRun = { id: string; type?: string; pull_request?: { number: number; title: string; url: string; author: string; head_sha: string; head_ref: string; base_ref: string }; review?: PullReview; status: string; created_at: string; context?: string; progress?: { at: string; level: string; message: string }[]; started_at?: string; finished_at?: string; source?: { name: string; provider: string; sha256?: string; files?: number; image?: { reference: string; resolved_digest?: string | null; os?: string | null; user?: string } }; summary: { agreement?: { both: number; only_trivy: number; only_grype: number }; files?: number; dependencies?: number; candidates?: number; sast?: number; secrets?: number; sca?: number; severities?: Record<string, number>; priorities?: Record<string, number>; kev?: number; fixable?: number; triage?: Record<TriageStatus, number>; actionable?: number; preexisting?: number; changed_files?: number; lifecycle?: { open: number; fixed: number; suppressed: number; from_pr: number; excluded?: number } }; steps?: ScanStep[]; findings?: RepositoryFinding[] }
@@ -49,7 +51,7 @@ const newer = (left: string, right: string) => { const a = versionKey(left), b =
 const worst = (findings: RepositoryFinding[]) => findings.reduce((best, item) => SEVERITY_ORDER[item.severity] < SEVERITY_ORDER[best] ? item.severity : best, 'info')
 const urgent = (findings: RepositoryFinding[]) => findings.reduce((best, item) => (ACTION_ORDER[item.priority?.action ?? 'track'] ?? 3) < (ACTION_ORDER[best] ?? 3) ? item.priority?.action ?? 'track' : best, 'track')
 
-type Group = { key: string; label: string; meta: string; scanner: string; findings: RepositoryFinding[]; severity: string; action: string; fix: string | null; epss: number | null; kev: boolean }
+type Group = { key: string; label: string; meta: string; scanner: string; findings: RepositoryFinding[]; severity: string; action: string; fix: string | null; epss: number | null; kev: boolean; sla: Sla | null }
 
 // Un paquete con tres avisos es un solo trabajo de remediación: se agrupa y se dice la versión que cierra todos.
 function groupFindings(findings: RepositoryFinding[]): Group[] {
@@ -62,7 +64,9 @@ function groupFindings(findings: RepositoryFinding[]): Group[] {
     const pkg = items[0].package
     const fix = pkg ? items.reduce<string | null>((best, item) => item.package?.fixed_version && (!best || newer(item.package.fixed_version, best)) ? item.package.fixed_version : best, null) : null
     const epss = items.reduce<number | null>((best, item) => item.epss && (best === null || item.epss.score > best) ? item.epss.score : best, null)
-    return { key, findings: items, scanner: items[0].scanner, severity: worst(items), action: urgent(items), fix, epss, kev: items.some(item => item.kev),
+    // El plazo del grupo es el más apremiante de sus avisos.
+    const sla = items.reduce<Sla | null>((best, item) => item.sla && (!best || item.sla.days_left < best.days_left) ? item.sla : best, null)
+    return { key, findings: items, scanner: items[0].scanner, severity: worst(items), action: urgent(items), fix, epss, kev: items.some(item => item.kev), sla,
       label: pkg ? `${pkg.name} ${pkg.version}` : items[0].title,
       meta: pkg ? `${items.length} ${items.length === 1 ? 'aviso' : 'avisos'} · ${pkg.ecosystem}${pkg.dev ? ' · de desarrollo' : pkg.direct === false ? ' · transitiva' : ''}${fix ? ` · actualizar a ${fix}` : ' · sin corrección publicada'}` : `${items[0].path}:${items[0].line}` }
   }).sort((left, right) => (ACTION_ORDER[left.action] - ACTION_ORDER[right.action]) || (SEVERITY_ORDER[left.severity] - SEVERITY_ORDER[right.severity]) || left.label.localeCompare(right.label))
@@ -76,11 +80,12 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const [severity, setSeverity] = useState('all')
   const [action, setAction] = useState('all')
   const [scanner, setScanner] = useState('all')
+  const [deadline, setDeadline] = useState('all')
   const [open, setOpen] = useState<string | null>(null)
   const [triageView, setTriageView] = useState(initialView)
   const [auditOpen, setAuditOpen] = useState(false)
   // Filtros secundarios plegados; se abren solos si alguno ya está en uso.
-  const hiddenActive = Number(triageView !== initialView) + Number(action !== 'all') + Number(scanner !== 'all')
+  const hiddenActive = Number(triageView !== initialView) + Number(action !== 'all') + Number(scanner !== 'all') + Number(deadline !== 'all')
   const [moreFilters, setMoreFilters] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [decision, setDecision] = useState<{ status: TriageStatus; fingerprints: string[] } | null>(null)
@@ -91,6 +96,8 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const [downloading, setDownloading] = useState<string | null>(null)
   const PAGE = 50
   const findings = useMemo(() => run.findings ?? [], [run.findings])
+  // Los plazos solo existen en el estado del registro (lo pendiente con fecha de detección), no en una ejecución suelta.
+  const hasSla = useMemo(() => findings.some(item => item.sla), [findings])
   // Las cifras de arriba cuentan solo lo pendiente: lo descartado en triage no es trabajo.
   const active = useMemo(() => findings.filter(item => !SUPPRESSED.includes(statusOf(item))), [findings])
   const count = (predicate: (item: RepositoryFinding) => boolean) => active.filter(predicate).length
@@ -98,7 +105,8 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const groups = useMemo(() => groupFindings(findings.filter(item =>
     (triageView === 'all' || (triageView === 'active' ? !SUPPRESSED.includes(statusOf(item)) : statusOf(item) === triageView))
     && (severity === 'all' || item.severity === severity) && (action === 'all' || item.priority?.action === action) && (scanner === 'all' || item.scanner === scanner)
-    && (!query.trim() || `${item.title} ${item.package?.name ?? ''} ${item.path} ${item.cve.join(' ')} ${item.ghsa.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase())))), [findings, triageView, severity, action, scanner, query])
+    && (deadline === 'all' || (deadline === 'overdue' ? item.sla?.state === 'overdue' : item.sla?.state === 'overdue' || item.sla?.state === 'soon'))
+    && (!query.trim() || `${item.title} ${item.package?.name ?? ''} ${item.path} ${item.cve.join(' ')} ${item.ghsa.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase())))), [findings, triageView, severity, action, scanner, deadline, query])
   const page = groups.slice(offset, offset + PAGE)
   const pageFingerprints = page.flatMap(group => group.findings.map(item => item.fingerprint))
   const toggle = (fingerprints: string[], on: boolean) => setSelected(previous => { const next = new Set(previous); for (const item of fingerprints) { if (on) next.add(item); else next.delete(item) } return next })
@@ -136,7 +144,9 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
         ? <><span className="font-mono">{run.source.image.reference}</span>{run.source.image.resolved_digest ? <> · digest <span className="font-mono">{run.source.image.resolved_digest.slice(7, 19)}</span></> : null}{run.source.image.os ? ` · ${run.source.image.os}` : ''} · usuario {run.source.image.user ?? 'root'}{run.summary.agreement ? ` · ${run.summary.agreement.both} avisos confirmados por Trivy y Grype` : ''}</>
         : <>snapshot <span className="font-mono">{run.source?.sha256?.slice(0, 12) ?? '—'}</span> · {run.summary.files ?? 0} archivos · {run.summary.dependencies ?? 0} dependencias</>}</p>{run.context && <p className="mt-2 text-sm text-app-muted">{run.context}</p>}</div><Button variant="outline" onClick={onNew} className="shrink-0 border-app-line bg-app-soft">Nuevo análisis <ArrowRight /></Button></div>}
 
-    <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+    <div className={`grid gap-3 ${hasSla ? 'grid-cols-2 sm:grid-cols-4 xl:grid-cols-7' : 'sm:grid-cols-3 xl:grid-cols-6'}`}>
+      {hasSla && <Tile label="Fuera de plazo" value={count(item => item.sla?.state === 'overdue')} tone={count(item => item.sla?.state === 'overdue') ? 'rose' : 'muted'}
+        hint={`${count(item => item.sla?.state === 'soon')} vencen en los próximos 7 días`} icon={Clock3} />}
       <Tile label="Actuar ya" value={count(item => item.priority?.action === 'act')} tone={count(item => item.priority?.action === 'act') ? 'rose' : 'muted'} icon={Flame} />
       <Tile label="Atender" value={count(item => item.priority?.action === 'attend')} tone={count(item => item.priority?.action === 'attend') ? 'amber' : 'muted'} />
       <Tile label="Críticas" value={count(item => item.severity === 'critical')} tone={count(item => item.severity === 'critical') ? 'rose' : 'muted'} />
@@ -156,6 +166,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
         <Filter label="Estado" value={triageView} onChange={value => { setTriageView(value === 'all' ? 'all' : value); setOffset(0) }} all="Todos los estados" options={[['active', 'Pendientes'], ['open', 'Abiertos'], ['in_progress', 'En curso'], ['fixed', 'Remediados'], ['false_positive', 'Falsos positivos'], ['accepted', 'Riesgo aceptado']]} />
         <Filter label="Prioridad" value={action} onChange={setAction} all="Toda prioridad" options={[['act', 'Actuar ya'], ['attend', 'Atender'], ['track', 'Seguimiento']]} />
         <Filter label="Fuente" value={scanner} onChange={setScanner} all="Toda fuente" options={[['sca', 'Dependencias'], ['sast', 'Código'], ['iac', 'Infraestructura'], ['cicd', 'Pipelines CI/CD'], ['secrets', 'Secretos']]} />
+        {hasSla && <Filter label="Plazo" value={deadline} onChange={value => { setDeadline(value); setOffset(0) }} all="Cualquier plazo" options={[['overdue', 'Fuera de plazo'], ['soon', 'Vencidos o vencen en 7 días']]} />}
       </div>}
       {selected.size > 0 && <div className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-panel px-4 py-2.5 shadow-lg">
         <span className="text-sm font-medium">{selected.size} {selected.size === 1 ? 'seleccionado' : 'seleccionados'}</span>
@@ -179,7 +190,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
               <button type="button" aria-expanded={expanded} onClick={() => setOpen(expanded ? null : group.key)} className="grid w-full gap-2 py-3 pr-4 pl-3 text-left transition hover:bg-app-soft md:grid-cols-[120px_90px_minmax(0,1fr)_110px_110px] md:items-center">
                 <Badge variant="outline" className={`w-fit ${actionClass(group.action)}`}>{actionLabel[group.action]}</Badge>
                 <Badge variant="outline" className={`w-fit ${severityClass(group.severity)}`}>{severityLabel[group.severity]}</Badge>
-                <span className="flex min-w-0 items-start gap-2"><ChevronRight className={`mt-1 size-3.5 shrink-0 text-app-subtle transition ${expanded ? 'rotate-90' : ''}`} /><span className="min-w-0"><span className="block truncate text-sm font-medium">{group.label}</span><span className="block truncate text-xs text-app-subtle">{group.meta}{group.kev ? ' · CISA KEV' : ''}{group.findings.some(item => item.ticket) ? ` · ${[...new Set(group.findings.flatMap(item => item.ticket ? [item.ticket.key] : []))].join(', ')}` : ''}</span>{group.findings[0].lifecycle?.origin?.kind === 'pr' && <span className="mt-1 mr-1 inline-block rounded border border-info-line px-1.5 text-[11px] text-info">PR #{group.findings[0].lifecycle.origin.pr}{group.findings[0].lifecycle.origin.merged ? ' · mergeado' : ''}</span>}{statuses.size > 1 ? <span className="mt-1 block text-[11px] text-app-subtle">Estados mixtos: {[...statuses].map(item => triageLabel[item]).join(', ')}</span> : <span className="mt-1 block"><TriageBadge state={groupState} /></span>}</span></span>
+                <span className="flex min-w-0 items-start gap-2"><ChevronRight className={`mt-1 size-3.5 shrink-0 text-app-subtle transition ${expanded ? 'rotate-90' : ''}`} /><span className="min-w-0"><span className="block truncate text-sm font-medium">{group.label}</span><span className="block truncate text-xs text-app-subtle">{group.meta}{group.kev ? ' · CISA KEV' : ''}{group.findings.some(item => item.ticket) ? ` · ${[...new Set(group.findings.flatMap(item => item.ticket ? [item.ticket.key] : []))].join(', ')}` : ''}</span>{group.findings[0].lifecycle?.origin?.kind === 'pr' && <span className="mt-1 mr-1 inline-block rounded border border-info-line px-1.5 text-[11px] text-info">PR #{group.findings[0].lifecycle.origin.pr}{group.findings[0].lifecycle.origin.merged ? ' · mergeado' : ''}</span>}<SlaPill sla={group.sla} />{statuses.size > 1 ? <span className="mt-1 block text-[11px] text-app-subtle">Estados mixtos: {[...statuses].map(item => triageLabel[item]).join(', ')}</span> : <span className="mt-1 block"><TriageBadge state={groupState} /></span>}</span></span>
                 <span className="font-mono text-xs text-app-muted">{group.epss !== null ? `${(group.epss * 100).toFixed(1)}%` : '—'}</span>
                 <span className="text-xs text-app-muted">{scannerLabel[group.scanner] ?? group.scanner}{group.findings[0].tool ? <span className="block text-[11px] text-app-subtle">{toolsOf(group.findings[0])}</span> : null}</span>
               </button>
@@ -235,7 +246,7 @@ function FindingDetail({ finding, runId, demo, canAccept, onPick, onChanged }: {
       <div className="min-w-0 text-xs text-app-muted"><span className="font-medium text-app-secondary">Triage: {finding.triage?.expired ? 'Abierto (la aceptación caducó)' : triageLabel[statusOf(finding)]}</span>{finding.triage?.by ? ` · ${finding.triage.by}` : ''}{finding.triage?.expires_at ? ` · caduca ${finding.triage.expires_at}` : ''}{finding.triage?.reason ? <span className="mt-0.5 block">{finding.triage.reason}</span> : null}</div>
       <div className="flex flex-wrap items-center gap-2">{finding.ticket && <a href={finding.ticket.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:underline"><Ticket className="size-3" />{finding.ticket.key}</a>}<TriageActions current={statusOf(finding)} canAccept={canAccept} onPick={onPick} size="xs" /></div>
     </div>
-    {finding.lifecycle && <p className="mt-2 text-xs leading-5 text-app-subtle"><span className="font-medium text-app-muted">Ciclo de vida: </span>{finding.lifecycle.origin?.kind === 'pr' ? `introducido en el PR #${finding.lifecycle.origin.pr}${finding.lifecycle.origin.branch ? ` (${finding.lifecycle.origin.branch})` : ''}${finding.lifecycle.origin.merged ? ', ya mergeado' : ''}` : 'detectado en la rama principal'}{finding.lifecycle.first_seen ? ` · visto por primera vez ${new Date(finding.lifecycle.first_seen).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}{finding.lifecycle.last_seen ? ` · última vez ${new Date(finding.lifecycle.last_seen).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}{finding.lifecycle.reopened_at ? ' · reabierto' : ''}{finding.lifecycle.fixed ? <span className="block text-brand">Remediado automáticamente: {finding.lifecycle.fixed.how}.</span> : null}{finding.lifecycle.status === 'excluded' ? <span className="block">Excluido: está en una ruta que un administrador excluyó{finding.lifecycle.excluded?.pattern ? <> (<code className="font-mono">{finding.lifecycle.excluded.pattern}</code>)</> : null}. No cuenta como abierto ni bloquea PRs.</span> : null}</p>}
+    {finding.lifecycle && <p className="mt-2 text-xs leading-5 text-app-subtle"><span className="font-medium text-app-muted">Ciclo de vida: </span>{finding.lifecycle.origin?.kind === 'pr' ? `introducido en el PR #${finding.lifecycle.origin.pr}${finding.lifecycle.origin.branch ? ` (${finding.lifecycle.origin.branch})` : ''}${finding.lifecycle.origin.merged ? ', ya mergeado' : ''}` : 'detectado en la rama principal'}{finding.lifecycle.first_seen ? ` · visto por primera vez ${new Date(finding.lifecycle.first_seen).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}{finding.lifecycle.last_seen ? ` · última vez ${new Date(finding.lifecycle.last_seen).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}` : ''}{finding.lifecycle.reopened_at ? ' · reabierto' : ''}{finding.sla ? <span className={`block ${finding.sla.state === 'overdue' ? 'text-danger' : finding.sla.state === 'soon' ? 'text-warning' : ''}`}>Plazo de corrección: {finding.sla.days} {finding.sla.days === 1 ? 'día' : 'días'} · vence el {finding.sla.due} ({slaText(finding.sla).toLowerCase()}).</span> : null}{finding.lifecycle.fixed ? <span className="block text-brand">Remediado automáticamente: {finding.lifecycle.fixed.how}.</span> : null}{finding.lifecycle.status === 'excluded' ? <span className="block">Excluido: está en una ruta que un administrador excluyó{finding.lifecycle.excluded?.pattern ? <> (<code className="font-mono">{finding.lifecycle.excluded.pattern}</code>)</> : null}. No cuenta como abierto ni bloquea PRs.</span> : null}</p>}
     <TriageHistory state={finding.triage} />
     {advisory?.details && <details className="mt-3"><summary className="cursor-pointer text-xs text-app-muted">Detalle del aviso</summary><p className="mt-2 text-xs leading-5 whitespace-pre-line text-app-muted">{advisory.details}</p></details>}
     {advisory?.references.length ? <p className="mt-3 flex flex-wrap gap-x-3 text-xs">{advisory.references.slice(0, 4).map(url => <a key={url} href={url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-brand hover:underline">{new URL(url).hostname} <ExternalLink className="size-3" /></a>)}</p> : null}

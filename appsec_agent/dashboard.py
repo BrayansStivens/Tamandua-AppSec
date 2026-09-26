@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from . import findings_registry, sla
 from .kinds import FULL_SCANS
 from .advisories import load_feeds, load_recent_cves
 from .assets import asset_key
@@ -112,6 +113,8 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
         by_asset[asset_key(record)].append(record)
 
     first_seen: dict[str, tuple[str, dict, str]] = {}
+    deadlines: dict[tuple[str, str], dict] = {}  # por (activo, huella): la misma huella puede estar en dos activos
+    policy_days = sla.policy(data_dir)["days"]
     fixed: dict[str, tuple[str, str]] = {}
     open_findings: list[tuple[str, dict]] = []
     top_assets = []
@@ -137,6 +140,15 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                 triage_totals.update((item.get("triage") or {}).get("status", "open") for item in current.values())
                 current = {digest: item for digest, item in current.items() if is_active(item)}
                 open_findings.extend((asset, finding) for finding in current.values())
+                # El plazo cuenta desde la primera detección en el registro (la misma fecha que ve Hallazgos).
+                registry = findings_registry.load(data_dir, key)["findings"]
+                for digest, finding in current.items():
+                    entry = registry.get(digest) or {}
+                    if entry.get("status", "open") != "open":
+                        continue
+                    due = sla.deadline(finding.get("severity", ""), entry.get("first_seen") or first_seen[digest][0], policy_days)
+                    if due:
+                        deadlines[(asset, digest)] = {**due, "severity": finding.get("severity")}
                 counts = Counter(item["severity"] for item in current.values())
                 previous = Counter(item["severity"] for item in runs[index - 1].get("findings", [])) if index else None
                 top_assets.append({"name": asset, "last_run": record["id"], "last_run_at": record["created_at"],
@@ -227,6 +239,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                  "mttr_days": round(sum(mttr) / len(mttr), 1) if mttr else None,
                  "runs_in_window": sum(1 for row in rows if row["created_at"] >= since.isoformat()),
                  "assets": len(by_asset), "kev_open": len(kev_items),
+                 "sla": {**sla.counts(list({"sla": due, "severity": due["severity"]} for due in deadlines.values())), "days": policy_days},
                  "triage": {status: triage_totals.get(status, 0) for status in ("open", "in_progress", "false_positive", "accepted")}},
         "issues_over_time": [{"day": _day((now - timedelta(days=offset)).isoformat()),
                               **{level: over_time.get(_day((now - timedelta(days=offset)).isoformat()), Counter()).get(level, 0) for level in SEVERITIES}}
@@ -239,7 +252,9 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
         "recent_runs": rows[:8],
         "top_issues": [{"title": finding["title"], "severity": finding["severity"], "asset": asset,
                         "action": (finding.get("priority") or {}).get("action"), "run_id": next((r["last_run"] for r in top_assets if r["name"] == asset), None),
-                        "epss": (finding.get("epss") or {}).get("score"), "kev": bool(finding.get("kev")), "fingerprint": finding["fingerprint"]}
+                        "epss": (finding.get("epss") or {}).get("score"), "kev": bool(finding.get("kev")), "fingerprint": finding["fingerprint"],
+                        "sla": {key: value for key, value in deadlines[(asset, finding["fingerprint"])].items() if key != "severity"}
+                        if (asset, finding["fingerprint"]) in deadlines else None}
                        for asset, finding in top_issues],
         "kev_news": kev_news, "cve_news": cve_news,
         "tools": (latest or {}).get("summary", {}).get("tools", []),
@@ -252,8 +267,8 @@ CACHE_SECONDS = 60
 
 
 def _signature(data_dir: Path) -> tuple:
-    """Lo que cambia el resultado: el índice de ejecuciones, el triage y los feeds (KEV, novedades de NVD)."""
-    paths = [data_dir / "runs" / "index.json", data_dir / "triage.json"]
+    """Lo que cambia el resultado: el índice de ejecuciones, el triage, los plazos, las exclusiones y los feeds (KEV, NVD)."""
+    paths = [data_dir / "runs" / "index.json", data_dir / "triage.json", data_dir / "sla.json", data_dir / "exclusions.json"]
     feeds = data_dir / "feeds"
     if feeds.is_dir():
         paths += sorted(path for path in feeds.iterdir() if path.suffix == ".json")

@@ -65,6 +65,17 @@ Hay carpetas que no conviene mirar: ejemplos vulnerables a propósito (como `fix
 
 La identidad del repositorio es la de GitHub (su id numérico): un repositorio renombrado sigue siendo el mismo, y los hallazgos de uno eliminado se retiran tras 24 horas de gracia. Se puede filtrar por ejecución, ver abiertos, remediados o todos, y exportar a PDF, JSON, Markdown, SARIF o Jira. La vista «Estado actual» exporta su registro acumulado por una ruta propia; no se confunde con una ejecución individual. Los dosieres PDF para SOC 2 Tipo II e ISO/IEC 27001:2022 son evidencia técnica para revisión, no certificaciones ni opiniones de cumplimiento.
 
+### Plazos de corrección
+
+Cada hallazgo pendiente tiene una fecha límite según su severidad, contada desde la **primera detección** (reabrirlo
+no reinicia el reloj). Por defecto: crítica 7 días, alta 30, media 90 y baja 180; un **administrador** los cambia en
+**Hallazgos → Plazos de corrección** (vacío = esa severidad no vence) y valen para todos los repositorios. Solo corren
+para lo abierto o en curso: lo remediado, lo excluido, los falsos positivos y los riesgos aceptados vigentes no vencen.
+
+Se ven en **Hallazgos** (tarjeta «Fuera de plazo», marca «Vencido hace N días» o «Vence en N días» y el filtro
+**Más filtros → Plazo**), en el **Resumen** (KPI «Fuera de plazo») y en el **informe de auditoría** (sección con la
+política y los vencidos ordenados por retraso: lo que piden SOC 2 e ISO 27001 como evidencia de gestión en plazo).
+
 ## CVE tracker
 
 Busca en una copia local de NVD (`data/feeds/cves.sqlite`, SQLite con FTS5) cruzada con CISA KEV y EPSS: texto libre, CVE por prefijo, severidad, solo KEV, año, orden por fecha, CVSS o EPSS y paginación. Un hilo la carga en segundo plano de lo más reciente a lo más antiguo, reanudable tras reiniciar, y luego la mantiene al día cada 2 horas por fecha de modificación. Sin API key NVD admite 5 peticiones cada 30 s y la carga completa (~400.000 CVE) tarda unas horas; con `APPSEC_AGENT_NVD_API_KEY` (va en cabecera, nunca se registra) va unas 8 veces más rápido. `APPSEC_AGENT_CVE_SYNC=off` la desactiva. El detalle de cada CVE dice qué repositorios analizados lo tienen entre sus hallazgos.

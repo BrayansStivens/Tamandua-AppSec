@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from ..kinds import FINDING_RUNS
-from .. import batches, exclusions, findings_registry, jira, triage
+from .. import batches, exclusions, findings_registry, jira, sla, triage
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
 from ..dashboard import cached as compute_dashboard, zone
@@ -602,6 +602,23 @@ def onboarding(request: Request):
         "demo": any((row.get("source") or {}).get("id") == "local:demo-ejemplos" for row in runs),
         "watching": any(config.get("enabled") for config in pr_watch.load(request.data_dir)["repositories"].values()),
         "alerts": alerts, "admin": request.user.get("role") == "admin"})
+
+
+@route("GET", "/api/sla")
+def sla_policy(request: Request):
+    """Plazos de corrección por severidad: los ve cualquiera (explican las fechas límite); los cambia un administrador."""
+    return request.json(200, sla.policy(request.data_dir))
+
+
+@route("POST", "/api/sla", admin=True, action="sla", body=1024)
+def sla_change(request: Request):
+    payload = request.payload
+    if not isinstance(payload, dict) or set(payload) != {"days"}:
+        return request.json(400, {"error": "Solicitud inválida"})
+    try:
+        return request.json(200, sla.save(request.data_dir, payload["days"], user=request.user))
+    except sla.SlaError as exc:
+        return request.json(400, {"error": str(exc)})
 
 
 @route("GET", "/api/notifications", admin=True)

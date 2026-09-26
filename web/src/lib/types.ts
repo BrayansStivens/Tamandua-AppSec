@@ -1,3 +1,4 @@
+import type { Sla } from '@/lib/sla'
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 export type Action = 'act' | 'attend' | 'track'
 export type RunStatus = 'queued' | 'running' | 'completed' | 'incomplete' | 'failed'
@@ -8,7 +9,8 @@ export type OwaspCoverage = { id: string; title: string; status: 'partial' | 'no
 export type ScanStep = { id: string; name: string; status: string; detail: string; tool?: { name: string; version: string; image: string; duration_s: number | null } }
 export type Dashboard = {
   window_days: number; generated_at: string
-  kpis: { security_score: { value: number; formula: string }; open: { total: number; critical: number; high: number; medium: number; low: number }; found_in_window: number; fixed_in_window: number; fix_rate: number | null; mttr_days: number | null; runs_in_window: number; assets: number; kev_open: number }
+  kpis: { security_score: { value: number; formula: string }; open: { total: number; critical: number; high: number; medium: number; low: number }; found_in_window: number; fixed_in_window: number; fix_rate: number | null; mttr_days: number | null; runs_in_window: number; assets: number; kev_open: number
+    sla?: { overdue: number; soon: number; overdue_by_severity: Record<string, number>; days: Record<string, number | null> } }
   issues_over_time: { day: string; critical: number; high: number; medium: number; low: number }[]
   open_vs_fixed: { day: string; found: number; fixed: number }[]
   top_assets: { name: string; last_run: string; last_run_at: string; open: number; critical: number; high: number; medium: number; low: number; kev: number; trend: number | null }[]
@@ -16,7 +18,7 @@ export type Dashboard = {
   exploitability: { kev: { cve: string; package: string | null; asset: string; fixed_version: string | null; ransomware: boolean }[]; high_epss: { cve: string; package: string | null; asset: string; epss: number; fixed_version: string | null }[]; kev_total?: number; epss_total?: number }
   activity: { day: string; runs: number }[]
   recent_runs: RunRow[]
-  top_issues: { title: string; severity: string; asset: string; action: string | null; run_id: string | null; epss: number | null; kev: boolean; fingerprint: string }[]
+  top_issues: { title: string; severity: string; asset: string; action: string | null; run_id: string | null; epss: number | null; kev: boolean; fingerprint: string; sla?: Sla | null }[]
   kev_news: { added_7d: number; added_30d: number; catalog_version: string | null; items: { cve: string; name: string | null; date_added: string | null; ransomware: boolean; affects: boolean }[] }
   cve_news: { published_7d: number; published_30d: number | null; per_day: { day: string; count: number }[]; fetched_at: string | null; refreshing: boolean; sample: number; by_severity: Record<string, number>; total_reported: number | null; items: { cve: string; published: string | null; score: number | null; severity: string | null; description: string; affects: boolean }[] }
   tools: { name: string; version: string; status: string }[]

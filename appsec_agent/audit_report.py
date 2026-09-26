@@ -130,6 +130,45 @@ def _group_cells(entry: dict, fallback_date) -> tuple[str, str]:
     return text, _t(where, 90)
 
 
+SLA_NAMES = {"critical": "crítica", "high": "alta", "medium": "media", "low": "baja"}
+SLA_LIMIT = 40
+
+
+def _deadlines(groups: list[dict], summary: dict | None) -> list:
+    """Plazos de corrección: la política y lo que está fuera de ella. Solo en el estado del repositorio (con fechas de detección)."""
+    if not summary or not summary.get("days"):
+        return []
+    days = summary["days"]
+    policy = ", ".join(f"{SLA_NAMES[level]} {_n(days[level], 'día', 'días')}" if days.get(level) else f"{SLA_NAMES[level]} sin plazo" for level in SLA_NAMES)
+    late = []
+    for entry in groups:
+        overdue = [item["sla"] for item in entry["items"] if (item.get("sla") or {}).get("state") == "overdue"]
+        if overdue:
+            late.append((min(item["days_left"] for item in overdue), min(item["due"] for item in overdue), entry))
+    late.sort(key=lambda row: (row[0], ORDER.get(row[2]["severity"], 9)))
+    # Las mismas unidades que el panel (avisos) y, entre paréntesis, las acciones de la tabla: un paquete puede reunir varios avisos.
+    items = [item for entry in groups for item in entry["items"]]
+    state = lambda wanted: sum(1 for item in items if (item.get("sla") or {}).get("state") == wanted)
+    running = sum(1 for item in items if item.get("sla"))
+    overdue = state("overdue")
+    story = [h2(f"Plazos de corrección ({_n(overdue, 'aviso', 'avisos')} fuera de plazo)"),
+             Paragraph(_t(f"Política del espacio de trabajo: {policy}, contados desde la primera detección. Se aplican a lo abierto o "
+                          f"en curso; lo remediado y las excepciones aprobadas no vencen. Con plazo corriendo: {_n(running, 'aviso', 'avisos')}; "
+                          f"fuera de plazo: {_n(overdue, 'aviso', 'avisos')} en {_n(len(late), 'acción', 'acciones')}; "
+                          f"vencen en los próximos 7 días: {_n(state('soon'), 'aviso', 'avisos')}.", 800), STYLE["body"])]
+    if not late:
+        return story + [Paragraph("Ningún hallazgo pendiente está fuera de plazo.", STYLE["body"])]
+    rows = [[Paragraph(label, STYLE["head"]) for label in ("Severidad", "Hallazgo", "Detectado", "Vencía", "Retraso")]]
+    for left, due, entry in late[:SLA_LIMIT]:
+        text, _ = _group_cells(entry, None)
+        rows.append([_chip(entry["severity"]), Paragraph(text, STYLE["cell"]), Paragraph(_first_seen(entry["items"], None), STYLE["cellmuted"]),
+                     Paragraph(due, STYLE["cellmuted"]), Paragraph(_n(-left, "día", "días"), STYLE["cell"])])
+    story.append(_grid(rows, [19 * mm, WIDTH - 83 * mm, 22 * mm, 22 * mm, 20 * mm], zebra=True))
+    if len(late) > SLA_LIMIT:
+        story.append(Paragraph(f"Se listan las {SLA_LIMIT} acciones con más retraso de {len(late)}; todas figuran en la tabla de hallazgos.", STYLE["note"]))
+    return story
+
+
 KEV_MARK = '<br/><font color="#b71824"><b>Explotación activa conocida (CISA KEV)</b></font>'
 
 
@@ -237,6 +276,7 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
         story.append(_grid(rows, [19 * mm, 52 * mm, 34 * mm, 19 * mm, 17 * mm, WIDTH - 141 * mm], zebra=True))
     else:
         story.append(Paragraph("Ningún hallazgo en el alcance elegido.", STYLE["body"]))
+    story += _deadlines(groups, (record.get("summary") or {}).get("sla"))
     # Excepciones: lo primero que pregunta un auditor. Van una a una: cada decisión tiene su motivo.
     exceptions = [item for item in findings if status_of(item) in ("accepted", "false_positive")]
     if options["include_exceptions"]:

@@ -29,7 +29,7 @@ import threading
 from pathlib import Path
 
 from .kinds import FINDING_RUNS, FULL_SCANS
-from . import logging_setup, triage
+from . import logging_setup, sla, triage
 from .assets import asset_key
 
 _log = logging_setup.get("findings")
@@ -246,15 +246,19 @@ def view(data_dir: Path, key: str, *, status: str = "open") -> dict:
               "source": {"uid": key if key.startswith("github#") else None, "id": key, "name": state.get("name") or key},
               "findings": items, "summary": {}, "steps": [], "owasp_coverage": [], "limitations": []}
     annotated = triage.annotate(data_dir, record)
+    days = sla.policy(data_dir)["days"]
+    sla.annotate(annotated["findings"], days)
 
     def bucket(item: dict) -> str:
         if item["lifecycle"]["status"] == "excluded":
             return "excluded"
         return "fixed" if item["lifecycle"]["status"] == "fixed" or item["triage"]["status"] == "fixed" else "open"
+    deadlines = {**sla.counts(annotated["findings"]), "days": days}
     if status != "all":
         annotated["findings"] = [item for item in annotated["findings"] if bucket(item) == status]
     return {**annotated, "type": "asset_state",
-            "summary": {**annotated["summary"], "lifecycle": summarize(data_dir, key), "candidates": len(annotated["findings"])}}
+            "summary": {**annotated["summary"], "lifecycle": summarize(data_dir, key), "candidates": len(annotated["findings"]),
+                        "sla": deadlines}}
 
 
 def summarize(data_dir: Path, key: str) -> dict:

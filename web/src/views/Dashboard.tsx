@@ -1,6 +1,6 @@
 import { GettingStarted } from '@/components/getting-started'
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { Activity, ArrowRight, ChevronDown, Flame, RefreshCw, ShieldAlert, Wrench } from 'lucide-react'
+import { Activity, ArrowRight, ChevronDown, Clock3, Flame, RefreshCw, ShieldAlert, Wrench } from 'lucide-react'
 import { ActivityHeatmap, FoundVsFixed, HBars, SeverityBar, StackedSeverityBars, sevColor, sevName } from '@/components/charts/charts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { Bone, Skeleton } from '@/components/loading'
 import { SeverityPill, type CveOverview } from '@/views/CveTracker'
 import { api, query } from '@/lib/api'
+import { slaText } from '@/lib/sla'
 import { formatDate, statusLabel, type Dashboard as DashboardData } from '@/lib/types'
 
 const SEVERITY_ES: Record<string, string> = { critical: 'crítica', high: 'alta', medium: 'media', low: 'baja', info: 'informativa' }
@@ -38,14 +39,14 @@ export function Dashboard({ onOpenRun, onNew, onTracker, onNavigate }: { onOpenR
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
       <Kpi label="Puntuación" value={kpis.security_score.value} suffix="/100" hint={kpis.security_score.formula} tone={kpis.security_score.value >= 80 ? 'teal' : kpis.security_score.value >= 50 ? 'amber' : 'rose'} />
       <Kpi label="Abiertos" value={kpis.open.total} hint={`${kpis.open.critical} críticos · ${kpis.open.high} altos`} tone={kpis.open.critical ? 'rose' : 'muted'} />
-      <Kpi label="Hallados en la ventana" value={kpis.found_in_window} hint="huellas nuevas" tone="muted" />
+      <Kpi label="Fuera de plazo" value={kpis.sla?.overdue ?? '—'} hint={kpis.sla ? `${kpis.sla.soon} vencen en los próximos 7 días` : 'sin plazos'} tone={kpis.sla?.overdue ? 'rose' : 'muted'} icon={Clock3} />
       <Kpi label="Corregidos" value={kpis.fixed_in_window} hint={kpis.fix_rate !== null ? `tasa de corrección ${kpis.fix_rate}%` : 'sin ejecuciones comparables'} tone="teal" icon={Wrench} />
       <Kpi label="Tiempo medio de corrección" value={kpis.mttr_days ?? '—'} suffix={kpis.mttr_days !== null ? ' días' : ''} hint="entre detección y desaparición" tone="muted" />
       <Kpi label="En CISA KEV" value={kpis.kev_open} hint="abiertos con explotación activa" tone={kpis.kev_open ? 'rose' : 'muted'} icon={Flame} />
     </div>
 
     <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
-      <Panel title="Hallazgos nuevos por día" description="Primera vez que aparece cada huella, por severidad."><StackedSeverityBars data={data.issues_over_time} /></Panel>
+      <Panel title="Hallazgos nuevos por día" description={`Primera vez que aparece cada huella, por severidad: ${kpis.found_in_window.toLocaleString('es-CO')} en la ventana.`}><StackedSeverityBars data={data.issues_over_time} /></Panel>
       <Panel title="Abiertos por severidad" description="Lo que hay en la última ejecución de cada activo."><SeverityBar counts={kpis.open} /></Panel>
     </div>
     <div className="grid gap-5 xl:grid-cols-[1fr_1fr_1fr]">
@@ -55,7 +56,7 @@ export function Dashboard({ onOpenRun, onNew, onTracker, onNavigate }: { onOpenR
     </div>
     <div className="grid gap-5 xl:grid-cols-[1fr_1fr_1fr]">
       <Panel title="Activos más afectados" description="Última ejecución de cada repositorio.">{data.top_assets.length ? <><div className="divide-y divide-app-line text-sm">{data.top_assets.slice(0, LIST).map(asset => <button key={asset.name} onClick={() => onOpenRun(asset.last_run)} className="flex w-full items-center justify-between gap-3 py-2 text-left hover:text-brand"><span className="min-w-0"><span className="block truncate">{asset.name}</span><span className="text-xs text-app-subtle">{asset.open} abiertos{asset.trend !== null ? ` · ${asset.trend > 0 ? '+' : ''}${asset.trend} vs anterior` : ''}</span></span><span className="flex shrink-0 gap-1 font-mono text-[11px]">{(['critical', 'high', 'medium', 'low'] as const).map(level => asset[level] ? <span key={level} className="rounded px-1.5 py-0.5 text-on-solid" style={{ background: sevColor[level] }} title={sevName[level]}>{asset[level]}</span> : null)}</span></button>)}</div><More shown={LIST} total={data.top_assets.length} label="Ver en Hallazgos" onClick={() => onNavigate('findings')} /></> : <Empty text="Sin activos analizados." />}</Panel>
-      <Panel title="Hallazgos prioritarios" description="Los primeros por prioridad, severidad y EPSS.">{data.top_issues.length ? <><div className="divide-y divide-app-line text-sm">{data.top_issues.slice(0, LIST).map(issue => <button key={issue.fingerprint} onClick={() => issue.run_id && onOpenRun(issue.run_id)} className="flex w-full items-start gap-2 py-2 text-left hover:text-brand"><span className="mt-1 inline-block size-2.5 shrink-0 rounded-sm" style={{ background: sevColor[issue.severity] }} title={`Severidad ${SEVERITY_ES[issue.severity] ?? issue.severity}`} /><span className="sr-only">Severidad {SEVERITY_ES[issue.severity] ?? issue.severity}: </span><span className="min-w-0"><span className="block truncate">{issue.title}</span><span className="text-xs text-app-subtle">{issue.asset}{issue.kev ? ' · KEV' : ''}{issue.epss ? ` · EPSS ${(issue.epss * 100).toFixed(1)}%` : ''}</span></span></button>)}</div><More shown={LIST} total={data.top_issues.length} label="Ver todos en Hallazgos" onClick={() => onNavigate('findings')} /></> : <Empty text="Nada abierto." />}</Panel>
+      <Panel title="Hallazgos prioritarios" description="Los primeros por prioridad, severidad y EPSS.">{data.top_issues.length ? <><div className="divide-y divide-app-line text-sm">{data.top_issues.slice(0, LIST).map(issue => <button key={issue.fingerprint} onClick={() => issue.run_id && onOpenRun(issue.run_id)} className="flex w-full items-start gap-2 py-2 text-left hover:text-brand"><span className="mt-1 inline-block size-2.5 shrink-0 rounded-sm" style={{ background: sevColor[issue.severity] }} title={`Severidad ${SEVERITY_ES[issue.severity] ?? issue.severity}`} /><span className="sr-only">Severidad {SEVERITY_ES[issue.severity] ?? issue.severity}: </span><span className="min-w-0"><span className="block truncate">{issue.title}</span><span className="text-xs text-app-subtle">{issue.asset}{issue.sla && issue.sla.state !== 'ok' ? ` · ${slaText(issue.sla).toLowerCase()}` : ''}{issue.kev ? ' · KEV' : ''}{issue.epss ? ` · EPSS ${(issue.epss * 100).toFixed(1)}%` : ''}</span></span></button>)}</div><More shown={LIST} total={data.top_issues.length} label="Ver todos en Hallazgos" onClick={() => onNavigate('findings')} /></> : <Empty text="Nada abierto." />}</Panel>
       <Panel title="Ejecuciones recientes" description="Últimos escaneos.">{data.recent_runs.length ? <><div className="divide-y divide-app-line text-sm">{data.recent_runs.slice(0, LIST).map(run => <button key={run.id} onClick={() => onOpenRun(run.id)} className="flex w-full items-center justify-between gap-3 py-2 text-left hover:text-brand"><span className="min-w-0"><span className="block truncate">{run.source?.name ?? run.fixture}</span><span className="text-xs text-app-subtle">{formatDate(run.created_at)}</span></span><Badge variant="outline" className="shrink-0 text-[11px]">{statusLabel(run.status)}</Badge></button>)}</div><More shown={LIST} total={data.recent_runs.length} label="Ver todas en Análisis" onClick={() => onNavigate('analyses')} /></> : <Empty text="Sin ejecuciones." />}</Panel>
     </div>
     <Card className="border-app-line bg-panel"><CardHeader className="pb-3"><CardTitle className="text-base">Actividad de análisis</CardTitle><CardDescription className="text-xs">Ejecuciones por día, hasta hoy.</CardDescription></CardHeader>
