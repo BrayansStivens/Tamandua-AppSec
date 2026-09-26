@@ -53,6 +53,36 @@ class IndexAndPagingTests(unittest.TestCase):
             self.assertEqual(len(list_runs(data_dir)), 30)
 
 
+class ConcurrentIndexTests(unittest.TestCase):
+    def test_concurrent_writers_do_not_fail_or_lose_rows(self):
+        """Antes: temporal con nombre fijo («x») y sin cerrojo → FileExistsError y filas perdidas."""
+        import threading
+        from appsec_agent.store import _index_path, update_index, _write_atomic
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            (data_dir / "runs").mkdir()
+            # Un temporal huérfano de un corte no bloquea nada.
+            (data_dir / "runs" / "index.json.tmp").write_text("basura")
+            errors = []
+
+            def writer(start):
+                try:
+                    for offset in range(25):
+                        update_index(data_dir, {"id": f"r{start + offset}", "type": "repository_scan", "status": "completed",
+                                                "created_at": "2026-09-26T00:00:00+00:00"})
+                except Exception as exc:  # noqa: BLE001 — cualquier fallo cuenta
+                    errors.append(exc)
+            threads = [threading.Thread(target=writer, args=(block * 100,)) for block in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            self.assertEqual(errors, [])
+            self.assertEqual(len(json.loads(_index_path(data_dir).read_text())), 100)
+            _write_atomic(data_dir / "x.json", "{}")
+            self.assertEqual([path.name for path in data_dir.iterdir() if path.name.endswith(".tmp") and path.name != "index.json.tmp"], [])
+
+
 class CoverageTests(unittest.TestCase):
     def test_rules_declare_their_owasp_category(self):
         counts = rules_by_category()

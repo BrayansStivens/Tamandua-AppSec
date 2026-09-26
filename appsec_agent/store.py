@@ -4,7 +4,10 @@ from __future__ import annotations
 from .triage import LABELS as TRIAGE_LABELS, SUPPRESSED
 
 import json
+import contextlib
 import os
+import tempfile
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,13 +21,23 @@ def _run_dir(data_dir: Path, run_id: str) -> Path:
     return data_dir / "runs" / run_id
 
 
+_index_lock = threading.RLock()
+
+
 def _write_atomic(path: Path, content: str) -> None:
-    temp_path = path.with_name(path.name + ".tmp")
-    with temp_path.open("x", encoding="utf-8") as handle:
-        handle.write(content)
-        handle.flush()
-        os.fsync(handle.fileno())
-    temp_path.replace(path)
+    """Escribe entero o nada. Temporal con nombre único en la misma carpeta: dos escritores a la vez no chocan
+    (antes un nombre fijo con «x» hacía fallar al segundo) y un temporal huérfano tras un corte no bloquea nada."""
+    handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
 
 
 def _persist(data_dir: Path, record: dict, report: str, sarif: dict | None = None, *, replace: bool = False) -> dict:
@@ -56,16 +69,22 @@ def _index_path(data_dir: Path) -> Path:
 def update_index(data_dir: Path, record: dict) -> None:
     """Una fila por ejecución. Con mil escaneos, listar no puede leer mil archivos con todos sus hallazgos."""
     path = _index_path(data_dir)
-    try:
-        index = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-    except (ValueError, OSError):
-        index = {}
-    index[record["id"]] = _row(record)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    _write_atomic(path, json.dumps(index, ensure_ascii=False, sort_keys=True) + "\n")
+    with _index_lock:  # leer-modificar-escribir: sin el cerrojo, dos escritores se pisan las filas
+        try:
+            index = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        except (ValueError, OSError):
+            index = {}
+        index[record["id"]] = _row(record)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        _write_atomic(path, json.dumps(index, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def rebuild_index(data_dir: Path) -> dict:
+    with _index_lock:
+        return _rebuild_index(data_dir)
+
+
+def _rebuild_index(data_dir: Path) -> dict:
     root = data_dir / "runs"
     index = {}
     if root.is_dir():
@@ -596,8 +615,9 @@ def list_runs(data_dir: Path) -> list[dict]:
         index = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
     except (ValueError, OSError):
         index = None
-    # Si el índice no existe o no cuadra con las carpetas, se reconstruye desde los archivos.
-    folders = {entry.name for entry in root.iterdir() if entry.is_dir() and not entry.is_symlink()}
+    # Si el índice no existe o no cuadra con las carpetas, se reconstruye desde los archivos. Solo cuentan las
+    # carpetas con run.json: una a medio crear (o de un corte) no debe forzar una reconstrucción en cada petición.
+    folders = {entry.name for entry in root.iterdir() if entry.is_dir() and not entry.is_symlink() and (entry / "run.json").is_file()}
     if not isinstance(index, dict) or set(index) != folders:
         index = rebuild_index(data_dir)
     return sorted(index.values(), key=lambda item: (item.get("created_at") or "", item["id"]), reverse=True)
