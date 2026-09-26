@@ -2,6 +2,8 @@
 
 <h1 align="center">Tamandua</h1>
 
+<p align="center"><a href="https://github.com/BrayansStivens/appsec-agent/actions/workflows/ci.yml"><img src="https://github.com/BrayansStivens/appsec-agent/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a></p>
+
 <p align="center"><strong>Se come tus bugs.</strong> Seguridad de aplicaciones autoalojada, libre y sin enviar tu código a nadie.</p>
 
 Tamandua analiza tus repositorios e imágenes de contenedor, te dice **qué corregir primero y cómo** (el comando exacto o un ejemplo de código), comprueba que quedó corregido y **vigila solo** lo que cambia después. Todo corre en tu máquina, con tus credenciales: tu código no va a ningún servicio nuestro.

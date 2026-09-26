@@ -130,9 +130,17 @@ def _engines(scan: dict) -> tuple[list[str], list[str]]:
 
 
 def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool = True, fail_on: str = "high",
-        allow_osv_upload: bool = False, progress=None, name: str | None = None) -> dict:
-    """Analiza `path` y aplica el umbral. Devuelve el resultado listo para mostrar y el código de salida."""
+        allow_osv_upload: bool = False, progress=None, name: str | None = None, exclude: list[str] | None = None) -> dict:
+    """Analiza `path` y aplica el umbral. Devuelve el resultado listo para mostrar y el código de salida.
+
+    `exclude`: patrones glob relativos a la raíz (`fixtures/**`, `**/testdata/**`) cuyos hallazgos no cuentan.
+    Se dicen en la salida («N en rutas excluidas»): nada se oculta sin decirlo."""
+    from .exclusions import ExclusionError, excluded, normalize
     from .scanners import docker_available, docker_problem
+    try:
+        patterns = normalize(list(exclude or []))
+    except ExclusionError as exc:
+        raise LocalScanError(f"--exclude: {exc}") from exc
     path = path.expanduser().resolve()
     if not path.is_dir():
         raise LocalScanError(f"No es una carpeta: {path}")
@@ -150,7 +158,8 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
         report("info", f"Copia de solo lectura: {stats['files']} archivos analizables.")
         scan = scan_repository(head, {**source, "files": stats["files"], "snapshot": stats},
                                allow_osv_upload=allow_osv_upload, data_dir=data_dir, progress=report)
-        findings = scan["findings"]
+        findings = [item for item in scan["findings"] if not excluded(item.get("path", ""), patterns)]
+        skipped = len(scan["findings"]) - len(findings)
         if base:
             commit = merge_base(path, base)
             changed = changed_lines(diff_files(path, commit))
@@ -178,6 +187,7 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
     if incomplete and code == EXIT_OK:
         code = EXIT_INCOMPLETE
     return {"target": str(path), "name": name, "comparison": comparison, "fail_on": fail_on,
+            "excluded": {"patterns": patterns, "findings": skipped},
             "status": "incomplete" if incomplete else "completed", "engines": {"ran": ran, "failed": failed},
             "not_analyzed": missing + [f"{step['name']}: {step['detail']}" for step in scan.get("steps") or []
                                        if (step.get("tool") or {}).get("name") in CORE_ENGINES and step["status"] not in ("completed", "partial")],
@@ -245,6 +255,9 @@ def render_text(result: dict, *, limit: int = 50) -> str:
         lines.append("Sin hallazgos nuevos." if comparison else "Sin hallazgos.")
     if comparison and comparison["preexisting_in_changed_code"]:
         lines += ["", f"{comparison['preexisting_in_changed_code']} ya existían en el código que tocas: no bloquean."]
+    skipped = (result.get("excluded") or {}).get("findings") or 0
+    if skipped:
+        lines += ["", f"{skipped} en rutas excluidas ({', '.join(_safe(item) for item in result['excluded']['patterns'])}): no cuentan."]
     lines += ["", f"Motores: {', '.join(result['engines']['ran']) or 'ninguno'}"
               + (f" · no se ejecutaron: {', '.join(result['engines']['failed'])}" if result["engines"]["failed"] else "")]
     for item in result["not_analyzed"]:
@@ -259,7 +272,7 @@ def render_text(result: dict, *, limit: int = 50) -> str:
 def render_json(result: dict) -> str:
     fields = ("fingerprint", "severity", "scanner", "tool", "also_detected_by", "rule_id", "title", "path", "line",
               "cwe", "cve", "ghsa", "package", "remediation", "priority", "kev", "epss")
-    payload = {key: result[key] for key in ("target", "status", "comparison", "fail_on", "engines", "not_analyzed", "exit_code")}
+    payload = {key: result.get(key) for key in ("target", "status", "comparison", "fail_on", "excluded", "engines", "not_analyzed", "exit_code")}
     payload["gate"] = result["gate"]
     payload["findings"] = [{key: item.get(key) for key in fields if item.get(key) is not None} for item in result["findings"]]
     return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"

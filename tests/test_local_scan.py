@@ -87,12 +87,12 @@ class GitTests(unittest.TestCase):
 
 
 class GateTests(unittest.TestCase):
-    def run_with(self, findings, *, status="completed", failed=(), docker=True, fail_on="high"):
+    def run_with(self, findings, *, status="completed", failed=(), docker=True, fail_on="high", exclude=None):
         with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as data, \
                 patch.object(local_scan, "scan_repository", return_value=scan_result(findings, status, failed)), \
                 patch("appsec_agent.scanners.docker_available", return_value=docker), \
                 patch("appsec_agent.scanners.docker_problem", return_value="Docker no responde."):
-            return run(Path(folder), data_dir=Path(data), fail_on=fail_on)
+            return run(Path(folder), data_dir=Path(data), fail_on=fail_on, exclude=exclude)
 
     def test_exit_codes(self):
         self.assertEqual(self.run_with([])["exit_code"], EXIT_OK)
@@ -120,6 +120,17 @@ class GateTests(unittest.TestCase):
         text = local_scan.render_text(result)
         self.assertNotIn("\x1b", text)
         self.assertIn("evil?[2K?[1A.py:1", text)
+
+    def test_excluded_paths_do_not_count_but_are_reported(self):
+        result = self.run_with([finding("a", "fixtures/vuln/app.py", 1, "critical"), finding("b", "tests/data/x.py", 2, "critical"),
+                                finding("c", "src/app.py", 3, "medium")], exclude=["fixtures/", "**/data/**"])
+        self.assertEqual(([item["fingerprint"] for item in result["findings"]], result["exit_code"]), (["c"], EXIT_OK))
+        self.assertEqual(result["excluded"], {"patterns": ["fixtures/**", "**/data/**"], "findings": 2})
+        self.assertIn("2 en rutas excluidas (fixtures/**, **/data/**): no cuentan.", local_scan.render_text(result))
+        self.assertEqual(json.loads(local_scan.render_json(result))["excluded"]["findings"], 2)
+        for bad in (["../fuera"], ["**"], ["/abs"], ["a;rm"]):
+            with self.assertRaises(LocalScanError):
+                self.run_with([], exclude=bad)
 
     def test_json_and_sarif_are_machine_readable(self):
         result = self.run_with([finding("a", "x.py", 3, "critical")])

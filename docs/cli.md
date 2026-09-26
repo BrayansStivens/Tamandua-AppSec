@@ -45,6 +45,7 @@ Los avisos de una misma dependencia salen en una línea con la versión que los 
 | `--fail-on` | Severidad desde la que falla: `critical`, `high` (por defecto), `medium`, `low` o `never` (solo informa). |
 | `--format` | `text` (por defecto), `json` o `sarif` (SARIF 2.1.0, con `security-severity` para GitHub code scanning). |
 | `--output FILE` | Escribe el resultado en un archivo; el resumen en texto sale igualmente por la salida de errores. |
+| `--exclude PATRÓN` | Ruta cuyos hallazgos no cuentan: glob relativo a la raíz (`fixtures/`, `**/testdata/**`; `*` no cruza `/`, `**` sí). Repetible. La salida dice cuántos se excluyeron. |
 | `--allow-incomplete` | No falla si un motor no pudo ejecutarse. Por defecto sí falla: un análisis que no terminó no equivale a «limpio». |
 | `--allow-osv-upload` | Autoriza consultas externas (nombres y versiones de dependencias a OSV y deps.dev para resolver transitivas). Por defecto no sale nada. |
 | `--name` | Nombre a mostrar (útil dentro de un contenedor, donde la carpeta se llama `/src`). |
@@ -115,7 +116,7 @@ jobs:
             -v "$PWD":/src:ro -v "$RUNNER_TEMP/tamandua-data":/data \
             appsec-agent/app:0.9 python -m appsec_agent scan /src --name "$REPO_NAME" \
             --base "origin/$BASE_REF" --format sarif --output /data/tamandua.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      - uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: ${{ runner.temp }}/tamandua-data/tamandua.sarif
@@ -143,9 +144,14 @@ tamandua:
       --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
 ```
 
-> Estas plantillas están comprobadas con el mismo `docker run` en local (macOS y Docker Desktop),
-> pero aún no en un runner real de GitHub o GitLab. Si algo falla, el error de Docker o del motor
+> El propio repositorio de Tamandua usa esta plantilla en [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+> (con `--exclude fixtures/` para sus ejemplos vulnerables a propósito). La de GitLab está comprobada con el
+> mismo `docker run` en local, pero aún no en un runner real. Si algo falla, el error de Docker o del motor
 > aparece en la línea «Sin analizar».
+
+**Exclusiones en CI.** `--exclude` vive en el workflow, que un pull request puede modificar. Protege
+`.github/workflows/` con CODEOWNERS y revisión obligatoria para que nadie se excluya a sí mismo sin que se vea.
+(En el panel las exclusiones viven en el servidor por eso mismo.)
 
 ## Privacidad
 

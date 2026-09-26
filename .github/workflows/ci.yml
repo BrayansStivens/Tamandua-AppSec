@@ -1,0 +1,116 @@
+# Pruebas y análisis de seguridad en cada pull request y en cada push a main.
+#
+# - backend: pruebas de Python.
+# - panel: tipos, lint y que appsec_agent/static está recompilado (el panel servido es el del repositorio).
+# - tamandua: Tamandua se analiza a sí mismo con su CLI (el mismo uso que se documenta en docs/cli.md).
+#   En un PR solo cuenta lo que el PR introduce y bloquea desde severidad alta; en main analiza todo e
+#   informa. fixtures/ son ejemplos vulnerables a propósito: se excluyen y la salida dice cuántos son.
+#
+# Acciones fijadas por commit; permisos mínimos por trabajo; sin credenciales persistidas en el checkout.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Pruebas del backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Dependencias
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Pruebas
+        run: python -m unittest discover -s tests
+
+  panel:
+    name: Panel (tipos, lint y compilado)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "22"
+      - name: Dependencias
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+      - name: Tipos
+        working-directory: web
+        run: npx tsc -b
+      - name: Lint
+        working-directory: web
+        run: npm run lint
+      - name: El panel servido está recompilado
+        run: |
+          (cd web && npm run build)
+          if [ -n "$(git status --porcelain -- appsec_agent/static)" ]; then
+            git status --short -- appsec_agent/static
+            echo "::error::appsec_agent/static no corresponde a web/src: ejecuta «make web» y sube el resultado."
+            exit 1
+          fi
+
+  tamandua:
+    name: Tamandua sobre sí mismo
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      security-events: write  # subir el SARIF a code scanning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # hace falta la historia para comparar con la rama base
+          persist-credentials: false
+      - name: Construir Tamandua
+        run: make build
+      - name: Analizar
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}  # nunca interpolado directamente en el script
+        run: |
+          mkdir -p "$RUNNER_TEMP/tamandua-data"
+          scope=()
+          if [ "$EVENT" = pull_request ]; then
+            scope=(--base "origin/$BASE_REF")
+          else
+            scope=(--fail-on never)  # main: inventario completo en code scanning, sin bloquear
+          fi
+          version="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' appsec_agent/api/core.py)"  # la etiqueta que acaba de construir make build
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)" \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "$PWD":/src:ro -v "$RUNNER_TEMP/tamandua-data":/data \
+            "appsec-agent/app:$version" python -m appsec_agent scan /src --name appsec-agent \
+            --exclude fixtures/ "${scope[@]}" --format sarif --output /data/tamandua.sarif
+      - name: ¿Hay SARIF?
+        id: sarif
+        if: always()
+        run: if [ -s "$RUNNER_TEMP/tamandua-data/tamandua.sarif" ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Subir a code scanning
+        # En PR desde un fork el token no puede escribir resultados: el veredicto ya está en el paso de análisis.
+        if: always() && steps.sarif.outputs.exists == 'true' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
+        with:
+          sarif_file: ${{ runner.temp }}/tamandua-data/tamandua.sarif
+          category: tamandua

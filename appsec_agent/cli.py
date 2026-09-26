@@ -36,7 +36,8 @@ def _scan_command(args) -> int:
 
     try:
         result = run(args.path, data_dir=args.data_dir, base=args.base, baseline=not args.no_baseline, name=args.name,
-                     fail_on=args.fail_on, allow_osv_upload=args.allow_osv_upload, progress=progress)
+                     fail_on=args.fail_on, allow_osv_upload=args.allow_osv_upload, progress=progress,
+                     exclude=args.exclude)
     except (LocalScanError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return EXIT_ERROR
@@ -84,6 +85,8 @@ def main(argv: list[str] | None = None) -> int:
     local.add_argument("--allow-osv-upload", action="store_true",
                        help="Autorizar consultas externas (nombres y versiones de dependencias a OSV y deps.dev)")
     local.add_argument("--quiet", action="store_true", help="Sin mensajes de progreso en la salida de errores")
+    local.add_argument("--exclude", action="append", default=[], metavar="PATRÓN",
+                       help="Ruta cuyos hallazgos no cuentan (glob relativo a la raíz: fixtures/**, **/testdata/**). Repetible")
     local.add_argument("--name", help="Nombre a mostrar (por defecto, el de la carpeta; útil dentro de un contenedor)")
     image = commands.add_parser("scan-image", help="Analizar una imagen de contenedor desde su registro, sin ejecutarla")
     image.add_argument("--reference", required=True, help="registro/repositorio:etiqueta, p. ej. ghcr.io/acme/api:1.4")

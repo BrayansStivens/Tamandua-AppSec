@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import fcntl
 import json
-import logging
 import os
 import shutil
 from contextlib import contextmanager
@@ -24,7 +23,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-_log = logging.getLogger("appsec_agent.migrations")
+from . import logging_setup
+
+_log = logging_setup.get("migrations")
 VERSION_FILE = "data-version.json"
 BACKUPS = "backups"
 KEEP_BACKUPS = 5
