@@ -33,7 +33,7 @@ def _moment(value) -> datetime:
 
 def _values(record: dict) -> dict:
     from tamandua.modules.sources.assets import asset_key
-    return {"type": record.get("type") or "lab", "status": record.get("status") or "completed", "created_at": _moment(record.get("created_at")),
+    return {"type": record["type"], "status": record.get("status") or "completed", "created_at": _moment(record.get("created_at")),
             "asset_key": asset_key(record) if record.get("source") else None, "row": _row(record), "record": record}
 
 
@@ -424,27 +424,24 @@ def render_repository_sarif(record: dict) -> dict:
                                                      "rules": list(rules.values())}}, "results": results}]}
 
 
-def render_profile_report(record: dict, profile: str, title: str = "", *, technical: str | None = None) -> str:
+def render_profile_report(record: dict, profile: str, title: str = "") -> str:
     """Dossier técnico; no emite una opinión de auditoría ni certificación."""
     labels = {
         "soc2": "SOC 2 Tipo II",
         "iso27001": "ISO/IEC 27001:2022",
         "custom": "Personalizado",
     }
-    if profile not in labels or record.get("type") not in ("lab_scan", "repository_scan", "image_scan", "pr_review", "asset_state"):
+    if profile not in labels or record.get("type") not in ("repository_scan", "image_scan", "pr_review", "asset_state"):
         raise ValueError("Perfil o ejecución no compatible")
     if title and (len(title) > 100 or not all(ch.isprintable() and ch not in "#`[]<>" for ch in title)):
         raise ValueError("Título inválido")
     heading = title.strip() if title else f"Evidencia técnica para {labels[profile]}"
     is_state = record["type"] == "asset_state"
-    is_repository = record["type"] in ("repository_scan", "image_scan", "pr_review", "asset_state")
-    technical_report = (render_asset_report(record) if record["type"] == "asset_state" else
-                        render_repository_report(record) if is_repository else technical or "")
+    technical_report = render_asset_report(record) if is_state else render_repository_report(record)
     scope = (f"`{record['source']['name']}`, registro acumulado de hallazgos; consultar ejecuciones originales para cobertura."
-             if record["type"] == "asset_state" else
+             if is_state else
              f"`{record['source']['name']}`, " + (f"imagen `{record['source']['image'].get('reference')}` leída del registro"
-             if record["source"].get("image") else f"snapshot SHA-256 `{record['source'].get('sha256')}`") + "; análisis estático puntual."
-             if is_repository else "`tenant-api-lab`, variante sintética indicada abajo; no incluye producción ni terceros.")
+             if record["source"].get("image") else f"snapshot SHA-256 `{record['source'].get('sha256')}`") + "; análisis estático puntual.")
     profile_rows = {
         "soc2": [
             ("Diseño del control", "Objetivo, responsables y frecuencia", "Descripción aprobada del control y dueño"),

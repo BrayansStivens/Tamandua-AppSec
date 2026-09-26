@@ -36,9 +36,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 COPY tamandua/ ./tamandua/
-COPY appsec_agent/ ./appsec_agent/
 COPY rules/ ./rules/
-COPY fixtures/tenant-api-lab/ ./fixtures/tenant-api-lab/
 COPY --from=web /src/tamandua/app/static ./tamandua/app/static
 # Usuario sin privilegios; compose alinea su UID/GID con el del host para que data/ y config/ sean tuyos.
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin appsec \

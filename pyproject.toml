@@ -11,6 +11,7 @@ version = { attr = "tamandua.version.VERSION" }
 # Contratos de arquitectura (import-linter): los comprueba `make arch` y el CI.
 [tool.importlinter]
 root_packages = ["tamandua"]
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Capas: la composición usa el negocio; el negocio no conoce la composición; lo compartido no conoce el negocio"
@@ -23,11 +24,7 @@ layers = [
 ]
 
 [[tool.importlinter.contracts]]
-name = "El laboratorio sintético no se usa desde el producto"
+name = "El negocio no depende del framework web: FastAPI y Starlette solo en la composición"
 type = "forbidden"
-source_modules = [
-    "tamandua.modules.identity", "tamandua.modules.sources", "tamandua.modules.scanning", "tamandua.modules.runs",
-    "tamandua.modules.findings", "tamandua.modules.intel", "tamandua.modules.compliance", "tamandua.modules.reporting",
-    "tamandua.modules.integrations", "tamandua.modules.pullrequests", "tamandua.modules.threats",
-]
-forbidden_modules = ["tamandua.modules.lab"]
+source_modules = ["tamandua.modules", "tamandua.shared"]
+forbidden_modules = ["fastapi", "starlette", "uvicorn"]

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { usePaged } from '@/shared/lib/usePaged'
 import { Pagination } from '@/shared/ui/pagination'
-import { BellRing, Boxes, Code2, FlaskConical, GitPullRequest, Plus, Radar, Search, ShieldCheck } from 'lucide-react'
+import { BellRing, Boxes, Code2, GitPullRequest, Plus, Radar, Search, ShieldCheck } from 'lucide-react'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Card, CardContent } from '@/shared/ui/card'
@@ -10,20 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/se
 import { SkeletonTable } from '@/shared/ui/loading'
 import { BatchPanel, useBatches } from '@/features/analyses/batches'
 
-export type AnalysisRow = { id: string; type: string; status: string; created_at: string; variant?: string; fixture?: string; source?: { name: string }; trigger?: { kind: string; head_sha?: string }; summary: { candidates?: number; confirmed?: number; executed?: number; planned?: number; severities?: Record<string, number>; kev?: number } }
+export type AnalysisRow = { id: string; type: string; status: string; created_at: string; variant?: string; fixture?: string; source?: { name: string }; trigger?: { kind: string; head_sha?: string }; summary: { candidates?: number; severities?: Record<string, number>; kev?: number } }
 
-const typeLabel = (type: string) => ({ repository_scan: 'Análisis de código', image_scan: 'Imagen de contenedor', pr_review: 'Revisión de PR', advisory_watch: 'Avisos nuevos', lab_scan: 'Laboratorio API', fixture_evaluation: 'Ground truth' }[type] ?? type)
+const typeLabel = (type: string) => ({ repository_scan: 'Análisis de código', image_scan: 'Imagen de contenedor', pr_review: 'Revisión de PR', advisory_watch: 'Avisos nuevos' }[type] ?? type)
 const statusLabel = (status: string) => ({ completed: 'Completada', incomplete: 'Incompleta', failed: 'Fallida', queued: 'En cola', running: 'Analizando…' }[status] ?? status)
-const typeIcon = (type: string) => type === 'advisory_watch' ? BellRing : type === 'repository_scan' ? Code2 : type === 'image_scan' ? Boxes : type === 'pr_review' ? GitPullRequest : type === 'lab_scan' ? FlaskConical : ShieldCheck
-const rowName = (row: AnalysisRow) => row.type === 'advisory_watch' ? row.source?.name ?? row.fixture ?? 'Activo' : row.type === 'repository_scan' ? row.source?.name ?? 'Repositorio' : row.type === 'image_scan' ? row.fixture ?? row.source?.name ?? 'Imagen' : row.type === 'pr_review' ? row.fixture ?? row.source?.name ?? 'Pull request' : row.type === 'lab_scan' ? `Laboratorio sintético · ${row.variant}` : 'Evaluación ground truth'
-// Un laboratorio reproduce la condición; un análisis estático solo deja candidatos. La columna no los mezcla.
-const rowIssues = (row: AnalysisRow) => row.type === 'pr_review'
-  ? { value: row.summary.candidates ?? 0, hint: 'nuevos en el PR' }
-  : row.type === 'advisory_watch'
-  ? { value: row.summary.candidates ?? 0, hint: 'avisos nuevos' }
-  : row.type === 'repository_scan' || row.type === 'image_scan'
-  ? { value: row.summary.candidates ?? 0, hint: 'candidatos' }
-  : { value: row.summary.confirmed ?? 0, hint: 'reproducidos' }
+const typeIcon = (type: string) => type === 'advisory_watch' ? BellRing : type === 'repository_scan' ? Code2 : type === 'image_scan' ? Boxes : type === 'pr_review' ? GitPullRequest : ShieldCheck
+const rowName = (row: AnalysisRow) => row.type === 'advisory_watch' ? row.source?.name ?? row.fixture ?? 'Activo' : row.type === 'repository_scan' ? row.source?.name ?? 'Repositorio' : row.type === 'image_scan' ? row.fixture ?? row.source?.name ?? 'Imagen' : row.type === 'pr_review' ? row.fixture ?? row.source?.name ?? 'Pull request' : row.fixture ?? 'Análisis'
+const rowIssues = (row: AnalysisRow) => ({ value: row.summary.candidates ?? 0,
+  hint: row.type === 'pr_review' ? 'nuevos en el PR' : row.type === 'advisory_watch' ? 'avisos nuevos' : 'candidatos' })
 
 export function AnalysisList({ refreshKey, onOpen, onNew, viewer }: { refreshKey: number; onOpen: (id: string) => void; onNew: () => void; viewer: { username: string; admin: boolean } }) {
   const [query, setQuery] = useState('')
@@ -50,11 +44,11 @@ export function AnalysisList({ refreshKey, onOpen, onNew, viewer }: { refreshKey
         <div className="hidden grid-cols-[110px_minmax(0,1fr)_170px_120px_150px] gap-3 border-b border-app-line px-4 py-3 text-xs text-app-subtle md:grid"><span>Estado</span><span>Análisis</span><span>Tipo</span><span>Hallazgos</span><span>Iniciado</span></div>
         {visible.map(row => { const Icon = typeIcon(row.type); const issues = rowIssues(row)
           return <button key={row.id} onClick={() => onOpen(row.id)} className="grid w-full gap-2 border-b border-app-line px-4 py-3 text-left transition last:border-b-0 hover:bg-app-soft md:grid-cols-[110px_minmax(0,1fr)_170px_120px_150px] md:items-center">
-            <Badge variant="outline" className={`w-fit ${row.status === 'completed' ? 'border-brand/30 text-brand' : row.status === 'failed' ? 'border-danger-line text-danger' : row.status === 'running' || row.status === 'queued' ? 'animate-pulse border-brand/30 text-brand' : 'border-warning-line text-warning'}`}>{statusLabel(row.status)}</Badge>
+            <Badge variant="outline" className={`w-fit ${row.status === 'completed' ? 'border-brand/30 text-brand' : row.status === 'failed' ? 'border-danger-line text-danger' : row.status === 'running' || row.status === 'queued' ? 'motion-safe:animate-pulse border-brand/30 text-brand' : 'border-warning-line text-warning'}`}>{statusLabel(row.status)}</Badge>
             <span className="flex min-w-0 items-center gap-2"><Icon className="size-4 shrink-0 text-app-muted" /><span className="min-w-0"><span className="block truncate text-sm font-medium">{rowName(row)}</span><span className="font-mono text-xs text-app-subtle">{row.id.slice(0, 8)}</span>{row.trigger?.kind === 'branch' && <span className="ml-2 text-xs text-app-subtle">· automático: cambió la rama principal{row.trigger.head_sha ? ` (${row.trigger.head_sha.slice(0, 7)})` : ''}</span>}{row.trigger?.kind === 'advisories' && <span className="ml-2 text-xs text-app-subtle">· automático: publicados después del último análisis</span>}</span></span>
             <span className="text-xs text-app-muted">{typeLabel(row.type)}</span>
             {row.summary.severities
-              ? <span className="flex flex-wrap items-center gap-1 text-[11px]">{([['critical', 'C', 'bg-danger-solid text-on-solid'], ['high', 'A', 'bg-attention-soft text-attention'], ['medium', 'M', 'bg-warning-soft text-warning'], ['low', 'B', 'bg-info-soft text-info']] as const).map(([level, letter, cls]) => (row.summary.severities?.[level] ?? 0) > 0 ? <span key={level} className={`rounded px-1.5 py-0.5 font-mono ${cls}`} title={level}>{letter}{row.summary.severities?.[level]}</span> : null)}{row.summary.kev ? <span className="rounded bg-danger-solid px-1.5 py-0.5 font-mono text-on-solid" title="CISA KEV">KEV</span> : null}{issues.value === 0 && <span className="text-app-subtle">0</span>}</span>
+              ? <span className="flex flex-wrap items-center gap-1 text-[11px]">{([['critical', 'C', 'Críticas', 'bg-danger-solid text-on-solid'], ['high', 'A', 'Altas', 'bg-attention-soft text-attention'], ['medium', 'M', 'Medias', 'bg-warning-soft text-warning'], ['low', 'B', 'Bajas', 'bg-info-soft text-info']] as const).map(([level, letter, name, cls]) => (row.summary.severities?.[level] ?? 0) > 0 ? <span key={level} className={`rounded px-1.5 py-0.5 font-mono ${cls}`} title={name} aria-label={`${name}: ${row.summary.severities?.[level]}`}>{letter}{row.summary.severities?.[level]}</span> : null)}{row.summary.kev ? <span className="rounded bg-danger-solid px-1.5 py-0.5 font-mono text-on-solid" title="CISA KEV">KEV</span> : null}{issues.value === 0 && <span className="text-app-subtle">0</span>}</span>
               : <span className="text-xs text-app-muted"><span className="font-mono text-sm text-app-secondary">{issues.value}</span> {issues.hint}</span>}
             <span className="text-xs text-app-muted">{new Date(row.created_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}</span>
           </button> })}

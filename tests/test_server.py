@@ -152,11 +152,9 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(list_runs(self.data_dir), [])
 
     def test_soc2_export_is_explicitly_non_certifying(self):
-        # El laboratorio ya no tiene ruta en la API: la ejecución se crea como lo hace la CLI (scan-fixture).
-        from tamandua.cli.main import DEFAULT_FIXTURE
-        from tamandua.modules.lab.engine import scan_fixture
-        from tamandua.modules.lab.runs import save_scan
-        run_id = save_scan(self.data_dir, scan_fixture(DEFAULT_FIXTURE, "fixed"))["id"]
+        from test_dashboard import _finding, _scan
+        from tamandua.modules.runs.store import save_repository_scan
+        run_id = save_repository_scan(self.data_dir, _scan("org/api", [_finding("a")], "2026-09-26T00:00:00+00:00"))["id"]
         status, report = self.request("GET", f"/api/runs/{run_id}/report-soc2.md")
         self.assertEqual(status, 200)
         self.assertIn(b"SOC 2 Tipo II", report)
@@ -171,23 +169,23 @@ class ServerTests(unittest.TestCase):
         status, _ = self.request("POST", "/api/repositories/scans",
                                  json.dumps({"source_id": "https://example.com", "allow_osv_upload": False}), headers)
         self.assertEqual(status, 400)
-        status, _ = self.request("POST", "/api/repositories/scans",
-                                 json.dumps({"source_id": "local:appsec-agent"}), headers)
+        # Sin decir si se autoriza OSV no se encola nada; un repositorio que la credencial no ve, tampoco.
+        status, _ = self.request("POST", "/api/repositories/scans", json.dumps({"source_id": "github:acme/api"}), headers)
         self.assertEqual(status, 400)
-        # El código de la propia herramienta no se ofrece en el panel salvo en modo dogfooding.
         status, _ = self.request("POST", "/api/repositories/scans",
-                                 json.dumps({"source_id": "local:appsec-agent", "allow_osv_upload": False}), headers)
+                                 json.dumps({"source_id": "github:acme/api", "allow_osv_upload": False}), headers)
         self.assertEqual(status, 400)
+        source = {"id": "github:acme/api", "name": "acme/api", "provider": "github"}
         with tempfile.TemporaryDirectory() as temporary, \
-                patch.dict("os.environ", {"APPSEC_AGENT_SHOW_WORKSPACE": "1"}), \
+                patch("tamandua.app.api.routes.runs.find_source", return_value=source), \
                 patch("tamandua.modules.runs.jobs.snapshot_source") as snapshot, \
                 patch("tamandua.modules.scanning.repository._query_osv", side_effect=AssertionError("OSV llamado")):
             root = Path(temporary)
             (root / "app.py").write_text('db.execute(f"SELECT {user_id}")\n')
-            snapshot.return_value = root, {"id": "local:appsec-agent", "name": "Código propio", "provider": "local", "files": 1}
+            snapshot.return_value = root, {**source, "files": 1}
             # La petición vuelve al instante con el identificador; el trabajo corre en segundo plano.
             status, payload = self.request("POST", "/api/repositories/scans",
-                                           json.dumps({"source_id": "local:appsec-agent", "allow_osv_upload": False}), headers)
+                                           json.dumps({"source_id": "github:acme/api", "allow_osv_upload": False}), headers)
             self.assertEqual(status, 202)
             queued = json.loads(payload)["run"]
             self.assertEqual(queued["status"], "queued")

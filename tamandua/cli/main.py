@@ -1,4 +1,4 @@
-"""Punto de entrada para evaluar el fixture y ver sus artefactos."""
+"""Línea de órdenes de Tamandua: `scan` para la terminal y CI, el panel, el worker y la administración."""
 
 from __future__ import annotations
 
@@ -10,10 +10,7 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tamandua.shared import paths
 from tamandua.modules.identity.auth import AuthError, Sessions, Users
-from tamandua.modules.lab.engine import scan_fixture
-from tamandua.modules.lab.fixture import FixtureError, verify_fixture
 from tamandua.modules.integrations.github import GitHubAppError, config as github_config
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.app.data_migrations import DataTooNew, upgrade as upgrade_data
@@ -21,11 +18,8 @@ from tamandua.modules.integrations.ai_providers import PROVIDERS, check_provider
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, available_sources, snapshot_source
 from tamandua.app.api.server import serve
-from tamandua.modules.lab.runs import save_run, save_scan
 from tamandua.modules.runs.store import list_runs, save_repository_scan
 
-
-DEFAULT_FIXTURE = paths.FIXTURES_DIR / "tenant-api-lab"
 
 
 def _scan_command(args) -> int:
@@ -59,11 +53,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-dir", type=Path, default=None,
                         help="Directorio de artefactos locales (por defecto ./data; en `scan`, ~/.cache/tamandua)")
     commands = parser.add_subparsers(dest="command", required=True)
-    verify = commands.add_parser("verify-fixture", help="Ejecutar los casos conocidos del laboratorio sintético")
-    verify.add_argument("--fixture", type=Path, required=True)
-    scan = commands.add_parser("scan-fixture", help="Detectar y reproducir cinco fallos en el laboratorio aprobado")
-    scan.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
-    scan.add_argument("--variant", choices=("vulnerable", "fixed", "both"), default="both")
     commands.add_parser("runs", help="Listar ejecuciones guardadas")
     commands.add_parser("sources", help="Listar repositorios disponibles en el workspace, GitHub y GitLab")
     repository = commands.add_parser("scan-repository", help="Analizar un repositorio seleccionado sin ejecutar su código")
@@ -142,19 +131,6 @@ def main(argv: list[str] | None = None) -> int:
         print(str(error), file=sys.stderr)
         return 1
     try:
-        if args.command == "verify-fixture":
-            record = save_run(args.data_dir, verify_fixture(args.fixture))
-            print(json.dumps({"id": record["id"], "status": record["status"], "summary": record["summary"]}, ensure_ascii=False))
-            return 0 if record["status"] == "completed" else 2
-        if args.command == "scan-fixture":
-            variants = ("vulnerable", "fixed") if args.variant == "both" else (args.variant,)
-            records = [save_scan(args.data_dir, scan_fixture(args.fixture, variant)) for variant in variants]
-            print(json.dumps([{"id": record["id"], "variant": record["variant"],
-                               "status": record["status"], "summary": record["summary"]} for record in records],
-                             ensure_ascii=False, indent=2))
-            if any(record["status"] == "incomplete" for record in records):
-                return 3
-            return 2 if any(record["summary"]["confirmed"] for record in records) else 0
         if args.command == "worker":
             from tamandua.app.worker import healthy, run as run_worker
             if args.check:
@@ -165,13 +141,13 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(list_runs(args.data_dir), ensure_ascii=False, indent=2))
             return 0
         if args.command == "sources":
-            print(json.dumps(available_sources(None, github_installations(args.data_dir), include_workspace=True),
+            print(json.dumps(available_sources(None, github_installations(args.data_dir)),
                              ensure_ascii=False, indent=2))
             return 0
         if args.command == "scan-repository":
             (args.data_dir / "work").mkdir(parents=True, exist_ok=True)
             with TemporaryDirectory(prefix="snapshot-", dir=args.data_dir / "work") as temporary:
-                listing = available_sources(None, github_installations(args.data_dir), include_workspace=True)
+                listing = available_sources(None, github_installations(args.data_dir))
                 selected = next((item for item in listing["sources"] if item["id"] == args.source_id), None)
                 root, source = snapshot_source(args.source_id, Path(temporary), None,
                                                selected.get("installation_id") if selected else None)
@@ -194,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
                              ensure_ascii=False, indent=2))
             return 3 if record["status"] == "incomplete" else 2 if record["summary"]["candidates"] else 0
         if args.command == "demo":
-            from tamandua.modules.lab.demo import seed
+            from tamandua.app.demo import seed
             from tamandua.modules.scanning.image import ImageError
             try:
                 result = seed(args.data_dir, fixtures=args.fixtures, models=args.models, image=args.image,
@@ -227,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result["status"] == "connected" else 3
         serve(args.data_dir, args.port, args.bind)
         return 0
-    except (FixtureError, SourceError, GitHubAppError, FileNotFoundError, ValueError) as exc:
+    except (SourceError, GitHubAppError, FileNotFoundError, ValueError) as exc:
         parser.exit(1, f"Error: {exc}\n")
 
 

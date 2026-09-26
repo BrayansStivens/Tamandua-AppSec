@@ -1,14 +1,21 @@
 # Arquitectura
 
-Tamandua es un único proceso Python (biblioteca estándar, `cryptography` para la GitHub App y `reportlab` para los PDF) que sirve el panel web, la API y los trabajos en segundo plano. Los motores de análisis corren como contenedores hermanos efímeros con el código montado en solo lectura, sin capacidades y con límites de memoria, CPU y procesos.
+Tamandua son tres servicios: el **API** (FastAPI, sirve también el panel), uno o varios **workers** que ejecutan los
+análisis de la cola y las tareas periódicas, y **PostgreSQL**, donde vive todo el estado. Los motores de análisis corren
+como contenedores hermanos efímeros lanzados por el worker, con el código montado en solo lectura, sin capacidades y
+con límites de memoria, CPU y procesos. El API no tiene acceso a Docker.
 
 ```mermaid
 flowchart LR
-  browser["Navegador<br/>panel React"] -- "HTTPS o loopback<br/>cookie HttpOnly + CSRF" --> app
+  browser["Navegador<br/>panel React"] -- "HTTPS o loopback<br/>cookie HttpOnly + CSRF" --> api
 
   subgraph host["Tu máquina (Docker)"]
-    app["appsec-agent<br/>API · panel · cola de trabajos"]
-    app -- "socket de Docker" --> engines
+    api["tamandua<br/>API · panel"]
+    worker["worker<br/>cola · tareas periódicas"]
+    db[("PostgreSQL<br/>ejecuciones · hallazgos · configuración")]
+    api --- db
+    worker --- db
+    worker -- "socket de Docker" --> engines
     subgraph engines["Motores efímeros (solo lectura, sin capacidades)"]
       trivy["Trivy<br/>SCA · IaC · secretos"]
       gitleaks["Gitleaks<br/>secretos"]
@@ -16,15 +23,14 @@ flowchart LR
       checkov["Checkov<br/>IaC · pipelines"]
       zizmor["zizmor<br/>GitHub Actions"]
     end
-    data[("data/<br/>ejecuciones · hallazgos · NVD")]
     config[("config/<br/>secretos cifrados")]
-    app --- data
-    app --- config
+    api --- config
+    worker --- config
   end
 
-  app -- "JWT de la App / token de instalación 1 h" --> github["api.github.com"]
-  app -- "rangos de fechas" --> nvd["NVD"]
-  app -- "feeds públicos" --> feeds["CISA KEV · EPSS"]
+  worker -- "JWT de la App / token de instalación 1 h" --> github["api.github.com"]
+  worker -- "rangos de fechas" --> nvd["NVD"]
+  worker -- "feeds públicos" --> feeds["CISA KEV · EPSS"]
 ```
 
 ## Estructura del código
@@ -35,7 +41,7 @@ Monolito modular (`tamandua/`), con capas que comprueba import-linter en cada PR
 tamandua/
   cli/          línea de comandos (scan para CI, demo, usuarios…)
   app/          composición: API (api/: rutas tipadas por contexto y rutas de tabla en api/routes/), worker,
-                migraciones (Alembic y de datos), estáticos del panel
+                migraciones (Alembic y de datos), datos de demostración, estáticos del panel
   modules/      el negocio, un paquete por contexto; no importa de app/ ni de cli/
     identity/       usuarios, sesiones, TOTP
     sources/        repositorios, activos (identidad estable), dominios
@@ -48,7 +54,6 @@ tamandua/
     integrations/   GitHub App, Jira, avisos (Slack/Teams/webhook), claves de IA
     pullrequests/   revisión de PR y vigilancia
     threats/        modelado de amenazas, diagrama e informe
-    lab/            laboratorio sintético (tenant-api-lab) y datos de demostración; el producto no lo usa
   shared/       transversal sin negocio: logs, almacén cifrado, rutas; no importa de modules/
 ```
 

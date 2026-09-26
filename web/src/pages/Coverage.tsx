@@ -44,7 +44,7 @@ export function CoverageView() {
     setLoading(true)
     api.get<RunRow & { owasp_coverage?: OwaspCoverage[]; steps?: ScanStep[] }>(`/api/runs/${encodeURIComponent(runId)}`).then(setDetail).catch(() => setDetail(null)).finally(() => setLoading(false))
   }, [runId])
-  const coverage = OWASP_TOP10.map(([id, title]) => detail?.owasp_coverage?.find(item => item.id === id) ?? { id, title, status: 'not_tested' as const, probe_ids: [], reason: 'Sin escaneo completo de este repositorio' })
+  const coverage = OWASP_TOP10.map(([id, title]) => detail?.owasp_coverage?.find(item => item.id === id) ?? { id, title, status: 'not_tested' as const, reason: 'Sin escaneo completo de este repositorio' })
   return <div className="space-y-5">
     <div className="max-w-xl space-y-1"><span className="text-xs text-app-muted">Repositorio</span><AssetPicker value={asset} onChange={value => { setAsset(value); setResolved(true) }} /></div>
     {!resolved ? <Skeleton rows={6} label="Cargando cobertura" />

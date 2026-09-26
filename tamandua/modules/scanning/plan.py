@@ -10,10 +10,9 @@ dice con nombre propio.
 
 from __future__ import annotations
 
-import os
 import re
 from collections import Counter
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 
 from tamandua.modules.sources.repositories import is_manifest
 from tamandua.modules.scanning.engines import IMAGES, RULES_DIR, docker_available, image_available
@@ -50,15 +49,6 @@ def rule_counts() -> Counter:
 
 def files_of(source_id: str, *, installation_id: int | None) -> list[str] | None:
     """Rutas del repositorio sin descargarlo. None si el proveedor no permite listarlas."""
-    if source_id == "local:appsec-agent":
-        from tamandua.modules.sources.repositories import IGNORED, WORKSPACE
-        paths = []
-        for directory, folders, names in os.walk(WORKSPACE):
-            folders[:] = [item for item in folders if item not in IGNORED and not item.startswith(".")]
-            paths.extend(str((Path(directory) / name).relative_to(WORKSPACE)) for name in names)
-            if len(paths) > 200_000:
-                break
-        return paths
     if source_id.startswith("github:") and installation_id is not None:
         from tamandua.modules.integrations.github import installation_repository, repository_tree
         entry = installation_repository(installation_id, source_id)

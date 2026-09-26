@@ -19,16 +19,8 @@ La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 
 ```bash
 .venv/bin/python -m tamandua --data-dir .dev/data sources
-.venv/bin/python -m tamandua --data-dir .dev/data scan-repository --source-id local:appsec-agent
+.venv/bin/python -m tamandua --data-dir .dev/data scan-repository --source-id github:org/repo
 .venv/bin/python -m tamandua --data-dir .dev/data runs
-```
-
-## Laboratorio sintético
-
-`fixtures/tenant-api-lab` es una API de prueba con cinco fallos conocidos y sus variantes corregidas. Sirve para comprobar el motor de pruebas dinámicas durante el desarrollo; no aparece en el panel.
-
-```bash
-.venv/bin/python -m tamandua --data-dir .dev/data scan-fixture --variant both
 ```
 
 ## Paginación de la API

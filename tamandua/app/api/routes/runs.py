@@ -65,10 +65,7 @@ def _artifact(request: Request, record: dict, artifact: str):
         return _json_file(request, vex.openvex(record, version=VERSION), "application/json")
     if artifact in PROFILE_REPORTS:
         profile = artifact.removeprefix("report-").rsplit(".", 1)[0]
-        technical = None
-        if record.get("type") == "lab_scan":  # el informe del laboratorio se guardó al crear la ejecución
-            technical = store_artifact(request.data_dir, record["id"], "report.md").decode("utf-8")
-        report = render_profile_report(record, profile, request.arg("title", ""), technical=technical)
+        report = render_profile_report(record, profile, request.arg("title", ""))
         if artifact.endswith(".pdf"):
             label = {"soc2": "SOC 2 Tipo II", "iso27001": "ISO/IEC 27001:2022", "custom": "Personalizado"}[profile]
             return request.send(200, render_pdf(report, title=f"Evidencia técnica para {label}",

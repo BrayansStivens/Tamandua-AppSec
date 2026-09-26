@@ -132,9 +132,6 @@ def collect(root: Path) -> dict:
 def live(source_id: str, *, installation_id: int | None) -> dict | None:
     """Inventario leído en el momento, sin escanear: de GitHub solo los manifiestos; del workspace, en disco."""
     import tempfile
-    from tamandua.modules.sources.repositories import WORKSPACE
-    if source_id == "local:appsec-agent":
-        return collect(WORKSPACE)
     if not source_id.startswith("github:") or installation_id is None:
         return None
     from tamandua.modules.integrations.github import installation_repository, repository_manifests

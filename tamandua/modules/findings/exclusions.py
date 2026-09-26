@@ -30,7 +30,7 @@ _log = logging_setup.get("exclusions")
 MAX_PATTERNS = 50
 MAX_LENGTH = 200
 PATTERN = re.compile(r"[A-Za-z0-9_.\-/*?]+")
-# Claves de activo: github#123, local:appsec-agent, image:ghcr.io/acme/api… Nada que rompa una línea de log.
+# Claves de activo: github#123, local:mi-repo, image:ghcr.io/acme/api… Nada que rompa una línea de log.
 ASSET_KEY = re.compile(r"[A-Za-z0-9#:_./@+-]{1,200}")
 HISTORY = 20
 

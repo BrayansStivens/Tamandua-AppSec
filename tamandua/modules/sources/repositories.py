@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from tamandua.shared import paths
 import io
 import json
 import os
@@ -15,7 +14,6 @@ from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
-WORKSPACE = paths.ROOT
 # Los topes no son una política de producto: son defensa contra descompresión
 # maliciosa y contra una ejecución desbocada. Lo que acota el trabajo real es la
 # lista de lo que los analizadores saben leer, no un presupuesto de bytes.
@@ -222,24 +220,10 @@ def list_repositories(provider: str, token: str | None = None) -> list[dict]:
     return result
 
 
-def _include_workspace(include_workspace: bool | None) -> bool:
-    if include_workspace is None:
-        return os.environ.get("APPSEC_AGENT_SHOW_WORKSPACE", "").strip() == "1"
-    return include_workspace
-
-
-WORKSPACE_SOURCE = {"id": "local:appsec-agent", "name": "appsec-agent · código propio", "provider": "local",
-                    "private": True, "branch": "workspace"}
-
-
-def available_sources(tokens: dict[str, str] | None = None, installation_id: int | list[int] | None = None, *,
-                      include_workspace: bool | None = None) -> dict:
-    """Todos los repositorios analizables (CLI). El panel usa `source_page`, que no lista organizaciones enteras.
-
-    El código de la propia herramienta solo aparece en la CLI (desarrollo y dogfooding) o si se pide
-    con APPSEC_AGENT_SHOW_WORKSPACE=1: a un usuario del panel no le sirve."""
+def available_sources(tokens: dict[str, str] | None = None, installation_id: int | list[int] | None = None) -> dict:
+    """Todos los repositorios analizables (CLI). El panel usa `source_page`, que no lista organizaciones enteras."""
     tokens = tokens or {}
-    sources = [dict(WORKSPACE_SOURCE)] if _include_workspace(include_workspace) else []
+    sources = []
     statuses = {}
     installations = [installation_id] if isinstance(installation_id, int) else installation_id or []
     if installations:
@@ -285,8 +269,7 @@ def _paged(first: list[dict], fetch, per_page: int, decorate):
 
 
 def source_page(tokens: dict[str, str] | None = None, installations: list[int] | None = None, *, query: str = "",
-                account: str | None = None, provider: str | None = None, page: int = 1, per_page: int = 25,
-                include_workspace: bool | None = None) -> dict:
+                account: str | None = None, provider: str | None = None, page: int = 1, per_page: int = 25) -> dict:
     """Una página de repositorios analizables, con el total y búsqueda por nombre.
 
     A GitHub solo se le pide la página visible (o su búsqueda): con miles de repositorios la
@@ -304,8 +287,6 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
         rows = [row for row in rows if not needle or needle in row["name"].casefold()]
         segments.append((len(rows), lambda offset, limit: rows[offset:offset + limit]))
 
-    if _include_workspace(include_workspace) and provider in (None, "local") and not account:
-        local([dict(WORKSPACE_SOURCE)])
     if installations:
         from tamandua.modules.integrations.github import GitHubAppError, installation_info, repositories_page, search_repositories
         statuses["github"] = {"configured": True, "origin": "github_app"}
@@ -362,15 +343,12 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
             "partial": partial, "accounts": sorted(set(accounts), key=str.casefold)}
 
 
-def find_source(tokens: dict[str, str] | None, installations: list[int] | None, source_id: str, *,
-                include_workspace: bool | None = None) -> dict | None:
+def find_source(tokens: dict[str, str] | None, installations: list[int] | None, source_id: str) -> dict | None:
     """Un repositorio concreto, validado contra su credencial sin listar el catálogo entero.
 
     Acepta el identificador por nombre (`github:owner/repo`) o la identidad estable (`github#123`)."""
     if not isinstance(source_id, str):
         return None
-    if source_id == WORKSPACE_SOURCE["id"]:
-        return dict(WORKSPACE_SOURCE) if _include_workspace(include_workspace) else None
     if installations and (source_id.startswith("github:") or source_id.startswith("github#")):
         from tamandua.modules.integrations.github import GitHubAppError, installation_info, installation_repository, installation_repository_by_uid
         owner = source_id.removeprefix("github:").split("/", 1)[0].casefold() if source_id.startswith("github:") else None
@@ -525,10 +503,6 @@ def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | 
     """Snapshot de solo lectura. `ref` fija un commit concreto (revisión de un PR); solo GitHub."""
     if ref is not None and (not re.fullmatch(r"[0-9a-f]{40}", ref) or not source_id.startswith("github:")):
         raise SourceError("Commit inválido")
-    if source_id == "local:appsec-agent":
-        stats = snapshot_directory(WORKSPACE, destination)
-        return destination, {"id": source_id, "name": "appsec-agent · código propio", "provider": "local",
-                             "files": stats["files"], "snapshot": stats}
     if not re.fullmatch(r"(?:github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+|gitlab:[0-9]+)", source_id):
         raise SourceError("Repositorio inválido")
     provider = source_id.partition(":")[0]

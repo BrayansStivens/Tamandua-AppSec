@@ -1,12 +1,12 @@
-// Plazo de corrección de un hallazgo (appsec_agent/findings/sla.py); lo reexporta features/findings/sla.
+// Plazo de corrección de un hallazgo (tamandua/modules/findings/sla.py); lo reexporta features/findings/sla.
 export type Sla = { days: number; due: string; days_left: number; state: 'overdue' | 'soon' | 'ok' }
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 export type Action = 'act' | 'attend' | 'track'
 export type RunStatus = 'queued' | 'running' | 'completed' | 'incomplete' | 'failed'
-export type Summary = { planned?: number; executed?: number; confirmed?: number; needs_follow_up?: number; passed?: number; total?: number; files?: number; dependencies?: number; candidates?: number; sast?: number; secrets?: number; sca?: number; iac?: number; cicd?: number; severities?: Record<string, number>; priorities?: Record<string, number>; kev?: number; fixable?: number; tools?: { name: string; version: string; status: string }[] }
+export type Summary = { files?: number; dependencies?: number; candidates?: number; sast?: number; secrets?: number; sca?: number; iac?: number; cicd?: number; severities?: Record<string, number>; priorities?: Record<string, number>; kev?: number; fixable?: number; tools?: { name: string; version: string; status: string }[] }
 export type RunRow = { id: string; type: string; status: RunStatus | string; created_at: string; fixture: string; variant?: string; context?: string; started_at?: string; finished_at?: string; source?: { name: string; provider: string; sha256?: string; files?: number }; summary: Summary }
 export type Page<T> = { items: T[]; total: number; limit: number; offset: number }
-export type OwaspCoverage = { id: string; title: string; status: 'partial' | 'not_tested' | 'inconclusive'; probe_ids: string[]; rules?: number; findings?: number; reason: string }
+export type OwaspCoverage = { id: string; title: string; status: 'partial' | 'not_tested' | 'inconclusive'; rules?: number; findings?: number; reason: string }
 export type ScanStep = { id: string; name: string; status: string; detail: string; tool?: { name: string; version: string; image: string; duration_s: number | null } }
 export type Dashboard = {
   window_days: number; generated_at: string

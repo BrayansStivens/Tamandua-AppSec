@@ -22,7 +22,7 @@ from tamandua.modules.reporting.design import (ATTENTION, ATTENTION_BG, BRAND, B
                             hexval, kpis, listing, meta, n, t, table)
 
 KINDS = {"repository_scan": "Análisis completo", "image_scan": "Análisis de imagen", "pr_review": "Revisión de pull request",
-         "asset_state": "Estado acumulado", "lab_scan": "Análisis de laboratorio"}
+         "asset_state": "Estado acumulado"}
 ACTIVE = ("open", "in_progress")
 ANNEX_LIMIT = 600
 DETAIL_LIMIT = 150   # bloques de detalle de código crítico o alto

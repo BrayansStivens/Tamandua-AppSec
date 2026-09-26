@@ -226,7 +226,7 @@ Con eso, cada hallazgo trae una **prioridad con sus factores visibles** (`act` s
 Si el propietario autoriza transmitir **solo nombres y versiones de dependencias** a `api.osv.dev`, activa la casilla del panel para esa ejecución o usa `--allow-osv-upload` en la CLI. Con esa autorización, OSV-Scanner también resuelve las dependencias transitivas de manifiestos sin lockfile (consulta deps.dev); sin ella, solo compara lo que declaran los manifiestos y lockfiles. Por defecto SCA aparece como `not_tested`. Una consulta inconclusa tampoco se presenta como cero vulnerabilidades.
 
 ```bash
-python3 -m appsec_agent scan-repository --source-id local:appsec-agent --allow-osv-upload
+make scan DIR=../mi-repo ARGS="--allow-osv-upload"
 ```
 
 Los informes JSON, Markdown, SARIF, SOC 2 Tipo II e ISO 27001 se descargan desde cada ejecución. Los perfiles de cumplimiento ordenan evidencia técnica; no constituyen auditoría, certificación ni atestación. Los enlaces CWE/CVE/GHSA apuntan a los registros públicos correspondientes cuando hay identificadores. DAST sobre objetivos reales sigue pendiente.

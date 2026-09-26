@@ -28,7 +28,7 @@ import { Integrations } from '@/pages/Integrations'
 import { PullRequests } from '@/pages/PullRequests'
 import { ThreatModels } from '@/pages/ThreatModels'
 import { Compliance } from '@/pages/Compliance'
-import type { RunDetail, RunRow } from '@/features/analyses/runs'
+import type { RunRow } from '@/shared/lib/types'
 import { Badge } from '@/shared/ui/badge'
 import { Button } from '@/shared/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
@@ -65,7 +65,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
   const runsResult = useQuery(runsQuery())
   const rows = useMemo(() => runsResult.data ?? [], [runsResult.data])
   const queryClient = useQueryClient()
-  const [detail, setDetail] = useState<RunDetail | null>(null)
+  const [detail, setDetail] = useState<RunRow | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(() => readRoute().params.get('run'))
   // La URL manda: Atrás, Adelante y refrescar restauran vista y ejecución.
   useEffect(() => {
@@ -125,7 +125,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     setView(nextView)
     writeRoute(nextView, { run: id })
     try {
-      const run = await api.get<RunDetail>(`/api/runs/${encodeURIComponent(id)}`)
+      const run = await api.get<RunRow>(`/api/runs/${encodeURIComponent(id)}`)
       setDetail(run)
       setError(null)
       return run

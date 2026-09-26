@@ -51,7 +51,7 @@ def owasp_coverage(findings: list[dict], *, sast_ran: bool, sca_status: str, iac
         for category in finding.get("owasp", []):
             per_category[category[:3]] = per_category.get(category[:3], 0) + 1
     result = []
-    for identifier, title, _ in WEB_TOP_10_2025:
+    for identifier, title in WEB_TOP_10_2025:
         found = per_category.get(identifier, 0)
         parts, status = [], "not_tested"
         if identifier == "A03":
@@ -97,6 +97,6 @@ def owasp_coverage(findings: list[dict], *, sast_ran: bool, sca_status: str, iac
         reason = "; ".join(parts)
         if status == "partial":
             reason += f". {found} hallazgo(s)." if found else ". Sin hallazgos."
-        result.append({"id": identifier, "title": title, "status": status, "probe_ids": [],
+        result.append({"id": identifier, "title": title, "status": status,
                        "rules": rules.get(identifier, 0), "findings": found, "reason": reason})
     return result

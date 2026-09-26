@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from tamandua.modules.lab import demo
+from tamandua.app import demo
 from tamandua.modules.pullrequests import watch as pr_watch
 from tamandua.modules.threats import model as tm
 from tamandua.modules.identity.auth import Users, totp_code
