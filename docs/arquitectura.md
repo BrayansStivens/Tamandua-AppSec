@@ -72,10 +72,13 @@ con TanStack Query. `python -m appsec_agent` y las variables `APPSEC_AGENT_*` si
 ## Datos en disco
 
 ```
+PostgreSQL (volumen tamandua-pg; esquema con migraciones de Alembic en tamandua/app/alembic)
+  runs                ejecuciones: fila de listado, registro completo, informe y SARIF (JSONB + columnas para filtrar)
+  registry_*          registro de hallazgos por activo (estado, CVE con índice GIN) e idempotencia por ejecución
+  triage_decisions    decisiones de triage con su historial
 data/
   auth/             usuarios (scrypt), sesiones (hash), clave de firma de cookies
-  runs/             una carpeta por ejecución + índice ligero para paginar
-  findings/         registro de hallazgos por repositorio
+  runs/, findings/, triage.json  formato anterior: se importan una vez a PostgreSQL y quedan intactos para volver atrás
   feeds/            KEV, EPSS, NVD (cves.sqlite)
   trivy-cache/      base de vulnerabilidades de Trivy
   logs/app.log      JSON por línea, rotado (10 MB × 5), sin secretos

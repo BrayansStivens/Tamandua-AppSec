@@ -8,6 +8,7 @@ from pathlib import Path
 from tamandua.modules.intel import cve_db
 from tamandua.modules.intel import euvd
 from tamandua.modules.findings import registry as findings_registry
+from tamandua.modules.findings import triage
 from tamandua.modules.identity.auth import Users
 
 from tests.test_auth import PASSWORD, HttpCase
@@ -161,7 +162,7 @@ class CveRoutesTests(HttpCase):
             "b": {"status": "fixed", "finding": {"cve": ["CVE-2026-20001"]}},  # remediado: ya no es tuyo
             "c": {"status": "open", "finding": {"cve": ["CVE-2026-20002"]}},  # descartado en triage abajo
             "d": {"status": "open", "finding": {"cve": ["CVE-2026-99999"]}}}})  # aún no está en la copia local
-        (self.data_dir / "triage.json").write_text(json.dumps({"github#1": {"c": {"status": "false_positive", "reason": "x"}}}))
+        triage._save_asset(self.data_dir, "github#1", {"c": {"status": "false_positive", "reason": "x"}})
         status, body, _ = self.call("GET", "/api/cve-db?mine=1", headers=self.cookie)
         self.assertEqual((status, [item["id"] for item in body["items"]], body["mine_total"]), (200, ["CVE-2026-12345"], 2))
         _, body, _ = self.call("GET", "/api/cve-db", headers=self.cookie)
@@ -172,8 +173,6 @@ class CveRoutesTests(HttpCase):
             "e": {"status": "open", "finding": {"cve": ["CVE-2026-20003"]}}}})
         _, body, _ = self.call("GET", "/api/cve-db?mine=1&sort=score", headers=self.cookie)
         self.assertEqual({item["id"] for item in body["items"]}, {"CVE-2026-12345", "CVE-2026-20003"})
-        (self.data_dir / "triage.json").write_text("{roto")
-        self.assertEqual(self.call("GET", "/api/cve-db?mine=1", headers=self.cookie)[0], 200)
 
 
 if __name__ == "__main__":

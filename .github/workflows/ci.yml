@@ -27,6 +27,18 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    services:
+      postgres:
+        image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+        env:
+          POSTGRES_USER: tamandua
+          POSTGRES_PASSWORD: tamandua  # solo para el contenedor efímero del CI
+          POSTGRES_DB: tamandua
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U tamandua" --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      APPSEC_AGENT_DATABASE_URL: postgresql+psycopg://tamandua:tamandua@127.0.0.1:5432/tamandua
+      APPSEC_AGENT_DB_ISOLATE: data-dir
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:

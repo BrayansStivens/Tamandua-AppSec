@@ -25,7 +25,7 @@ from tamandua.shared import log as logging_setup
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, snapshot_source
 from tamandua.modules.sources.assets import asset_key
-from tamandua.modules.runs.store import _run_dir, _write_atomic, list_runs, load_run, save_repository_scan, update_index
+from tamandua.modules.runs.store import list_runs, load_run, save_record, save_repository_scan
 
 log = logging_setup.get("jobs")
 Progress = Callable[[str, str], None]
@@ -44,8 +44,8 @@ class ScanJobs:
         # Cada cuánto mira el trabajador, sin nada en cola, si hay un lote que avanzar.
         self.idle_poll = 3.0
         self._recover()
-        # El registro de hallazgos se deriva de las ejecuciones: si no existe, se reconstruye.
-        if not (data_dir / "findings").is_dir():
+        # El registro de hallazgos se deriva de las ejecuciones: si está vacío y hay ejecuciones, se reconstruye.
+        if findings_registry.is_empty(data_dir) and list_runs(data_dir):
             findings_registry.rebuild(data_dir)
         self._worker = threading.Thread(target=self._loop, name="appsec-scans", daemon=True)
         self._worker.start()
@@ -175,7 +175,7 @@ class ScanJobs:
         if job.get("kind") == "image_scan":
             return self._execute_image(job)
         run_id = job["run_id"]
-        record = self._records.get(run_id) or json.loads((_run_dir(self.data_dir, run_id) / "run.json").read_text(encoding="utf-8"))
+        record = self._records.get(run_id) or load_run(self.data_dir, run_id)
         record["status"] = "running"
         record["started_at"] = _now()
 
@@ -219,7 +219,7 @@ class ScanJobs:
     def _execute_image(self, job: dict) -> None:
         from tamandua.modules.scanning.image import scan_image
         run_id = job["run_id"]
-        record = self._records.get(run_id) or json.loads((_run_dir(self.data_dir, run_id) / "run.json").read_text(encoding="utf-8"))
+        record = self._records.get(run_id) or load_run(self.data_dir, run_id)
         record["status"] = "running"
         record["started_at"] = _now()
 
@@ -265,7 +265,7 @@ class ScanJobs:
         from tamandua.modules.integrations.github import GitHubAppError, pull_files
         run_id, pull, source_id = job["run_id"], job["pull"], job["source_id"]
         repository = source_id.removeprefix("github:")
-        record = self._records.get(run_id) or json.loads((_run_dir(self.data_dir, run_id) / "run.json").read_text(encoding="utf-8"))
+        record = self._records.get(run_id) or load_run(self.data_dir, run_id)
         record["status"], record["started_at"] = "running", _now()
 
         def progress(level: str, message: str) -> None:
@@ -378,7 +378,4 @@ class ScanJobs:
         self._save(record)
 
     def _save(self, record: dict) -> None:
-        run_dir = _run_dir(self.data_dir, record["id"])
-        run_dir.mkdir(parents=True, exist_ok=True)
-        _write_atomic(run_dir / "run.json", json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
-        update_index(self.data_dir, record)
+        save_record(self.data_dir, record)

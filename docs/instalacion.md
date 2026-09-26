@@ -53,20 +53,27 @@ make backup
 make update
 ```
 
-`data/` y `config/` se conservan. Si la versión nueva cambia el formato de algún dato, lo convierte sola al arrancar, una sola vez y tras guardar una copia de lo que toca en `data/backups/`: no hay que hacer nada a mano. Antes de actualizar conviene hacer una copia (ver abajo) y comprobar que no hay análisis en marcha en **Análisis**: un reinicio marca como fallidos los que estuvieran corriendo.
+`data/`, `config/` y la base de datos se conservan. Si la versión nueva cambia el formato de algún dato, lo convierte sola al arrancar, una sola vez y tras guardar una copia de lo que toca en `data/backups/`: no hay que hacer nada a mano. Antes de actualizar conviene hacer una copia (ver abajo) y comprobar que no hay análisis en marcha en **Análisis**: un reinicio marca como fallidos los que estuvieran corriendo.
 
 ## Copias de seguridad
 
 | Carpeta | Qué contiene | Cómo tratarla |
 | --- | --- | --- |
-| `data/` | Ejecuciones, hallazgos, usuarios (contraseñas con scrypt), logs, copia de NVD y cachés | Sin secretos en claro. Se pueden excluir `data/feeds/`, `data/trivy-cache/` y `data/grype-cache/`: se vuelven a descargar. |
+| Base de datos (volumen `tamandua-pg`) | Ejecuciones, registro de hallazgos y triage (PostgreSQL) | `make backup` la vuelca con `pg_dump` en `database.dump`. |
+| `data/` | Usuarios (contraseñas con scrypt), ajustes, logs, copia de NVD y cachés | Sin secretos en claro. Se pueden excluir `data/feeds/`, `data/trivy-cache/` y `data/grype-cache/`: se vuelven a descargar. |
 | `config/` | `secrets.vault` (cifrado) y `master.key` | **Es la llave de tus credenciales.** Guárdala aparte de `data/` y con el mismo cuidado que una contraseña. |
 
 ```bash
-make backup        # backups/<fecha>/data.tgz y config.tgz
+make backup        # backups/<fecha>/database.dump, data.tgz y config.tgz
 ```
 
-La app se detiene unos segundos para que la copia sea coherente, y el comando se niega si hay análisis en curso (`FORCE=1` para forzarlo). `config.tgz` contiene los secretos cifrados **y** la clave maestra: guárdalo fuera de la máquina y protegido. Para restaurar, con la app parada, descomprime ambos en la raíz del repositorio.
+La app se detiene unos segundos para que la copia sea coherente, y el comando se niega si hay análisis en curso (`FORCE=1` para forzarlo). `config.tgz` contiene los secretos cifrados **y** la clave maestra: guárdalo fuera de la máquina y protegido. Para restaurar, con la app parada, descomprime `data.tgz` y `config.tgz` en la raíz del repositorio y vuelca la base:
+
+```bash
+docker compose up -d postgres
+docker compose exec -T postgres pg_restore -U tamandua -d tamandua --clean --if-exists < backups/<fecha>/database.dump
+make up
+```
 
 Si pierdes `config/master.key` (o cambias `APPSEC_AGENT_MASTER_KEY`), los secretos guardados no se pueden descifrar: tendrás que volver a conectar la GitHub App y las claves de IA y Jira. El resto de datos no se pierde.
 

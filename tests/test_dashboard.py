@@ -41,34 +41,30 @@ class IndexAndPagingTests(unittest.TestCase):
                                      created_at=(now - timedelta(minutes=index)).isoformat())
             rows = list_runs(data_dir)
             self.assertEqual(len(rows), 30)
-            self.assertTrue((data_dir / "runs" / "index.json").is_file())
             # Las filas del índice no arrastran los hallazgos.
             self.assertNotIn("findings", rows[0])
             page = page_runs(data_dir, limit=10, offset=10, kind="repository_scan")
             self.assertEqual((len(page["items"]), page["total"], page["offset"]), (10, 30, 10))
             self.assertEqual(page_runs(data_dir, query="repo-1")["total"], 10)
-            # Si el índice se pierde, se reconstruye desde las carpetas.
-            (data_dir / "runs" / "index.json").unlink()
+            # Las filas del listado se pueden regenerar desde el registro completo de cada ejecución.
             self.assertEqual(len(rebuild_index(data_dir)), 30)
+            self.assertEqual(page_runs(data_dir, status="completed", asset="github:org/repo-1")["total"], 10)
             self.assertEqual(len(list_runs(data_dir)), 30)
 
 
 class ConcurrentIndexTests(unittest.TestCase):
     def test_concurrent_writers_do_not_fail_or_lose_rows(self):
-        """Antes: temporal con nombre fijo («x») y sin cerrojo → FileExistsError y filas perdidas."""
+        """Antes (archivos): temporal con nombre fijo y sin cerrojo → FileExistsError y filas perdidas. Ahora es la base."""
         import threading
-        from tamandua.modules.runs.store import _index_path, update_index, _write_atomic
+        from tamandua.modules.runs.store import list_runs, update_index
         with tempfile.TemporaryDirectory() as temporary:
             data_dir = Path(temporary)
-            (data_dir / "runs").mkdir()
-            # Un temporal huérfano de un corte no bloquea nada.
-            (data_dir / "runs" / "index.json.tmp").write_text("basura")
             errors = []
 
             def writer(start):
                 try:
                     for offset in range(25):
-                        update_index(data_dir, {"id": f"r{start + offset}", "type": "repository_scan", "status": "completed",
+                        update_index(data_dir, {"id": f"{start + offset:032x}", "type": "repository_scan", "status": "completed",
                                                 "created_at": "2026-09-26T00:00:00+00:00"})
                 except Exception as exc:  # noqa: BLE001 — cualquier fallo cuenta
                     errors.append(exc)
@@ -78,9 +74,7 @@ class ConcurrentIndexTests(unittest.TestCase):
             for thread in threads:
                 thread.join()
             self.assertEqual(errors, [])
-            self.assertEqual(len(json.loads(_index_path(data_dir).read_text())), 100)
-            _write_atomic(data_dir / "x.json", "{}")
-            self.assertEqual([path.name for path in data_dir.iterdir() if path.name.endswith(".tmp") and path.name != "index.json.tmp"], [])
+            self.assertEqual(len(list_runs(data_dir)), 100)
 
 
 class CoverageTests(unittest.TestCase):

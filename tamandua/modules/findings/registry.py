@@ -23,10 +23,15 @@ el hallazgo reaparece en una ejecución posterior, se reabre solo.
 from __future__ import annotations
 
 import hashlib
-import json
-import os
-import threading
+from contextlib import contextmanager
 from pathlib import Path
+
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
+
+from tamandua.modules.findings.tables import registry_assets, registry_findings
+from tamandua.shared import db
+from tamandua.shared.db import TENANT
 
 from tamandua.modules.runs.kinds import FINDING_RUNS, FULL_SCANS
 from tamandua.shared import log as logging_setup
@@ -35,28 +40,62 @@ from tamandua.modules.findings import triage
 from tamandua.modules.sources.assets import asset_key
 
 _log = logging_setup.get("findings")
-_lock = threading.Lock()
 VIEW_PREFIX = "asset:"
 
 
 def _path(data_dir: Path, key: str) -> Path:
+    """Archivo del formato antiguo (antes de PostgreSQL); solo lo usa la importación."""
     return data_dir / "findings" / f"{hashlib.sha256(key.encode()).hexdigest()[:32]}.json"
 
 
+def _cves(entry: dict) -> list[str]:
+    return [item for item in ((entry.get("finding") or {}).get("cve") or []) if isinstance(item, str)]
+
+
 def load(data_dir: Path, key: str) -> dict:
-    try:
-        payload = json.loads(_path(data_dir, key).read_text(encoding="utf-8"))
-    except (FileNotFoundError, ValueError, OSError):
-        return {"asset": key, "name": None, "findings": {}}
-    return payload if isinstance(payload, dict) else {"asset": key, "name": None, "findings": {}}
+    """El estado de un activo: {"asset", "name", "findings": {huella: entrada}, "applied": [ejecuciones]}."""
+    with db.transaction(data_dir) as connection:
+        head = connection.execute(select(registry_assets.c.name, registry_assets.c.applied)
+                                  .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key == key)).first()
+        entries = {digest: entry for digest, entry in connection.execute(
+            select(registry_findings.c.fingerprint, registry_findings.c.entry)
+            .where(registry_findings.c.tenant_id == TENANT, registry_findings.c.asset_key == key))}
+    return {"asset": key, "name": head.name if head else None, "findings": entries, "applied": list(head.applied) if head else []}
 
 
 def _save(data_dir: Path, payload: dict) -> None:
-    target = _path(data_dir, payload["asset"])
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    key = payload["asset"]
+    head = insert(registry_assets).values(tenant_id=TENANT, asset_key=key, name=payload.get("name"), applied=payload.get("applied") or [])
+    rows = [{"tenant_id": TENANT, "asset_key": key, "fingerprint": digest, "status": entry.get("status") or "open",
+             "cves": _cves(entry), "entry": entry} for digest, entry in (payload.get("findings") or {}).items()]
+    with db.transaction(data_dir) as connection:
+        connection.execute(head.on_conflict_do_update(index_elements=[registry_assets.c.tenant_id, registry_assets.c.asset_key],
+                                                      set_={"name": head.excluded.name, "applied": head.excluded.applied}))
+        if rows:
+            statement = insert(registry_findings)
+            connection.execute(statement.on_conflict_do_update(
+                index_elements=[registry_findings.c.tenant_id, registry_findings.c.asset_key, registry_findings.c.fingerprint],
+                set_={"status": statement.excluded.status, "cves": statement.excluded.cves, "entry": statement.excluded.entry,
+                      "updated_at": func.now()}), rows)
+
+
+@contextmanager
+def _locked(data_dir: Path, key: str):
+    """Leer-modificar-guardar el estado de un activo en una transacción con cerrojo (entre procesos, no solo hilos)."""
+    with db.transaction(data_dir) as connection:
+        db.lock(connection, "registry", key)
+        yield load(data_dir, key)
+
+
+def forget_asset(data_dir: Path, key: str) -> None:
+    with db.transaction(data_dir) as connection:
+        connection.execute(delete(registry_findings).where(registry_findings.c.tenant_id == TENANT, registry_findings.c.asset_key == key))
+        connection.execute(delete(registry_assets).where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key == key))
+
+
+def is_empty(data_dir: Path) -> bool:
+    with db.transaction(data_dir) as connection:
+        return connection.execute(select(registry_assets.c.asset_key).where(registry_assets.c.tenant_id == TENANT).limit(1)).first() is None
 
 
 def _clean(finding: dict) -> dict:
@@ -82,8 +121,7 @@ def apply(data_dir: Path, record: dict) -> dict:
     key = asset_key(record)
     stamp = record.get("finished_at") or record["created_at"]
     pull = record.get("pull_request") or {}
-    with _lock:
-        state = load(data_dir, key)
+    with _locked(data_dir, key) as state:
         if record["id"] in state.setdefault("applied", []):
             return {"opened": 0, "fixed": 0}
         state["name"] = (record.get("source") or {}).get("name") or state.get("name")
@@ -144,8 +182,7 @@ def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) 
     """Al cambiar las rutas excluidas: lo abierto que cae en ellas pasa a excluido y lo excluido que ya no cae vuelve a abierto."""
     from tamandua.modules.findings.exclusions import excluded
     moved = {"excluded": 0, "reopened": 0}
-    with _lock:
-        state = load(data_dir, key)
+    with _locked(data_dir, key) as state:
         for entry in state["findings"].values():
             pattern = excluded((entry.get("finding") or {}).get("path", ""), active)
             if entry.get("status") == "open" and pattern:
@@ -163,8 +200,7 @@ def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) 
 def pull_closed(data_dir: Path, key: str, number: int, *, merged: bool, when: str) -> int:
     """PR cerrado: sin merge, sus hallazgos se retiran; con merge, esperan al escaneo completo."""
     changed = 0
-    with _lock:
-        state = load(data_dir, key)
+    with _locked(data_dir, key) as state:
         for entry in state["findings"].values():
             origin = entry.get("origin") or {}
             if entry["status"] != "open" or origin.get("kind") != "pr" or origin.get("pr") != number:
@@ -182,10 +218,9 @@ def pull_closed(data_dir: Path, key: str, number: int, *, merged: bool, when: st
 def rebuild(data_dir: Path) -> int:
     """Reconstruye todos los registros desde las ejecuciones, en orden cronológico."""
     from tamandua.modules.runs.store import list_runs, load_run
-    folder = data_dir / "findings"
-    if folder.is_dir():
-        for path in folder.glob("*.json"):
-            path.unlink()
+    with db.transaction(data_dir) as connection:
+        connection.execute(delete(registry_findings).where(registry_findings.c.tenant_id == TENANT))
+        connection.execute(delete(registry_assets).where(registry_assets.c.tenant_id == TENANT))
     applied = 0
     for row in sorted(list_runs(data_dir), key=lambda item: item.get("finished_at") or item["created_at"]):
         try:
@@ -194,42 +229,6 @@ def rebuild(data_dir: Path) -> int:
         except (ValueError, OSError):
             continue
     return applied
-
-
-def repair_incomplete_fixes(data_dir: Path) -> int:
-    """Una vez: reabre lo que un escaneo incompleto dio por remediado antes de que eso dejara de ocurrir.
-
-    Solo toca remediaciones automáticas hechas por una ejecución que no terminó entera; el triage
-    manual, las exclusiones y los cierres de PR quedan como están. Devuelve cuántos hallazgos reabrió."""
-    from tamandua.modules.runs.store import list_runs
-    folder = data_dir / "findings"
-    marker = folder / ".repaired-incomplete-fixes"
-    if not folder.is_dir() or marker.exists():
-        return 0
-    status = {row["id"]: row.get("status") for row in list_runs(data_dir)}
-    reopened = 0
-    with _lock:
-        for path in folder.glob("*.json"):
-            try:
-                state = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            changed = False
-            for entry in (state.get("findings") or {}).values():
-                fixed = entry.get("fixed") or {}
-                if entry.get("status") == "fixed" and fixed.get("auto") and status.get(fixed.get("run_id")) not in (None, "completed"):
-                    entry["status"] = "open"
-                    entry.pop("fixed", None)
-                    changed = True
-                    reopened += 1
-            if changed:
-                temporary = path.with_suffix(".tmp")
-                temporary.write_text(json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-                os.replace(temporary, path)
-        marker.write_text("1\n", encoding="utf-8")
-    if reopened:
-        _log.warning("registry_repaired", extra={"reason": f"{reopened} hallazgos reabiertos: los había remediado un escaneo incompleto"})
-    return reopened
 
 
 def view(data_dir: Path, key: str, *, status: str = "open") -> dict:
@@ -295,59 +294,31 @@ def resolve(data_dir: Path, run_id: str) -> dict:
 
 
 def assets_with_cve(data_dir: Path, cve: str) -> list[dict]:
-    """Repositorios con un hallazgo que cita este CVE, para responder «¿me afecta?» desde el tracker."""
-    folder = data_dir / "findings"
-    matches = []
-    for path in sorted(folder.glob("*.json")) if folder.is_dir() else []:
-        try:
-            state = json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, OSError):
-            continue
-        hits = [entry for entry in (state.get("findings") or {}).values() if cve in ((entry.get("finding") or {}).get("cve") or [])]
-        if hits:
-            matches.append({"asset": state.get("asset"), "name": state.get("name") or state.get("asset"),
-                            "open": sum(1 for entry in hits if entry.get("status") == "open"),
-                            "fixed": sum(1 for entry in hits if entry.get("status") == "fixed"),
-                            "packages": sorted({(entry["finding"].get("package") or {}).get("name") or entry["finding"].get("title", "")
-                                                for entry in hits})[:5]})
-    return matches
-
-
-_cve_cache: dict[Path, tuple[tuple, frozenset[str]]] = {}
+    """Repositorios con un hallazgo que cita este CVE, para responder «¿me afecta?» desde el tracker (índice GIN)."""
+    by_asset: dict[str, list[dict]] = {}
+    with db.transaction(data_dir) as connection:
+        for key, entry in connection.execute(select(registry_findings.c.asset_key, registry_findings.c.entry)
+                                             .where(registry_findings.c.tenant_id == TENANT, registry_findings.c.cves.any_() == cve)
+                                             .order_by(registry_findings.c.asset_key)):
+            by_asset.setdefault(key, []).append(entry)
+        names = dict(connection.execute(select(registry_assets.c.asset_key, registry_assets.c.name)
+                                        .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key.in_(list(by_asset)))).all())
+    return [{"asset": key, "name": names.get(key) or key,
+             "open": sum(1 for entry in hits if entry.get("status") == "open"),
+             "fixed": sum(1 for entry in hits if entry.get("status") == "fixed"),
+             "packages": sorted({(entry["finding"].get("package") or {}).get("name") or entry["finding"].get("title", "") for entry in hits})[:5]}
+            for key, hits in by_asset.items()]
 
 
 def open_cves(data_dir: Path) -> frozenset[str]:
-    """Los CVE que siguen abiertos en algún activo (sin lo descartado en triage), para «solo los míos» en el tracker.
-
-    Se relee solo si cambió algún registro o el triage: el tracker lo consulta en cada búsqueda."""
-    folder = data_dir / "findings"
-    files = sorted(folder.glob("*.json")) if folder.is_dir() else []
-    triage_file = data_dir / "triage.json"
-    try:
-        signature = tuple((path.name, path.stat().st_mtime_ns, path.stat().st_size) for path in files) + (
-            (triage_file.stat().st_mtime_ns, triage_file.stat().st_size) if triage_file.exists() else 0,)
-    except OSError:
-        signature = ()
-    cached = _cve_cache.get(data_dir)
-    if cached and signature and cached[0] == signature:
-        return cached[1]
-    try:
-        decisions = triage.load(data_dir)
-    except triage.TriageError:
-        decisions = {}  # un triage ilegible no debe tumbar el buscador
+    """Los CVE que siguen abiertos en algún activo (sin lo descartado en triage), para «solo los míos» en el tracker."""
+    decisions = triage.load(data_dir)
     found: set[str] = set()
-    for path in files:
-        try:
-            state = json.loads(path.read_text(encoding="utf-8"))
-        except (ValueError, OSError):
-            continue
-        manual = decisions.get(state.get("asset"), {})
-        for digest, entry in (state.get("findings") or {}).items():
-            if entry.get("status") != "open":
+    with db.transaction(data_dir) as connection:
+        for key, digest, cves in connection.execute(select(registry_findings.c.asset_key, registry_findings.c.fingerprint, registry_findings.c.cves)
+                                                    .where(registry_findings.c.tenant_id == TENANT, registry_findings.c.status == "open",
+                                                           func.cardinality(registry_findings.c.cves) > 0)):
+            if (triage.effective((decisions.get(key) or {}).get(digest)) or {}).get("status", "open") in triage.SUPPRESSED:
                 continue
-            if (triage.effective(manual.get(digest)) or {}).get("status", "open") in triage.SUPPRESSED:
-                continue
-            found.update(cve for cve in ((entry.get("finding") or {}).get("cve") or []) if isinstance(cve, str) and cve.startswith("CVE-"))
-    result = frozenset(found)
-    _cve_cache[data_dir] = (signature, result)
-    return result
+            found.update(cve for cve in cves if cve.startswith("CVE-"))
+    return frozenset(found)

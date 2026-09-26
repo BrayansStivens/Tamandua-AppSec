@@ -5,6 +5,8 @@ import os
 import tempfile
 import time
 import unittest
+
+from tamandua.modules.runs.store import artifact as store_artifact
 from pathlib import Path
 from unittest.mock import patch
 
@@ -52,7 +54,7 @@ class JobsTests(unittest.TestCase):
         levels = [event["level"] for event in record["progress"]]
         self.assertEqual(levels[0], "info")
         self.assertIn("ok", levels)
-        self.assertTrue((self.data_dir / "runs" / queued["id"] / "report.md").is_file())
+        self.assertTrue(bool(store_artifact(self.data_dir, queued["id"], "report.md")))
         self.assertFalse(any((self.data_dir / "work").iterdir()), "el snapshot temporal se limpia")
 
     def test_source_failure_is_reported_without_server_internals(self):

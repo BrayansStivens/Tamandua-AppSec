@@ -96,7 +96,7 @@ scan: ## Analiza una carpeta local: make scan DIR=../mi-repo ARGS="--base main -
 	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro appsec python -m tamandua scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
 
 demo: ## Datos de demostración: analiza los ejemplos vulnerables e importa un modelo de amenazas (IMAGE=nginx:1.21 añade una imagen)
-	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath fixtures)":/demo/fixtures:ro -v "$(abspath web/src/examples/threat-models)":/demo/models:ro \
+	@$(COMPOSE) run --rm -T -v "$(abspath fixtures)":/demo/fixtures:ro -v "$(abspath web/src/examples/threat-models)":/demo/models:ro \
 		appsec python -m tamandua --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
 
 update: ## Actualiza el código (git pull) y reconstruye
@@ -134,8 +134,8 @@ dev: ## Servidor local sin contenedor en 127.0.0.1:8767 (motores vía tu Docker)
 web: ## Compila el panel en tamandua/app/static/
 	cd web && npm run build
 
-test: ## Pruebas del backend
-	$(VENV)/bin/python -m unittest discover -s tests
+test: ## Pruebas del backend (arranca un Postgres efímero de pruebas si hace falta)
+	@url=$$(sh scripts/test-db.sh) && APPSEC_AGENT_DATABASE_URL="$$url" APPSEC_AGENT_DB_ISOLATE=data-dir $(VENV)/bin/python -m unittest discover -s tests
 
 openapi: ## Esquema OpenAPI de la API y tipos TypeScript del panel (web/src/shared/api/)
 	@mkdir -p web/src/shared/api

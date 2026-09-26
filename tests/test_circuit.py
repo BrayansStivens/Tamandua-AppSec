@@ -1,6 +1,8 @@
 import json
 import tempfile
 import unittest
+
+from tamandua.modules.runs.store import artifact as store_artifact
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -29,7 +31,7 @@ class CircuitTests(unittest.TestCase):
             self.assertEqual(saved["summary"]["fixed_controls"], 5)
             self.assertEqual(load_run(root, saved["id"]), saved)
             self.assertEqual(len(list_runs(root)), 1)
-            report = (root / "runs" / saved["id"] / "report.md").read_text()
+            report = store_artifact(root, saved["id"], "report.md").decode()
             self.assertIn("no se descubrieron hallazgos nuevos", report)
             self.assertIn("SQLI-F", report)
 
@@ -65,13 +67,13 @@ class CircuitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             saved = save_scan(root, vulnerable)
-            sarif = json.loads((root / "runs" / saved["id"] / "findings.sarif").read_text())
+            sarif = json.loads(store_artifact(root, saved["id"], "findings.sarif").decode())
             self.assertEqual(sarif["version"], "2.1.0")
             self.assertEqual(len(sarif["runs"][0]["results"]), 5)
             self.assertEqual(load_run(root, saved["id"])["summary"]["confirmed"], 5)
             self.assertEqual(list_runs(root)[0]["variant"], "vulnerable")
-            self.assertIn("BOLA", (root / "runs" / saved["id"] / "report.md").read_text())
-            self.assertIn("A10 · Mishandling of Exceptional Conditions", (root / "runs" / saved["id"] / "report.md").read_text())
+            self.assertIn("BOLA", store_artifact(root, saved["id"], "report.md").decode())
+            self.assertIn("A10 · Mishandling of Exceptional Conditions", store_artifact(root, saved["id"], "report.md").decode())
 
     def test_scan_does_not_need_ground_truth_file(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -89,7 +91,7 @@ class CircuitTests(unittest.TestCase):
         self.assertEqual({item["status"] for item in result["owasp_coverage"] if item["id"] in ("A01", "A05")}, {"inconclusive"})
         with tempfile.TemporaryDirectory() as directory:
             saved = save_scan(Path(directory), result)
-            report = (Path(directory) / "runs" / saved["id"] / "report.md").read_text()
+            report = store_artifact(Path(directory), saved["id"], "report.md").decode()
             self.assertIn("pruebas pendientes de completar", report)
 
     def test_cli_returns_distinct_codes_for_findings_and_clean_control(self):

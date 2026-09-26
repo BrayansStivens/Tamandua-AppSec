@@ -19,11 +19,14 @@ fi
 
 mkdir -p "$target"
 chmod 700 backups "$target"
+# Ejecuciones, hallazgos y triage: volcado de PostgreSQL (formato custom de pg_restore).
+docker compose exec -T postgres pg_dump -U tamandua -d tamandua -Fc > "$target/database.dump"
 tar czf "$target/data.tgz" --exclude=data/feeds --exclude=data/trivy-cache --exclude=data/grype-cache --exclude=data/work --exclude=data/tmp data
 tar czf "$target/config.tgz" config
-chmod 600 "$target"/*.tgz
+chmod 600 "$target"/*.tgz "$target/database.dump"
 
 [ -n "$running" ] && docker compose start appsec >/dev/null
 echo "Copia en $target/"
-echo "  data.tgz    ejecuciones, hallazgos, usuarios y ajustes (sin secretos)"
+echo "  database.dump  ejecuciones, hallazgos y triage (PostgreSQL; se restaura con pg_restore)"
+echo "  data.tgz    usuarios, ajustes y el resto de data/ (sin secretos)"
 echo "  config.tgz  SECRETOS CIFRADOS + CLAVE MAESTRA: guárdalo fuera de esta máquina y protegido"

@@ -18,12 +18,16 @@ Cada cambio queda en el historial del hallazgo con quién, cuándo y por qué.
 
 from __future__ import annotations
 
-import json
-import os
 import re
-import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
+
+from tamandua.modules.findings.tables import triage_decisions
+from tamandua.shared import db
+from tamandua.shared.db import TENANT
 
 from tamandua.modules.runs.kinds import FINDING_RUNS
 from tamandua.modules.sources.assets import asset_key
@@ -42,32 +46,53 @@ SUPPRESSED = ("false_positive", "accepted", "fixed")
 REASON_MIN, REASON_MAX, NOTE_MAX = 10, 500, 1000
 MAX_BATCH, HISTORY_MAX = 500, 50
 ACCEPT_DEFAULT_DAYS, ACCEPT_MAX_DAYS = 90, 365
-_lock = threading.Lock()
 
 
-def _path(data_dir: Path) -> Path:
-    return data_dir / "triage.json"
-
-
-# `asset_key` vive en assets.py: identidad estable del repositorio (id numérico de GitHub).
+# `asset_key` vive en sources/assets.py: identidad estable del repositorio (id numérico de GitHub).
+# Las decisiones viven en PostgreSQL (tabla triage_decisions), una fila por activo y huella.
 
 
 def load(data_dir: Path) -> dict:
-    try:
-        payload = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError) as exc:
-        raise TriageError("Registro de triage ilegible") from exc
-    return payload if isinstance(payload, dict) else {}
+    """Todas las decisiones: {activo: {huella: decisión}}. Para un solo activo, `load_asset` (más barato)."""
+    result: dict = {}
+    with db.transaction(data_dir) as connection:
+        for key, digest, decision in connection.execute(select(triage_decisions.c.asset_key, triage_decisions.c.fingerprint,
+                                                               triage_decisions.c.decision).where(triage_decisions.c.tenant_id == TENANT)):
+            result.setdefault(key, {})[digest] = decision
+    return result
 
 
-def _save(data_dir: Path, payload: dict) -> None:
-    data_dir.mkdir(parents=True, exist_ok=True)
-    target = _path(data_dir)
-    temporary = target.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+def load_asset(data_dir: Path, key: str) -> dict:
+    with db.transaction(data_dir) as connection:
+        return {digest: decision for digest, decision in connection.execute(
+            select(triage_decisions.c.fingerprint, triage_decisions.c.decision)
+            .where(triage_decisions.c.tenant_id == TENANT, triage_decisions.c.asset_key == key))}
+
+
+def _save_asset(data_dir: Path, key: str, decisions: dict) -> None:
+    if not decisions:
+        return
+    rows = [{"tenant_id": TENANT, "asset_key": key, "fingerprint": digest, "status": decision.get("status", "open"), "decision": decision}
+            for digest, decision in decisions.items()]
+    statement = insert(triage_decisions)
+    with db.transaction(data_dir) as connection:
+        connection.execute(statement.on_conflict_do_update(
+            index_elements=[triage_decisions.c.tenant_id, triage_decisions.c.asset_key, triage_decisions.c.fingerprint],
+            set_={"status": statement.excluded.status, "decision": statement.excluded.decision, "updated_at": func.now()}), rows)
+
+
+def forget_asset(data_dir: Path, key: str) -> int:
+    with db.transaction(data_dir) as connection:
+        return connection.execute(delete(triage_decisions).where(triage_decisions.c.tenant_id == TENANT, triage_decisions.c.asset_key == key)).rowcount
+
+
+def rename_asset(data_dir: Path, old: str, new: str) -> None:
+    """Un activo gana identidad estable (p. ej. github#id): sus decisiones pasan a la clave nueva; mandan las ya existentes allí."""
+    with db.transaction(data_dir) as connection:
+        db.lock(connection, "triage", new)
+        merged = {**load_asset(data_dir, old), **load_asset(data_dir, new)}
+        forget_asset(data_dir, old)
+        _save_asset(data_dir, new, merged)
 
 
 def _clean_text(value, *, limit: int, field: str) -> str:
@@ -103,7 +128,8 @@ def annotate(data_dir: Path, record: dict, decisions: dict | None = None) -> dic
     """Copia de la ejecución con el estado de triage en cada hallazgo y el recuento en el resumen."""
     if record.get("type") not in FINDING_RUNS:
         return record
-    asset = (decisions if decisions is not None else load(data_dir)).get(asset_key(record), {})
+    key = asset_key(record)
+    asset = decisions.get(key, {}) if decisions is not None else load_asset(data_dir, key)
     counts = {status: 0 for status in STATUSES}
     findings = []
     for finding in record.get("findings", []):
@@ -154,12 +180,13 @@ def decide(data_dir: Path, record: dict, fingerprints, status, *, reason=None, n
     stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
     event = {"status": status, "reason": reason, "note": note, "by": user["username"], "at": stamp,
              "expires_at": expires_at, "run_id": record["id"]}
-    with _lock:
-        decisions = load(data_dir)
-        asset = decisions.setdefault(asset_key(record), {})
+    key = asset_key(record)
+    with db.transaction(data_dir) as connection:
+        db.lock(connection, "triage", key)  # dos decisiones a la vez sobre el mismo activo no se pisan el historial
+        asset = load_asset(data_dir, key)
         for digest in dict.fromkeys(fingerprints):
             entry = asset.get(digest, {"history": []})
             history = [*entry.get("history", []), event][-HISTORY_MAX:]
             asset[digest] = {**event, "history": history}
-        _save(data_dir, decisions)
-    return annotate(data_dir, record, decisions)
+        _save_asset(data_dir, key, {digest: asset[digest] for digest in dict.fromkeys(fingerprints)})
+    return annotate(data_dir, record, {key: asset})

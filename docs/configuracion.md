@@ -11,6 +11,8 @@ Todas las variables son opcionales y se ponen en `.env` (copia de `.env.example`
 | `APPSEC_AGENT_MASTER_KEY` | se genera en `config/` | Clave maestra del almacén (`openssl rand -base64 32`). |
 | `APPSEC_AGENT_REQUIRE_TOTP` | `admins` | `admins`, `all` o `none`. |
 | `APPSEC_AGENT_NVD_API_KEY` | — | API key de NVD: descarga de CVE más rápida. Va en cabecera y nunca se registra. |
+| `TAMANDUA_DB_PASSWORD` | (generada) | Contraseña de PostgreSQL; `make setup` la crea en `.env`. |
+| `APPSEC_AGENT_DATABASE_URL` | (compose) | Conexión a PostgreSQL. `compose.yaml` la arma con la contraseña; fuera de compose, p. ej. `postgresql+psycopg://tamandua:…@localhost:5432/tamandua`. |
 | `APPSEC_AGENT_CVE_SYNC` | `on` | `off` desactiva la copia local de NVD. |
 | `APPSEC_AGENT_EUVD` | `on` | `off` no consulta EUVD (ENISA) cuando NVD no puntúa un CVE. Solo sale el identificador del CVE. |
 | `APPSEC_AGENT_PR_POLL_SECONDS` | `300` | Cada cuánto se consultan los PRs vigilados. |

@@ -59,19 +59,6 @@ class RegistryTests(unittest.TestCase):
         self.run_([_finding(A)])
         self.assertEqual(self.status(), {A: "open", B: "fixed", C: "fixed"})
 
-    def test_old_fixes_made_by_incomplete_scans_are_repaired_once(self):
-        """Datos de antes del arreglo: una remediación automática hecha por un escaneo incompleto se deshace."""
-        import json
-        self.run_([_finding(A), _finding(B)])
-        broken = self.run_([], status="incomplete")
-        path = next((self.data_dir / "findings").glob("*.json"))
-        state = json.loads(path.read_text())
-        state["findings"][B].update(status="fixed", fixed={"at": "x", "run_id": broken["id"], "how": "viejo", "auto": True})
-        path.write_text(json.dumps(state))
-        self.assertEqual(registry.repair_incomplete_fixes(self.data_dir), 1)
-        self.assertEqual(self.status(), {A: "open", B: "open"})
-        self.assertEqual(registry.repair_incomplete_fixes(self.data_dir), 0)  # una sola vez
-
     def test_the_dashboard_ignores_incomplete_scans(self):
         from tamandua.modules.reporting import dashboard
         self.run_([_finding(A), _finding(B)])

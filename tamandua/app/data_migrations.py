@@ -38,20 +38,106 @@ class Migration:
     apply: Callable[[Path], object]
 
 
+# --- formato antiguo en archivos (antes de PostgreSQL) -------------------------------------------------------------
+# Las migraciones 1 y 2 se publicaron cuando todo vivía en archivos: siguen operando sobre ellos, antes de importar.
+
+def _legacy_runs(data_dir: Path):
+    root = data_dir / "runs"
+    for folder in sorted(root.iterdir()) if root.is_dir() else []:
+        path = folder / "run.json"
+        if folder.is_dir() and not folder.is_symlink() and path.is_file():
+            try:
+                yield folder, json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+
+
 def _repair_incomplete_fixes(data_dir: Path) -> object:
-    from tamandua.modules.findings.registry import repair_incomplete_fixes
-    return repair_incomplete_fixes(data_dir)
+    """Reabre lo que un escaneo incompleto dio por remediado (antes de que eso dejara de ocurrir)."""
+    folder = data_dir / "findings"
+    marker = folder / ".repaired-incomplete-fixes"
+    if not folder.is_dir() or marker.exists():
+        return 0
+    status = {record.get("id"): record.get("status") for _, record in _legacy_runs(data_dir)}
+    reopened = 0
+    for path in folder.glob("*.json"):
+        try:
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        changed = False
+        for entry in (state.get("findings") or {}).values():
+            fixed = entry.get("fixed") or {}
+            if entry.get("status") == "fixed" and fixed.get("auto") and status.get(fixed.get("run_id")) not in (None, "completed"):
+                entry["status"] = "open"
+                entry.pop("fixed", None)
+                changed = True
+                reopened += 1
+        if changed:
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+            os.replace(temporary, path)
+    marker.write_text("1\n", encoding="utf-8")
+    if reopened:
+        _log.warning("registry_repaired", extra={"reason": f"{reopened} hallazgos reabiertos: los había remediado un escaneo incompleto"})
+    return reopened
 
 
 def _rebuild_runs_index(data_dir: Path) -> object:
-    # Filas del índice escritas antes de que existieran campos como «trigger»: se regeneran desde run.json.
-    from tamandua.modules.runs.store import rebuild_index
-    return len(rebuild_index(data_dir)) if (data_dir / "runs").is_dir() else 0
+    """Se publicó para regenerar runs/index.json. Desde la importación a PostgreSQL (migración 3) el índice es la propia
+    tabla y la importación lee cada run.json: no queda nada que hacer."""
+    return 0
+
+
+def _import_to_postgres(data_dir: Path) -> object:
+    """Copia a PostgreSQL las ejecuciones, el registro de hallazgos y el triage que había en archivos.
+
+    Idempotente (lo ya importado no se pisa) y de solo lectura sobre los archivos: quedan intactos para volver a la
+    versión anterior si hiciera falta. Devuelve cuántos elementos importó."""
+    from sqlalchemy.dialects.postgresql import insert
+
+    from tamandua.modules.findings import registry, triage
+    from tamandua.modules.runs import store
+    from tamandua.modules.runs.tables import runs
+    from tamandua.shared import db
+    imported = {"ejecuciones": 0, "activos": 0, "decisiones": 0}
+    with db.transaction(data_dir) as connection:
+        for folder, record in _legacy_runs(data_dir):
+            if not isinstance(record, dict) or not record.get("id"):
+                continue
+            report = (folder / "report.md").read_text(encoding="utf-8") if (folder / "report.md").is_file() else None
+            try:
+                sarif = json.loads((folder / "findings.sarif").read_text(encoding="utf-8")) if (folder / "findings.sarif").is_file() else None
+            except (OSError, ValueError):
+                sarif = None
+            values = {**store._values(record), "report": report, "sarif": sarif}
+            inserted = connection.execute(insert(runs).values(tenant_id=db.TENANT, id=record["id"], **values)
+                                          .on_conflict_do_nothing().returning(runs.c.id)).first()
+            imported["ejecuciones"] += inserted is not None
+        for path in sorted((data_dir / "findings").glob("*.json")) if (data_dir / "findings").is_dir() else []:
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(state, dict) and state.get("asset") and not registry.load(data_dir, state["asset"])["findings"]:
+                registry._save(data_dir, {**state, "findings": state.get("findings") or {}})
+                imported["activos"] += 1
+        try:
+            decisions = json.loads((data_dir / "triage.json").read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, ValueError):
+            decisions = {}
+        for key, entries in (decisions.items() if isinstance(decisions, dict) else []):
+            if isinstance(entries, dict) and not triage.load_asset(data_dir, key):
+                triage._save_asset(data_dir, key, entries)
+                imported["decisiones"] += len(entries)
+    return ", ".join(f"{count} {name}" for name, count in imported.items())
 
 
 MIGRATIONS: tuple[Migration, ...] = (
     Migration("reabrir-remediados-por-escaneos-incompletos", ("findings",), _repair_incomplete_fixes),
-    Migration("regenerar-indice-de-ejecuciones", ("runs/index.json",), _rebuild_runs_index),
+    Migration("regenerar-indice-de-ejecuciones", (), _rebuild_runs_index),
+    # Los archivos no se tocan (son la copia para volver atrás): no hace falta copiarlos antes.
+    Migration("importar-a-postgresql", (), _import_to_postgres),
 )
 LATEST = len(MIGRATIONS)
 
@@ -125,7 +211,9 @@ def _backup(data_dir: Path, pending: list[tuple[int, Migration]]) -> Path | None
 
 
 def upgrade(data_dir: Path) -> list[str]:
-    """Deja data/ en la última versión. Devuelve los nombres de lo que migró (vacío si ya estaba al día)."""
+    """Deja la base (esquema de Alembic) y data/ en la última versión. Devuelve lo que migró en data/ (vacío si nada)."""
+    from tamandua.app import database
+    database.upgrade()  # antes que nada: las migraciones de datos y la aplicación leen de estas tablas
     data_dir.mkdir(parents=True, exist_ok=True)
     version = current(data_dir)
     if version == LATEST:

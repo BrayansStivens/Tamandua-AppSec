@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -53,7 +52,8 @@ def _write_json(path: Path, payload) -> None:
 
 def backfill(data_dir: Path, repositories: list[dict]) -> int:
     """Ejecuciones guardadas antes de la identidad estable: se les pone su `uid` y se mueven triage y tickets."""
-    from tamandua.modules.runs.store import _run_dir, list_runs, update_index
+    from tamandua.modules.findings import triage
+    from tamandua.modules.runs.store import list_runs, load_run, save_record
     uid_of = {item["id"]: item["uid"] for item in repositories if item.get("uid")}
     moved: dict[str, str] = {}
     updated = 0
@@ -61,17 +61,17 @@ def backfill(data_dir: Path, repositories: list[dict]) -> int:
         source = row.get("source") or {}
         if source.get("uid") or source.get("id") not in uid_of:
             continue
-        path = _run_dir(data_dir, row["id"]) / "run.json"
         try:
-            record = json.loads(path.read_text(encoding="utf-8"))
+            record = load_run(data_dir, row["id"])
         except (OSError, ValueError):
             continue
         record.setdefault("source", {})["uid"] = uid_of[source["id"]]
-        _write_json(path, record)
-        update_index(data_dir, record)
+        save_record(data_dir, record)
         moved[source["id"]] = uid_of[source["id"]]
         updated += 1
-    for name in ("triage.json", "jira-links.json"):
+    for old_key, uid in moved.items():
+        triage.rename_asset(data_dir, old_key, uid)
+    for name in ("jira-links.json",):
         target = data_dir / name
         try:
             payload = json.loads(target.read_text(encoding="utf-8"))
@@ -133,14 +133,12 @@ def purge(data_dir: Path, uid: str) -> int:
     from tamandua.modules.integrations import jira
     from tamandua.modules.pullrequests import watch as pr_watch
     from tamandua.modules.findings import triage
-    from tamandua.modules.runs.store import _run_dir, list_runs, rebuild_index
-    removed = 0
-    for row in list_runs(data_dir):
-        if asset_key(row) == uid:
-            shutil.rmtree(_run_dir(data_dir, row["id"]), ignore_errors=True)
-            removed += 1
-    rebuild_index(data_dir)
-    for path in (data_dir / "triage.json", data_dir / "jira-links.json"):
+    from tamandua.modules.findings import registry as findings_registry
+    from tamandua.modules.runs.store import delete_runs, list_runs
+    removed = delete_runs(data_dir, [row["id"] for row in list_runs(data_dir) if asset_key(row) == uid])
+    triage.forget_asset(data_dir, uid)
+    findings_registry.forget_asset(data_dir, uid)
+    for path in (data_dir / "jira-links.json",):
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, ValueError, OSError):

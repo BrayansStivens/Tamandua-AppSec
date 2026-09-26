@@ -4,50 +4,62 @@ from __future__ import annotations
 from tamandua.modules.findings.triage import LABELS as TRIAGE_LABELS, SUPPRESSED
 
 import json
-import contextlib
 import os
-import tempfile
-import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert
+
+from tamandua.modules.runs.tables import runs
+from tamandua.shared import db
+from tamandua.shared.db import TENANT
+
+
+
+def _check_id(run_id: str) -> str:
+    if not isinstance(run_id, str) or len(run_id) != 32 or any(ch not in "0123456789abcdef" for ch in run_id):
+        raise ValueError("ID de ejecución inválido")
+    return run_id
 
 
 def _run_dir(data_dir: Path, run_id: str) -> Path:
-    if len(run_id) != 32 or any(ch not in "0123456789abcdef" for ch in run_id):
-        raise ValueError("ID de ejecución inválido")
-    return data_dir / "runs" / run_id
+    """Carpeta de una ejecución en el formato antiguo en archivos; solo la usa la importación a PostgreSQL."""
+    return data_dir / "runs" / _check_id(run_id)
 
 
-_index_lock = threading.RLock()
-
-
-def _write_atomic(path: Path, content: str) -> None:
-    """Escribe entero o nada. Temporal con nombre único en la misma carpeta: dos escritores a la vez no chocan
-    (antes un nombre fijo con «x» hacía fallar al segundo) y un temporal huérfano tras un corte no bloquea nada."""
-    handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+def _moment(value) -> datetime:
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.unlink(temporary)
-        raise
+        moment = datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return datetime.now(timezone.utc)
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def _values(record: dict) -> dict:
+    from tamandua.modules.sources.assets import asset_key
+    return {"type": record.get("type") or "lab", "status": record.get("status") or "completed", "created_at": _moment(record.get("created_at")),
+            "asset_key": asset_key(record) if record.get("source") else None, "row": _row(record), "record": record}
 
 
 def _persist(data_dir: Path, record: dict, report: str, sarif: dict | None = None, *, replace: bool = False) -> dict:
-    run_dir = _run_dir(data_dir, record["id"])
-    run_dir.mkdir(parents=True, exist_ok=replace)
-    _write_atomic(run_dir / "report.md", report)
-    if sarif is not None:
-        _write_atomic(run_dir / "findings.sarif", json.dumps(sarif, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
-    _write_atomic(run_dir / "run.json", json.dumps(record, ensure_ascii=False, indent=2, sort_keys=True) + "\n")
-    update_index(data_dir, record)
+    values = {**_values(record), "report": report, "sarif": sarif}
+    statement = insert(runs).values(tenant_id=TENANT, id=_check_id(record["id"]), **values)
+    with db.transaction(data_dir) as connection:
+        if replace:
+            connection.execute(statement.on_conflict_do_update(index_elements=[runs.c.tenant_id, runs.c.id], set_={**values, "updated_at": func.now()}))
+        elif connection.execute(statement.on_conflict_do_nothing().returning(runs.c.id)).first() is None:
+            raise FileExistsError(f"La ejecución {record['id']} ya existe")
     return record
+
+
+def save_record(data_dir: Path, record: dict) -> None:
+    """Guarda el registro de una ejecución (progreso, estado, resultado) sin tocar su informe ni su SARIF."""
+    values = _values(record)
+    statement = insert(runs).values(tenant_id=TENANT, id=_check_id(record["id"]), **values)
+    with db.transaction(data_dir) as connection:
+        connection.execute(statement.on_conflict_do_update(index_elements=[runs.c.tenant_id, runs.c.id], set_={**values, "updated_at": func.now()}))
 
 
 def _row(record: dict) -> dict:
@@ -61,60 +73,60 @@ def _row(record: dict) -> dict:
     return item
 
 
-def _index_path(data_dir: Path) -> Path:
-    return data_dir / "runs" / "index.json"
-
-
 def update_index(data_dir: Path, record: dict) -> None:
-    """Una fila por ejecución. Con mil escaneos, listar no puede leer mil archivos con todos sus hallazgos."""
-    path = _index_path(data_dir)
-    with _index_lock:  # leer-modificar-escribir: sin el cerrojo, dos escritores se pisan las filas
-        try:
-            index = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        except (ValueError, OSError):
-            index = {}
-        index[record["id"]] = _row(record)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        _write_atomic(path, json.dumps(index, ensure_ascii=False, sort_keys=True) + "\n")
+    """Compatibilidad: en PostgreSQL el «índice» es la propia tabla; guardar el registro lo actualiza."""
+    save_record(data_dir, record)
 
 
 def rebuild_index(data_dir: Path) -> dict:
-    with _index_lock:
-        return _rebuild_index(data_dir)
-
-
-def _rebuild_index(data_dir: Path) -> dict:
-    root = data_dir / "runs"
-    index = {}
-    if root.is_dir():
-        for entry in root.iterdir():
-            if not entry.is_dir() or entry.is_symlink():
-                continue
-            try:
-                index[entry.name] = _row(load_run(data_dir, entry.name))
-            except (ValueError, OSError, json.JSONDecodeError):
-                continue
-    _write_atomic(_index_path(data_dir), json.dumps(index, ensure_ascii=False, sort_keys=True) + "\n") if root.is_dir() else None
-    return index
+    """Compatibilidad: regenera la fila de listado de cada ejecución desde su registro completo."""
+    rows = {}
+    with db.transaction(data_dir) as connection:
+        for run_id, record in connection.execute(select(runs.c.id, runs.c.record).where(runs.c.tenant_id == TENANT)):
+            row = _row(record)
+            connection.execute(update(runs).where(runs.c.tenant_id == TENANT, runs.c.id == run_id).values(row=row))
+            rows[run_id] = row
+    return rows
 
 
 def page_runs(data_dir: Path, *, limit: int = 25, offset: int = 0, status: str | None = None,
               kind: str | None = None, query: str | None = None, asset: str | None = None) -> dict:
-    rows = list_runs(data_dir)
+    """Filtra, cuenta y pagina en la base (antes se cargaban todas las filas en memoria)."""
+    conditions = [runs.c.tenant_id == TENANT]
     if asset:
-        from tamandua.modules.sources.assets import asset_key
-        rows = [row for row in rows if asset_key(row) == asset]
+        conditions.append(runs.c.asset_key == asset)
     if status:
-        rows = [row for row in rows if row["status"] == status]
+        conditions.append(runs.c.status == status)
     if kind:
-        kinds = set(kind.split(","))
-        rows = [row for row in rows if row["type"] in kinds]
+        conditions.append(runs.c.type.in_(kind.split(",")))
     if query:
-        needle = query.strip().lower()
-        rows = [row for row in rows if needle in f"{(row.get('source') or {}).get('name', '')} {row.get('fixture', '')} {row['id']} {row.get('variant', '')}".lower()]
+        needle = f"%{query.strip().lower().replace(chr(92), chr(92) * 2).replace('%', chr(92) + '%').replace('_', chr(92) + '_')}%"
+        text = func.lower(func.concat_ws(" ", runs.c.row["source"]["name"].astext, runs.c.row["fixture"].astext, runs.c.id, runs.c.row["variant"].astext))
+        conditions.append(text.like(needle, escape="\\"))
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
-    return {"items": rows[offset:offset + limit], "total": len(rows), "limit": limit, "offset": offset}
+    with db.transaction(data_dir) as connection:
+        total = connection.execute(select(func.count()).select_from(runs).where(*conditions)).scalar_one()
+        rows = connection.execute(select(runs.c.row).where(*conditions).order_by(runs.c.created_at.desc(), runs.c.id.desc())
+                                  .limit(limit).offset(offset)).scalars().all()
+    return {"items": list(rows), "total": total, "limit": limit, "offset": offset}
+
+
+def artifact(data_dir: Path, run_id: str, name: str) -> bytes:
+    """Informe Markdown o SARIF guardados con la ejecución."""
+    column = {"report.md": runs.c.report, "findings.sarif": runs.c.sarif}[name]
+    with db.transaction(data_dir) as connection:
+        value = connection.execute(select(column).where(runs.c.tenant_id == TENANT, runs.c.id == _check_id(run_id))).scalar_one_or_none()
+    if value is None:
+        raise FileNotFoundError(name)
+    return value.encode("utf-8") if isinstance(value, str) else (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def delete_runs(data_dir: Path, run_ids: list[str]) -> int:
+    if not run_ids:
+        return 0
+    with db.transaction(data_dir) as connection:
+        return connection.execute(delete(runs).where(runs.c.tenant_id == TENANT, runs.c.id.in_([_check_id(item) for item in run_ids]))).rowcount
 
 
 def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = None, created_at: str | None = None) -> dict:
@@ -491,22 +503,15 @@ def render_profile_report(record: dict, profile: str, title: str = "", *, techni
 
 
 def load_run(data_dir: Path, run_id: str) -> dict:
-    path = _run_dir(data_dir, run_id) / "run.json"
-    return json.loads(path.read_text(encoding="utf-8"))
+    with db.transaction(data_dir) as connection:
+        record = connection.execute(select(runs.c.record).where(runs.c.tenant_id == TENANT, runs.c.id == _check_id(run_id))).scalar_one_or_none()
+    if record is None:
+        raise FileNotFoundError(f"Ejecución {run_id} no encontrada")
+    return record
 
 
 def list_runs(data_dir: Path) -> list[dict]:
-    root = data_dir / "runs"
-    if not root.is_dir():
-        return []
-    path = _index_path(data_dir)
-    try:
-        index = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
-    except (ValueError, OSError):
-        index = None
-    # Si el índice no existe o no cuadra con las carpetas, se reconstruye desde los archivos. Solo cuentan las
-    # carpetas con run.json: una a medio crear (o de un corte) no debe forzar una reconstrucción en cada petición.
-    folders = {entry.name for entry in root.iterdir() if entry.is_dir() and not entry.is_symlink() and (entry / "run.json").is_file()}
-    if not isinstance(index, dict) or set(index) != folders:
-        index = rebuild_index(data_dir)
-    return sorted(index.values(), key=lambda item: (item.get("created_at") or "", item["id"]), reverse=True)
+    """Las filas de listado, de la más reciente a la más antigua."""
+    with db.transaction(data_dir) as connection:
+        return list(connection.execute(select(runs.c.row).where(runs.c.tenant_id == TENANT)
+                                       .order_by(runs.c.created_at.desc(), runs.c.id.desc())).scalars())

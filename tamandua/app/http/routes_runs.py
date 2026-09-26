@@ -29,7 +29,7 @@ from tamandua.modules.reporting.pdf import render_pdf
 from tamandua.modules.reporting.technical import render_technical_pdf
 from tamandua.modules.reporting.audit import ReportError, render_audit_pdf, render_portfolio_pdf, validate_options
 from tamandua.modules.runs.kinds import FULL_SCANS
-from tamandua.modules.runs.store import _run_dir, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
+from tamandua.modules.runs.store import artifact as store_artifact, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
 from tamandua.modules.runs.store import render_repository_sarif, render_tickets
 from tamandua.app.http.core import VERSION, Request, route
 
@@ -68,7 +68,7 @@ def _artifact(request: Request, record: dict, artifact: str):
         profile = artifact.removeprefix("report-").rsplit(".", 1)[0]
         technical = None
         if record.get("type") == "lab_scan":  # el informe del laboratorio se guardó al crear la ejecución
-            technical = (_run_dir(request.data_dir, record["id"]) / "report.md").read_text(encoding="utf-8")
+            technical = store_artifact(request.data_dir, record["id"], "report.md").decode("utf-8")
         report = render_profile_report(record, profile, request.arg("title", ""), technical=technical)
         if artifact.endswith(".pdf"):
             label = {"soc2": "SOC 2 Tipo II", "iso27001": "ISO/IEC 27001:2022", "custom": "Personalizado"}[profile]
@@ -77,7 +77,7 @@ def _artifact(request: Request, record: dict, artifact: str):
         return request.send(200, report.encode("utf-8"), "text/markdown; charset=utf-8")
     if artifact in ("report.md", "findings.sarif"):
         content_type = "text/markdown; charset=utf-8" if artifact == "report.md" else "application/sarif+json"
-        return request.send(200, (_run_dir(request.data_dir, record["id"]) / artifact).read_bytes(), content_type)
+        return request.send(200, store_artifact(request.data_dir, record["id"], artifact), content_type)
     return request.json(404, {"error": "Formato no disponible para esta ejecución"})
 
 

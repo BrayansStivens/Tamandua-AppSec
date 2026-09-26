@@ -42,6 +42,8 @@ services:
       APPSEC_AGENT_PR_POLL_SECONDS: ${APPSEC_AGENT_PR_POLL_SECONDS:-300}
       APPSEC_AGENT_BRANCH_MIN_MINUTES: ${APPSEC_AGENT_BRANCH_MIN_MINUTES:-60}
       APPSEC_AGENT_ADVISORY_WATCH_HOURS: ${APPSEC_AGENT_ADVISORY_WATCH_HOURS:-24}
+      # Ejecuciones, hallazgos y triage viven en PostgreSQL (servicio `postgres`, solo en la red interna).
+      APPSEC_AGENT_DATABASE_URL: "postgresql+psycopg://tamandua:${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}@postgres:5432/tamandua"
       HOME: /home/appsec
     volumes:
       - ./data:/data
@@ -74,12 +76,40 @@ services:
     depends_on:
       opengrep:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/api/health', headers={'Host':'127.0.0.1:8766'}), timeout=4).status == 200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
+
+  # Base de datos. Sin puerto publicado: solo la app la alcanza, por la red interna de compose. Los datos, en el
+  # volumen `tamandua-pg` (make backup hace además un pg_dump).
+  postgres:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    container_name: tamandua-postgres
+    environment:
+      POSTGRES_USER: tamandua
+      POSTGRES_DB: tamandua
+      POSTGRES_PASSWORD: "${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}"
+    volumes:
+      - tamandua-pg:/var/lib/postgresql
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 128mb
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tamandua -d tamandua"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Solo construye la imagen del motor SAST (con su binario verificado por SHA-256) y comprueba
   # que arranca; la app la lanza después por cada análisis. Termina al momento: es normal.
@@ -89,3 +119,6 @@ services:
     command: ["--version"]
     network_mode: none
     restart: "no"
+
+volumes:
+  tamandua-pg:

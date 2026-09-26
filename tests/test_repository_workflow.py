@@ -5,6 +5,8 @@ import json
 import tarfile
 import tempfile
 import unittest
+
+from tamandua.modules.runs.store import artifact as store_artifact
 from pathlib import Path
 from unittest.mock import patch
 
@@ -37,7 +39,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
             self.assertEqual(next(step for step in result["steps"] if step["id"] == "sca")["status"], "not_tested")
             self.assertNotIn(secret, json.dumps(result))
             stored = save_repository_scan(root / "runs", result)
-            self.assertNotIn(secret, (root / "runs" / "runs" / stored["id"] / "report.md").read_text())
+            self.assertNotIn(secret, store_artifact(root / "runs", stored["id"], "report.md").decode())
 
     def test_osv_is_only_queried_with_explicit_opt_in(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -221,7 +223,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
             self.assertEqual(scan["context"], "Panel interno sin PII")
             data_dir = Path(temporary) / "data"
             record = save_repository_scan(data_dir, scan)
-            report = (data_dir / "runs" / record["id"] / "report.md").read_text(encoding="utf-8")
+            report = store_artifact(data_dir, record["id"], "report.md").decode()
             self.assertIn("Panel interno sin PII", report)
             self.assertIn("no una verificación del sistema", report)
 

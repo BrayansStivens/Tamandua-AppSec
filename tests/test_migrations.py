@@ -60,26 +60,44 @@ class MigrationTests(unittest.TestCase):
         with self.assertRaises(migrations.DataTooNew):
             migrations.upgrade(self.data_dir)
 
-    def test_the_old_incomplete_fix_repair_runs_as_a_migration(self):
-        from tamandua.modules.findings import registry
-        from tamandua.modules.runs.store import save_repository_scan
+    def test_an_install_from_the_file_era_is_repaired_and_imported_into_postgres(self):
+        """Una instalación con los archivos de antes (sin versión): se repara (migración 1) y se importa (3), sin tocar
+        los archivos, que quedan para volver atrás."""
+        import hashlib
         from test_dashboard import _finding, _scan
+        from tamandua.modules.findings import registry, triage
+        from tamandua.modules.runs.store import artifact, list_runs
         a, b = "a" * 64, "b" * 64
-
-        def save(findings, stamp, status="completed"):
-            record = {**_scan("org/api", findings, stamp), "status": status, "finished_at": stamp}
+        good, broken = "1" * 32, "2" * 32
+        for run_id, status, findings, stamp in ((good, "completed", [_finding(a), _finding(b)], "2026-09-01T00:00:00+00:00"),
+                                                (broken, "incomplete", [], "2026-09-02T00:00:00+00:00")):
+            folder = self.data_dir / "runs" / run_id
+            folder.mkdir(parents=True)
+            record = {**_scan("org/api", findings, stamp), "id": run_id, "status": status, "created_at": stamp, "finished_at": stamp}
             record["source"]["uid"] = "github#7"
-            return save_repository_scan(self.data_dir, record, created_at=stamp)
-        save([_finding(a), _finding(b)], "2026-09-01T00:00:00+00:00")
-        broken = save([], "2026-09-02T00:00:00+00:00", "incomplete")
-        # Un registro anterior al arreglo: aquel escaneo incompleto dio algo por remediado.
-        path = next((self.data_dir / "findings").glob("*.json"))
-        state = json.loads(path.read_text())
-        state["findings"][b].update(status="fixed", fixed={"at": "x", "run_id": broken["id"], "how": "viejo", "auto": True})
-        path.write_text(json.dumps(state))
-        migrations.upgrade(self.data_dir)
-        self.assertEqual(registry.load(self.data_dir, "github#7")["findings"][b]["status"], "open")
+            (folder / "run.json").write_text(json.dumps(record))
+            (folder / "report.md").write_text(f"# informe {run_id}")
+        registry_file = self.data_dir / "findings" / f"{hashlib.sha256(b'github#7').hexdigest()[:32]}.json"
+        registry_file.parent.mkdir()
+        registry_file.write_text(json.dumps({"asset": "github#7", "name": "org/api", "applied": [good, broken], "findings": {
+            a: {"status": "open", "first_seen": "2026-09-01T00:00:00+00:00", "finding": _finding(a)},
+            # Un escaneo incompleto lo dio por remediado antes de que eso dejara de ocurrir: hay que reabrirlo.
+            b: {"status": "fixed", "first_seen": "2026-09-01T00:00:00+00:00", "finding": _finding(b),
+                "fixed": {"at": "x", "run_id": broken, "how": "viejo", "auto": True}}}}))
+        (self.data_dir / "triage.json").write_text(json.dumps({"github#7": {a: {"status": "in_progress", "reason": "", "by": "ana"}}}))
+        before = sorted(path.read_bytes() for path in self.data_dir.rglob("run.json"))
+        done = migrations.upgrade(self.data_dir)
+        self.assertEqual(done, [migration.name for migration in migrations.MIGRATIONS])
+        self.assertEqual({row["id"] for row in list_runs(self.data_dir)}, {good, broken})
+        self.assertEqual(artifact(self.data_dir, good, "report.md").decode(), f"# informe {good}")
+        state = registry.load(self.data_dir, "github#7")
+        self.assertEqual({digest: entry["status"] for digest, entry in state["findings"].items()}, {a: "open", b: "open"})
+        self.assertEqual(state["applied"], [good, broken])  # la idempotencia por ejecución sobrevive a la importación
+        self.assertEqual(triage.load_asset(self.data_dir, "github#7")[a]["status"], "in_progress")
+        self.assertEqual(sorted(path.read_bytes() for path in self.data_dir.rglob("run.json")), before)  # intactos
         self.assertEqual(self.version()["history"][0]["result"], 1)
+        self.assertEqual(migrations.upgrade(self.data_dir), [])  # una sola vez
+
 
 if __name__ == "__main__":
     unittest.main()
