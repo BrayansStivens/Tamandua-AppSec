@@ -72,6 +72,19 @@ def color_of(item: dict, *, boundary: bool = False) -> str:
     return "neutral" if boundary else KIND_COLOR.get(base_kind(item), "neutral")
 
 
+def is_manual(component: dict) -> bool:
+    """A chosen color that differs from the role's color: it needs its own legend entry."""
+    return component.get("color") in COLORS and component["color"] != KIND_COLOR.get(base_kind(component), "neutral")
+
+
+def legend_tones(model: dict) -> tuple[list[str], list[str]]:
+    """Legend tones in use: (role colors, in LEGEND order; manual colors, in palette order). Same as legendTones in threat-colors.ts."""
+    components = model.get("components", [])
+    automatic = {color_of(item) for item in components if not is_manual(item)}
+    manual = {item["color"] for item in components if is_manual(item)}
+    return [tone for tone, _ in LEGEND if tone in automatic], [tone for tone in COLORS if tone in manual]
+
+
 def _snap(value: float) -> float:
     # Como Math.round del editor (la mitad, hacia arriba), no el redondeo al par de round().
     return math.floor(value / SNAP + 0.5) * SNAP
@@ -512,8 +525,11 @@ def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | Non
     bottom = max((item[3] for item in extents), default=420) + 76
     width, height = max(560, right - left), max(300, bottom - top)
     # Leyenda: los colores automáticos que se usan y los tipos de línea; si no cabe en una fila, sigue en otra.
-    used = {color_of(item) for item in components.values() if not item.get("color")}
-    entries = [("swatch", tone, localize(label, locale)) for tone, label in LEGEND if tone in used]
+    # A manual color shows the team's label, or a placeholder so that every color on the diagram is explained.
+    automatic, manual = legend_tones(model)
+    labels, names = model.get("legend") or {}, dict(LEGEND)
+    entries = [("swatch", tone, localize(names[tone], locale)) for tone in automatic]
+    entries += [("swatch", tone, (labels.get(tone) or "").strip()[:40] or t("threats.diagram.legend_custom", locale)) for tone in manual]
     entries += [("line", None, t("threats.diagram.legend_encrypted", locale)), ("dashed", None, t("threats.diagram.legend_unencrypted", locale)),
                 ("note", None, t("threats.diagram.legend_note", locale))]
     rows, row, used_w = [], [], 0.0

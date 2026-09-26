@@ -1,12 +1,13 @@
-# Pruebas y análisis de seguridad en cada pull request y en cada push a main.
+# Tests and security analysis on every pull request and every push to main.
 #
-# - backend: pruebas de Python.
-# - panel: tipos, lint y que tamandua/app/static está recompilado (el panel servido es el del repositorio).
-# - tamandua: Tamandua se analiza a sí mismo con su CLI (el mismo uso que se documenta en docs/cli.md).
-#   En un PR solo cuenta lo que el PR introduce y bloquea desde severidad alta; en main analiza todo e
-#   informa. fixtures/ son ejemplos vulnerables a propósito: se excluyen y la salida dice cuántos son.
+# - backend: Python tests.
+# - panel: types, lint, and a check that tamandua/app/static is rebuilt (the served panel is the one in the repo).
+# - tamandua: Tamandua analyzes itself with its CLI (the same usage documented in docs/cli.md).
+#   On a PR only what the PR introduces counts, and it blocks from high severity up; on main it analyzes
+#   everything and reports. fixtures/ are intentionally vulnerable examples: they are excluded and the output
+#   says how many there are.
 #
-# Acciones fijadas por commit; permisos mínimos por trabajo; sin credenciales persistidas en el checkout.
+# Actions pinned by commit; least-privilege permissions per job; no credentials persisted in the checkout.
 name: CI
 
 on:
@@ -22,7 +23,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend (contratos y pruebas)
+    name: Backend (contracts and tests)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -32,7 +33,7 @@ jobs:
         image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
         env:
           POSTGRES_USER: tamandua
-          POSTGRES_PASSWORD: tamandua  # solo para el contenedor efímero del CI
+          POSTGRES_PASSWORD: tamandua  # only for the ephemeral CI container
           POSTGRES_DB: tamandua
         ports: ["5432:5432"]
         options: --health-cmd "pg_isready -U tamandua" --health-interval 2s --health-timeout 5s --health-retries 30
@@ -47,22 +48,22 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
-      - name: Dependencias
+      - name: Dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
-      - name: Contratos de arquitectura
+      - name: Architecture contracts
         run: lint-imports
-      - name: El esquema OpenAPI del panel corresponde a la API
+      - name: The panel's OpenAPI schema matches the API
         run: |
           python -c "from tamandua.app.api import openapi_document; print(openapi_document(), end='')" > /tmp/openapi.json
           if ! cmp -s /tmp/openapi.json web/src/shared/api/openapi.json; then
-            echo "::error::web/src/shared/api/openapi.json no corresponde a la API: ejecuta «make openapi» y sube el resultado."
+            echo "::error::web/src/shared/api/openapi.json does not match the API: run 'make openapi' and commit the result."
             exit 1
           fi
-      - name: Pruebas
+      - name: Tests
         run: python -m unittest discover -s tests
 
   panel:
-    name: Panel (tipos, lint y compilado)
+    name: Panel (types, lint and build)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -74,67 +75,67 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: "22"
-      - name: Dependencias
+      - name: Dependencies
         working-directory: web
         run: npm ci --no-audit --no-fund
-      - name: Tipos
+      - name: Types
         working-directory: web
         run: npx tsc -b
       - name: Lint
         working-directory: web
         run: npm run lint
-      - name: El panel servido está recompilado
+      - name: The served panel is rebuilt
         run: |
           (cd web && npm run build)
           if [ -n "$(git status --porcelain -- tamandua/app/static)" ]; then
             git status --short -- tamandua/app/static
-            echo "::error::tamandua/app/static no corresponde a web/src: ejecuta «make web» y sube el resultado."
+            echo "::error::tamandua/app/static does not match web/src: run 'make web' and commit the result."
             exit 1
           fi
 
   tamandua:
-    name: Tamandua sobre sí mismo
+    name: Tamandua on itself
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
-      actions: read           # upload-sarif lee el run en repositorios privados
-      security-events: write  # subir el SARIF a code scanning
+      actions: read           # upload-sarif reads the run in private repositories
+      security-events: write  # upload the SARIF to code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 0  # hace falta la historia para comparar con la rama base
+          fetch-depth: 0  # history is needed to compare with the base branch
           persist-credentials: false
-      - name: Construir Tamandua
+      - name: Build Tamandua
         run: make build
-      - name: Analizar
+      - name: Analyze
         env:
           EVENT: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}  # nunca interpolado directamente en el script
+          BASE_REF: ${{ github.base_ref }}  # never interpolated directly into the script
         run: |
           mkdir -p "$RUNNER_TEMP/tamandua-data"
           scope=()
           if [ "$EVENT" = pull_request ]; then
             scope=(--base "origin/$BASE_REF")
           else
-            scope=(--fail-on never)  # main: inventario completo en code scanning, sin bloquear
+            scope=(--fail-on never)  # main: full inventory in code scanning, without blocking
           fi
-          version="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' tamandua/version.py)"  # la etiqueta que acaba de construir make build
+          version="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' tamandua/version.py)"  # the tag that make build just built
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)" \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "$PWD":/src:ro -v "$RUNNER_TEMP/tamandua-data":/data \
             "tamandua/app:$version" python -m tamandua scan /src --name tamandua \
             --exclude fixtures/ "${scope[@]}" --format sarif --output /data/tamandua.sarif
-      - name: ¿Hay SARIF?
+      - name: Is there a SARIF?
         id: sarif
         if: always()
         run: if [ -s "$RUNNER_TEMP/tamandua-data/tamandua.sarif" ]; then echo "exists=true" >> "$GITHUB_OUTPUT"; fi
-      - name: Subir a code scanning
-        # En PR desde un fork el token no puede escribir resultados: el veredicto ya está en el paso de análisis.
+      - name: Upload to code scanning
+        # On a PR from a fork the token cannot write results: the verdict is already in the analysis step.
         if: always() && steps.sarif.outputs.exists == 'true' && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
-        # En un repositorio privado sin GitHub Advanced Security, code scanning no acepta resultados: no se rompe
-        # el CI por eso (el veredicto es el del paso «Analizar»).
+        # In a private repository without GitHub Advanced Security, code scanning does not accept results: CI does
+        # not fail because of that (the verdict is the one from the "Analyze" step).
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
         with:

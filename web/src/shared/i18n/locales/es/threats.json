@@ -18,7 +18,8 @@
     "services": "APIs, servicios y tareas",
     "data": "Datos",
     "identity": "Identidad",
-    "actors": "Actores y terceros"
+    "actors": "Actores y terceros",
+    "custom": "Color personalizado"
   },
   "count": {
     "components_one": "{{count}} componente",
@@ -334,6 +335,10 @@
     "unencrypted_flow": "sin cifrar",
     "unencrypted": "Sin cifrar",
     "legend": "Leyenda del diagrama",
+    "legend_edit": "{{label}} ({{color}}): editar la etiqueta de la leyenda",
+    "legend_edit_hint": "Ponle nombre a este color en la leyenda",
+    "legend_input": "Etiqueta de la leyenda para el color {{color}}",
+    "legend_remove": "Quitar etiqueta",
     "aria": {
       "node": "Haz clic en Intro o Espacio para seleccionar el componente. Supr para quitarlo, Escape para cancelar.",
       "node_keyboard_disabled": "Haz clic en Intro o Espacio para seleccionar el componente.",
@@ -387,6 +392,9 @@
     "color": "Color",
     "color_by_kind": "Según el tipo ({{color}})",
     "automatic": "Automático",
+    "legend_label": "Etiqueta de la leyenda",
+    "legend_label_hint": "Se aplica a todos los componentes de color {{color}}. Si la dejas vacía, la leyenda muestra «{{placeholder}}».",
+    "legend_same_as_kind": "Es el color de su tipo: la leyenda lo incluye en «{{category}}».",
     "description": "Descripción",
     "description_placeholder": "Qué hace y qué datos maneja",
     "code": "Código (repositorio)",
@@ -404,7 +412,7 @@
     "add": "Añade componentes y fronteras desde la barra del lienzo.",
     "flows": "Para crear un flujo, arrastra desde uno de los puntos de un componente hasta otro. La flecha indica hacia dónde viajan los datos.",
     "select": "Haz clic en un componente, un flujo o el nombre de una frontera para editarlo aquí. Suprimir borra lo seleccionado.",
-    "colors": "Color: el del papel de cada componente (leyenda abajo a la derecha); cámbialo al seleccionarlo. Anillo naranja: amenazas con indicios en los análisis. Línea roja discontinua: flujo sin cifrar.",
+    "colors": "Color: el del papel de cada componente (leyenda abajo a la derecha); cámbialo al seleccionarlo. Para ponerle nombre a un color que elegiste, haz clic en él en la leyenda o usa el campo bajo el selector de color. Anillo naranja: amenazas con indicios en los análisis. Línea roja discontinua: flujo sin cifrar.",
     "numbers": "Cada flujo lleva un número: es el mismo del SVG y de la tabla de flujos del informe."
   },
   "importer": {

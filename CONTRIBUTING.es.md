@@ -24,6 +24,6 @@ Gracias por el interés. Antes de abrir un PR:
    - Si cambias el formato de algo que ya está en `data/`: lector tolerante y, si hay que reescribir datos, una migración con su prueba (ver [desarrollo.md](docs/es/desarrollo.md)).
 4. Nunca pegues tokens, claves ni logs sin revisar en issues o PRs.
 
-**Firma del CLA.** En tu primer PR, un bot te pedirá aceptar el [Acuerdo de Licencia de Contribución](CLA.md) con un comentario. Conservas los derechos de autor; el acuerdo permite distribuir tu aporte bajo la [AGPL-3.0](LICENSE) (las reglas de `rules/`, bajo MIT) y también en una posible edición comercial, con el compromiso de que siga disponible en la edición libre.
+**Firma del CLA.** En tu primer PR, un bot te pedirá aceptar el [Acuerdo de Licencia de Contribución](CLA.es.md) con un comentario. Conservas los derechos de autor; el acuerdo permite distribuir tu aporte bajo la [AGPL-3.0](LICENSE) (las reglas de `rules/`, bajo MIT) y también en una posible edición comercial, con el compromiso de que siga disponible en la edición libre.
 
 Detalles para ejecutar sin contenedores en [docs/es/desarrollo.md](docs/es/desarrollo.md).

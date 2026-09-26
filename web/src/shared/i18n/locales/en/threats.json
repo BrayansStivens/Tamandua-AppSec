@@ -18,7 +18,8 @@
     "services": "APIs, services and jobs",
     "data": "Data",
     "identity": "Identity",
-    "actors": "Actors and third parties"
+    "actors": "Actors and third parties",
+    "custom": "Custom color"
   },
   "count": {
     "components_one": "{{count}} component",
@@ -334,6 +335,10 @@
     "unencrypted_flow": "unencrypted",
     "unencrypted": "Unencrypted",
     "legend": "Diagram legend",
+    "legend_edit": "{{label}} ({{color}}): edit legend label",
+    "legend_edit_hint": "Name this color in the legend",
+    "legend_input": "Legend label for {{color}}",
+    "legend_remove": "Remove label",
     "aria": {
       "node": "Press Enter or Space to select the component. Delete removes it, Escape cancels.",
       "node_keyboard_disabled": "Press Enter or Space to select the component.",
@@ -387,6 +392,9 @@
     "color": "Color",
     "color_by_kind": "Based on type ({{color}})",
     "automatic": "Automatic",
+    "legend_label": "Legend label",
+    "legend_label_hint": "Applies to every {{color}} component. Leave it empty and the legend shows “{{placeholder}}”.",
+    "legend_same_as_kind": "This is its type's color: the legend lists it under “{{category}}”.",
     "description": "Description",
     "description_placeholder": "What it does and what data it handles",
     "code": "Code (repository)",
@@ -404,7 +412,7 @@
     "add": "Add components and boundaries from the canvas toolbar.",
     "flows": "To create a flow, drag from one of a component's connection points to another component. The arrow shows which way the data travels.",
     "select": "Click a component, a flow or a boundary's name to edit it here. Delete removes the selection.",
-    "colors": "Color: each component takes the color of its role (legend at the bottom right); change it once selected. Orange ring: threats with evidence from scans. Dashed red line: unencrypted flow.",
+    "colors": "Color: each component takes the color of its role (legend at the bottom right); change it once selected. To name a color you chose, click it in the legend or use the field below the color picker. Orange ring: threats with evidence from scans. Dashed red line: unencrypted flow.",
     "numbers": "Each flow has a number, the same one used in the SVG and in the report's flow table."
   },
   "importer": {

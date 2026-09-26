@@ -250,7 +250,8 @@ function CustomModulesPicker({ value, onChange }: { value: CustomModule[]; onCha
 function payloadOf(model: Model) {
   return { name: model.name, description: model.description, methodology: model.methodology ?? 'stride', custom_modules: model.custom_modules ?? ['manual', 'elements'], repositories: model.repositories ?? [], repository_refs: model.repository_refs ?? [], components: model.components, flows: model.flows,
            boundaries: model.boundaries, manual_threats: model.manual_threats ?? [], attack_trees: model.attack_trees ?? [],
-           attack_mappings: model.attack_mappings ?? [], pasta: Object.fromEntries(Object.entries(model.pasta ?? {}).filter(([, text]) => text.trim())) }
+           attack_mappings: model.attack_mappings ?? [], pasta: Object.fromEntries(Object.entries(model.pasta ?? {}).filter(([, text]) => text.trim())),
+           legend: model.legend ?? {} }
 }
 
 function Threats({ view, draft, methodology, busy, onChanged, onOpenRun, onSaveModel }: { view: View; draft: Model; methodology: Methodology; busy: boolean; onChanged: (view: View) => void; onOpenRun: (id: string) => void; onSaveModel: (model: Model) => Promise<boolean> }) {

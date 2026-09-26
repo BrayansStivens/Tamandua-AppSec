@@ -1,5 +1,5 @@
 import { baseKind } from '@/features/threats/threat-layout'
-import type { Component } from '@/features/threats/threat-model-types'
+import type { Component, Model } from '@/features/threats/threat-model-types'
 
 // Colores del diagrama: solo tokens del panel (claro y oscuro con contraste comprobado), los mismos que
 // usan el SVG y el PDF (tamandua/modules/threats/diagram.py). Sin color elegido, cada componente toma el de su
@@ -24,6 +24,24 @@ export const LEGEND: [Tone, string][] = [
 export const isTone = (value: unknown): value is Tone => TONES.includes(value as Tone)
 export const toneOf = (component: Component): Tone => isTone(component.color) ? component.color : KIND_TONE[baseKind(component)] ?? 'neutral'
 export const boundaryTone = (color?: string | null): Tone => isTone(color) ? color : 'neutral'
+export const kindTone = (component: Component): Tone => KIND_TONE[baseKind(component)] ?? 'neutral'
+// A chosen color that differs from the role's color gets its own legend entry, labeled by the team.
+export const isManual = (component: Component) => isTone(component.color) && component.color !== kindTone(component)
+
+// Legend tones in use: role colors (LEGEND order) and manual colors (palette order). Same as legend_tones in diagram.py.
+export function legendTones(model: Pick<Model, 'components'>): { automatic: Tone[]; manual: Tone[] } {
+  const automatic = new Set(model.components.filter(item => !isManual(item)).map(toneOf))
+  const manual = new Set(model.components.filter(isManual).map(toneOf))
+  return { automatic: LEGEND.map(([tone]) => tone).filter(tone => automatic.has(tone)), manual: TONES.filter(tone => manual.has(tone)) }
+}
+
+// Sets or clears (empty text) the team's label for a manual color; it applies to every component with that color.
+export function withLegendLabel(model: Model, tone: Tone, label: string): Model {
+  const legend = { ...model.legend }
+  if (label.trim()) legend[tone] = label
+  else delete legend[tone]
+  return { ...model, legend }
+}
 
 // Clases literales (Tailwind solo genera las que ve escritas completas).
 export const NODE_TONE: Record<Tone, string> = {

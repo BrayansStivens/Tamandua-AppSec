@@ -84,7 +84,8 @@
     "pasta_stage": "La etapa «{{stage}}»",
     "each_manual": "Cada amenaza propia",
     "each_node": "Cada paso del árbol",
-    "each_tree": "Cada árbol"
+    "each_tree": "Cada árbol",
+    "legend_label": "Etiqueta de la leyenda ({{color}})"
   },
   "errors": {
     "field_required": "{{field}}: campo obligatorio",
@@ -93,6 +94,7 @@
     "folder_relative": "{{field}}: usa una carpeta relativa del repositorio, p. ej. frontend/ o services/api/",
     "folder_segments": "{{field}}: sin «..» ni tramos vacíos",
     "invalid_color": "Color inválido en {{id}}",
+    "invalid_legend": "La leyenda del diagrama solo admite colores de la paleta",
     "invalid_model": "Modelo inválido",
     "invalid_component": "Componente inválido",
     "component_id": "Cada componente necesita un identificador único (minúsculas, números y guiones)",
@@ -199,6 +201,7 @@
     "legend_data": "Datos",
     "legend_identity": "Identidad",
     "legend_actors": "Actores y terceros",
+    "legend_custom": "Color personalizado",
     "legend_encrypted": "Flujo cifrado",
     "legend_unencrypted": "Sin cifrar",
     "legend_note": "«3 · HTTPS»: flujo n.º 3 (qué viaja, en la tabla de flujos del informe)",

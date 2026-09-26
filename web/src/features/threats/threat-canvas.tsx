@@ -5,13 +5,13 @@ import {
   type Connection, type Edge, type EdgeChange, type EdgeProps, type Node, type NodeChange, type NodeProps,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { Check as CheckIcon, Globe2, LayoutGrid, Lock, Plus, Square, Trash2, Undo2 } from 'lucide-react'
+import { Check as CheckIcon, Globe2, LayoutGrid, Lock, Pencil, Plus, Square, Trash2, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
 import { autoLayout, baseKind, curvePoint, fitBox, labelSpots, lanes, NODE_H, NODE_W, shift, sizeOf, type Side } from '@/features/threats/threat-layout'
-import { BOUNDARY_TONE, boundaryTone, LEGEND, NODE_BASE, NODE_TONE, NODE_WASH, TEXT_TONE, toneOf, TONE_NAMES, TONES, type Tone } from '@/features/threats/threat-colors'
+import { BOUNDARY_TONE, boundaryTone, isManual, kindTone, LEGEND, legendTones, NODE_BASE, NODE_TONE, NODE_WASH, TEXT_TONE, toneOf, TONE_NAMES, TONES, withLegendLabel, type Tone } from '@/features/threats/threat-colors'
 import { assetGroups, newId, PROCESSES, STORES, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/features/threats/threat-model-types'
 
 // Editor visual del modelo: los componentes se arrastran, los flujos se crean uniendo sus puntos y las
@@ -331,7 +331,7 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
         fitView fitViewOptions={{ padding: 0.15 }} minZoom={0.2} maxZoom={2} snapToGrid snapGrid={[8, 8]}>
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
         <Controls showInteractive={false} />
-        <Panel position="bottom-right"><Legend /></Panel>
+        <Panel position="bottom-right"><Legend model={model} setModel={setModel} /></Panel>
         <Panel position="top-left" className="flex flex-wrap gap-1.5">
           <Select value={null} onValueChange={value => { if (value) addComponent(value as Kind) }}><SelectTrigger aria-label={t('canvas.add_component')} className="h-8 border-app-line bg-panel text-xs shadow-sm"><Plus className="size-3.5" /><SelectValue placeholder={t('canvas.component_placeholder')} /></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}<SelectItem value="custom">{t('canvas.other_kind')}</SelectItem></SelectContent></Select>
           <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={addBoundary}><Square />{t('canvas.boundary')}</Button>
@@ -395,7 +395,9 @@ function Inspector({ model, setModel, catalog, node, flowId: selected, onRemove 
       </div>
       {item.kind === 'custom' && <label className={field}><span className={label}>{t('inspector.custom_kind')}</span><Input value={item.custom_kind ?? ''} maxLength={80} onChange={event => update({ custom_kind: event.target.value })} placeholder={t('inspector.custom_kind_placeholder')} className="h-8 border-app-line bg-app-soft" /></label>}
       {item.kind === 'custom' && <label className={field}><span className={label}>{t('inspector.custom_base')}</span><Select value={item.custom_base || 'service'} onValueChange={value => { if (value) update({ custom_base: value as Exclude<Kind, 'custom'> }) }}><SelectTrigger aria-label={t('inspector.custom_base')} className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.custom_base || 'service']}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-[11px] text-app-subtle">{t('inspector.custom_base_hint')}</p></label>}
-      <ColorPicker label={t('inspector.color')} value={item.color} automatic={t('inspector.color_by_kind', { color: t(TONE_NAMES[toneOf({ ...item, color: '' })]).toLowerCase() })} onChange={color => update({ color })} />
+      <ColorPicker label={t('inspector.color')} value={item.color} automatic={t('inspector.color_by_kind', { color: t(TONE_NAMES[kindTone(item)]).toLowerCase() })} onChange={color => update({ color })} />
+      {isManual(item) && <LegendLabelField model={model} setModel={setModel} tone={toneOf(item)} />}
+      {!isManual(item) && item.color && <p className="-mt-2 text-[11px] text-app-subtle">{t('inspector.legend_same_as_kind', { category: t(LEGEND.find(([tone]) => tone === kindTone(item))?.[1] ?? 'legend.actors') })}</p>}
       <label className={field}><span className={label}>{t('inspector.description')}</span><textarea value={item.description ?? ''} maxLength={400} rows={2} onChange={event => update({ description: event.target.value })} placeholder={t('inspector.description_placeholder')} className="w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-fg" /></label>
       <label className={field}><span className={label}>{t('inspector.code')}</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, asset_ref: event.target.value ? '' : item.asset_ref })} className={select}><option value="">{t('inspector.not_linked')}</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select>{item.asset_ref && !item.asset && <p className="mt-1 text-xs text-warning">{t('inspector.imported_ref', { ref: item.asset_ref })}</p>}</label>
       {item.asset && <div className={field}><label htmlFor="tm-component-path" className={label}>{t('inspector.path')}</label><Input id="tm-component-path" aria-describedby="tm-component-path-hint" value={item.path ?? ''} maxLength={200} placeholder={t('inspector.path_placeholder')} onChange={event => update({ path: event.target.value })} className="h-8 border-app-line bg-app-soft font-mono text-xs" />
@@ -449,10 +451,55 @@ function ColorPicker({ label, value, automatic, onChange }: { label: string; val
   </div>
 }
 
-function Legend() {
+// Label for a manual color, shown under the color picker; it names the color for every component that uses it.
+function LegendLabelField({ model, setModel, tone }: { model: Model; setModel: (model: Model) => void; tone: Tone }) {
   const { t } = useTranslation('threats')
-  return <div role="group" aria-label={t('canvas.legend')} className="hidden max-w-[420px] flex-wrap md:flex items-center gap-x-3 gap-y-1 rounded-lg border border-app-line bg-panel/95 px-2.5 py-1.5 text-[11px] text-app-muted shadow-sm">
-    {LEGEND.map(([tone, text]) => <span key={tone} className="flex items-center gap-1"><span aria-hidden className={`inline-block h-2.5 w-4 rounded-sm border ${NODE_TONE[tone]}`} />{t(text)}</span>)}
+  return <div className="-mt-2 space-y-1">
+    <label htmlFor="tm-legend-label" className="text-[11px] font-medium text-app-muted">{t('inspector.legend_label')}</label>
+    <Input id="tm-legend-label" aria-describedby="tm-legend-label-hint" value={model.legend?.[tone] ?? ''} maxLength={40} placeholder={t('legend.custom')}
+      onChange={event => setModel(withLegendLabel(model, tone, event.target.value))} className="h-8 border-app-line bg-app-soft" />
+    <p id="tm-legend-label-hint" className="text-[11px] leading-4 text-app-subtle">{t('inspector.legend_label_hint', { color: t(TONE_NAMES[tone]).toLowerCase(), placeholder: t('legend.custom') })}</p>
+  </div>
+}
+
+const swatch = (tone: Tone) => <span aria-hidden className={`inline-block h-2.5 w-4 shrink-0 rounded-sm border ${NODE_TONE[tone]}`} />
+
+// Role colors in use, then one entry per manual color with the team's label (a placeholder until it has one).
+// Manual entries open an inline editor; removing the label keeps the color.
+function Legend({ model, setModel }: { model: Model; setModel: (model: Model) => void }) {
+  const { t } = useTranslation('threats')
+  const [editing, setEditing] = useState<Tone | null>(null)
+  const [value, setValue] = useState('')
+  const box = useRef<HTMLDivElement>(null)
+  const { automatic, manual } = legendTones(model)
+  // A tone that stops being used while its editor is open closes it (it must not reopen on its own later).
+  const active = editing && manual.includes(editing) ? editing : null
+  const open = (tone: Tone) => { setValue(model.legend?.[tone] ?? ''); setEditing(tone) }
+  const close = (tone: Tone, label?: string) => {
+    if (label !== undefined) setModel(withLegendLabel(model, tone, label.trim()))
+    setEditing(null)
+    requestAnimationFrame(() => box.current?.querySelector<HTMLButtonElement>(`[data-legend="${tone}"]`)?.focus())
+  }
+  return <div ref={box} role="group" aria-label={t('canvas.legend')} className="hidden max-w-[420px] flex-wrap md:flex items-center gap-x-3 gap-y-1 rounded-lg border border-app-line bg-panel/95 px-2.5 py-1.5 text-[11px] text-app-muted shadow-sm">
+    {automatic.map(tone => <span key={tone} className="flex items-center gap-1">{swatch(tone)}{t(LEGEND.find(([entry]) => entry === tone)![1])}</span>)}
+    {manual.map(tone => {
+      const label = model.legend?.[tone]?.trim()
+      const color = t(TONE_NAMES[tone])
+      if (active === tone) return <form key={tone} className="nokey flex basis-full flex-wrap items-center gap-1"
+        onSubmit={event => { event.preventDefault(); close(tone, value) }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(tone) } }}>
+        {swatch(tone)}
+        <Input autoFocus value={value} maxLength={40} placeholder={t('legend.custom')} aria-label={t('canvas.legend_input', { color: color.toLowerCase() })}
+          onChange={event => setValue(event.target.value)} className="h-7 min-w-0 flex-1 border-app-line bg-app-soft text-xs" />
+        <Button type="submit" size="xs">{t('common:actions.save')}</Button>
+        <Button type="button" size="xs" variant="ghost" onClick={() => close(tone)}>{t('common:actions.cancel')}</Button>
+        {label && <Button type="button" size="xs" variant="ghost" onClick={() => close(tone, '')}>{t('canvas.legend_remove')}</Button>}
+      </form>
+      return <button key={tone} type="button" data-legend={tone} onClick={() => open(tone)} title={t('canvas.legend_edit_hint')}
+        aria-label={t('canvas.legend_edit', { label: label || t('legend.custom'), color })}
+        className="flex min-h-6 items-center gap-1 rounded px-1 -mx-1 hover:bg-app-soft hover:text-app-fg">
+        {swatch(tone)}<span className={label ? '' : 'italic'}>{label || t('legend.custom')}</span><Pencil aria-hidden className="size-3 text-app-subtle" />
+      </button>
+    })}
     <span className="flex items-center gap-1"><span aria-hidden className="inline-block w-4 border-t-[1.5px] border-dashed border-danger" />{t('canvas.unencrypted')}</span>
   </div>
 }

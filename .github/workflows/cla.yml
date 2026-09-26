@@ -1,13 +1,13 @@
-# Pide la firma del CLA (CLA.md) en los pull requests y la registra en la rama `cla-signatures`
-# (signatures/v1/cla.json). Sustituye a contributor-assistant/github-action, archivada en marzo de 2026:
-# el script es nuestro y solo usa actions/github-script, mantenida por GitHub y fijada por commit.
+# Asks for the CLA signature (CLA.md) on pull requests and records it in the `cla-signatures` branch
+# (signatures/v1/cla.json). Replaces contributor-assistant/github-action, archived in March 2026:
+# the script is ours and only uses actions/github-script, maintained by GitHub and pinned by commit.
 #
-# Por qué pull_request_target es seguro aquí: el workflow no descarga ni ejecuta el código del PR
-# (no hay checkout ni `run:`), y el script no interpola nada del evento en una orden: lee el PR por
-# la API, compara el comentario con la frase exacta y escribe en una rama propia.
+# Why pull_request_target is safe here: the workflow neither downloads nor runs the PR's code
+# (no checkout, no `run:`), and the script interpolates nothing from the event into a command: it reads
+# the PR through the API, compares the comment with the exact phrase and writes to a branch of its own.
 name: CLA
 
-on:  # zizmor: ignore[dangerous-triggers] sin checkout ni ejecución del código del PR (ver arriba)
+on:  # zizmor: ignore[dangerous-triggers] no checkout or execution of the PR's code (see above)
   issue_comment:
     types: [created]
   pull_request_target:
@@ -25,21 +25,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write        # registrar la firma en la rama cla-signatures
-      pull-requests: write   # leer los commits del PR y comentar
-      statuses: write        # estado «CLA» en el último commit
+      contents: write        # record the signature in the cla-signatures branch
+      pull-requests: write   # read the PR's commits and comment
+      statuses: write        # "CLA" status on the latest commit
     if: >-
       github.event_name == 'pull_request_target' ||
       (github.event.issue.pull_request &&
         (github.event.comment.body == 'recheck' ||
+         github.event.comment.body == 'I have read the Tamandua CLA and I accept it' ||
          github.event.comment.body == 'He leído el CLA de Tamandua y lo acepto'))
     steps:
-      - name: Comprobar y registrar firmas
-        # v9.0.0, fijada por commit
+      - name: Check and record signatures
+        # v9.0.0, pinned by commit
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         with:
           script: |
-            const PHRASE = 'He leído el CLA de Tamandua y lo acepto'
+            const PHRASE = 'I have read the Tamandua CLA and I accept it'
+            const PHRASES = [PHRASE, 'He leído el CLA de Tamandua y lo acepto']  // either language signs
             const BRANCH = 'cla-signatures'
             const FILE = 'signatures/v1/cla.json'
             const MARKER = '<!-- tamandua-cla -->'
@@ -70,7 +72,7 @@ jobs:
               }
             }
 
-            // Autores de los commits del PR con cuenta de GitHub; los bots y la lista de permitidos no firman.
+            // Authors of the PR's commits with a GitHub account; bots and the allowlist don't sign.
             async function authors() {
               const commits = await github.paginate(github.rest.pulls.listCommits, { owner, repo, pull_number: number, per_page: 100 })
               const people = new Map()
@@ -80,7 +82,7 @@ jobs:
                 if (who && who.id) {
                   if (who.type !== 'Bot' && !ALLOWLIST.has(who.login)) people.set(who.id, who.login)
                 } else {
-                  unknown.add((commit.commit.author && commit.commit.author.name) || 'sin nombre')
+                  unknown.add((commit.commit.author && commit.commit.author.name) || 'no name')
                 }
               }
               return { people, unknown }
@@ -97,10 +99,10 @@ jobs:
                 const content = Buffer.from(JSON.stringify({ signedContributors: list }, null, 2) + '\n').toString('base64')
                 try {
                   await github.rest.repos.createOrUpdateFileContents({ owner, repo, path: FILE, branch: BRANCH, sha, content,
-                    message: `CLA firmado por ${commenter.login} en #${number}` })
+                    message: `CLA signed by ${commenter.login} in #${number}` })
                   return
                 } catch (error) {
-                  // Otra firma entró a la vez: se relee y se reintenta.
+                  // Another signature landed at the same time: reload and retry.
                   if ((error.status !== 409 && error.status !== 422) || attempt === 2) throw error
                 }
               }
@@ -109,17 +111,17 @@ jobs:
             async function report(pending, unknown, sha) {
               const ok = pending.length === 0 && unknown.size === 0
               await github.rest.repos.createCommitStatus({ owner, repo, sha, context: 'CLA', state: ok ? 'success' : 'failure',
-                description: ok ? 'Todas las personas del PR han firmado el CLA' : 'Falta firmar el CLA' })
+                description: ok ? 'Everyone in this PR has signed the CLA' : 'CLA signature missing' })
               const body = ok
-                ? `${MARKER}\nTodas las personas que contribuyen en este PR han firmado el CLA. ¡Gracias!`
+                ? `${MARKER}\nEveryone contributing to this PR has signed the CLA. Thank you.`
                 : [MARKER,
-                   `¡Gracias por tu contribución! Antes de poder aceptarla necesitamos que leas y aceptes el [Acuerdo de Licencia de Contribución](${DOCUMENT}). ` +
-                   'Conservas los derechos de autor de tu código; el acuerdo nos da una licencia para distribuirlo también en una posible edición comercial, ' +
-                   'y garantiza que seguirá disponible en la edición libre.',
-                   '', 'Para firmarlo, comenta exactamente esta frase (solo hace falta una vez):', '', '```', PHRASE, '```',
-                   ...(pending.length ? ['', `Falta la firma de: ${pending.map(login => '@' + login).join(', ')}.`] : []),
-                   ...(unknown.size ? ['', `Hay commits sin cuenta de GitHub asociada (${[...unknown].join(', ')}): configura en git el email ` +
-                                       'de tu cuenta, reescribe esos commits y vuelve a subirlos.'] : [])].join('\n')
+                   `Thank you for your contribution. Before we can accept it, please read and accept the [Contributor License Agreement](${DOCUMENT}). ` +
+                   'You keep the copyright in your code; the agreement gives us a license to also distribute it in a possible commercial edition, ' +
+                   'and guarantees it stays available in the free edition.',
+                   '', 'To sign it, comment exactly this phrase (you only need to do it once):', '', '```', PHRASE, '```',
+                   ...(pending.length ? ['', `Signature still needed from: ${pending.map(login => '@' + login).join(', ')}.`] : []),
+                   ...(unknown.size ? ['', `Some commits have no linked GitHub account (${[...unknown].join(', ')}): set your account's email ` +
+                                       'in git, rewrite those commits and push them again.'] : [])].join('\n')
               const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: number, per_page: 100 })
               const previous = comments.find(comment => comment.user && comment.user.type === 'Bot' && (comment.body || '').startsWith(MARKER))
               if (previous) {
@@ -131,9 +133,9 @@ jobs:
 
             const { data: pull } = await github.rest.pulls.get({ owner, repo, pull_number: number })
             const { people, unknown } = await authors()
-            if (context.eventName === 'issue_comment' && context.payload.comment.body.trim() === PHRASE) {
+            if (context.eventName === 'issue_comment' && PHRASES.includes(context.payload.comment.body.trim())) {
               const commenter = context.payload.comment.user
-              // Solo firma quien es autor de algún commit del PR: nadie firma por otra persona.
+              // Only an author of one of the PR's commits can sign: nobody signs for someone else.
               if (people.has(commenter.id)) await sign(commenter)
             }
             const { list } = await load()

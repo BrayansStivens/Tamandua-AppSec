@@ -1,4 +1,4 @@
-"""El editor (threat-layout.ts) y las exportaciones (threat_diagram.py) colocan el diagrama igual.
+"""El editor (threat-layout.ts) y las exportaciones (threat_diagram.py) colocan el diagrama igual (y su leyenda, threat-colors.ts).
 
 Se ejecuta el TypeScript con Node (≥ 22.6 quita los tipos sin compilar). Sin Node, la prueba se omite.
 """
@@ -44,6 +44,29 @@ class LayoutParityTests(unittest.TestCase):
                 with self.subTest(example=path.name):
                     self.assertEqual(editor["positions"], exported["nodes"])
                     self.assertEqual(editor["boxes"], exported["boundaries"])
+
+    def test_editor_and_exports_list_the_same_legend(self):
+        with tempfile.TemporaryDirectory() as folder:
+            shutil.copy(ROOT / "web/src/features/threats/threat-layout.ts", Path(folder) / "threat-layout.ts")
+            colors = (ROOT / "web/src/features/threats/threat-colors.ts").read_text(encoding="utf-8")
+            (Path(folder) / "colors.ts").write_text(colors.replace("'@/features/threats/threat-layout'", "'./threat-layout.ts'"))
+            models = []
+            for path in EXAMPLES:
+                model = tm.from_portable(json.loads(path.read_text(encoding="utf-8")))
+                tones = list(threat_diagram.COLORS)
+                # Every component painted with some palette color, including its own role's color.
+                painted = [{**item, "color": tones[index % len(tones)] if index % 3 else ""} for index, item in enumerate(model["components"])]
+                models += [model, {**model, "components": painted}]
+            (Path(folder) / "models.json").write_text(json.dumps(models))
+            code = ("const {legendTones} = await import(process.argv[1]); import fs from 'fs';"
+                    "console.log(JSON.stringify(JSON.parse(fs.readFileSync(process.argv[2])).map(model => legendTones(model))))")
+            output = subprocess.run(["node", "--no-warnings", "--input-type=module", "-e", code, str(Path(folder) / "colors.ts"), str(Path(folder) / "models.json")],
+                                    capture_output=True, text=True, check=True).stdout
+            for model, editor in zip(models, json.loads(output)):
+                automatic, manual = threat_diagram.legend_tones(model)
+                with self.subTest(model=model["name"]):
+                    self.assertEqual((editor["automatic"], editor["manual"]), (automatic, manual))
+            self.assertTrue(any(threat_diagram.legend_tones(model)[1] for model in models))
 
 
 if __name__ == "__main__":

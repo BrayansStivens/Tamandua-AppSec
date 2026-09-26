@@ -133,6 +133,18 @@ def _color(value, identifier: str) -> str:
     return value
 
 
+def _legend(raw, components: list[dict]) -> dict:
+    """Team labels for manual colors ({tone: label}); labels of colors no component uses are dropped."""
+    if raw in (None, {}):
+        return {}
+    if not isinstance(raw, dict) or any(tone not in threat_diagram.COLORS for tone in raw):
+        raise ModelError(msg("threats.errors.invalid_legend"))
+    used = set(threat_diagram.legend_tones({"components": components})[1])
+    labels = {tone: _text(raw[tone], 40, msg("threats.fields.legend_label", color=threat_diagram.COLOR_NAMES[tone]))
+              for tone in threat_diagram.COLORS if tone in raw}
+    return {tone: label for tone, label in labels.items() if label and tone in used}
+
+
 def validate(payload: dict, *, known_assets: set[str]) -> dict:
     """Normaliza un modelo que llega del panel. Todo lo que no se reconoce se rechaza."""
     if not isinstance(payload, dict):
@@ -228,6 +240,7 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
         extras = threat_methods.validate(payload, elements=ids | flow_ids)
     except threat_methods.MethodError as exc:
         raise ModelError(exc.message) from exc
+    model["legend"] = _legend(payload.get("legend"), components)
     return {**model, "components": components, "flows": flows, "boundaries": boundaries, **extras}
 
 
@@ -239,6 +252,8 @@ def to_portable(model: dict, assets: dict[str, dict] | None = None) -> dict:
 
     fields = ("name", "description", "methodology", "components", "flows", "boundaries")
     portable = {key: model[key] for key in fields if key in model}
+    if model.get("legend"):
+        portable["legend"] = model["legend"]
     if model.get("methodology") == "custom":
         portable["custom_modules"] = model.get("custom_modules", ["manual", "elements"])
     allowed = _portable_sections(model)

@@ -344,6 +344,43 @@ class ModelTests(unittest.TestCase):
         self.assertNotIn('<script>', svg)
         self.assertIn('x="120" y="80"', svg)
 
+    def test_legend_labels_manual_colors(self):
+        painted = [{**item, "color": "danger"} if item["id"] in ("api", "db") else item for item in model()["components"]]
+        current = model(components=painted, legend={"danger": "  Alcance   PCI ", "info": "sin uso"})
+        self.assertEqual(current["legend"], {"danger": "Alcance PCI"})  # trimmed; colors no component uses are dropped
+        self.assertEqual(model()["legend"], {})  # a model without a legend is still valid
+        self.assertEqual(model(legend=None)["legend"], {})
+        # A chosen color equal to the role's color is explained by the role's entry, not a custom one.
+        same = model(components=[{**item, "color": "success"} if item["id"] == "db" else item for item in model()["components"]],
+                     legend={"success": "Datos"})
+        self.assertEqual(same["legend"], {})
+        self.assertEqual(model(components=painted, legend={"danger": "   "})["legend"], {})
+        for legend in ({"red": "Rojo"}, ["danger"], "danger", {"danger": 5}, {"danger": "x" * 41}, {"danger": "a\x00b"}):
+            with self.subTest(legend=legend), self.assertRaises(tm.ModelError):
+                model(components=painted, legend=legend)
+        self.assertEqual(len(model(components=painted, legend={"danger": "x" * 40})["legend"]["danger"]), 40)
+        # The portable format carries the legend; documents from before it existed import without one.
+        document = json.loads(json.dumps(tm.to_portable(current)))
+        self.assertEqual(document["model"]["legend"], {"danger": "Alcance PCI"})
+        self.assertEqual(tm.from_portable(document)["legend"], {"danger": "Alcance PCI"})
+        self.assertNotIn("legend", tm.to_portable(model())["model"])
+        del document["model"]["legend"]
+        self.assertEqual(tm.from_portable(document)["legend"], {})
+        with self.assertRaises(tm.ModelError):
+            tm.from_portable({**document, "model": {**document["model"], "legend": {"purple": "x"}}})
+
+    def test_svg_legend_lists_roles_in_use_and_manual_colors(self):
+        painted = [{**item, "color": "danger"} if item["id"] == "api" else item for item in model()["components"]]
+        svg = tm.to_svg(model(components=painted, legend={"danger": '<b>"PCI" & co</b>'}), locale="en")
+        ET.fromstring(svg)
+        self.assertIn("&lt;b&gt;&quot;PCI&quot; &amp; co&lt;/b&gt;", svg)
+        self.assertNotIn("<b>", svg)
+        self.assertIn(">Data<", svg)
+        self.assertNotIn("APIs, services and jobs", svg)  # the only API is painted red
+        unlabeled = tm.to_svg(model(components=painted), locale="es")
+        self.assertIn(">Color personalizado<", unlabeled)
+        self.assertNotIn("Color personalizado", tm.to_svg(model(), locale="es"))
+
     def test_portable_json_round_trip_detaches_assets(self):
         original = model(methodology="custom", custom_modules=["stride", "trees", "manual"],
                          repository_refs=["grupo/por-conectar"])
@@ -413,8 +450,12 @@ class RouteTests(HttpCase):
             status, decided, _ = self.post("/api/threat-models/decide", "threat-decision",
                                            {"id": model_id, "threat": threat, "status": "mitigated", "reason": "Consultas parametrizadas desde el ORM"}, cookie)
             self.assertEqual(next(row for row in decided["threats"] if row["id"] == threat)["status"], "mitigated")
-            status, _, _ = self.post("/api/threat-models", "save-threat-model", {"id": model_id, "model": {**decided["model"], "name": "Tienda v2"}}, cookie)
+            painted = [{**item, "color": "danger"} if index == 0 else item for index, item in enumerate(decided["model"]["components"])]
+            status, saved, _ = self.post("/api/threat-models", "save-threat-model", {"id": model_id, "model": {
+                **decided["model"], "name": "Tienda v2", "components": painted, "legend": {"danger": "Alcance PCI"}}}, cookie)
             self.assertEqual(status, 200)
+            self.assertEqual(saved["model"]["legend"], {"danger": "Alcance PCI"})
+            self.assertIn("Alcance PCI", self.call("GET", f"/api/threat-models/{model_id}/diagram.svg", headers={"Cookie": cookie})[1].decode())
             for artifact in ("threat-dragon.json", "tm.py", "report.md", "report.pdf", "diagram.svg", "model.json"):
                 self.assertEqual(self.call("GET", f"/api/threat-models/{model_id}/{artifact}", headers={"Cookie": cookie})[0], 200)
             status, pdf = self.call("GET", f"/api/threat-models/{model_id}/report.pdf", headers={"Cookie": cookie})[:2]

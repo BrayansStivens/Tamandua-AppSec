@@ -14,7 +14,8 @@ export type TreeNode = { id: string; parent: string | null; text: string; gate: 
 export type AttackTree = { id: string; goal: string; nodes: TreeNode[] }
 export type AttackMapping = { technique: string; element?: string; status: 'relevant' | 'mitigated' | 'not_applicable'; note?: string }
 export type Model = { id: string; name: string; description?: string; components: Component[]; flows: Flow[]; boundaries: Boundary[]; updated_at?: string; updated_by?: string;
-  methodology?: import('@/features/threats/threat-guides').Methodology; custom_modules?: CustomModule[]; repositories?: string[]; repository_refs?: string[]; manual_threats?: ManualThreat[]; attack_trees?: AttackTree[]; attack_mappings?: AttackMapping[]; pasta?: Record<string, string> }
+  methodology?: import('@/features/threats/threat-guides').Methodology; custom_modules?: CustomModule[]; repositories?: string[]; repository_refs?: string[]; manual_threats?: ManualThreat[]; attack_trees?: AttackTree[]; attack_mappings?: AttackMapping[]; pasta?: Record<string, string>;
+  legend?: Partial<Record<import('@/features/threats/threat-colors').Tone, string>> }
 export type MethodsCatalog = { methodologies: Record<string, string>; linddun: Record<string, string>; tactics: Record<string, string>;
   techniques: Record<string, { name: string; name_es: string; tactics: string[] }>; suggestions: Record<string, string[]>; pasta_stages: { key: string; title: string }[] }
 export type Evidence = { asset: string; run_id: string; fingerprint: string; title: string; severity: string; location: string }

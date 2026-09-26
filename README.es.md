@@ -65,7 +65,7 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 | [Arquitectura](docs/es/arquitectura.md) | Componentes, flujo de un análisis y datos en disco |
 | [Solución de problemas](docs/es/solucion-problemas.md) | Errores frecuentes |
 | [Desarrollo](docs/es/desarrollo.md) | Sin contenedores, CLI y pruebas |
-| [Software de terceros](THIRD_PARTY_NOTICES.md) | Licencias de los motores, las bases de avisos y las dependencias |
+| [Software de terceros](THIRD_PARTY_NOTICES.es.md) | Licencias de los motores, las bases de avisos y las dependencias |
 
 ## Seguridad, en corto
 
@@ -97,7 +97,7 @@ TAMANDUA_ALLOWED_ORIGINS=https://appsec.tu-dominio.com
 
 ## Contribuir
 
-Issues y PRs son bienvenidos: lee [CONTRIBUTING.es.md](CONTRIBUTING.es.md). En el primer PR se firma el [CLA](CLA.md) con un comentario. Las reglas SAST propias están en `rules/`.
+Issues y PRs son bienvenidos: lee [CONTRIBUTING.es.md](CONTRIBUTING.es.md). En el primer PR se firma el [CLA](CLA.es.md) con un comentario. Las reglas SAST propias están en `rules/`.
 
 ## Licencia
 

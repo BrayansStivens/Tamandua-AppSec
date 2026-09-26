@@ -84,7 +84,8 @@
     "pasta_stage": "Stage \"{{stage}}\"",
     "each_manual": "Each team threat",
     "each_node": "Each tree step",
-    "each_tree": "Each tree"
+    "each_tree": "Each tree",
+    "legend_label": "Legend label ({{color}})"
   },
   "errors": {
     "field_required": "{{field}} is required",
@@ -93,6 +94,7 @@
     "folder_relative": "{{field}}: use a folder relative to the repository, e.g. frontend/ or services/api/",
     "folder_segments": "{{field}}: no \"..\" or empty segments",
     "invalid_color": "Invalid color in {{id}}",
+    "invalid_legend": "The diagram legend can only label colors from the palette",
     "invalid_model": "Invalid model",
     "invalid_component": "Invalid component",
     "component_id": "Each component needs a unique ID (lowercase letters, numbers and hyphens)",
@@ -199,6 +201,7 @@
     "legend_data": "Data",
     "legend_identity": "Identity",
     "legend_actors": "Actors and third parties",
+    "legend_custom": "Custom color",
     "legend_encrypted": "Encrypted flow",
     "legend_unencrypted": "Unencrypted",
     "legend_note": "\"3 · HTTPS\": flow no. 3 (what it carries is in the report's flow table)",
