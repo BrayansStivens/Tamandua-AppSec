@@ -324,9 +324,24 @@ def sides(a: dict, b: dict) -> tuple[str, str]:
     return ("bottom", "top") if dy >= 0 else ("top", "bottom")
 
 
-def _curve(a: dict, b: dict) -> tuple[tuple[float, float], ...]:
+LANE = 14  # separación entre flujos que unen los mismos dos componentes (ida y vuelta, o varios)
+
+
+def lanes(flows: list[dict]) -> dict[str, float]:
+    """Desplazamiento de cada flujo: los que comparten extremos (en cualquier sentido) van en carriles paralelos."""
+    groups: dict[frozenset, list[str]] = {}
+    for flow in flows:
+        groups.setdefault(frozenset((flow["source"], flow["target"])), []).append(flow["id"])
+    return {identifier: (index - (len(members) - 1) / 2) * LANE for members in groups.values() for index, identifier in enumerate(members)}
+
+
+def _shift(point: tuple[float, float], side: str, offset: float) -> tuple[float, float]:
+    return (point[0], point[1] + offset) if side in ("left", "right") else (point[0] + offset, point[1])
+
+
+def _curve(a: dict, b: dict, offset: float = 0) -> tuple[tuple[float, float], ...]:
     source_side, target_side = sides(a, b)
-    start, end = _anchor(a, source_side), _anchor(b, target_side)
+    start, end = _shift(_anchor(a, source_side), source_side, offset), _shift(_anchor(b, target_side), target_side, offset)
     c1 = _control(source_side, *start, *end)
     c2 = _control(target_side, *end, *start)
     return start, c1, c2, end
@@ -423,11 +438,12 @@ def scene(model: dict, kinds: dict[str, str] | None = None) -> dict:
                   {"t": "text", "x": box["x"] + 14, "y": box["y"] + 24, "text": boundary["name"][:80], "size": 12.5, "bold": True, "fill": ink}]
     # Flujos: curvas como las del editor, numeradas en el orden del modelo (la tabla del informe usa el mismo número).
     curves = []
+    offsets = lanes(model.get("flows", []))
     for number, flow in enumerate(model.get("flows", []), start=1):
         a, b = rects.get(flow["source"]), rects.get(flow["target"])
         if not a or not b:
             continue
-        curves.append((flow, number, _curve(a, b), math.hypot(b["x"] - a["x"], b["y"] - a["y"])))
+        curves.append((flow, number, _curve(a, b, offsets.get(flow["id"], 0)), math.hypot(b["x"] - a["x"], b["y"] - a["y"])))
     spots = label_spots([(flow["id"], curve, flow_label(number, flow), length) for flow, number, curve, length in curves], list(rects.values()))
     curves = [(flow, number, curve) for flow, number, curve, _ in curves]
     for flow, number, curve in curves:

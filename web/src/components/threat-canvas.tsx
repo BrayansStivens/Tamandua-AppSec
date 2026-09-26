@@ -9,7 +9,7 @@ import { Check as CheckIcon, Globe2, LayoutGrid, Lock, Plus, Square, Trash2, Und
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { autoLayout, baseKind, curvePoint, fitBox, labelSpots, NODE_H, NODE_W, sizeOf, type Side } from '@/components/threat-layout'
+import { autoLayout, baseKind, curvePoint, fitBox, labelSpots, lanes, NODE_H, NODE_W, shift, sizeOf, type Side } from '@/components/threat-layout'
 import { BOUNDARY_TONE, boundaryTone, LEGEND, NODE_BASE, NODE_TONE, NODE_WASH, TEXT_TONE, toneOf, TONE_NAMES, TONES, type Tone } from '@/components/threat-colors'
 import { assetGroups, newId, PROCESSES, STORES, type Catalog, type Component, type Flow, type Kind, type Model, type Point, type Threat } from '@/components/threat-model-types'
 
@@ -22,7 +22,7 @@ const select = 'h-8 w-full rounded-lg border border-app-line bg-app-soft px-2 te
 
 type ComponentData = { component: Component; kindLabel: string; flagged: boolean }
 type BoundaryData = { name: string; tone: Tone }
-type FlowData = { flow: Flow; number: number; flagged: boolean; labelAt?: number }
+type FlowData = { flow: Flow; number: number; flagged: boolean; labelAt?: number; offset?: number }
 type CanvasNode = Node<ComponentData, 'component'> | Node<BoundaryData, 'boundary'>
 
 const componentId = (id: string) => `c:${id}`
@@ -122,7 +122,10 @@ function BoundaryNode({ data, selected }: NodeProps<Node<BoundaryData, 'boundary
   </div>
 }
 
-function FlowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected, markerEnd }: EdgeProps<Edge<FlowData, 'flow'>>) {
+function FlowEdge({ id, sourceX: rawSourceX, sourceY: rawSourceY, targetX: rawTargetX, targetY: rawTargetY, sourcePosition, targetPosition, data, selected, markerEnd }: EdgeProps<Edge<FlowData, 'flow'>>) {
+  // Carril propio si hay más flujos entre los mismos dos componentes (no se pintan uno encima del otro).
+  const [sourceX, sourceY] = shift(sourcePosition as Side, rawSourceX, rawSourceY, data?.offset ?? 0)
+  const [targetX, targetY] = shift(targetPosition as Side, rawTargetX, rawTargetY, data?.offset ?? 0)
   const [path, midX, midY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
   const at = data?.labelAt ?? 0.5
   const spot = at === 0.5 ? { x: midX, y: midY } : curvePoint(sourceX, sourceY, sourcePosition as Side, targetX, targetY, targetPosition as Side, at)
@@ -240,10 +243,11 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
       if (!a || !b) return []
       return [{ item, number: index + 1, handles: sides(a, b) }]
     })
+    const offsets = lanes(model.flows)
     const spots = labelSpots(drawn.map(({ item, number, handles }) => ({ id: item.id, source: rects[item.source], target: rects[item.target],
-      sourceSide: side[handles[0]], targetSide: side[handles[1]], text: `${number} · ${item.protocol}` })), Object.values(rects))
+      sourceSide: side[handles[0]], targetSide: side[handles[1]], text: `${number} · ${item.protocol}`, offset: offsets[item.id] })), Object.values(rects))
     return drawn.map(({ item, number, handles: [sourceHandle, targetHandle] }) => ({ id: flowId(item.id), type: 'flow' as const, source: componentId(item.source), target: componentId(item.target),
-      sourceHandle, targetHandle, selected: selectedFlow === item.id, data: { flow: item, number, flagged: hot.has(item.id), labelAt: spots[item.id] },
+      sourceHandle, targetHandle, selected: selectedFlow === item.id, data: { flow: item, number, flagged: hot.has(item.id), labelAt: spots[item.id], offset: offsets[item.id] },
       markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 } }))
   }, [model.flows, rects, selectedFlow, hot])
 
@@ -431,7 +435,7 @@ function ColorPicker({ label, value, automatic, onChange }: { label: string; val
 }
 
 function Legend() {
-  return <div role="group" aria-label="Leyenda del diagrama" className="flex max-w-[420px] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-app-line bg-panel/95 px-2.5 py-1.5 text-[11px] text-app-muted shadow-sm">
+  return <div role="group" aria-label="Leyenda del diagrama" className="hidden max-w-[420px] flex-wrap md:flex items-center gap-x-3 gap-y-1 rounded-lg border border-app-line bg-panel/95 px-2.5 py-1.5 text-[11px] text-app-muted shadow-sm">
     {LEGEND.map(([tone, text]) => <span key={tone} className="flex items-center gap-1"><span aria-hidden className={`inline-block h-2.5 w-4 rounded-sm border ${NODE_TONE[tone]}`} />{text}</span>)}
     <span className="flex items-center gap-1"><span aria-hidden className="inline-block w-4 border-t-[1.5px] border-dashed border-danger" />Sin cifrar</span>
   </div>

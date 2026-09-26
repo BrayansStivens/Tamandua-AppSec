@@ -253,16 +253,17 @@ def render_repository_report(record: dict) -> str:
                   "Descripción aportada por el equipo, no una verificación del sistema.", ""]
     active = [item for item in findings if (item.get("triage") or {}).get("status", "open") not in SUPPRESSED]
     suppressed = [item for item in findings if item not in active]
-    lines += ["## Hallazgos", ""]
-    if not findings:
-        lines += ["No se generaron hallazgos con las reglas y dependencias examinadas. La cobertura se detalla más abajo.", ""]
-    for finding in active:
-        lines += _finding_block(finding)
+    lines += _findings_sections([dict(item) for item in active])
     if suppressed:
+        # Cada decisión con quién la tomó y por qué: es lo primero que pregunta quien revisa.
         lines += ["## Descartados en triage", "",
-                  f"{len(suppressed)} hallazgos marcados como falso positivo o riesgo aceptado, con quién lo decidió y por qué.", ""]
+                  f"{len(suppressed)} hallazgos marcados como falso positivo o riesgo aceptado, con quién lo decidió y por qué.", "",
+                  "| Hallazgo | Decisión | Motivo | Por | Vence |", "|---|---|---|---|---|"]
         for finding in suppressed:
-            lines += _finding_block(finding)
+            triage = finding.get("triage") or {}
+            lines.append(f"| {_md(finding['title'], 100)} | {_md(triage.get('status'), 20)} | {_md(triage.get('reason') or '—', 200)} | "
+                         f"{_md(triage.get('by') or '—', 40)} | {_md(str(triage.get('expires_at') or '—')[:10], 12)} |")
+        lines.append("")
     lines += ["## Cobertura de esta ejecución", ""]
     for index, step in enumerate(record["steps"], 1):
         lines += [f"{index}. **{step['name']}** · `{step['status']}`. {step['detail']}"]
@@ -271,6 +272,80 @@ def render_repository_report(record: dict) -> str:
         lines.append(f"- {item['id']} · {item['title']}: `{item['status']}` · {item['reason']}")
     lines += ["", "### Límites", "", *[f"- {item}" for item in record["limitations"]], ""]
     return "\n".join(lines + _sources_section(record.get("findings") or []))
+
+
+def _md(value, limit: int = 160) -> str:
+    """Celda de tabla Markdown: una línea, sin romper la tabla y acotada."""
+    text = " ".join(str(value if value is not None else "").split()).replace("|", "\\|")
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "…"
+
+
+SEVERITY_TEXT = {"critical": "Crítica", "high": "Alta", "medium": "Media", "low": "Baja", "info": "Info"}
+MD_DETAIL_LIMIT, MD_TABLE_LIMIT, MD_ANNEX_LIMIT = 150, 500, 600
+
+
+def _findings_sections(active: list[dict]) -> list[str]:
+    """Hallazgos como en el informe técnico en PDF: qué hacer primero, dependencias agrupadas por paquete con su
+    comando, código con detalle solo de críticos y altos, y un índice compacto. El detalle completo de cada
+    hallazgo sigue en el panel, el JSON, el SARIF y los tickets."""
+    from .fix_guide import attach
+    from .remediation import action, counts_text, fix_groups
+    lines = ["## Hallazgos", ""]
+    if not active:
+        return lines + ["No se generaron hallazgos con las reglas y dependencias examinadas. La cobertura se detalla más abajo.", ""]
+    attach(active)
+    groups = fix_groups(active)
+    lines += [f"{len(active)} hallazgos pendientes que se cierran con {len(groups)} acciones.", "", "### Qué hacer primero", "",
+              "| Severidad | Qué | Dónde | Acción |", "|---|---|---|---|"]
+    for entry in groups[:15]:
+        item = entry["items"][0]
+        what = (f"{entry['name']} {entry['version']} · {len(entry['items'])} avisos" if entry["kind"] == "package" else item.get("title"))
+        where = entry["path"] if entry["kind"] == "package" else f"{item.get('path')}:{item.get('line')}"
+        lines.append(f"| {SEVERITY_TEXT.get(entry['severity'], entry['severity'])}{' · KEV' if entry['kev'] else ''} | {_md(what, 100)} | "
+                     f"`{_md(where, 90)}` | {_md(action(entry, short=True), 160)} |")
+    packages = [entry for entry in groups if entry["kind"] == "package"]
+    if packages:
+        lines += ["", f"### Dependencias ({len(packages)} paquetes · {sum(len(entry['items']) for entry in packages)} avisos)", "",
+                  "| Severidad | Paquete | Manifiesto | Avisos | Actualizar a | Comando |", "|---|---|---|---|---|---|"]
+        for entry in packages:
+            commands = [command["code"] for command in (entry["items"][0].get("fix") or {}).get("commands") or [] if command.get("label") == "Actualiza"]
+            lines.append(f"| {SEVERITY_TEXT.get(entry['severity'], entry['severity'])}{' · KEV' if entry['kev'] else ''} | "
+                         f"{_md(entry['name'], 60)} {_md(entry['version'], 30)} | `{_md(entry['path'], 80)}` | {_md(counts_text(entry['counts']), 80)} | "
+                         f"{_md(entry['target'] or 'sin corrección', 40)} | {('`' + _md(commands[0], 120) + '`') if commands and '`' not in commands[0] else '—'} |")
+    code = [item for item in active if not (item.get("scanner") == "sca" and (item.get("package") or {}).get("name"))]
+    if code:
+        serious = [item for item in code if item.get("severity") in ("critical", "high")]
+        rest = [item for item in code if item.get("severity") not in ("critical", "high")]
+        lines += ["", f"### Código, secretos e infraestructura ({len(code)})", ""]
+        for finding in serious[:MD_DETAIL_LIMIT]:
+            lines += _finding_block(finding)
+        if len(serious) > MD_DETAIL_LIMIT:
+            lines += [f"Se detallan {MD_DETAIL_LIMIT} de {len(serious)} críticos y altos; el resto está en el panel, el JSON y el SARIF.", ""]
+        if rest:
+            lines += [f"#### Medios y bajos ({len(rest)})", "", "| Severidad | Hallazgo | Ubicación | Corrección |", "|---|---|---|---|"]
+            for item in rest[:MD_TABLE_LIMIT]:
+                where = f"{item.get('path')}:{item.get('line')}"
+                lines.append(f"| {SEVERITY_TEXT.get(item.get('severity'), item.get('severity'))} | {_md(item.get('title'), 100)} | "
+                             f"`{_md(where, 90)}` | {_md(item.get('remediation'), 160)} |")
+            if len(rest) > MD_TABLE_LIMIT:
+                lines.append(f"| | … y {len(rest) - MD_TABLE_LIMIT} más en el panel | | |")
+            lines.append("")
+    advisories = [item for item in active if item.get("scanner") == "sca"]
+    if advisories:
+        lines += ["", f"### Anexo · Índice de vulnerabilidades ({len(advisories)})", "",
+                  "| Identificador | Paquete | Severidad | CVSS | EPSS | KEV | Corregida en | Fuente |", "|---|---|---|---|---|---|---|---|"]
+        for item in sorted(advisories, key=lambda entry: (list(SEVERITY_TEXT).index(entry.get("severity")) if entry.get("severity") in SEVERITY_TEXT else 9,
+                                                           str((entry.get("package") or {}).get("name"))))[:MD_ANNEX_LIMIT]:
+            package, advisory = item.get("package") or {}, item.get("advisory") or {}
+            epss = (item.get("epss") or {}).get("score")
+            identifier = ((item.get("cve") or [])[:1] or (item.get("ghsa") or [])[:1] or [item.get("rule_id")])[0]
+            lines.append(f"| {_md(identifier, 40)} | {_md(package.get('name'), 60)} {_md(package.get('version'), 30)} | "
+                         f"{SEVERITY_TEXT.get(item.get('severity'), '—')} | {advisory['cvss_score'] if isinstance(advisory.get('cvss_score'), (int, float)) else '—'} | "
+                         f"{f'{epss * 100:.1f} %' if isinstance(epss, (int, float)) else '—'} | {'sí' if item.get('kev') else '—'} | "
+                         f"{_md(package.get('fixed_version') or '—', 40)} | {_md((item.get('source') or {}).get('short') or '—', 20)} |")
+        if len(advisories) > MD_ANNEX_LIMIT:
+            lines.append(f"| … y {len(advisories) - MD_ANNEX_LIMIT} más en el JSON y el SARIF | | | | | | | |")
+    return lines + [""]
 
 
 def _sources_section(findings: list[dict]) -> list[str]:

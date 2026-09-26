@@ -226,7 +226,19 @@ export function fitBox(box: Box, members: { position: Point; width: number; heig
 // pisa componentes ni etiquetas ya colocadas. Mismo trazado que getBezierPath de React Flow.
 export type Side = 'top' | 'right' | 'bottom' | 'left'
 type Rect = { x: number; y: number; width: number; height: number }
-export type LabelEdge = { id: string; source: Rect; target: Rect; sourceSide: Side; targetSide: Side; text: string }
+export type LabelEdge = { id: string; source: Rect; target: Rect; sourceSide: Side; targetSide: Side; text: string; offset?: number }
+
+// Flujos que unen los mismos dos componentes (ida y vuelta, o varios): carriles paralelos, como en threat_diagram.lanes.
+export const LANE = 14
+export function lanes(flows: { id: string; source: string; target: string }[]): Record<string, number> {
+  const groups = new Map<string, string[]>()
+  for (const flow of flows) {
+    const key = [flow.source, flow.target].sort().join('\u0000')
+    groups.set(key, [...(groups.get(key) ?? []), flow.id])
+  }
+  return Object.fromEntries([...groups.values()].flatMap(members => members.map((id, index) => [id, (index - (members.length - 1) / 2) * LANE])))
+}
+export const shift = (side: Side, x: number, y: number, offset: number): [number, number] => side === 'left' || side === 'right' ? [x, y + offset] : [x + offset, y]
 
 const LABEL_MAX = 132
 const LABEL_H = 20
@@ -254,7 +266,8 @@ export function labelSpots(edges: LabelEdge[], components: Rect[]): Record<strin
   // Primero los flujos cortos: tienen menos sitio donde elegir.
   const length = (edge: LabelEdge) => Math.hypot(edge.target.x - edge.source.x, edge.target.y - edge.source.y)
   for (const edge of [...edges].sort((a, b) => length(a) - length(b))) {
-    const [sx, sy] = anchor(edge.source, edge.sourceSide), [tx, ty] = anchor(edge.target, edge.targetSide)
+    const [ax, ay] = anchor(edge.source, edge.sourceSide), [bx, by] = anchor(edge.target, edge.targetSide)
+    const [sx, sy] = shift(edge.sourceSide, ax, ay, edge.offset ?? 0), [tx, ty] = shift(edge.targetSide, bx, by, edge.offset ?? 0)
     const width = Math.min(LABEL_MAX, edge.text.length * 6 + 14) + 8
     let best = { t: 0.5, cost: Infinity, rect: null as Rect | null }
     for (const t of SPOTS) {

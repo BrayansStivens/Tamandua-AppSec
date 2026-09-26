@@ -133,3 +133,9 @@ class ThreatReportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LaneTests(unittest.TestCase):
+    def test_flows_between_the_same_components_get_parallel_lanes(self):
+        flows = [{"id": "ida", "source": "a", "target": "b"}, {"id": "vuelta", "source": "b", "target": "a"}, {"id": "otro", "source": "a", "target": "c"}]
+        self.assertEqual(threat_diagram.lanes(flows), {"ida": -7.0, "vuelta": 7.0, "otro": 0.0})
