@@ -118,7 +118,8 @@ def main(argv: list[str] | None = None) -> int:
         action.add_argument("--username", required=True)
         if name == "reset-password":
             action.add_argument("--password-stdin", action="store_true")
-    commands.add_parser("worker", help="Ejecutar los análisis de la cola y las tareas periódicas (el servicio `worker` de compose)")
+    worker = commands.add_parser("worker", help="Ejecutar los análisis de la cola y las tareas periódicas (el servicio `worker` de compose)")
+    worker.add_argument("--check", action="store_true", help="Salud: 0 si este worker ha dado señales de vida hace poco (healthcheck)")
     panel = commands.add_parser("serve", help="Abrir el panel web local de solo lectura")
     panel.add_argument("--port", type=int, default=8766)
     panel.add_argument("--bind", default=None, help="Interfaz de escucha; por defecto 127.0.0.1 (o APPSEC_AGENT_BIND)")
@@ -130,7 +131,8 @@ def main(argv: list[str] | None = None) -> int:
         return _scan_command(args)
     args.data_dir = args.data_dir or Path("data")
     try:
-        upgrade_data(args.data_dir)
+        if not (args.command == "worker" and args.check):  # el healthcheck no migra nada: solo mira el latido
+            upgrade_data(args.data_dir)
     except DataTooNew as error:
         print(str(error), file=sys.stderr)
         return 1
@@ -149,7 +151,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 3
             return 2 if any(record["summary"]["confirmed"] for record in records) else 0
         if args.command == "worker":
-            from tamandua.app.worker import run as run_worker
+            from tamandua.app.worker import healthy, run as run_worker
+            if args.check:
+                return 0 if healthy(args.data_dir) else 1
             run_worker(args.data_dir)
             return 0
         if args.command == "runs":

@@ -97,3 +97,11 @@ def run(data_dir: Path) -> None:
     print("Worker en marcha: ejecuta los análisis de la cola.", flush=True)
     jobs.run_worker()
     print("Worker detenido.", flush=True)
+
+
+def healthy(data_dir: Path) -> bool:
+    """Para el healthcheck del contenedor: algún worker de esta máquina (hostname) latió hace poco."""
+    import socket
+    from tamandua.modules.runs import queue
+    host = socket.gethostname()
+    return any(worker["id"].startswith(f"{host}:") for worker in queue.workers_alive(data_dir))

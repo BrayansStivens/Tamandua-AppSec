@@ -92,6 +92,13 @@ services:
   worker:
     <<: *app
     command: ["python", "-m", "tamandua", "--data-dir", "/data", "worker"]
+    # Sin HTTP: la salud es su latido en la base (el de la imagen consulta /api/health, que aquí no existe).
+    healthcheck:
+      test: ["CMD", "python", "-m", "tamandua", "--data-dir", "/data", "worker", "--check"]
+      interval: 60s
+      timeout: 15s
+      start_period: 60s
+      retries: 3
     environment: *app-env
     volumes:
       - ./data:/data
