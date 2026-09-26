@@ -79,7 +79,7 @@ export function Compliance({ user, onNew }: { user: SessionUser; onNew: () => vo
         : `${t('events.none_in_kev')}${counts.unscanned ? ` ${t('events.unscanned', { count: counts.unscanned })}` : ''}`}</p>}
       {events.error && <p role="alert" className="text-sm text-danger">{events.error}</p>}
       {counts.events > 0 && !events.items.length && events.loading ? <SkeletonList rows={3} label={t('loading_events')} />
-        : <div className={`space-y-3 transition-opacity ${events.loading ? 'opacity-60' : ''}`}>{events.items.map(event => <EventCard key={event.id} event={event} admin={admin} onMark={(stage, sent) => change({ op: 'mark', event: event.id, stage, sent })} />)}</div>}
+        : <div aria-busy={events.loading} className={`space-y-3 motion-safe:transition-opacity ${events.loading ? 'opacity-60' : ''}`}>{events.items.map(event => <EventCard key={event.id} event={event} admin={admin} onMark={(stage, sent) => change({ op: 'mark', event: event.id, stage, sent })} />)}</div>}
       {events.total > events.limit && <div className="rounded-xl border border-app-line bg-panel"><Pagination total={events.total} limit={events.limit} offset={events.offset} onPrev={events.prev} onNext={events.next} noun={t('events.noun')} /></div>}
     </section>
   </div>
@@ -108,8 +108,8 @@ function Products({ counts, admin, onChange, onNew }: { counts: Counts; admin: b
   return <div className="space-y-2">
     <p className="text-sm font-medium">{counts.products ? t('products.title') : t('products.title_none')}</p>
     {products.error && <p role="alert" className="text-xs text-danger">{products.error}</p>}
-    {counts.products > 0 && (!products.items.length && products.loading ? <SkeletonList rows={2} dense label={t('products.loading')} />
-      : <div className="overflow-hidden rounded-xl border border-app-line"><ul className={`divide-y divide-app-line transition-opacity ${products.loading ? 'opacity-60' : ''}`}>{products.items.map(product => <li key={product.key} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+    {counts.products > 0 && !(products.error && !products.items.length) && (!products.items.length && products.loading ? <SkeletonList rows={2} dense label={t('products.loading')} />
+      : <div className="overflow-hidden rounded-xl border border-app-line"><ul aria-busy={products.loading} className={`divide-y divide-app-line motion-safe:transition-opacity ${products.loading ? 'opacity-60' : ''}`}>{products.items.map(product => <li key={product.key} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
       <span className="min-w-0"><span className="font-medium">{product.name}</span><span className="block truncate text-xs text-app-subtle">{product.support_until ? t('products.supported_until', { asset: product.asset, date: product.support_until }) : product.asset}</span>
         {!product.last_complete && <span className="block text-xs text-warning">{t('products.not_scanned')}</span>}</span>
       {admin && <Button size="xs" variant="ghost" aria-label={t('products.remove', { name: product.name })} onClick={() => void onChange({ op: 'unproduct', key: product.key })}><X />{t('common:actions.remove')}</Button>}
