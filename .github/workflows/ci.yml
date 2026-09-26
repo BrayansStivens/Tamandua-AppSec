@@ -38,6 +38,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
       - name: Contratos de arquitectura
         run: lint-imports
+      - name: El esquema OpenAPI del panel corresponde a la API
+        run: |
+          python -c "from tamandua.app.api import openapi_document; print(openapi_document(), end='')" > /tmp/openapi.json
+          if ! cmp -s /tmp/openapi.json web/src/shared/api/openapi.json; then
+            echo "::error::web/src/shared/api/openapi.json no corresponde a la API: ejecuta «make openapi» y sube el resultado."
+            exit 1
+          fi
       - name: Pruebas
         run: python -m unittest discover -s tests
 

@@ -1,4 +1,6 @@
 import os
+
+import asgi
 from unittest.mock import patch
 
 from tamandua.app.http import transport_check
@@ -48,14 +50,4 @@ class FirstRunTests(HttpCase):
         self.assertIn(b"Referrer-Policy: no-referrer", raw)
 
     def raw(self, method, path, headers):
-        import io
-        handler = self.handler_class.__new__(self.handler_class)
-        handler.server = type("Server", (), {"server_port": 8766})()
-        handler.client_address = ("127.0.0.1", 10000)
-        handler.request_version = "HTTP/1.1"
-        handler.command, handler.path = method, path
-        handler.requestline = f"{method} {path} HTTP/1.1"
-        handler.rfile, handler.wfile = io.BytesIO(b""), io.BytesIO()
-        handler.headers = {"Content-Length": "0", **headers}
-        getattr(handler, f"do_{method}")()
-        return handler.wfile.getvalue()
+        return asgi.raw(self.client, method, path, None, headers)

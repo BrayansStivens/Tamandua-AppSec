@@ -185,3 +185,20 @@ def draft(event: dict) -> str:
         "",
         "Antes de enviar: confirma que la vulnerabilidad afecta de verdad al producto (el hallazgo es un candidato del escáner).",
     ])
+
+
+def overview(data_dir: Path) -> dict:
+    """Lo que muestra la vista Cumplimiento: productos (con su último análisis completo), eventos con su borrador y
+    los activos que se pueden marcar. Sin un análisis completo terminado, «nada por notificar» no significaría nada."""
+    from tamandua.modules.runs.kinds import FULL_SCANS
+    from tamandua.modules.runs.store import list_runs
+    from tamandua.modules.sources.assets import asset_key, overview as assets_overview
+    assets = {row["key"]: row.get("name") or row["key"] for row in assets_overview(data_dir)}
+    complete: dict[str, str] = {}
+    for row in list_runs(data_dir):  # de más reciente a más antiguo
+        if row["type"] in FULL_SCANS and row["status"] == "completed":
+            complete.setdefault(asset_key(row), row["created_at"])
+    products = [{"key": key, **product, "asset": assets.get(key, key), "last_complete": complete.get(key)}
+                for key, product in load(data_dir)["products"].items()]
+    return {"products": products, "events": [{**event, "draft": draft(event)} for event in events(data_dir)],
+            "reporting_page": REPORTING_PAGE, "assets": [{"key": key, "name": name} for key, name in assets.items()]}

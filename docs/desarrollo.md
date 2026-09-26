@@ -54,6 +54,16 @@ cd ..
 
 Las pruebas necesitan `cryptography` (almacén cifrado y firma del JWT): córrelas con el venv, `.venv/bin/python -m unittest discover -s tests`.
 
+### Añadir o migrar una ruta de la API
+
+Las rutas nuevas van en FastAPI, en `tamandua/app/api/<contexto>.py`: parámetros y respuesta con modelos Pydantic,
+seguridad con `guard(Policy(public=…, admin=…, action=…))` (la misma tubería que el router clásico: CSRF, sesión,
+segundo factor, rol) y la lógica en el módulo de negocio, nunca en la ruta. Lo que aún no se ha migrado lo atiende el
+router clásico detrás de FastAPI (`app/api/legacy.py`); al migrar una ruta se borra de `app/http/routes_*.py`.
+
+Después, `make openapi` regenera el esquema y los tipos TypeScript del panel (`web/src/shared/api/`), que se usan con
+`apiGet('/api/…')`: si la API y el panel no cuadran, falla `tsc`. El CI comprueba que el esquema está al día.
+
 ### Cambiar el formato de algo que ya está en `data/`
 
 Quien actualiza Tamandua ya tiene datos: una versión nueva nunca debe romperlos ni pedirle que haga nada a mano.

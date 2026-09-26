@@ -81,15 +81,6 @@ def _artifact(request: Request, record: dict, artifact: str):
     return request.json(404, {"error": "Formato no disponible para esta ejecución"})
 
 
-@route("GET", "/api/health", public=True, enrolment=True)
-def health(request: Request):
-    # Sin sesión la salud solo confirma que el proceso responde: nada del estado interno.
-    if request.user is None:
-        return request.json(200, {"status": "ok", "version": VERSION})
-    return request.json(200, {"status": "ok", "docker": docker_available(), "queued": request.state.jobs.pending(),
-                              "version": VERSION})
-
-
 @route("GET", "/", public=True, enrolment=True)
 def index(request: Request):
     return _static(request, "index.html")
@@ -316,17 +307,6 @@ def run_detail(request: Request):
     except (ValueError, OSError, json.JSONDecodeError):
         pass
     return request.json(404, {"error": "Ejecución no encontrada"})
-
-
-@route("GET", "/api/dashboard")
-def dashboard(request: Request):
-    try:
-        days = int(request.arg("days", "30"))
-    except ValueError:
-        return request.json(400, {"error": "Ventana inválida"})
-    if days not in (7, 30, 90, 365):
-        return request.json(400, {"error": "Ventana inválida"})
-    return request.json(200, compute_dashboard(request.data_dir, days, zone(request.arg("tz"))))
 
 
 @route("GET", "/api/cves")
@@ -628,12 +608,6 @@ def onboarding(request: Request):
         "demo": any((row.get("source") or {}).get("id") == "local:demo-ejemplos" for row in runs),
         "watching": any(config.get("enabled") for config in pr_watch.load(request.data_dir)["repositories"].values()),
         "alerts": alerts, "admin": request.user.get("role") == "admin"})
-
-
-@route("GET", "/api/sla")
-def sla_policy(request: Request):
-    """Plazos de corrección por severidad: los ve cualquiera (explican las fechas límite); los cambia un administrador."""
-    return request.json(200, sla.policy(request.data_dir))
 
 
 @route("POST", "/api/sla", admin=True, action="sla", body=1024)

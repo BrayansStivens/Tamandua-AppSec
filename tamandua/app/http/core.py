@@ -85,6 +85,38 @@ def route(method: str, path: str, **options):
     return register
 
 
+@dataclass(frozen=True)
+class Denied:
+    """Respuesta de la tubería de seguridad cuando no deja pasar."""
+    status: int
+    message: str
+    extra: dict = field(default_factory=dict)
+
+
+def host_allowed(port: int, host: str | None) -> bool:
+    return host in {urlsplit(origin).netloc for origin in allowed_origins(port)}
+
+
+def authorize(state: State, entry, *, method: str, port: int, origin: str | None, action: str | None,
+              cookie: str | None) -> tuple[dict | None, dict | None] | Denied:
+    """La tubería de seguridad, igual para el router clásico y para FastAPI (`entry` es una Route o una Policy):
+    CSRF en POST (Origin + cabecera de acción) → sesión → segundo factor → política TOTP → rol."""
+    if method == "POST":
+        # CSRF antes que nada: un POST de otro origen no llega ni a mirar la sesión.
+        if origin not in allowed_origins(port) or action != entry.action:
+            return Denied(403, "Origen o acción no permitidos")
+    user, session = state.auth.current(cookie)
+    if user is not None and user.get("totp", {}).get("enabled") and not (session or {}).get("mfa"):
+        user, session = None, None
+    if user is None and not entry.public:
+        return Denied(401, "Inicia sesión para continuar")
+    if user is not None and not entry.enrolment and state.auth.needs_totp(user):
+        return Denied(403, "Activa el segundo factor para continuar", {"code": "totp_required"})
+    if entry.admin and (user is None or user["role"] != "admin"):
+        return Denied(403, "Solo un administrador puede hacer esto")
+    return user, session
+
+
 def find(method: str, path: str) -> Route | None:
     entry = ROUTES.get((method, path))
     if entry is not None:
@@ -184,27 +216,17 @@ def build_handler(state: State):
 
         def _dispatch(self, method: str):
             self._started = time.time()
-            hosts = {urlsplit(origin).netloc for origin in allowed_origins(self.server.server_port)}
-            if self.headers.get("Host") not in hosts:
+            if not host_allowed(self.server.server_port, self.headers.get("Host")):
                 return self.fail(403, "Host no permitido")
             path = urlsplit(self.path).path
             entry = find(method, path)
             if entry is None:
                 return self.fail(404, "Ruta no encontrada")
-            if method == "POST":
-                # CSRF antes que nada: un POST de otro origen no llega ni a mirar la sesión.
-                if (self.headers.get("Origin") not in allowed_origins(self.server.server_port)
-                        or self.headers.get("X-AppSec-Agent-Action") != entry.action):
-                    return self.fail(403, "Origen o acción no permitidos")
-            user, session = state.auth.current(self.headers.get("Cookie"))
-            if user is not None and user.get("totp", {}).get("enabled") and not (session or {}).get("mfa"):
-                user, session = None, None
-            if user is None and not entry.public:
-                return self.fail(401, "Inicia sesión para continuar")
-            if user is not None and not entry.enrolment and state.auth.needs_totp(user):
-                return self.fail(403, "Activa el segundo factor para continuar", code="totp_required")
-            if entry.admin and (user is None or user["role"] != "admin"):
-                return self.fail(403, "Solo un administrador puede hacer esto")
+            verdict = authorize(state, entry, method=method, port=self.server.server_port, origin=self.headers.get("Origin"),
+                                action=self.headers.get("X-AppSec-Agent-Action"), cookie=self.headers.get("Cookie"))
+            if isinstance(verdict, Denied):
+                return self.fail(verdict.status, verdict.message, **verdict.extra)
+            user, session = verdict
             payload = None
             if method == "POST":
                 try:

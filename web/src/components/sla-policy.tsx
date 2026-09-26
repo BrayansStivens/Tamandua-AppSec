@@ -3,6 +3,7 @@ import { Clock3, LoaderCircle, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
+import { apiGet } from '@/shared/api/client'
 import type { SlaPolicy } from '@/lib/sla'
 import { formatDate } from '@/lib/types'
 
@@ -17,7 +18,7 @@ export function SlaPolicyCard({ canEdit, onChanged }: { canEdit: boolean; onChan
   const [draft, setDraft] = useState<Record<Level, string>>({ critical: '', high: '', medium: '', low: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  useEffect(() => { api.get<SlaPolicy>('/api/sla').then(setPolicy).catch(() => setPolicy(null)) }, [])
+  useEffect(() => { apiGet('/api/sla').then(setPolicy).catch(() => setPolicy(null)) }, [])
 
   const start = () => {
     if (!policy) return

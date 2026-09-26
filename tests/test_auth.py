@@ -8,6 +8,8 @@ import stat
 import tempfile
 import time
 import unittest
+
+import asgi
 from pathlib import Path
 from unittest.mock import patch
 
@@ -141,29 +143,20 @@ class HttpCase(unittest.TestCase):
         engines.start()
         self.addCleanup(engines.stop)
         self.handler_class = make_handler(self.data_dir)
+        # Todas las peticiones pasan por la aplicación completa: FastAPI y, detrás, el router clásico.
+        self.client = asgi.client_for(self.data_dir, self.handler_class)
 
     def tearDown(self):
         self.directory.cleanup()
 
     def call(self, method, path, body=None, headers=None):
-        handler = self.handler_class.__new__(self.handler_class)
-        handler.server = type("Server", (), {"server_port": 8766})()
-        handler.client_address = ("127.0.0.1", 10000)
-        handler.request_version = "HTTP/1.1"
-        handler.command, handler.path = method, path
-        handler.requestline = f"{method} {path} HTTP/1.1"
-        payload = json.dumps(body) if body is not None else ""
-        handler.rfile, handler.wfile = io.BytesIO(payload.encode()), io.BytesIO()
-        handler.headers = {"Host": "127.0.0.1:8766", "Content-Length": str(len(payload)), **(headers or {})}
-        getattr(handler, f"do_{method}")()
-        head, _, content = handler.wfile.getvalue().partition(b"\r\n\r\n")
-        lines = head.decode().split("\r\n")
-        cookies = [line.split(":", 1)[1].strip() for line in lines if line.lower().startswith("set-cookie:")]
+        response = asgi.request(self.client, method, path, json.dumps(body) if body is not None else None, headers)
+        cookies = response.headers.get_list("set-cookie")
         try:
-            body = json.loads(content or b"null")
+            body = response.json() if response.content else None
         except ValueError:
-            body = content  # artefactos que no son JSON (Markdown, scripts)
-        return int(lines[0].split()[1]), body, cookies
+            body = response.content  # artefactos que no son JSON (Markdown, scripts)
+        return response.status_code, body, cookies
 
     def post(self, path, action, body, cookie=None):
         return self.call("POST", path, body, {"Origin": ORIGIN, "X-AppSec-Agent-Action": action,

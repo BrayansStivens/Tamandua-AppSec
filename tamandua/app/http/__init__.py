@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 from tamandua.shared import log as logging_setup
@@ -12,7 +11,6 @@ from tamandua.modules.identity.auth import Authenticator
 from tamandua.modules.runs.jobs import ScanJobs
 from tamandua.app.http import routes_auth  # noqa: F401 — registran sus rutas
 from tamandua.app.http import routes_cra  # noqa: F401 — registran sus rutas
-from tamandua.app.http import routes_cves  # noqa: F401 — registran sus rutas
 from tamandua.app.http import routes_prs  # noqa: F401 — registran sus rutas
 from tamandua.app.http import routes_runs  # noqa: F401 — registran sus rutas
 from tamandua.app.http import routes_sources  # noqa: F401 — registran sus rutas
@@ -70,22 +68,18 @@ def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
     # Fuera de un contenedor se escucha solo en loopback; dentro, en todas las interfaces del contenedor.
     address = bind or os.environ.get("APPSEC_AGENT_BIND", "127.0.0.1")
     handler = make_handler(data_dir, watch_pull_requests=True)
-    with ThreadingHTTPServer((address, port), handler) as server:
-        cert, key = os.environ.get("APPSEC_AGENT_TLS_CERT", "").strip(), os.environ.get("APPSEC_AGENT_TLS_KEY", "").strip()
-        if cert or key:
-            import ssl
-            context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            context.minimum_version = ssl.TLSVersion.TLSv1_2
-            context.load_cert_chain(cert, key)
-            server.socket = context.wrap_socket(server.socket, server_side=True)
-        print(f"Panel: {public_url(server.server_port)} (escuchando en {address}:{server.server_port}"
-              f"{', TLS' if cert else ''})", flush=True)
-        code = handler.state.auth.setup_code()
-        if code:
-            # Directo a la consola y no al log en fichero: solo quien ve la consola del servidor puede reclamarlo.
-            print("\n" + "=" * 64 + "\n  Primer arranque: crea el administrador en el panel con este código\n"
-                  f"      {code}\n  (solo sirve una vez y solo mientras no haya usuarios)\n" + "=" * 64 + "\n", flush=True)
-        try:
-            server.serve_forever()
-        except KeyboardInterrupt:
-            print("Panel detenido.", flush=True)
+    from tamandua.app.api import create_app
+    import uvicorn
+    app = create_app(data_dir, port=port, handler=handler)
+    cert, key = os.environ.get("APPSEC_AGENT_TLS_CERT", "").strip(), os.environ.get("APPSEC_AGENT_TLS_KEY", "").strip()
+    print(f"Panel: {public_url(port)} (escuchando en {address}:{port}{', TLS' if cert else ''})", flush=True)
+    code = handler.state.auth.setup_code()
+    if code:
+        # Directo a la consola y no al log en fichero: solo quien ve la consola del servidor puede reclamarlo.
+        print("\n" + "=" * 64 + "\n  Primer arranque: crea el administrador en el panel con este código\n"
+              f"      {code}\n  (solo sirve una vez y solo mientras no haya usuarios)\n" + "=" * 64 + "\n", flush=True)
+    # Sin cabecera Server, sin confiar en X-Forwarded-* (el host permitido lo decide APPSEC_AGENT_ALLOWED_ORIGINS)
+    # y con los mismos límites de TLS que antes (1.2 como mínimo).
+    uvicorn.run(app, host=address, port=port, log_level="warning", access_log=False, server_header=False, proxy_headers=False,
+                ssl_certfile=cert or None, ssl_keyfile=key or None, timeout_keep_alive=5)
+    print("Panel detenido.", flush=True)

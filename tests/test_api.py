@@ -1,0 +1,45 @@
+"""API FastAPI (F1): rutas tipadas delante, router clásico detrás, un solo control de seguridad."""
+
+import json
+import unittest
+from pathlib import Path
+
+import asgi
+from tamandua.app.api import openapi_document
+from tamandua.modules.identity.auth import Users
+from test_auth import ORIGIN, PASSWORD, HttpCase
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class OpenApiTests(unittest.TestCase):
+    def test_document_lists_the_migrated_routes_and_matches_the_committed_copy(self):
+        document = json.loads(openapi_document())
+        self.assertTrue({"/api/health", "/api/dashboard", "/api/cve-db", "/api/cve-db/item", "/api/sla", "/api/cra"} <= set(document["paths"]))
+        # El panel se genera de esta copia: si la API cambia, `make openapi` (el CI lo comprueba).
+        self.assertEqual(openapi_document(), (ROOT / "web/src/shared/api/openapi.json").read_text())
+
+
+class StackTests(HttpCase):
+    def test_same_security_on_both_sides_of_the_strangler(self):
+        # Ruta migrada (FastAPI) y ruta clásica (adaptador): mismo 401, mismas cabeceras.
+        for path in ("/api/sla", "/api/runs"):
+            raw = asgi.raw(self.client, "GET", path)
+            self.assertIn(b" 401 ", raw.split(b"\r\n", 1)[0], path)
+            self.assertIn(b"X-Frame-Options: DENY", raw, path)
+            self.assertIn(b"Content-Security-Policy: default-src 'none'", raw, path)
+        self.assertEqual(asgi.request(self.client, "GET", "/api/sla", headers={"Host": "evil.test"}).json(), {"error": "Host no permitido"})
+        Users(self.data_dir).create("ana", PASSWORD)
+        status, _, cookies = self.post("/api/auth/login", "login", {"username": "ana", "password": PASSWORD})  # POST clásico
+        self.assertEqual((status, len(cookies)), (200, 1))
+        cookie = {"Cookie": cookies[0].split("; ")[0]}
+        self.assertIn("HttpOnly", cookies[0])  # la cookie del clásico cruza el adaptador intacta
+        self.assertEqual(self.call("GET", "/api/sla", headers=cookie)[0], 200)
+        self.assertEqual(self.call("GET", "/api/dashboard?days=12", headers=cookie), (400, {"error": "Parámetros inválidos"}, []))
+        self.assertEqual(self.call("GET", "/api/no-existe", headers=cookie)[0], 404)
+        # CSRF: un POST sin la cabecera de acción no pasa, venga de donde venga.
+        self.assertEqual(self.call("POST", "/api/sla", {"days": {}}, {**cookie, "Origin": ORIGIN})[0], 403)
+
+
+if __name__ == "__main__":
+    unittest.main()

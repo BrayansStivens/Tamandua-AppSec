@@ -30,7 +30,7 @@ export DOCKER_SOCKET_GID
 ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' tamandua/modules/scanning/engines.py
 
 .DEFAULT_GOAL := help
-.PHONY: arch help doctor setup build up down restart status logs ps setup-code engines scan demo update backup shell cli \
+.PHONY: arch openapi help doctor setup build up down restart status logs ps setup-code engines scan demo update backup shell cli \
         clean purge dev-setup dev test lint web check
 
 ## —— Uso ———————————————————————————————————————————————————————————————
@@ -136,6 +136,11 @@ web: ## Compila el panel en tamandua/app/static/
 
 test: ## Pruebas del backend
 	$(VENV)/bin/python -m unittest discover -s tests
+
+openapi: ## Esquema OpenAPI de la API y tipos TypeScript del panel (web/src/shared/api/)
+	@mkdir -p web/src/shared/api
+	$(VENV)/bin/python -c "from tamandua.app.api import openapi_document; print(openapi_document(), end='')" > web/src/shared/api/openapi.json
+	cd web && npx --yes openapi-typescript@7.13.0 src/shared/api/openapi.json -o src/shared/api/schema.d.ts
 
 arch: ## Contratos de arquitectura (import-linter, ver pyproject.toml)
 	$(VENV)/bin/lint-imports

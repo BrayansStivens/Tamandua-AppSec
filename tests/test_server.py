@@ -5,6 +5,8 @@ import json
 import os
 import tempfile
 import unittest
+
+import asgi
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,6 +34,7 @@ class ServerTests(unittest.TestCase):
         policy.start()
         self.addCleanup(policy.stop)
         self.handler_class = make_handler(self.data_dir)
+        self.client = asgi.client_for(self.data_dir, self.handler_class)
         self.origin = "http://127.0.0.1:8766"
         # Todas las rutas exigen sesión: las pruebas entran como un administrador creado por la CLI.
         Users(self.data_dir).create("operadora", "correcto-caballo-bateria", role="admin")
@@ -56,20 +59,7 @@ class ServerTests(unittest.TestCase):
 
     def raw_request(self, method, path, body=None, headers=None, cookie="default"):
         cookie = self.cookie if cookie == "default" else cookie
-        handler = self.handler_class.__new__(self.handler_class)
-        handler.server = type("Server", (), {"server_port": 8766})()
-        handler.client_address = ("127.0.0.1", 10000)
-        handler.request_version = "HTTP/1.1"
-        handler.command = method
-        handler.path = path
-        handler.requestline = f"{method} {path} HTTP/1.1"
-        handler.rfile = io.BytesIO((body or "").encode("utf-8"))
-        handler.wfile = io.BytesIO()
-        handler.log_message = lambda *_args: None
-        handler.headers = {"Host": "127.0.0.1:8766", "Content-Length": str(len(body or "")),
-                           **({"Cookie": cookie} if cookie else {}), **(headers or {})}
-        getattr(handler, f"do_{method}")()
-        return handler.wfile.getvalue()
+        return asgi.raw(self.client, method, path, body, {**({"Cookie": cookie} if cookie else {}), **(headers or {})})
 
     def test_rejects_cross_origin_and_arbitrary_targets(self):
         body = json.dumps({"source_id": "local:x", "allow_osv_upload": False})

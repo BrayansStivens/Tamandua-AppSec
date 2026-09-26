@@ -1,3 +1,5 @@
 # Solo para desarrollo y CI: no van en la imagen.
 -r requirements.txt
 import-linter==2.15
+# Cliente HTTP de las pruebas (TestClient de Starlette).
+httpx==0.28.1

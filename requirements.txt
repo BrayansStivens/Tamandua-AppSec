@@ -3,3 +3,8 @@
 cryptography>=43,<47
 # Informes PDF de hallazgos y modelos de amenazas.
 reportlab>=4.2,<5
+# API HTTP (F1): FastAPI sobre Starlette, servidor ASGI Uvicorn y validación con Pydantic.
+# Versiones exactas: se actualizan a propósito (Renovate + CI), no por sorpresa.
+fastapi==0.141.1
+uvicorn==0.54.0
+pydantic==2.13.5
