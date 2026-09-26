@@ -68,6 +68,8 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     return () => window.removeEventListener('popstate', sync)
   }, [])
   useEffect(() => { if (!readRoute().view) writeRoute(view, {}, { replace: true }) }, [view])
+  // Cada vista empieza arriba: sin esto hereda el scroll de la anterior (p. ej. el CVE tracker abría al pie).
+  useEffect(() => { window.scrollTo({ top: 0 }) }, [view])
   const [error, setError] = useState<string | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [selectedSource, setSelectedSource] = useState<string | null>(null)

@@ -8,9 +8,13 @@ huella que estaba en una ejecución anterior de ese activo y ya no aparece en la
 
 from __future__ import annotations
 
+import threading
+import time
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+import re
+from datetime import datetime, timedelta, timezone, tzinfo
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .kinds import FULL_SCANS
 from .advisories import load_feeds, load_recent_cves
@@ -27,11 +31,40 @@ CWE_NAMES = {
     400: "Consumo de recursos sin límite", 770: "Asignación sin límites", 20: "Validación de entrada", 200: "Exposición de información",
     287: "Autenticación incorrecta", 352: "CSRF", 611: "XXE", 94: "Inyección de código", 1104: "Componente vulnerable",
     285: "Autorización incorrecta", 306: "Sin autenticación", 74: "Inyección", 1336: "Inyección de plantilla", 915: "Asignación masiva",
+    # Las más comunes en paquetes del sistema (imágenes): memoria y recursos.
+    125: "Lectura fuera de límites", 787: "Escritura fuera de límites", 119: "Desbordamiento de búfer", 120: "Copia de búfer sin comprobar",
+    416: "Uso tras liberar", 415: "Doble liberación", 476: "Desreferencia de puntero nulo", 190: "Desbordamiento de entero",
+    191: "Subdesbordamiento de entero", 401: "Fuga de memoria", 404: "Liberación de recursos incorrecta", 674: "Recursión sin control",
+    835: "Bucle infinito", 362: "Condición de carrera", 367: "TOCTOU", 369: "División por cero", 908: "Memoria sin inicializar",
+    459: "Limpieza incompleta", 59: "Seguimiento de enlaces", 732: "Permisos incorrectos", 269: "Gestión de privilegios", 522: "Credenciales poco protegidas",
+    319: "Transmisión en claro", 297: "Validación de nombre de host", 330: "Aleatoriedad insuficiente", 203: "Canal lateral por diferencias",
+    444: "HTTP request smuggling", 113: "Inyección CRLF", 117: "Inyección en logs", 23: "Path traversal relativo", 434: "Subida de archivos sin restricción",
+    639: "Autorización por clave de usuario (IDOR)", 862: "Sin autorización", 863: "Autorización incorrecta", 1395: "Componente de terceros vulnerable",
 }
 
 
 def _day(stamp: str) -> str:
     return stamp[:10]
+
+
+def zone(name: str | None) -> tzinfo:
+    """La zona de quien mira el panel («hoy» es su hoy, no el del servidor). Una desconocida o rara, UTC."""
+    if not name or len(name) > 64 or not re.fullmatch(r"[A-Za-z]+(?:[/_+-][A-Za-z0-9]+)*", name):
+        return timezone.utc
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return timezone.utc
+
+
+def _day_in(where: tzinfo):
+    def day(stamp: str) -> str:
+        try:
+            moment = datetime.fromisoformat(stamp)
+        except (TypeError, ValueError):
+            return (stamp or "")[:10]
+        return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(where).date().isoformat()
+    return day
 
 
 def _score(open_by_severity: dict, kev: int = 0, high_epss: int = 0) -> dict:
@@ -47,7 +80,8 @@ def _score(open_by_severity: dict, kev: int = 0, high_epss: int = 0) -> dict:
             "formula": "100·e^(−riesgo/150); riesgo = 8·críticos + 3·altos + 0,8·medios + 0,1·bajos + 15·en KEV + 5·EPSS ≥ 10 %"}
 
 
-def compute(data_dir: Path, days: int = 30) -> dict:
+def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dict:
+    _day = _day_in(where)  # los días se cuentan en la zona de quien mira
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=days)
     rows = list_runs(data_dir)
@@ -199,8 +233,8 @@ def compute(data_dir: Path, days: int = 30) -> dict:
                              for offset in range(days, -1, -1)],
         "open_vs_fixed": open_vs_fixed,
         "top_assets": top_assets[:10],
-        "by_cwe": [{"cwe": cwe, "name": CWE_NAMES.get(cwe, f"CWE-{cwe}"), "count": count} for cwe, count in cwe_counter.most_common(8)],
-        "exploitability": {"kev": kev_items[:10], "high_epss": epss_items[:10]},
+        "by_cwe": [{"cwe": cwe, "name": CWE_NAMES.get(cwe), "count": count} for cwe, count in cwe_counter.most_common(8)],
+        "exploitability": {"kev": kev_items[:25], "high_epss": epss_items[:25], "kev_total": len(kev_items), "epss_total": len(epss_items)},
         "activity": year,
         "recent_runs": rows[:8],
         "top_issues": [{"title": finding["title"], "severity": finding["severity"], "asset": asset,
@@ -210,3 +244,43 @@ def compute(data_dir: Path, days: int = 30) -> dict:
         "kev_news": kev_news, "cve_news": cve_news,
         "tools": (latest or {}).get("summary", {}).get("tools", []),
     }
+
+
+_cache: dict[tuple, tuple[float, dict]] = {}
+_cache_lock = threading.Lock()
+CACHE_SECONDS = 60
+
+
+def _signature(data_dir: Path) -> tuple:
+    """Lo que cambia el resultado: el índice de ejecuciones, el triage y los feeds (KEV, novedades de NVD)."""
+    paths = [data_dir / "runs" / "index.json", data_dir / "triage.json"]
+    feeds = data_dir / "feeds"
+    if feeds.is_dir():
+        paths += sorted(path for path in feeds.iterdir() if path.suffix == ".json")
+    stamp = []
+    for path in paths:
+        try:
+            status = path.stat()
+            stamp.append((path.name, status.st_mtime_ns, status.st_size))
+        except OSError:
+            stamp.append((path.name, 0, 0))
+    return tuple(stamp)
+
+
+def cached(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dict:
+    """compute() lee todas las ejecuciones: con cientos de análisis, abrir el Resumen no puede repetirlo en cada visita.
+
+    Se recalcula si cambió algo de lo que depende, si cambió el día o pasado CACHE_SECONDS."""
+    key = (str(data_dir), days, str(where), _signature(data_dir), datetime.now(where).date().isoformat())
+    now = time.monotonic()
+    with _cache_lock:
+        hit = _cache.get(key)
+        if hit and now - hit[0] < CACHE_SECONDS:
+            return hit[1]
+    result = compute(data_dir, days, where)
+    with _cache_lock:
+        for stale in [item for item in _cache if item[0] == key[0]]:
+            del _cache[stale]
+        _cache[key] = (now, result)
+    return result
+

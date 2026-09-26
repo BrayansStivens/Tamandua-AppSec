@@ -69,7 +69,8 @@ La identidad del repositorio es la de GitHub (su id numérico): un repositorio r
 
 Busca en una copia local de NVD (`data/feeds/cves.sqlite`, SQLite con FTS5) cruzada con CISA KEV y EPSS: texto libre, CVE por prefijo, severidad, solo KEV, año, orden por fecha, CVSS o EPSS y paginación. Un hilo la carga en segundo plano de lo más reciente a lo más antiguo, reanudable tras reiniciar, y luego la mantiene al día cada 2 horas por fecha de modificación. Sin API key NVD admite 5 peticiones cada 30 s y la carga completa (~400.000 CVE) tarda unas horas; con `APPSEC_AGENT_NVD_API_KEY` (va en cabecera, nunca se registra) va unas 8 veces más rápido. `APPSEC_AGENT_CVE_SYNC=off` la desactiva. El detalle de cada CVE dice qué repositorios analizados lo tienen entre sus hallazgos.
 
-La página muestra, para cada CVE, severidad y CVSS, EPSS, si está en CISA KEV, CWE, vector, referencias y **qué repositorios tuyos lo tienen** entre sus hallazgos. La búsqueda queda en la URL: se puede compartir o recargar. En el **Resumen**, *Novedades* muestra los publicados en 7 y 30 días y un «skyline» 3D de los últimos 30 días por severidad.
+La página muestra, para cada CVE, severidad y CVSS, EPSS, si está en CISA KEV, CWE, vector, referencias y **qué repositorios tuyos lo tienen** entre sus hallazgos. **Solo los que me afectan** limita la lista a los CVE
+abiertos en tus repositorios e imágenes (sin lo descartado en triage), y cada fila marca «te afecta». La búsqueda queda en la URL: se puede compartir o recargar. En el **Resumen**, *Novedades* muestra los publicados en 7 y 30 días y un «skyline» 3D de los últimos 30 días por severidad.
 
 ## Revisión de pull requests
 

@@ -305,3 +305,43 @@ def assets_with_cve(data_dir: Path, cve: str) -> list[dict]:
                             "packages": sorted({(entry["finding"].get("package") or {}).get("name") or entry["finding"].get("title", "")
                                                 for entry in hits})[:5]})
     return matches
+
+
+_cve_cache: dict[Path, tuple[tuple, frozenset[str]]] = {}
+
+
+def open_cves(data_dir: Path) -> frozenset[str]:
+    """Los CVE que siguen abiertos en algún activo (sin lo descartado en triage), para «solo los míos» en el tracker.
+
+    Se relee solo si cambió algún registro o el triage: el tracker lo consulta en cada búsqueda."""
+    folder = data_dir / "findings"
+    files = sorted(folder.glob("*.json")) if folder.is_dir() else []
+    triage_file = data_dir / "triage.json"
+    try:
+        signature = tuple((path.name, path.stat().st_mtime_ns, path.stat().st_size) for path in files) + (
+            (triage_file.stat().st_mtime_ns, triage_file.stat().st_size) if triage_file.exists() else 0,)
+    except OSError:
+        signature = ()
+    cached = _cve_cache.get(data_dir)
+    if cached and signature and cached[0] == signature:
+        return cached[1]
+    try:
+        decisions = triage.load(data_dir)
+    except triage.TriageError:
+        decisions = {}  # un triage ilegible no debe tumbar el buscador
+    found: set[str] = set()
+    for path in files:
+        try:
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            continue
+        manual = decisions.get(state.get("asset"), {})
+        for digest, entry in (state.get("findings") or {}).items():
+            if entry.get("status") != "open":
+                continue
+            if (triage.effective(manual.get(digest)) or {}).get("status", "open") in triage.SUPPRESSED:
+                continue
+            found.update(cve for cve in ((entry.get("finding") or {}).get("cve") or []) if isinstance(cve, str) and cve.startswith("CVE-"))
+    result = frozenset(found)
+    _cve_cache[data_dir] = (signature, result)
+    return result

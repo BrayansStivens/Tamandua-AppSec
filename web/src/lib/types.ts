@@ -12,8 +12,8 @@ export type Dashboard = {
   issues_over_time: { day: string; critical: number; high: number; medium: number; low: number }[]
   open_vs_fixed: { day: string; found: number; fixed: number }[]
   top_assets: { name: string; last_run: string; last_run_at: string; open: number; critical: number; high: number; medium: number; low: number; kev: number; trend: number | null }[]
-  by_cwe: { cwe: number; name: string; count: number }[]
-  exploitability: { kev: { cve: string; package: string | null; asset: string; fixed_version: string | null; ransomware: boolean }[]; high_epss: { cve: string; package: string | null; asset: string; epss: number; fixed_version: string | null }[] }
+  by_cwe: { cwe: number; name: string | null; count: number }[]
+  exploitability: { kev: { cve: string; package: string | null; asset: string; fixed_version: string | null; ransomware: boolean }[]; high_epss: { cve: string; package: string | null; asset: string; epss: number; fixed_version: string | null }[]; kev_total?: number; epss_total?: number }
   activity: { day: string; runs: number }[]
   recent_runs: RunRow[]
   top_issues: { title: string; severity: string; asset: string; action: string | null; run_id: string | null; epss: number | null; kev: boolean; fingerprint: string }[]

@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 
 from .. import cve_db
-from ..findings_registry import assets_with_cve
+from ..findings_registry import assets_with_cve, open_cves
 from .core import Request, route
 
 MAX_OFFSET = 10_000  # más allá, que se acote con filtros: evita OFFSET caros
@@ -26,8 +26,10 @@ def cve_search(request: Request):
             or not 1 <= limit <= 100 or not 0 <= offset <= MAX_OFFSET
             or (year is not None and not 1999 <= year <= datetime.now(timezone.utc).year + 1)):
         return request.json(400, {"error": "Parámetros inválidos"})
+    mine = open_cves(request.data_dir)
     return request.json(200, cve_db.search(request.data_dir, query=query, severity=severity, kev=request.arg("kev") == "1",
-                                           year=year, sort=sort, limit=limit, offset=offset))
+                                           year=year, sort=sort, limit=limit, offset=offset, mine=mine,
+                                           only=mine if request.arg("mine") == "1" else None) | {"mine_total": len(mine)})
 
 
 @route("GET", "/api/cve-db/overview")

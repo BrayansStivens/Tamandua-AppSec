@@ -46,7 +46,6 @@ class ScanJobs:
         # El registro de hallazgos se deriva de las ejecuciones: si no existe, se reconstruye.
         if not (data_dir / "findings").is_dir():
             findings_registry.rebuild(data_dir)
-        findings_registry.repair_incomplete_fixes(data_dir)
         self._worker = threading.Thread(target=self._loop, name="appsec-scans", daemon=True)
         self._worker.start()
 

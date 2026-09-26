@@ -12,7 +12,7 @@ from ..kinds import FINDING_RUNS
 from .. import batches, exclusions, findings_registry, jira, triage
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
-from ..dashboard import compute as compute_dashboard
+from ..dashboard import cached as compute_dashboard, zone
 from ..integrations import github_installations
 from ..repository_sources import find_source
 from ..scanners import docker_available
@@ -301,7 +301,7 @@ def dashboard(request: Request):
         return request.json(400, {"error": "Ventana inválida"})
     if days not in (7, 30, 90, 365):
         return request.json(400, {"error": "Ventana inválida"})
-    return request.json(200, compute_dashboard(request.data_dir, days))
+    return request.json(200, compute_dashboard(request.data_dir, days, zone(request.arg("tz"))))
 
 
 @route("GET", "/api/cves")

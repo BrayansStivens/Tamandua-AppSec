@@ -118,6 +118,25 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(len(result["activity"]), 365)
         self.assertEqual(sum(day["runs"] for day in result["activity"]), 2)
 
+    def test_days_are_counted_in_the_viewer_timezone_and_cached(self):
+        """«Hoy» es el de quien mira: en Bogotá, un análisis a las 21:00 del 25 cuenta el 25, no el 26 (UTC)."""
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            evening = datetime(2026, 9, 26, 2, 0, tzinfo=timezone.utc)  # 21:00 del 25 en Bogotá
+            save_repository_scan(data_dir, _scan("org/app", [], evening.isoformat()), created_at=evening.isoformat())
+            bogota = dashboard.zone("America/Bogota")
+            with patch.object(dashboard, "datetime", wraps=datetime) as clock:
+                clock.now = lambda tz=None: datetime(2026, 9, 26, 3, 0, tzinfo=timezone.utc).astimezone(tz) if tz else datetime(2026, 9, 26, 3, 0)
+                local = {row["day"]: row["runs"] for row in dashboard.compute(data_dir, 30, bogota)["activity"] if row["runs"]}
+                utc = {row["day"]: row["runs"] for row in dashboard.compute(data_dir, 30)["activity"] if row["runs"]}
+            self.assertEqual((local, utc), ({"2026-09-25": 1}, {"2026-09-26": 1}))
+            for bad in ("../../etc/passwd", "Nada/Inventado", "", None, "x" * 80):
+                self.assertIs(dashboard.zone(bad), timezone.utc)
+            first = dashboard.cached(data_dir, 30, bogota)
+            self.assertIs(dashboard.cached(data_dir, 30, bogota), first)  # sin cambios: no recalcula
+            save_repository_scan(data_dir, _scan("org/otra", [], evening.isoformat()))
+            self.assertIsNot(dashboard.cached(data_dir, 30, bogota), first)  # una ejecución nueva invalida
+
     def test_nvd_feed_parses_scores_and_descriptions(self):
         body = json.dumps({"totalResults": 1, "timestamp": "2026-09-23T00:00:00", "vulnerabilities": [{"cve": {
             "id": "CVE-2026-777", "published": "2026-09-22T10:00:00.000",

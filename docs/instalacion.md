@@ -53,7 +53,7 @@ make backup
 make update
 ```
 
-`data/` y `config/` se conservan. Antes de actualizar conviene hacer una copia (ver abajo) y comprobar que no hay análisis en marcha en **Análisis**: un reinicio marca como fallidos los que estuvieran corriendo.
+`data/` y `config/` se conservan. Si la versión nueva cambia el formato de algún dato, lo convierte sola al arrancar, una sola vez y tras guardar una copia de lo que toca en `data/backups/`: no hay que hacer nada a mano. Antes de actualizar conviene hacer una copia (ver abajo) y comprobar que no hay análisis en marcha en **Análisis**: un reinicio marca como fallidos los que estuvieran corriendo.
 
 ## Copias de seguridad
 

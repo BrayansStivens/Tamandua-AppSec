@@ -139,6 +139,31 @@ class CveRoutesTests(HttpCase):
         self.assertEqual((status, body["count"], body["sync"]["phase"]), (200, 1, "pending"))
         self.assertNotIn("nvd_api_key", json.dumps(body).lower())
 
+    def test_only_mine_filters_to_open_cves_in_my_assets(self):
+        connection = cve_db.connect(self.data_dir)
+        with connection:
+            cve_db.upsert(connection, [nvd_entry("CVE-2026-20001", "2026-09-18T00:00:00.000"), nvd_entry("CVE-2026-20002", "2026-09-17T00:00:00.000"),
+                                       nvd_entry("CVE-2026-20003", "2026-09-16T00:00:00.000")])
+        connection.close()
+        findings_registry._save(self.data_dir, {"asset": "github#1", "name": "acme/web", "findings": {
+            "a": {"status": "open", "finding": {"cve": ["CVE-2026-12345"]}},
+            "b": {"status": "fixed", "finding": {"cve": ["CVE-2026-20001"]}},  # remediado: ya no es tuyo
+            "c": {"status": "open", "finding": {"cve": ["CVE-2026-20002"]}},  # descartado en triage abajo
+            "d": {"status": "open", "finding": {"cve": ["CVE-2026-99999"]}}}})  # aún no está en la copia local
+        (self.data_dir / "triage.json").write_text(json.dumps({"github#1": {"c": {"status": "false_positive", "reason": "x"}}}))
+        status, body, _ = self.call("GET", "/api/cve-db?mine=1", headers=self.cookie)
+        self.assertEqual((status, [item["id"] for item in body["items"]], body["mine_total"]), (200, ["CVE-2026-12345"], 2))
+        _, body, _ = self.call("GET", "/api/cve-db", headers=self.cookie)
+        self.assertEqual({item["id"]: item["affects"] for item in body["items"]},
+                         {"CVE-2026-12345": True, "CVE-2026-20001": False, "CVE-2026-20002": False, "CVE-2026-20003": False})
+        # La caché se invalida al cambiar el registro.
+        findings_registry._save(self.data_dir, {"asset": "github#2", "name": "acme/api", "findings": {
+            "e": {"status": "open", "finding": {"cve": ["CVE-2026-20003"]}}}})
+        _, body, _ = self.call("GET", "/api/cve-db?mine=1&sort=score", headers=self.cookie)
+        self.assertEqual({item["id"] for item in body["items"]}, {"CVE-2026-12345", "CVE-2026-20003"})
+        (self.data_dir / "triage.json").write_text("{roto")
+        self.assertEqual(self.call("GET", "/api/cve-db?mine=1", headers=self.cookie)[0], 200)
+
 
 if __name__ == "__main__":
     unittest.main()

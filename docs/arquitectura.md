@@ -66,10 +66,18 @@ data/
   logs/app.log      JSON por línea, rotado (10 MB × 5), sin secretos
   integrations.json instalaciones de GitHub conectadas (identificador, cuenta, permisos)
   pr-watch.json     repositorios vigilados y PRs revisados
+  data-version.json versión del formato de data/ y migraciones aplicadas
+  backups/          copia de lo que tocó cada migración (se guardan las 5 últimas)
 config/
   secrets.vault     secretos cifrados
   master.key        clave maestra (si no viene del entorno)
 ```
+
+**Actualizar sin romper los datos.** Al arrancar (panel o CLI), `appsec_agent/migrations.py` compara la versión
+guardada en `data-version.json` con la del código y aplica, en orden y una sola vez, las migraciones pendientes,
+tras copiar a `data/backups/` solo lo que van a tocar. Cada paso guarda su versión: si uno falla, el siguiente
+arranque reanuda desde ahí. Una instalación nueva nace en la última versión; unos datos de una versión más nueva
+que el código (volver a una versión anterior) impiden arrancar en vez de arriesgarse a estropearlos.
 
 ## Decisiones de diseño
 

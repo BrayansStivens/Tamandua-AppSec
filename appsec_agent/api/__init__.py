@@ -6,7 +6,7 @@ import os
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-from .. import logging_setup
+from .. import logging_setup, migrations
 from ..auth import Authenticator
 from ..jobs import ScanJobs
 from . import routes_auth, routes_cves, routes_prs, routes_runs, routes_sources, routes_threats  # noqa: F401 — registran sus rutas
@@ -16,6 +16,7 @@ __all__ = ["make_handler", "serve", "allowed_origins", "public_url", "ROUTES", "
 
 
 def make_handler(data_dir: Path, *, watch_pull_requests: bool = False):
+    migrations.upgrade(data_dir)  # antes de que nada lea: una actualización convierte los datos viejos una sola vez
     state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir),
                   auth=Authenticator(data_dir))
     if watch_pull_requests:

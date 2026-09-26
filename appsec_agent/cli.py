@@ -15,6 +15,7 @@ from .engine import scan_fixture
 from .fixture import FixtureError, verify_fixture
 from .github_app import GitHubAppError, config as github_config
 from .integrations import github_installations
+from .migrations import DataTooNew, upgrade as upgrade_data
 from .providers import PROVIDERS, check_provider, provider_status
 from .repository_scan import scan_repository
 from .repository_sources import SourceError, available_sources, snapshot_source
@@ -122,6 +123,11 @@ def main(argv: list[str] | None = None) -> int:
                                           else Path.home() / ".cache" / "tamandua")
         return _scan_command(args)
     args.data_dir = args.data_dir or Path("data")
+    try:
+        upgrade_data(args.data_dir)
+    except DataTooNew as error:
+        print(str(error), file=sys.stderr)
+        return 1
     try:
         if args.command == "verify-fixture":
             record = save_run(args.data_dir, verify_fixture(args.fixture))

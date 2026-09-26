@@ -54,4 +54,18 @@ cd ..
 
 Las pruebas necesitan `cryptography` (almacén cifrado y firma del JWT): córrelas con el venv, `.venv/bin/python -m unittest discover -s tests`.
 
+### Cambiar el formato de algo que ya está en `data/`
+
+Quien actualiza Tamandua ya tiene datos: una versión nueva nunca debe romperlos ni pedirle que haga nada a mano.
+
+1. **Lector tolerante.** El código lee también el formato anterior: `dict.get` con valor por defecto para
+   campos nuevos, sin suponer tipos que antes no existían. Leer nunca lanza por un campo que falta.
+2. **Migración si hay que reescribir.** Se añade al final de `MIGRATIONS` en `appsec_agent/migrations.py`:
+   idempotente (repetirla no daña), con las rutas que toca en `touches` (se copian antes) y rápida en
+   instalaciones grandes. Nunca se reordena ni se borra una migración publicada: la versión es su posición.
+3. **Prueba con datos viejos** en `tests/test_migrations.py` (o junto al módulo): se escriben a mano en el
+   formato anterior, se migra y se comprueba el resultado.
+
+Si el cambio solo añade un campo que puede faltar, basta con el punto 1: no hace falta migración.
+
 `npm run build` actualiza los activos servidos por Python. Para recarga en desarrollo usa `npm run dev`; Vite reenvía `/api` al backend en 8766.

@@ -11,8 +11,8 @@ import { Bone, Skeleton, SkeletonList } from '@/components/loading'
 import { api, query } from '@/lib/api'
 import { readRoute, writeRoute } from '@/lib/route'
 
-export type CveRow = { id: string; published: string | null; severity: string | null; score: number | null; version: string | null; description: string; kev: boolean; epss: number | null; epss_percentile: number | null }
-type CvePage = { items: CveRow[]; total: number; limit: number; offset: number }
+export type CveRow = { id: string; published: string | null; severity: string | null; score: number | null; version: string | null; description: string; kev: boolean; epss: number | null; epss_percentile: number | null; affects?: boolean }
+type CvePage = { items: CveRow[]; total: number; limit: number; offset: number; mine_total?: number }
 export type CveOverview = {
   count: number; kev_total: number; years: { year: number; count: number }[]
   latest_kev: { id: string; date_added: string; name: string | null; ransomware: boolean; severity: string | null; score: number | null }[]
@@ -35,11 +35,11 @@ export function SeverityPill({ severity, score }: { severity: string | null; sco
   return <Badge variant="outline" className="gap-1.5 border-app-line text-[11px] text-app-secondary"><span className="size-2 rounded-full" style={{ background: sevColor[severity] ?? 'var(--axis-line)' }} />{sevLabel[severity] ?? severity}{score !== undefined && score !== null ? <span className="font-mono text-app-muted">{score.toFixed(1)}</span> : null}</Badge>
 }
 
-type Filters = { q: string; severity: string; kev: boolean; year: string; sort: string; page: number; size: number }
+type Filters = { q: string; severity: string; kev: boolean; mine: boolean; year: string; sort: string; page: number; size: number }
 const fromRoute = (): Filters => {
   const params = readRoute().params
   const size = Number(params.get('size'))
-  return { q: params.get('q') ?? '', severity: params.get('severity') ?? '', kev: params.get('kev') === '1', year: params.get('year') ?? '',
+  return { q: params.get('q') ?? '', severity: params.get('severity') ?? '', kev: params.get('kev') === '1', mine: params.get('mine') === '1', year: params.get('year') ?? '',
     sort: SORTS.some(([value]) => value === params.get('sort')) ? params.get('sort')! : 'published', page: Math.max(1, Number(params.get('page')) || 1), size: SIZES.includes(size) ? size : 25 }
 }
 
@@ -55,7 +55,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
   // La URL guarda la búsqueda: refrescar o compartir el enlace deja la misma vista.
   const apply = useCallback((next: Partial<Filters>) => setFilters(current => {
     const merged = { ...current, ...next, page: next.page ?? 1 }
-    writeRoute('cves', { q: merged.q, severity: merged.severity, kev: merged.kev ? '1' : null, year: merged.year, sort: merged.sort === 'published' ? null : merged.sort,
+    writeRoute('cves', { q: merged.q, severity: merged.severity, kev: merged.kev ? '1' : null, mine: merged.mine ? '1' : null, year: merged.year, sort: merged.sort === 'published' ? null : merged.sort,
       page: merged.page > 1 ? String(merged.page) : null, size: merged.size === 25 ? null : String(merged.size), id: open }, { replace: true })
     return merged
   }), [open])
@@ -64,7 +64,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
   useEffect(() => {
     let cancelled = false
     setLoading(true); setError('')
-    api.get<CvePage>(`/api/cve-db?${query({ q: filters.q, severity: filters.severity || undefined, kev: filters.kev ? 1 : undefined, year: filters.year || undefined,
+    api.get<CvePage>(`/api/cve-db?${query({ q: filters.q, severity: filters.severity || undefined, kev: filters.kev ? 1 : undefined, mine: filters.mine ? 1 : undefined, year: filters.year || undefined,
       sort: filters.sort, limit: filters.size, offset: Math.min(10000, (filters.page - 1) * filters.size) })}`)
       .then(result => { if (!cancelled) setPage(result) })
       .catch(caught => { if (!cancelled) setError(caught instanceof Error ? caught.message : String(caught)) })
@@ -77,6 +77,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
     writeRoute('cves', { ...params, id }, { replace: true })
   }
   const submit = (event: FormEvent) => { event.preventDefault(); apply({ q: draft.trim() }) }
+  const mineTotal = page?.mine_total ?? null
   const pages = page ? Math.max(1, Math.ceil(Math.min(page.total, 10000 + filters.size) / filters.size)) : 1
 
   return <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -93,15 +94,17 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
           <Select value={filters.sort} onValueChange={value => apply({ sort: value ?? 'published' })}><SelectTrigger aria-label="Orden" className="h-9 min-w-36 border-app-line bg-app-soft">{SORTS.find(([value]) => value === filters.sort)?.[1]}</SelectTrigger>
             <SelectContent className="border border-app-line bg-panel p-1 text-app-fg shadow-xl">{SORTS.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
           <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-app-line bg-app-soft px-3 text-sm whitespace-nowrap"><input type="checkbox" checked={filters.kev} onChange={event => apply({ kev: event.target.checked })} className="size-3.5 accent-[var(--primary)]" />Solo KEV</label>
+          <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-app-line bg-app-soft px-3 text-sm whitespace-nowrap"><input type="checkbox" checked={filters.mine} onChange={event => apply({ mine: event.target.checked })} className="size-3.5 accent-[var(--primary)]" />Solo los que me afectan{mineTotal !== null ? <span className="text-xs text-app-subtle tabular-nums">({mineTotal.toLocaleString('es-CO')})</span> : null}</label>
           </div>
         </form>
-        {(filters.q || filters.year || filters.severity || filters.kev) && <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        {(filters.q || filters.year || filters.severity || filters.kev || filters.mine) && <div className="flex flex-wrap items-center gap-1.5 text-xs">
           <span className="text-app-subtle">Filtros:</span>
           {filters.q && <Chip label={`«${filters.q}»`} onClear={() => { setDraft(''); apply({ q: '' }) }} />}
           {filters.year && <Chip label={`Año ${filters.year}`} onClear={() => apply({ year: '' })} />}
           {filters.severity && <Chip label={sevLabel[filters.severity]} onClear={() => apply({ severity: '' })} />}
           {filters.kev && <Chip label="Solo KEV" onClear={() => apply({ kev: false })} />}
-          <button type="button" onClick={() => { setDraft(''); apply({ q: '', year: '', severity: '', kev: false }) }} className="text-app-muted underline-offset-2 hover:underline">Limpiar todo</button>
+          {filters.mine && <Chip label="Me afectan" onClear={() => apply({ mine: false })} />}
+          <button type="button" onClick={() => { setDraft(''); apply({ q: '', year: '', severity: '', kev: false, mine: false }) }} className="text-app-muted underline-offset-2 hover:underline">Limpiar todo</button>
         </div>}
       </CardContent></Card>
 
@@ -115,7 +118,8 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
                 <th className="w-16 px-3 py-2.5 text-right font-normal">EPSS</th><th className="w-28 px-3 py-2.5 font-normal">Publicado</th><th className="px-4 py-2.5 font-normal">Descripción</th></tr></thead>
               <tbody>{page.items.map(item => <tr key={item.id} onClick={() => show(item.id)} className="cursor-pointer border-b border-app-line align-top last:border-0 hover:bg-app-soft">
                 <td className="px-4 py-3 whitespace-nowrap"><button type="button" className="font-mono text-xs font-medium hover:underline" onClick={event => { event.stopPropagation(); show(item.id) }}>{item.id}</button>
-                  {item.kev && <span className="ml-2 inline-flex items-center gap-0.5 rounded bg-danger-solid px-1 py-0.5 align-middle text-[11px] font-semibold text-on-solid" title="En el catálogo CISA KEV: explotación activa"><Flame className="size-2.5" />KEV</span>}</td>
+                  {item.kev && <span className="ml-2 inline-flex items-center gap-0.5 rounded bg-danger-solid px-1 py-0.5 align-middle text-[11px] font-semibold text-on-solid" title="En el catálogo CISA KEV: explotación activa"><Flame className="size-2.5" />KEV</span>}
+                  {item.affects && !filters.mine && <span className="mt-1 block w-fit rounded border border-danger-line px-1 text-[11px] text-danger" title="Abierto en alguno de tus activos">te afecta</span>}</td>
                 <td className="px-3 py-3"><SeverityPill severity={item.severity} /></td>
                 <td className="px-3 py-3 text-right font-mono text-xs tabular-nums">{item.score?.toFixed(1) ?? '—'}</td>
                 <td className="px-3 py-3 text-right font-mono text-xs tabular-nums">{percent(item.epss)}</td>
@@ -123,7 +127,7 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
                 <td className="px-4 py-3 text-xs leading-5 text-app-muted"><span className="line-clamp-2">{item.description}</span></td>
               </tr>)}</tbody>
             </table>
-            {!page.items.length && <div className="flex flex-col items-center gap-2 py-12 text-center"><Search className="size-6 text-app-subtle" /><p className="font-medium">Nada coincide</p><p className="max-w-sm text-sm text-app-muted">{overview?.count ? 'Prueba con menos palabras o quita algún filtro.' : 'La base local aún está vacía: se está descargando de NVD.'}</p></div>}
+            {!page.items.length && <div className="flex flex-col items-center gap-2 py-12 text-center"><Search className="size-6 text-app-subtle" /><p className="font-medium">{filters.mine && !mineTotal ? 'Ningún CVE abierto en tus activos' : 'Nada coincide'}</p><p className="max-w-sm text-sm text-app-muted">{filters.mine && !mineTotal ? 'Tus análisis no tienen hallazgos abiertos con CVE, o aún no has analizado nada.' : filters.mine ? 'Prueba quitando algún filtro. Si la descarga de NVD no ha terminado, algunos de tus CVE aún no están en la copia local.' : overview?.count ? 'Prueba con menos palabras o quita algún filtro.' : 'La base local aún está vacía: se está descargando de NVD.'}</p></div>}
           </div>}
         {page && page.total > 0 && <div className="flex flex-wrap items-center justify-between gap-3 border-t border-app-line px-4 py-2.5 text-xs text-app-subtle">
           <span className="tabular-nums">Mostrando {(page.offset + 1).toLocaleString('es-CO')}–{Math.min(page.offset + page.limit, page.total).toLocaleString('es-CO')} de {page.total.toLocaleString('es-CO')} CVE</span>
@@ -139,8 +143,13 @@ export function CveTracker({ onNew }: { onNew: () => void }) {
     </div>
 
     <aside className="space-y-4">
-      <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">¿Te afecta?</CardTitle><CardDescription className="text-xs leading-5">Analiza tus repositorios: cruzamos las dependencias con estos CVE, con KEV y EPSS, y te decimos cuáles tienes de verdad.</CardDescription></CardHeader>
-        <CardContent><Button onClick={onNew} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">Nuevo análisis <ArrowRight /></Button></CardContent></Card>
+      <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">¿Te afecta?</CardTitle><CardDescription className="text-xs leading-5">{mineTotal === null && error ? 'Ahora no se puede comprobar: vuelve a intentarlo en un momento.'
+          : mineTotal === null ? <span role="status" aria-label="Cargando tus CVE" className="block space-y-1.5"><Bone className="h-3 w-full" /><Bone className="h-3 w-2/3" /></span>
+          : mineTotal ? <>Tienes <strong className="text-app-fg tabular-nums">{mineTotal.toLocaleString('es-CO')}</strong> CVE abiertos en tus repositorios e imágenes (sin contar lo descartado en triage).</>
+          : 'Analiza tus repositorios: cruzamos las dependencias con estos CVE, con KEV y EPSS, y te decimos cuáles tienes de verdad.'}</CardDescription></CardHeader>
+        <CardContent>{mineTotal === null ? (error ? null : <Bone className="h-9" />)
+          : mineTotal ? <Button variant="outline" onClick={() => apply({ mine: !filters.mine })} className="w-full border-app-line bg-app-soft">{filters.mine ? 'Ver todos los CVE' : 'Ver solo los que me afectan'} <ArrowRight /></Button>
+          : <Button variant="outline" onClick={onNew} className="w-full border-app-line bg-app-soft">Nuevo análisis <ArrowRight /></Button>}</CardContent></Card>
       <Card className="border-app-line bg-panel"><CardHeader className="pb-2"><CardTitle className="text-base">Por año</CardTitle><CardDescription className="text-xs">{overview ? `${overview.count.toLocaleString('es-CO')} CVE en la copia local` : <Bone className="h-3 w-32" />}</CardDescription></CardHeader>
         {/* Ley de Hick: un selector con los años (y sus cifras) en lugar de una rejilla de ~30 botones. */}
         <CardContent>{overview?.years.length ? <Select value={filters.year || 'all'} onValueChange={value => apply({ year: !value || value === 'all' ? '' : value })}>

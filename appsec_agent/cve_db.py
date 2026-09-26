@@ -288,10 +288,18 @@ SELECT = """SELECT c.id, c.published, c.severity, c.score, c.version, c.descript
 
 
 def search(data_dir: Path, *, query: str = "", severity: str | None = None, kev: bool = False, year: int | None = None,
-           sort: str = "published", limit: int = 25, offset: int = 0) -> dict:
-    """Búsqueda paginada. Todo va parametrizado; el texto libre pasa por FTS5 con palabras saneadas."""
+           sort: str = "published", limit: int = 25, offset: int = 0, only: frozenset[str] | None = None,
+           mine: frozenset[str] = frozenset()) -> dict:
+    """Búsqueda paginada. Todo va parametrizado; el texto libre pasa por FTS5 con palabras saneadas.
+
+    `only` restringe a esos CVE (p. ej. los abiertos en tus activos); `mine` solo marca cada fila con `affects`."""
     clauses, params = ["(c.status IS NULL OR c.status != 'Rejected')"], []
     join = ""
+    if only is not None:
+        # Un único parámetro JSON, sea cual sea el tamaño del conjunto (sin tope de variables de SQLite); el JOIN
+        # recorre esa lista y busca cada CVE por clave primaria en vez de recorrer la tabla entera.
+        join = " JOIN json_each(?) mine ON mine.value = c.id"
+        params.append(json.dumps(sorted(only)))
     text = query.strip()
     if _CVE_PREFIX.fullmatch(text):
         clauses.append("c.id LIKE ? ESCAPE '\\'")
@@ -299,7 +307,7 @@ def search(data_dir: Path, *, query: str = "", severity: str | None = None, kev:
     elif text:
         match = _fts_query(text)
         if match:
-            join = " JOIN cves_fts f ON f.rowid = c.rowid"
+            join += " JOIN cves_fts f ON f.rowid = c.rowid"
             clauses.append("cves_fts MATCH ?")
             params.append(match)
     if severity == "none":
@@ -324,7 +332,7 @@ def search(data_dir: Path, *, query: str = "", severity: str | None = None, kev:
         rows = connection.execute(f"{base} ORDER BY {SORTS[sort]} LIMIT ? OFFSET ?", [*params, limit, offset]).fetchall()  # nosemgrep: appsec.py.sql-string-building
     finally:
         connection.close()
-    return {"items": [_item(row) for row in rows], "total": total, "limit": limit, "offset": offset}
+    return {"items": [{**_item(row), "affects": row["id"] in mine} for row in rows], "total": total, "limit": limit, "offset": offset}
 
 
 def detail(data_dir: Path, identifier: str) -> dict | None:
