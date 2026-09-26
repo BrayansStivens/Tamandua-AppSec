@@ -57,7 +57,7 @@ def save_record(data_dir: Path, record: dict) -> None:
 
 
 def _row(record: dict) -> dict:
-    item = {key: record.get(key) for key in ("id", "type", "status", "created_at", "fixture", "summary")}
+    item = {key: record.get(key) for key in ("id", "type", "status", "created_at", "target", "summary")}
     for key in ("variant", "source", "context", "started_at", "finished_at", "pull_request", "trigger"):
         if key in record and record[key] is not None:
             item[key] = record[key]
@@ -79,7 +79,7 @@ def page_runs(data_dir: Path, *, limit: int = 25, offset: int = 0, status: str |
         conditions.append(runs.c.type.in_(kind.split(",")))
     if query:
         needle = f"%{query.strip().lower().replace(chr(92), chr(92) * 2).replace('%', chr(92) + '%').replace('_', chr(92) + '_')}%"
-        text = func.lower(func.concat_ws(" ", runs.c.row["source"]["name"].astext, runs.c.row["fixture"].astext, runs.c.id, runs.c.row["variant"].astext))
+        text = func.lower(func.concat_ws(" ", runs.c.row["source"]["name"].astext, runs.c.row["target"].astext, runs.c.id, runs.c.row["variant"].astext))
         conditions.append(text.like(needle, escape="\\"))
     limit = max(1, min(limit, 200))
     offset = max(0, offset)

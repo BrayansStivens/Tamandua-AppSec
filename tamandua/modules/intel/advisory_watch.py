@@ -190,7 +190,7 @@ def check(data_dir: Path, *, run=None, now: datetime | None = None) -> dict:
         source = record.get("source") or {}
         severities = {level: sum(1 for item in new if item.get("severity") == level) for level in ("critical", "high", "medium", "low", "info")}
         save_repository_scan(data_dir, {
-            "type": "advisory_watch", "status": "completed", "source": source, "fixture": record.get("fixture") or source.get("name"),
+            "type": "advisory_watch", "status": "completed", "source": source, "target": record.get("target") or source.get("name"),
             "variant": "advisories", "context": "", "requested_by": "vigilante",
             "trigger": {"kind": "advisories", "base_run": record["id"], "base_at": record.get("created_at")},
             "started_at": now.isoformat(timespec="seconds"), "finished_at": now.isoformat(timespec="seconds"),

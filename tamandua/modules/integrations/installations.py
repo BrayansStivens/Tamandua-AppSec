@@ -16,8 +16,6 @@ class IntegrationError(ValueError):
     pass
 
 
-
-
 def load(data_dir: Path) -> dict:
     data = documents.load(data_dir, "integrations", {})
     if not isinstance(data, dict):
@@ -43,15 +41,15 @@ def save_github(data_dir: Path, installation_id: int, details: dict, connected_b
         records = github_connections(data_dir)
         records = [item for item in records if item["installation_id"] != installation_id]
         records.append(record)
-        data["github"] = records[0] if len(records) == 1 else records
+        data["github"] = records
         _write(data_dir, data)
     return record
 
 
 def github_connections(data_dir: Path) -> list[dict]:
-    """Instalaciones conectadas, aceptando el registro antiguo de una sola cuenta."""
+    """Instalaciones conectadas."""
     value = load(data_dir).get("github")
-    rows = [value] if isinstance(value, dict) else value if isinstance(value, list) else []
+    rows = value if isinstance(value, list) else []
     return [row for row in rows if isinstance(row, dict) and isinstance(row.get("installation_id"), int)
             and not isinstance(row["installation_id"], bool) and row["installation_id"] > 0]
 
@@ -75,7 +73,7 @@ def clear_github(data_dir: Path, installation_id: int | None = None) -> None:
             rows = [row for row in current if row["installation_id"] != installation_id]
             changed = len(rows) != len(current)
             if rows:
-                data["github"] = rows[0] if len(rows) == 1 else rows
+                data["github"] = rows
             else:
                 data.pop("github", None)
         if changed:

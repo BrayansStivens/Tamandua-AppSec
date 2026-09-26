@@ -25,7 +25,7 @@ def _finding(fingerprint, severity="high", cwe=(79,), kev=None, epss=None, packa
 def _scan(name, findings, when):
     severities = {level: sum(1 for item in findings if item["severity"] == level) for level in ("critical", "high", "medium", "low", "info")}
     return {"type": "repository_scan", "status": "completed", "source": {"id": f"github:{name}", "name": name, "provider": "github", "sha256": "x"},
-            "fixture": name, "variant": "code", "context": "", "steps": [], "findings": findings, "owasp_coverage": [],
+            "target": name, "variant": "code", "context": "", "steps": [], "findings": findings, "owasp_coverage": [],
             "summary": {"files": 1, "dependencies": 1, "candidates": len(findings), "sast": 0, "secrets": 0, "sca": len(findings),
                         "severities": severities, "priorities": {}, "kev": 0, "fixable": len(findings), "tools": [], "planned": 3, "executed": 3, "confirmed": 0},
             "limitations": [], "scanned_at": when}

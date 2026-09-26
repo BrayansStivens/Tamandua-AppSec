@@ -160,7 +160,7 @@ def findings_message(record: dict, opened: list[dict]) -> dict:
     """El contenido común de un aviso de hallazgos; cada canal lo pinta a su manera."""
     counts = {level: sum(1 for item in opened if item.get("severity") == level) for level in ORDER}
     top = sorted(opened, key=lambda item: (ORDER.index(item.get("severity", "info")) if item.get("severity") in ORDER else 9, not item.get("kev")))[:5]
-    name = (record.get("source") or {}).get("name") or record.get("fixture") or "activo"
+    name = (record.get("source") or {}).get("name") or record.get("target") or "activo"
     origin = {"advisory_watch": "avisos publicados después del último análisis",
               "image_scan": "análisis de la imagen"}.get(record.get("type"), "análisis completo del repositorio")
     if (record.get("trigger") or {}).get("kind") == "branch":

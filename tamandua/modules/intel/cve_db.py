@@ -80,12 +80,6 @@ def connect(data_dir: Path) -> sqlite3.Connection:
     connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("PRAGMA synchronous=NORMAL")
     with _schema_lock:
-        # EPSS son ~400.000 filas: sin rowid ocupa la mitad. Las bases antiguas se migran recargándolo.
-        legacy = connection.execute("SELECT sql FROM sqlite_master WHERE name = 'epss'").fetchone()
-        if legacy and "WITHOUT ROWID" not in legacy[0].upper():
-            with connection:
-                connection.execute("DROP TABLE epss")
-                connection.execute("DELETE FROM state WHERE key = 'epss_version'")
         connection.executescript(SCHEMA)
     return connection
 

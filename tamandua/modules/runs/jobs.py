@@ -98,7 +98,7 @@ class ScanJobs:
                                 requested_by: str | None = None, trigger: dict | None = None) -> dict:
         run_id = uuid.uuid4().hex
         record = {"schema_version": "0.3.0", "id": run_id, "type": "repository_scan", "status": "queued",
-                  "created_at": _now(), "fixture": source_name, "variant": "code",
+                  "created_at": _now(), "target": source_name, "variant": "code",
                   "source": {"id": source_id, "uid": uid, "name": source_name, "provider": source_id.partition(":")[0]},
                   "context": " ".join(context.split())[:400], "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
@@ -122,7 +122,7 @@ class ScanJobs:
         run_id = uuid.uuid4().hex
         name = source_id.removeprefix("github:")
         record = {"schema_version": "0.3.0", "id": run_id, "type": "pr_review", "status": "queued", "created_at": _now(),
-                  "fixture": f"{name}#{pull['number']}", "variant": "pull_request",
+                  "target": f"{name}#{pull['number']}", "variant": "pull_request",
                   "source": {"id": source_id, "uid": uid, "name": name, "provider": "github"},
                   "pull_request": {key: pull.get(key) for key in ("number", "title", "url", "author", "head_sha", "head_ref", "base_ref")},
                   "requested_by": requested_by, "context": "", "summary": {"candidates": 0, "files": 0, "dependencies": 0},
@@ -138,7 +138,7 @@ class ScanJobs:
         """Análisis de una imagen de contenedor leída del registro: no se ejecuta ni se construye."""
         run_id = uuid.uuid4().hex
         record = {"schema_version": "0.3.0", "id": run_id, "type": "image_scan", "status": "queued", "created_at": _now(),
-                  "fixture": image["reference"], "variant": "image",
+                  "target": image["reference"], "variant": "image",
                   "source": {"id": image["asset"], "uid": None, "name": image["name"], "provider": "registry", "image": image},
                   "requested_by": requested_by, "context": " ".join(context.split())[:400],
                   "summary": {"candidates": 0, "files": 0, "dependencies": 0},
@@ -350,7 +350,7 @@ class ScanJobs:
                      f"{len(introduced)} hallazgos nuevos introducidos por el PR; {len(outcome['preexisting'])} ya existían"
                      + ("" if baseline else " (sin escaneo previo de la rama principal: se cuenta lo que cae en líneas cambiadas)") + ".")
             delivery = self._deliver(installation, repository, pull, outcome, run_id, baseline, config, progress)
-            save_repository_scan(self.data_dir, {**scan, "type": "pr_review", "fixture": record["fixture"], "variant": "pull_request",
+            save_repository_scan(self.data_dir, {**scan, "type": "pr_review", "target": record["target"], "variant": "pull_request",
                                                  "pull_request": record["pull_request"], "requested_by": record.get("requested_by"),
                                                  "findings": introduced, "summary": summary,
                                                  "unused_dependencies": outcome["unused"],

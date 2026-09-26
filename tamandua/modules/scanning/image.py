@@ -471,7 +471,7 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
     tools = [trivy, grype, checkov]
     return {"type": "image_scan", "status": "completed" if trivy["status"] == "completed" and grype["status"] == "completed" else "incomplete",
             "source": {"id": image["asset"], "uid": None, "name": image["name"], "provider": "registry", "image": image_meta},
-            "fixture": image["reference"], "variant": "image", "context": " ".join(str(context).split())[:400],
+            "target": image["reference"], "variant": "image", "context": " ".join(str(context).split())[:400],
             "steps": steps, "findings": findings, "owasp_coverage": coverage,
             "dependencies": trivy.get("packages") or [],
             "system_packages": trivy.get("system_packages") or [],  # solo para el SBOM

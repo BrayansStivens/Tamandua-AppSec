@@ -514,7 +514,7 @@ def reverify_finding(request: Request):
         return request.json(409, {"error": "Son datos de demostración: se vuelven a analizar con «make demo». Reverificar funciona en tus repositorios e imágenes."})
     if base["type"] == "image_scan":
         try:
-            image = parse_reference(str((source.get("image") or {}).get("reference") or base.get("fixture") or ""))
+            image = parse_reference(str((source.get("image") or {}).get("reference") or base.get("target") or ""))
         except ImageError as exc:
             return request.json(409, {"error": f"No se puede repetir el análisis de la imagen: {exc}"})
         queued = state.jobs.enqueue_image_scan(image=image, context="", requested_by=by)

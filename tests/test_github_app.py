@@ -159,17 +159,17 @@ class GitHubAppTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 save_github(data_dir, 0, details, None)
 
-    def test_connections_migrate_from_single_record_and_can_remove_one_account(self):
+    def test_connections_are_a_list_and_one_account_can_be_removed(self):
         with tempfile.TemporaryDirectory() as temporary:
             data_dir = Path(temporary)
             save_github(data_dir, 77, {"account": "acme"}, "admin")
-            self.assertIsInstance(load(data_dir)["github"], dict)
+            self.assertIsInstance(load(data_dir)["github"], list)
             save_github(data_dir, 88, {"account": "beta"}, "admin")
             self.assertEqual(github_installations(data_dir), [77, 88])
             self.assertEqual([row["account"] for row in load(data_dir)["github"]], ["acme", "beta"])
             clear_github(data_dir, 77)
             self.assertEqual(github_installations(data_dir), [88])
-            self.assertIsInstance(load(data_dir)["github"], dict)
+            self.assertIsInstance(load(data_dir)["github"], list)
 
     def test_app_installations_reads_more_than_one_page(self):
         first = [{"id": index, "account": {"login": "org" + str(index), "type": "Organization"}}

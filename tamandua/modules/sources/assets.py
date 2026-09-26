@@ -26,7 +26,7 @@ _log = logging_setup.get("assets")
 
 def asset_key(record: dict) -> str:
     source = record.get("source") or {}
-    return source.get("uid") or source.get("id") or source.get("name") or record.get("fixture") or "desconocido"
+    return source.get("uid") or source.get("id") or source.get("name") or record.get("target") or "desconocido"
 
 
 def load_registry(data_dir: Path) -> dict:

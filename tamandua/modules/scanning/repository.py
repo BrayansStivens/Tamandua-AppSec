@@ -345,7 +345,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             # Sin Docker no corrió ningún motor: las reglas internas no bastan para dar el repositorio por revisado.
             "status": "incomplete" if not engines or sca_status == "inconclusive" or truncated or misconfigured or any(
                 tool["tool"] in ("opengrep", "gitleaks", "trivy", "osv-scanner") and tool["status"] == "inconclusive" for tool in tools) else "completed",
-            "source": source, "fixture": source["name"], "variant": "code", "context": declared,
+            "source": source, "target": source["name"], "variant": "code", "context": declared,
             "steps": steps, "findings": findings,
             "owasp_coverage": coverage, "inventory": collect_inventory(root), "unused_dependencies": unused_dependencies(root),
             # Paquetes con versión (de Trivy): la vigilancia diaria de avisos los contrasta sin reanalizar.

@@ -10,12 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/se
 import { SkeletonTable } from '@/shared/ui/loading'
 import { BatchPanel, useBatches } from '@/features/analyses/batches'
 
-export type AnalysisRow = { id: string; type: string; status: string; created_at: string; variant?: string; fixture?: string; source?: { name: string }; trigger?: { kind: string; head_sha?: string }; summary: { candidates?: number; severities?: Record<string, number>; kev?: number } }
+export type AnalysisRow = { id: string; type: string; status: string; created_at: string; variant?: string; target?: string; source?: { name: string }; trigger?: { kind: string; head_sha?: string }; summary: { candidates?: number; severities?: Record<string, number>; kev?: number } }
 
 const typeLabel = (type: string) => ({ repository_scan: 'Análisis de código', image_scan: 'Imagen de contenedor', pr_review: 'Revisión de PR', advisory_watch: 'Avisos nuevos' }[type] ?? type)
 const statusLabel = (status: string) => ({ completed: 'Completada', incomplete: 'Incompleta', failed: 'Fallida', queued: 'En cola', running: 'Analizando…' }[status] ?? status)
 const typeIcon = (type: string) => type === 'advisory_watch' ? BellRing : type === 'repository_scan' ? Code2 : type === 'image_scan' ? Boxes : type === 'pr_review' ? GitPullRequest : ShieldCheck
-const rowName = (row: AnalysisRow) => row.type === 'advisory_watch' ? row.source?.name ?? row.fixture ?? 'Activo' : row.type === 'repository_scan' ? row.source?.name ?? 'Repositorio' : row.type === 'image_scan' ? row.fixture ?? row.source?.name ?? 'Imagen' : row.type === 'pr_review' ? row.fixture ?? row.source?.name ?? 'Pull request' : row.fixture ?? 'Análisis'
+const rowName = (row: AnalysisRow) => row.type === 'advisory_watch' ? row.source?.name ?? row.target ?? 'Activo' : row.type === 'repository_scan' ? row.source?.name ?? 'Repositorio' : row.type === 'image_scan' ? row.target ?? row.source?.name ?? 'Imagen' : row.type === 'pr_review' ? row.target ?? row.source?.name ?? 'Pull request' : row.target ?? 'Análisis'
 const rowIssues = (row: AnalysisRow) => ({ value: row.summary.candidates ?? 0,
   hint: row.type === 'pr_review' ? 'nuevos en el PR' : row.type === 'advisory_watch' ? 'avisos nuevos' : 'candidatos' })
 

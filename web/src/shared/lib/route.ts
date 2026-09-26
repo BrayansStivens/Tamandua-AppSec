@@ -5,10 +5,7 @@ const SLUGS: Record<string, string> = {
   repositories: 'repositorios', pulls: 'pull-requests', domains: 'dominios', integrations: 'integraciones',
   users: 'usuarios', account: 'cuenta', cves: 'cve-tracker', compliance: 'cumplimiento',
 }
-// Enlaces guardados de antes del cambio de nombre («Pentests» pasó a «Análisis»): siguen funcionando.
-const LEGACY: Record<string, string> = { pentests: 'analyses' }
-const VIEWS: Record<string, string> = { ...LEGACY, ...Object.fromEntries(Object.entries(SLUGS).map(([view, slug]) => [slug, view])) }
-export const ROUTE_EVENT = 'appsec:route'
+const VIEWS: Record<string, string> = Object.fromEntries(Object.entries(SLUGS).map(([view, slug]) => [slug, view]))
 
 export function readRoute(): { view: string | null; params: URLSearchParams } {
   const hash = window.location.hash
@@ -23,7 +20,6 @@ export function writeRoute(view: string, params: Record<string, string | null | 
   if (next === window.location.hash) return
   if (replace) window.history.replaceState(null, '', next)
   else window.history.pushState(null, '', next)
-  window.dispatchEvent(new Event(ROUTE_EVENT))
 }
 
 // Cambia un parámetro sin crear una entrada nueva en el historial (p. ej. al elegir un repositorio).

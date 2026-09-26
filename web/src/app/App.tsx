@@ -86,7 +86,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     for (const row of rows) {
       const before = previous.current.get(row.id)
       if ((before === 'queued' || before === 'running') && row.status !== 'queued' && row.status !== 'running') {
-        const name = row.type === 'repository_scan' ? row.source?.name ?? 'repositorio' : row.type === 'image_scan' ? row.fixture ?? 'imagen' : row.fixture
+        const name = row.type === 'repository_scan' ? row.source?.name ?? 'repositorio' : row.type === 'image_scan' ? row.target ?? 'imagen' : row.target
         toasts.push(row.status === 'failed' ? 'error' : 'ok', row.status === 'failed'
           ? `El escaneo de ${name} falló.`
           : `Escaneo de ${name} terminado: ${row.summary.candidates ?? 0} hallazgos${row.summary.severities ? ` (${row.summary.severities.critical ?? 0} críticos, ${row.summary.severities.high ?? 0} altos)` : ''}.`)
@@ -133,6 +133,8 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
   }, [])
   // Entrar en Hallazgos desde el menú muestra el estado actual; abrir una ejecución concreta pasa por openRun.
   const selectView = (next: View) => { if (next === 'new') setSelectedSource(null); if (next === 'findings') setSelectedId(null); setView(next); setMobileOpen(false); writeRoute(next) }
+  // Un CVE concreto del Resumen: la URL lleva su id (lo lee el tracker al montarse) y la vista cambia a la vez.
+  const openTracker = (id?: string) => { if (!id) return selectView('cves'); writeRoute('cves', { id }); setView('cves'); setMobileOpen(false) }
   const scanSource = (id: string) => { setSelectedSource(id); setView('new'); setMobileOpen(false) }
   const completedRepositoryScan = async (id: string) => { await refresh(); await openRun(id, 'findings') }
 
@@ -162,7 +164,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     if (view === 'analyses') return <AnalysisList refreshKey={rows.length * 1000 + rows.filter(row => row.status === 'running' || row.status === 'queued').length} onOpen={id => openRun(id, 'findings')} onNew={() => selectView('new')} viewer={{ username: user.username, admin: user.role === 'admin' }} />
     if (view === 'repositories') return <CodeSources showRepositories runs={rows} onScan={scanSource} canManage={user.role === 'admin'} />
     if (view === 'domains') return <ComingSoonPage title="Pruebas dinámicas de aplicaciones web y API (DAST)" description="Pruebas dinámicas (DAST) contra tus aplicaciones en marcha, solo sobre dominios cuya propiedad hayas demostrado." plan={['Verificación de propiedad del dominio por DNS TXT (ya implementada, se activará con el resto)', 'Escaneo activo con ZAP o Nuclei en un contenedor aislado, con límites de velocidad y de alcance', 'Autenticación en la aplicación con una cuenta de prueba que tú declares', 'Hallazgos con la petición y la respuesta que los demuestran, en el mismo ciclo de vida que los del código']} />
-    if (view === 'overview') return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onNavigate={view => selectView(view as View)} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
+    if (view === 'overview') return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onNavigate={view => selectView(view as View)} onTracker={openTracker} />
     if (view === 'threats') return <ThreatModels user={user} onOpenRun={id => openRun(id, 'findings')} />
     if (view === 'cves') return <CveTracker onNew={() => selectView('new')} />
     if (view === 'compliance') return <Compliance user={user} onNew={() => selectView('new')} />
@@ -172,7 +174,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     if (view === 'account') return <Account user={user} onChanged={session.reload} />
     if (view === 'users' && user.role === 'admin') return <Users me={user} />
     if (view === 'integrations') return <Integrations user={user} />
-    return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onNavigate={view => selectView(view as View)} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
+    return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onNavigate={view => selectView(view as View)} onTracker={openTracker} />
   }
 
   return <div className="min-h-screen bg-app text-app-fg"><TopProgress /><div className="flex min-h-screen">

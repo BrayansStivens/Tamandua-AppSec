@@ -27,7 +27,7 @@ export function TopProgress() {
     return () => { window.removeEventListener(LOADING_EVENT, listen); window.clearTimeout(timer) }
   }, [])
   return <div aria-hidden className={`pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 overflow-hidden transition-opacity ${active ? 'opacity-100' : 'opacity-0'}`}>
-    <div className="h-full w-1/3 animate-[appsec-progress_1.1s_ease-in-out_infinite] bg-brand" />
+    <div className="h-full w-1/3 motion-safe:animate-[tamandua-progress_1.1s_ease-in-out_infinite] bg-brand" />
   </div>
 }
 
@@ -87,7 +87,7 @@ export function SkeletonCard({ lines = 3, label = 'Cargando' }: { lines?: number
   </Region>
 }
 
-// Compatibilidad: bloques genéricos (y métricas encima si se piden).
+// Bloques genéricos (y métricas encima si se piden).
 export function Skeleton({ rows = 3, tiles = 0, label = 'Cargando' }: { rows?: number; tiles?: number; label?: string }) {
   return <Region label={label} className="space-y-4">
     {tiles > 0 && <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">{Array.from({ length: tiles }, (_, index) => <Bone key={index} className="h-20 rounded-xl" />)}</div>}

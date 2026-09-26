@@ -7,9 +7,9 @@ export class ApiError extends Error {
   constructor(message: string, status: number, retryIn?: number) { super(message); this.status = status; this.retryIn = retryIn }
 }
 
-export const UNAUTHORIZED_EVENT = 'appsec:unauthorized'
-export const TOTP_REQUIRED_EVENT = 'appsec:totp-required'
-export const LOADING_EVENT = 'appsec:loading'
+export const UNAUTHORIZED_EVENT = 'tamandua:unauthorized'
+export const TOTP_REQUIRED_EVENT = 'tamandua:totp-required'
+export const LOADING_EVENT = 'tamandua:loading'
 
 // Peticiones en curso: la barra de progreso superior las escucha para que nada cargue en silencio.
 let inflight = 0
