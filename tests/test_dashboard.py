@@ -10,7 +10,7 @@ from unittest.mock import patch
 from tamandua.modules.reporting import dashboard
 from tamandua.modules.intel.advisories import _parse_nvd
 from tamandua.modules.scanning.coverage import owasp_coverage, rules_by_category
-from tamandua.modules.runs.store import list_runs, page_runs, rebuild_index, save_repository_scan
+from tamandua.modules.runs.store import list_runs, page_runs, save_repository_scan
 
 
 def _finding(fingerprint, severity="high", cwe=(79,), kev=None, epss=None, package="axios"):
@@ -46,8 +46,6 @@ class IndexAndPagingTests(unittest.TestCase):
             page = page_runs(data_dir, limit=10, offset=10, kind="repository_scan")
             self.assertEqual((len(page["items"]), page["total"], page["offset"]), (10, 30, 10))
             self.assertEqual(page_runs(data_dir, query="repo-1")["total"], 10)
-            # Las filas del listado se pueden regenerar desde el registro completo de cada ejecución.
-            self.assertEqual(len(rebuild_index(data_dir)), 30)
             self.assertEqual(page_runs(data_dir, status="completed", asset="github:org/repo-1")["total"], 10)
             self.assertEqual(len(list_runs(data_dir)), 30)
 
@@ -56,7 +54,7 @@ class ConcurrentIndexTests(unittest.TestCase):
     def test_concurrent_writers_do_not_fail_or_lose_rows(self):
         """Antes (archivos): temporal con nombre fijo y sin cerrojo → FileExistsError y filas perdidas. Ahora es la base."""
         import threading
-        from tamandua.modules.runs.store import list_runs, update_index
+        from tamandua.modules.runs.store import list_runs, save_record
         with tempfile.TemporaryDirectory() as temporary:
             data_dir = Path(temporary)
             errors = []
@@ -64,7 +62,7 @@ class ConcurrentIndexTests(unittest.TestCase):
             def writer(start):
                 try:
                     for offset in range(25):
-                        update_index(data_dir, {"id": f"{start + offset:032x}", "type": "repository_scan", "status": "completed",
+                        save_record(data_dir, {"id": f"{start + offset:032x}", "type": "repository_scan", "status": "completed",
                                                 "created_at": "2026-09-26T00:00:00+00:00"})
                 except Exception as exc:  # noqa: BLE001 — cualquier fallo cuenta
                     errors.append(exc)

@@ -19,9 +19,7 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import re
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -164,10 +162,6 @@ def _http(credentials: dict, method: str, path: str, body: dict | None = None) -
 
 
 # ------------------------------------------------------ incidencias
-
-def _links_path(data_dir: Path) -> Path:
-    return data_dir / "jira-links.json"
-
 
 def load_links(data_dir: Path) -> dict:
     payload = documents.load(data_dir, "jira-links", {})

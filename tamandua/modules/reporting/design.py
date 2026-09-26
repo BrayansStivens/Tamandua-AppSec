@@ -131,12 +131,6 @@ def kpis(items: list[tuple[str, object, colors.Color, colors.Color]], width: flo
     return result
 
 
-def severity_kpis(counts: dict, total_label: str, total, extra: list | None = None) -> Table:
-    """Las tarjetas habituales: total, críticas, altas y lo que añada cada informe."""
-    return kpis([(total_label, total, INK, SOFT), ("críticas", counts.get("critical", 0), SEVERITY["critical"][1], DANGER_BG),
-                 ("altas", counts.get("high", 0), ATTENTION, ATTENTION_BG), *(extra or [])])
-
-
 def meta(pairs: list[tuple[str, str]]) -> Table:
     """Cuadrícula de metadatos (quién, qué, cuándo), de tres en tres."""
     rows = []

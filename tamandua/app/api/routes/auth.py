@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 
 from tamandua.modules.identity.auth import AuthError, Locked, verify_password
-from tamandua.app.http.core import Request, public_url, route
+from tamandua.app.api.routing import Request, route
+from tamandua.app.api.security import public_url
 
 
 def _fields(request: Request, *names: str) -> dict | None:

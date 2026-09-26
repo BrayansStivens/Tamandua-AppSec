@@ -1,4 +1,4 @@
-"""Cliente de pruebas sobre la aplicación ASGI completa (FastAPI + router clásico detrás), sin socket."""
+"""Cliente de pruebas sobre la aplicación ASGI completa (FastAPI con todas sus rutas), sin socket."""
 
 from starlette.testclient import TestClient
 
@@ -7,8 +7,8 @@ from tamandua.app.api import create_app
 PORT = 8766
 
 
-def client_for(data_dir, handler) -> TestClient:
-    app = create_app(data_dir, port=PORT, handler=handler)
+def client_for(data_dir, state) -> TestClient:
+    app = create_app(data_dir, port=PORT, state=state)
     return TestClient(app, base_url=f"http://127.0.0.1:{PORT}", client=("127.0.0.1", 10000), follow_redirects=False)
 
 

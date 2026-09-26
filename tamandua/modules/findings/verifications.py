@@ -16,18 +16,11 @@ hallazgo se engancha a él en vez de lanzar otro.
 
 from __future__ import annotations
 
-import json
-import os
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
 MAX_PER_ASSET = 500
 from tamandua.shared import documents
-
-
-def _path(data_dir: Path) -> Path:
-    return data_dir / "verifications.json"
 
 
 def load(data_dir: Path) -> dict:

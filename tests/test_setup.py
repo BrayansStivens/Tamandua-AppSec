@@ -3,7 +3,7 @@ import os
 import asgi
 from unittest.mock import patch
 
-from tamandua.app.http import transport_check
+from tamandua.app.api.server import transport_check
 
 from tests.test_auth import PASSWORD, HttpCase
 
@@ -13,7 +13,7 @@ class FirstRunTests(HttpCase):
         return {"code": code, "username": username, "password": PASSWORD, "display_name": "Brayan"}
 
     def test_first_admin_needs_the_console_code_and_only_once(self):
-        auth = self.handler_class.state.auth
+        auth = self.state.auth
         code = auth.setup_code()
         self.assertRegex(code, r"^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$")
         self.assertEqual(auth.setup_code(), code)  # estable mientras no se use
@@ -30,7 +30,7 @@ class FirstRunTests(HttpCase):
         self.assertFalse(self.call("GET", "/api/auth/session")[1]["setup_required"])
 
     def test_setup_is_throttled_and_needs_csrf_header(self):
-        self.handler_class.state.auth.setup_code()
+        self.state.auth.setup_code()
         self.assertEqual(self.call("POST", "/api/auth/setup", self.setup_body("X"), {"Origin": "http://127.0.0.1:8766"})[0], 403)
         statuses = [self.post("/api/auth/setup", "setup-admin", self.setup_body("AAAA-BBBB-CCCC"))[0] for _ in range(7)]
         self.assertEqual(statuses[-1], 429)

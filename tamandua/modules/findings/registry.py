@@ -22,7 +22,6 @@ el hallazgo reaparece en una ejecución posterior, se reabre solo.
 
 from __future__ import annotations
 
-import hashlib
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -41,11 +40,6 @@ from tamandua.modules.sources.assets import asset_key
 
 _log = logging_setup.get("findings")
 VIEW_PREFIX = "asset:"
-
-
-def _path(data_dir: Path, key: str) -> Path:
-    """Archivo del formato antiguo (antes de PostgreSQL); solo lo usa la importación."""
-    return data_dir / "findings" / f"{hashlib.sha256(key.encode()).hexdigest()[:32]}.json"
 
 
 def _cves(entry: dict) -> list[str]:

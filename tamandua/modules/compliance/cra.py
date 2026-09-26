@@ -15,10 +15,7 @@ como enviada y cuándo. Un falso positivo en el triage («no afecta») no abre e
 
 from __future__ import annotations
 
-import json
-import os
 import re
-import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -37,10 +34,6 @@ NAME_MAX = 120
 
 class CraError(ValueError):
     pass
-
-
-def _path(data_dir: Path) -> Path:
-    return data_dir / "cra.json"
 
 
 def load(data_dir: Path) -> dict:

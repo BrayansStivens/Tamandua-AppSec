@@ -19,8 +19,8 @@ NEW_PASSWORD = "-".join(("otra", "frase", "muy", "larga", "99"))
 from tamandua.modules.identity import auth
 from tamandua.modules.identity.auth import AuthError, Authenticator, Locked, Users, totp_code
 from tamandua.cli.main import main as cli
-from tamandua.app.http import PREFIXES, ROUTES
-from tamandua.app.server import make_handler
+from tamandua.app.api.routing import PREFIXES, ROUTES
+from tamandua.app.api.server import build_state
 
 PASSWORD = "correcto-caballo-bateria"
 ORIGIN = "http://127.0.0.1:8766"
@@ -152,9 +152,9 @@ class HttpCase(unittest.TestCase):
         self.addCleanup(policy.stop)
         engines.start()
         self.addCleanup(engines.stop)
-        self.handler_class = make_handler(self.data_dir)
-        # Todas las peticiones pasan por la aplicación completa: FastAPI y, detrás, el router clásico.
-        self.client = asgi.client_for(self.data_dir, self.handler_class)
+        self.state = build_state(self.data_dir)
+        # Todas las peticiones pasan por la aplicación completa (FastAPI con todas sus rutas).
+        self.client = asgi.client_for(self.data_dir, self.state)
 
     def tearDown(self):
         self.directory.cleanup()

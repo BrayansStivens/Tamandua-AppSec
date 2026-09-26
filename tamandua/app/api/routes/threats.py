@@ -13,7 +13,8 @@ from tamandua.modules.scanning.inventory import live as live_inventory
 from tamandua.modules.sources.repositories import SourceError, find_source
 from tamandua.modules.sources.assets import asset_key
 from tamandua.modules.runs.store import list_runs, load_run
-from tamandua.app.http.core import VERSION, Request, route
+from tamandua.app.api.routing import Request, route
+from tamandua.version import VERSION
 
 
 def _model_keys(model) -> list[str]:

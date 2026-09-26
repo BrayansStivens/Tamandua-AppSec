@@ -20,7 +20,7 @@ from tamandua.app.data_migrations import DataTooNew, upgrade as upgrade_data
 from tamandua.modules.integrations.ai_providers import PROVIDERS, check_provider, provider_status
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, available_sources, snapshot_source
-from tamandua.app.server import serve
+from tamandua.app.api.server import serve
 from tamandua.modules.lab.runs import save_run, save_scan
 from tamandua.modules.runs.store import list_runs, save_repository_scan
 

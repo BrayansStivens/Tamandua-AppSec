@@ -12,7 +12,6 @@ from unittest.mock import patch
 
 from tamandua.modules.runs import batches
 from tamandua.shared import paths
-from tamandua.modules.integrations import github as github_app
 from tamandua.modules.integrations import notifications
 from tamandua.modules.runs.store import save_repository_scan
 from test_dashboard import _finding, _scan
@@ -88,7 +87,7 @@ class NotificationTests(unittest.TestCase):
             save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high")], "2026-09-25"))
             save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high")], "2026-09-26"))  # nada nuevo: sin aviso
             save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high"), _finding("b" * 64, "critical")], "2026-09-27"))
-            batch = batches.create(data, [{"source_id": "github:acme/a", "name": "acme/a", "installation_id": 7}], by="ana", label="uno")
+            batches.create(data, [{"source_id": "github:acme/a", "name": "acme/a", "installation_id": 7}], by="ana", label="uno")
             current, index = batches.take_next(data)
             batches.attach(data, current["id"], index, run_id="1" * 32)
             self.assertIsNone(batches.take_next(data))

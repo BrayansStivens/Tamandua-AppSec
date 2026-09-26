@@ -1,4 +1,4 @@
-"""API FastAPI (F1): rutas tipadas delante, router clásico detrás, un solo control de seguridad."""
+"""API FastAPI: rutas tipadas y rutas de tabla (@route), un solo control de seguridad."""
 
 import json
 import unittest
@@ -21,7 +21,7 @@ class OpenApiTests(unittest.TestCase):
 
 
 class StackTests(HttpCase):
-    def test_same_security_on_both_sides_of_the_strangler(self):
+    def test_same_security_for_typed_and_table_routes(self):
         # Ruta migrada (FastAPI) y ruta clásica (adaptador): mismo 401, mismas cabeceras.
         for path in ("/api/sla", "/api/runs"):
             raw = asgi.raw(self.client, "GET", path)

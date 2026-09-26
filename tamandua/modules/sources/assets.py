@@ -13,9 +13,6 @@ no deben destruir datos: solo se reconcilia con una lista leída entera.
 
 from __future__ import annotations
 
-import json
-import os
-import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -32,19 +29,9 @@ def asset_key(record: dict) -> str:
     return source.get("uid") or source.get("id") or source.get("name") or record.get("fixture") or "desconocido"
 
 
-def _registry_path(data_dir: Path) -> Path:
-    return data_dir / "repo-registry.json"
-
-
 def load_registry(data_dir: Path) -> dict:
     payload = documents.load(data_dir, "repo-registry", {})
     return payload if isinstance(payload, dict) else {}
-
-
-def _write_json(path: Path, payload) -> None:
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
 
 
 def backfill(data_dir: Path, repositories: list[dict]) -> int:
@@ -119,7 +106,6 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
 
 def purge(data_dir: Path, uid: str) -> int:
     """Borra ejecuciones, triage, tickets enlazados y vigilancia de un repositorio. Devuelve ejecuciones borradas."""
-    from tamandua.modules.integrations import jira
     from tamandua.modules.pullrequests import watch as pr_watch
     from tamandua.modules.findings import triage
     from tamandua.modules.findings import registry as findings_registry
@@ -138,10 +124,8 @@ def purge(data_dir: Path, uid: str) -> int:
 
 def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
     """Un renglón por repositorio analizado: su último escaneo completo, lo pendiente y si GitHub lo retiró."""
-    from tamandua.modules.findings import triage
-    from tamandua.modules.runs.store import list_runs, load_run
+    from tamandua.modules.runs.store import list_runs
     registry = load_registry(data_dir)
-    decisions = triage.load(data_dir)
     groups: dict[str, dict] = {}
     for row in list_runs(data_dir):  # del más reciente al más antiguo
         if row["type"] not in FINDING_RUNS:

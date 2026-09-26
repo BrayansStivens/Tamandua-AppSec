@@ -6,7 +6,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tamandua.modules.integrations import github as github_app
 from tamandua.shared import paths
 from tamandua.shared import log as logging_setup
 from tamandua.shared import vault

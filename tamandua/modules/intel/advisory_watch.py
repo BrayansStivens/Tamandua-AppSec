@@ -68,10 +68,6 @@ def sbom(dependencies: list[dict]) -> dict:
     return {"bomFormat": "CycloneDX", "specVersion": "1.5", "version": 1, "components": components}
 
 
-def _state_path(data_dir: Path) -> Path:
-    return data_dir / "advisory-watch.json"
-
-
 def load_state(data_dir: Path) -> dict:
     payload = documents.load(data_dir, "advisory-watch", {})
     return payload if isinstance(payload, dict) else {}

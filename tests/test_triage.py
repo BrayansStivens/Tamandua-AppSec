@@ -1,6 +1,5 @@
 """Triage persistente: la decisión sobrevive entre escaneos y cambia lo que cuenta como pendiente."""
 
-import json
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta, timezone

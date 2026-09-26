@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import http.client
 import ipaddress
-import json
-import os
 import re
 import secrets
 import socket
@@ -23,10 +21,6 @@ class DomainError(ValueError):
 
 KINDS = ("web", "api", "surface")
 CONTEXT_LIMIT = 400
-
-
-def _path(data_dir: Path) -> Path:
-    return data_dir / "domains.json"
 
 
 def list_domains(data_dir: Path) -> list[dict]:

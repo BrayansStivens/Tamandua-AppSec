@@ -10,9 +10,6 @@ positivo y el riesgo aceptado vigente no vencen; una aceptación caducada vuelve
 
 from __future__ import annotations
 
-import json
-import os
-import threading
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -29,10 +26,6 @@ SOON_DAYS = 7  # «vence pronto»: dentro de una semana
 
 class SlaError(ValueError):
     pass
-
-
-def _path(data_dir: Path) -> Path:
-    return data_dir / "sla.json"
 
 
 def _clean_days(value) -> int | None:

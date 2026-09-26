@@ -22,7 +22,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import json
 import os
 import re
 import secrets
@@ -68,16 +67,6 @@ _SCRYPT_SLOTS = threading.BoundedSemaphore(8)
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def _write_private(path: Path, payload) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    temporary = path.with_suffix(".tmp")
-    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        json.dump(payload, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
-    os.replace(temporary, path)
 
 
 # ---------------------------------------------------------------- contraseñas
@@ -528,11 +517,6 @@ class Throttle:
                 for stale_key, _ in sorted(self._failures.items(), key=lambda item: item[1][1])[:1000]:
                     del self._failures[stale_key]
             return 0
-
-    def blocked_for(self, key: str) -> int:
-        with self._lock:
-            count, until = self._failures.get(key, (0, 0.0))
-        return max(0, int(until - time.time())) if count >= LOCK_AFTER else 0
 
     def succeeded(self, key: str) -> None:
         with self._lock:

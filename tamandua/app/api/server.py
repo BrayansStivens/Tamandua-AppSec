@@ -1,23 +1,16 @@
-"""API HTTP del panel. Importar los módulos de rutas los registra en la tabla."""
+"""Arranque del panel: el estado compartido (auth, cola, log) y el servidor uvicorn."""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from tamandua.shared import log as logging_setup
 from tamandua.app import data_migrations as migrations
+from tamandua.app.api.security import State, public_url
 from tamandua.modules.identity.auth import Authenticator
 from tamandua.modules.runs.jobs import ScanJobs
-from tamandua.app.http import routes_auth  # noqa: F401 — registran sus rutas
-from tamandua.app.http import routes_cra  # noqa: F401 — registran sus rutas
-from tamandua.app.http import routes_prs  # noqa: F401 — registran sus rutas
-from tamandua.app.http import routes_runs  # noqa: F401 — registran sus rutas
-from tamandua.app.http import routes_sources  # noqa: F401 — registran sus rutas
-from tamandua.app.http import routes_threats  # noqa: F401 — registran sus rutas
-from tamandua.app.http.core import ROUTES, PREFIXES, State, allowed_origins, build_handler, public_url
-
-__all__ = ["make_handler", "serve", "allowed_origins", "public_url", "ROUTES", "PREFIXES"]
 
 
 def embedded_worker() -> bool:
@@ -26,7 +19,7 @@ def embedded_worker() -> bool:
     return os.environ.get("APPSEC_AGENT_EMBEDDED_WORKER", "1").lower() not in ("0", "false", "no", "off")
 
 
-def make_handler(data_dir: Path, *, watch_pull_requests: bool = False, worker: bool | None = None):
+def build_state(data_dir: Path, *, watch_pull_requests: bool = False, worker: bool | None = None) -> State:
     migrations.upgrade(data_dir)  # antes de que nada lea: una actualización convierte los datos viejos una sola vez
     embedded = embedded_worker() if worker is None else worker
     state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir, worker=embedded),
@@ -34,7 +27,7 @@ def make_handler(data_dir: Path, *, watch_pull_requests: bool = False, worker: b
     if watch_pull_requests and embedded:
         from tamandua.app.worker import start_periodic
         start_periodic(data_dir, state.jobs)
-    return build_handler(state)
+    return state
 
 
 LOOPBACK = ("127.0.0.1", "localhost", "::1", "[::1]")
@@ -46,7 +39,6 @@ def transport_check(port: int) -> str | None:
     La contraseña, la cookie de sesión y los tokens que se pegan en Integraciones viajan en
     cada petición: servirlos por HTTP a la red los expone a cualquiera en el camino.
     """
-    from urllib.parse import urlsplit
     url = public_url(port)
     parts = urlsplit(url)
     if parts.scheme == "https":
@@ -68,13 +60,13 @@ def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
         raise SystemExit(problem)
     # Fuera de un contenedor se escucha solo en loopback; dentro, en todas las interfaces del contenedor.
     address = bind or os.environ.get("APPSEC_AGENT_BIND", "127.0.0.1")
-    handler = make_handler(data_dir, watch_pull_requests=True)
+    state = build_state(data_dir, watch_pull_requests=True)
     from tamandua.app.api import create_app
     import uvicorn
-    app = create_app(data_dir, port=port, handler=handler)
+    app = create_app(data_dir, port=port, state=state)
     cert, key = os.environ.get("APPSEC_AGENT_TLS_CERT", "").strip(), os.environ.get("APPSEC_AGENT_TLS_KEY", "").strip()
     print(f"Panel: {public_url(port)} (escuchando en {address}:{port}{', TLS' if cert else ''})", flush=True)
-    code = handler.state.auth.setup_code()
+    code = state.auth.setup_code()
     if code:
         # Directo a la consola y no al log en fichero: solo quien ve la consola del servidor puede reclamarlo.
         print("\n" + "=" * 64 + "\n  Primer arranque: crea el administrador en el panel con este código\n"

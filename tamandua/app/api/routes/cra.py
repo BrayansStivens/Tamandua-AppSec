@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tamandua.modules.compliance import cra
 from tamandua.modules.sources.assets import overview as assets_overview
-from tamandua.app.http.core import Request, route
+from tamandua.app.api.routing import Request, route
 
 
 @route("POST", "/api/cra", admin=True, action="cra", body=2048)

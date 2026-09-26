@@ -7,9 +7,6 @@ acuñan en memoria cuando hacen falta (ver `github_app`).
 
 from __future__ import annotations
 
-import json
-import os
-import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from tamandua.shared import documents
@@ -19,10 +16,6 @@ class IntegrationError(ValueError):
     pass
 
 
-
-
-def _path(data_dir: Path) -> Path:
-    return data_dir / "integrations.json"
 
 
 def load(data_dir: Path) -> dict:

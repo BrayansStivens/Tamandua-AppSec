@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from tamandua.modules.integrations import github as github_app
 from tamandua.shared import paths
 from tamandua.modules.integrations.ai_providers import _NoRedirect, check_provider, provider_status
 

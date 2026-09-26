@@ -33,7 +33,7 @@ La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 
 ## Paginación de la API
 
-`GET /api/runs/page?limit&offset&status&type&q` pagina en el servidor sobre `data/runs/index.json`, un índice ligero de una fila por ejecución que se mantiene al guardar y se reconstruye si no cuadra con las carpetas; con mil ejecuciones no se leen mil archivos con sus hallazgos. El panel usa el mismo hook de paginación en la lista de análisis, el selector de ejecución y la tabla de hallazgos.
+`GET /api/runs/page?limit&offset&status&type&q` filtra, cuenta y pagina en PostgreSQL sobre la fila ligera de cada ejecución (columna `row` de `runs`); con mil ejecuciones no se cargan mil registros con sus hallazgos. El panel usa el mismo hook de paginación en la lista de análisis, el selector de ejecución y la tabla de hallazgos.
 
 ## Logs
 
@@ -57,9 +57,10 @@ Las pruebas necesitan PostgreSQL: `make test` arranca uno efímero en Docker (da
 ### Añadir o migrar una ruta de la API
 
 Las rutas nuevas van en FastAPI, en `tamandua/app/api/<contexto>.py`: parámetros y respuesta con modelos Pydantic,
-seguridad con `guard(Policy(public=…, admin=…, action=…))` (la misma tubería que el router clásico: CSRF, sesión,
-segundo factor, rol) y la lógica en el módulo de negocio, nunca en la ruta. Lo que aún no se ha migrado lo atiende el
-router clásico detrás de FastAPI (`app/api/legacy.py`); al migrar una ruta se borra de `app/http/routes_*.py`.
+seguridad con `guard(Policy(public=…, admin=…, action=…))` (CSRF, sesión, segundo factor, rol; ver
+`app/api/security.py`) y la lógica en el módulo de negocio, nunca en la ruta. Las rutas anteriores siguen declaradas
+en tabla con `@route` en `app/api/routes/<área>.py` (misma tubería, registradas por `routing.mount`); al tocar una a
+fondo, conviene pasarla a tipada.
 
 Después, `make openapi` regenera el esquema y los tipos TypeScript del panel (`web/src/shared/api/`), que se usan con
 `apiGet('/api/…')`: si la API y el panel no cuadran, falla `tsc`. El CI comprueba que el esquema está al día.
@@ -75,17 +76,16 @@ APPSEC_AGENT_DATABASE_URL=… .venv/bin/python -c "from alembic import command; 
 Revisa el archivo generado en `tamandua/app/alembic/versions/`. `tests/test_database.py` falla si las tablas del código y
 las migraciones no coinciden.
 
-### Cambiar el formato de algo que ya está en `data/`
+### Cambiar el formato de datos que ya existen
 
 Quien actualiza Tamandua ya tiene datos: una versión nueva nunca debe romperlos ni pedirle que haga nada a mano.
 
-1. **Lector tolerante.** El código lee también el formato anterior: `dict.get` con valor por defecto para
-   campos nuevos, sin suponer tipos que antes no existían. Leer nunca lanza por un campo que falta.
-2. **Migración si hay que reescribir.** Se añade al final de `MIGRATIONS` en `tamandua/app/data_migrations.py`:
-   idempotente (repetirla no daña), con las rutas que toca en `touches` (se copian antes) y rápida en
-   instalaciones grandes. Nunca se reordena ni se borra una migración publicada: la versión es su posición.
-3. **Prueba con datos viejos** en `tests/test_migrations.py` (o junto al módulo): se escriben a mano en el
-   formato anterior, se migra y se comprueba el resultado.
+1. **Lector tolerante.** El código lee también el formato anterior (en un documento JSONB o una columna `record`):
+   `dict.get` con valor por defecto para campos nuevos, sin suponer tipos que antes no existían.
+2. **Migración si hay que reescribir.** Un cambio de tablas va en Alembic (arriba). Reescribir contenido va al final
+   de `MIGRATIONS` en `tamandua/app/data_migrations.py`: idempotente, rápida en instalaciones grandes y sin
+   reordenar ni borrar nunca una publicada (la versión es su posición).
+3. **Prueba con datos viejos** en `tests/test_migrations.py` (o junto al módulo).
 
 Si el cambio solo añade un campo que puede faltar, basta con el punto 1: no hace falta migración.
 

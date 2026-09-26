@@ -34,7 +34,8 @@ Monolito modular (`tamandua/`), con capas que comprueba import-linter en cada PR
 ```
 tamandua/
   cli/          línea de comandos (scan para CI, demo, usuarios…)
-  app/          composición: servidor HTTP y rutas (http/), migraciones de datos al arrancar, estáticos del panel
+  app/          composición: API (api/: rutas tipadas por contexto y rutas de tabla en api/routes/), worker,
+                migraciones (Alembic y de datos), estáticos del panel
   modules/      el negocio, un paquete por contexto; no importa de app/ ni de cli/
     identity/       usuarios, sesiones, TOTP
     sources/        repositorios, activos (identidad estable), dominios
@@ -65,8 +66,10 @@ web/src/
 Los datos del servidor van con TanStack Query (`shared/api/queries.ts`): caché compartida entre vistas y sondeo solo
 mientras hay algo en marcha. Los tipos de las rutas migradas salen del OpenAPI (`make openapi`).
 
-La seguridad de la API está en un solo sitio (`app/http/core.py`): host permitido → CSRF (Origin + cabecera de acción) →
-sesión → segundo factor → rol → tamaño del cuerpo. Los manejadores no leen cabeceras ni cookies por su cuenta.
+La seguridad de la API está en un solo sitio (`app/api/security.py`): host permitido → CSRF (Origin + cabecera de
+acción) → sesión → segundo factor → rol → tamaño del cuerpo. La aplican igual las rutas tipadas (`deps.guard`) y las de
+tabla (`routing.mount`). Los manejadores no leen cabeceras ni cookies por su cuenta; un error no controlado responde
+500 sin traza.
 El panel React + TypeScript (`web/`) se compila a `tamandua/app/static/`.
 
 Servicios (compose): `appsec` (panel y API con FastAPI, sin acceso a Docker), `worker` (ejecuta los análisis de la
@@ -92,22 +95,25 @@ PostgreSQL (volumen tamandua-pg; esquema con migraciones de Alembic en tamandua/
   runs                ejecuciones: fila de listado, registro completo, informe y SARIF (JSONB + columnas para filtrar)
   registry_*          registro de hallazgos por activo (estado, CVE con índice GIN) e idempotencia por ejecución
   triage_decisions    decisiones de triage con su historial
+  users, sessions, auth_challenges   identidad: usuarios (scrypt, TOTP cifrado), sesiones y retos de 2FA (solo hashes)
+  documents           configuración por documento JSONB: plazos, exclusiones, integraciones, dominios, lotes,
+                      modelos de amenazas, vigilancia de PRs y de avisos, enlaces con Jira, kit CRA…
+  jobs, workers, outbox   cola de análisis, latido de los workers y buzón de avisos con reintentos
 data/
-  auth/             usuarios (scrypt), sesiones (hash), clave de firma de cookies
-  runs/, findings/, triage.json  formato anterior: se importan una vez a PostgreSQL y quedan intactos para volver atrás
-  feeds/            KEV, EPSS, NVD (cves.sqlite)
+  auth/session.key  clave de firma de cookies (no va a la base: quien lee la base no puede firmar sesiones)
+  feeds/            KEV, EPSS, NVD (cves.sqlite; caché regenerable)
   trivy-cache/      base de vulnerabilidades de Trivy
   logs/app.log      JSON por línea, rotado (10 MB × 5), sin secretos
-  integrations.json instalaciones de GitHub conectadas (identificador, cuenta, permisos)
-  pr-watch.json     repositorios vigilados y PRs revisados
-  data-version.json versión del formato de data/ y migraciones aplicadas
-  backups/          copia de lo que tocó cada migración (se guardan las 5 últimas)
+  data-version.json versión de las migraciones de datos aplicadas
+  backups/          copia de lo que tocó cada migración de datos (se guardan las 5 últimas)
 config/
   secrets.vault     secretos cifrados
   master.key        clave maestra (si no viene del entorno)
 ```
 
-**Actualizar sin romper los datos.** Al arrancar (panel o CLI), `tamandua/app/data_migrations.py` compara la versión
+**Actualizar sin romper los datos.** El esquema de la base lo llevan las migraciones de Alembic
+(`tamandua/app/alembic/versions/`), que se aplican al arrancar. Para datos que haya que reescribir,
+`tamandua/app/data_migrations.py` compara la versión
 guardada en `data-version.json` con la del código y aplica, en orden y una sola vez, las migraciones pendientes,
 tras copiar a `data/backups/` solo lo que van a tocar. Cada paso guarda su versión: si uno falla, el siguiente
 arranque reanuda desde ahí. Una instalación nueva nace en la última versión; unos datos de una versión más nueva
@@ -115,7 +121,17 @@ que el código (volver a una versión anterior) impiden arrancar en vez de arrie
 
 ## Decisiones de diseño
 
-- **Sin dependencias web en el backend.** Menos superficie de ataque y menos actualizaciones de seguridad que seguir.
+- **Pocas dependencias y fijadas.** FastAPI, uvicorn, Pydantic, SQLAlchemy (Core), psycopg y Alembic, con versión
+  exacta: poca superficie de ataque y actualizaciones de seguridad fáciles de seguir.
 - **Sondeo en vez de webhooks.** El servidor no necesita ser accesible desde internet.
 - **Una GitHub App por workspace**, con cuatro permisos. Para varias organizaciones, GitHub exige que pueda instalarse en cualquier cuenta; el administrador escoge explícitamente cuáles conectar al workspace. Una clave filtrada tendría acceso a todas las instalaciones de esa App, por lo que su custodia sigue siendo crítica.
 - **Honestidad en los resultados.** Lo que no se pudo probar sale como `not_tested` con su motivo; un análisis incompleto nunca se presenta como «cero vulnerabilidades».
+
+## Pendiente (aplazado a propósito)
+
+Primero la edición community bien hecha. Queda preparado, pero sin construir:
+
+- **Multiinquilino real.** Cada tabla ya lleva `tenant_id` (hoy siempre `default`); falta Row Level Security en
+  PostgreSQL y el concepto de organización.
+- **Observabilidad.** Trazas y métricas con OpenTelemetry (hoy: log JSON estructurado y latido de los workers).
+- **SSO (OIDC/SAML) y cuotas por consumo.** Son de la edición gestionada y viven fuera de este repositorio.

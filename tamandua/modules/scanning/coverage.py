@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from pathlib import Path
 
 from tamandua.shared import paths
 from tamandua.modules.scanning.owasp import WEB_TOP_10_2025

@@ -1,4 +1,4 @@
-"""Seguridad y contexto de las rutas FastAPI: la misma tubería que el router clásico (core.authorize)."""
+"""Seguridad y contexto de las rutas tipadas: la misma tubería que las de tabla (security.authorize)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import Request
 
-from tamandua.app.http.core import Denied, State, authorize
+from tamandua.app.api.security import Denied, State, authorize
 
 
 class ApiError(Exception):
@@ -20,7 +20,7 @@ class ApiError(Exception):
 
 @dataclass(frozen=True)
 class Policy:
-    """Lo que protege una ruta; mismos campos que core.Route."""
+    """Lo que protege una ruta; mismos campos que routing.Route."""
     public: bool = False
     admin: bool = False
     enrolment: bool = False
@@ -42,7 +42,7 @@ class Context:
 def guard(policy: Policy = Policy()):
     """Dependencia FastAPI: aplica la política y devuelve el Context, o corta con el error de siempre."""
     def dependency(request: Request) -> Context:
-        state: State = request.app.state.legacy
+        state: State = request.app.state.core
         verdict = authorize(state, policy, method=request.method, port=request.app.state.port,
                             origin=request.headers.get("origin"), action=request.headers.get("x-appsec-agent-action"),
                             cookie=request.headers.get("cookie"))

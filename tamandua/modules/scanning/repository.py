@@ -15,7 +15,6 @@ from tamandua.modules.scanning.inventory import collect as collect_inventory
 from tamandua.modules.scanning.unused_deps import analyze as unused_dependencies
 from tamandua.modules.intel.advisories import MAX_DETAILS, dependency_finding, fetch_advisory, load_feeds
 from tamandua.modules.scanning.coverage import owasp_coverage
-from tamandua.modules.scanning.owasp import WEB_TOP_10_2025
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
 from tamandua.modules.scanning.engines import IMAGES, docker_available, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy

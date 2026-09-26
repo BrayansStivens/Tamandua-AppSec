@@ -5,7 +5,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tamandua.modules.integrations import github as github_app
 from tamandua.shared import paths
 from tamandua.modules.scanning import image as image_scan
 from tamandua.modules.identity.auth import Users
@@ -133,7 +132,7 @@ class ImageRoutesTests(HttpCase):
         self.assertEqual(status, 400)
         self.assertIn("privada", body["error"])
         with patch("tamandua.modules.scanning.image.check_registry_address"), \
-                patch.object(self.handler_class.state.jobs, "enqueue_image_scan", return_value={"id": "r1", "status": "queued"}) as enqueue:
+                patch.object(self.state.jobs, "enqueue_image_scan", return_value={"id": "r1", "status": "queued"}) as enqueue:
             status, body, _ = self.post("/api/images/scans", "scan-image", {"reference": "ghcr.io/acme/api:1"}, self.member)
         self.assertEqual((status, body["image"]["reference"]), (202, "ghcr.io/acme/api:1"))
         self.assertEqual(enqueue.call_args.kwargs["requested_by"], "miembro")

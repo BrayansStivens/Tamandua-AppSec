@@ -9,8 +9,8 @@ from tamandua.modules.integrations.github import GitHubAppError, installation_re
 from tamandua.modules.sources.repositories import source_page
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.runs.store import list_runs
-from tamandua.app.http.core import Request, route
-from tamandua.app.http.routes_sources import paging
+from tamandua.app.api.routing import Request, route
+from tamandua.app.api.routes.sources import paging
 
 
 def _repository(request: Request, source_id) -> tuple[int, str, str] | None:

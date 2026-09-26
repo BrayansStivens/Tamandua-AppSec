@@ -9,7 +9,6 @@ infraestructura. Los tokens de código que acompañan a un trabajo van sellados 
 
 from __future__ import annotations
 
-import json
 import os
 import socket
 import threading
@@ -351,15 +350,15 @@ class ScanJobs:
                      f"{len(introduced)} hallazgos nuevos introducidos por el PR; {len(outcome['preexisting'])} ya existían"
                      + ("" if baseline else " (sin escaneo previo de la rama principal: se cuenta lo que cae en líneas cambiadas)") + ".")
             delivery = self._deliver(installation, repository, pull, outcome, run_id, baseline, config, progress)
-            final = save_repository_scan(self.data_dir, {**scan, "type": "pr_review", "fixture": record["fixture"], "variant": "pull_request",
-                                                         "pull_request": record["pull_request"], "requested_by": record.get("requested_by"),
-                                                         "findings": introduced, "summary": summary,
-                                                         "unused_dependencies": outcome["unused"],
-                                                         "review": {"baseline_run": baseline["id"] if baseline else None,
-                                                                    "verdict": outcome["verdict"], "delivery": delivery,
-                                                                    "gate": config["gate"]},
-                                                         "progress": record["progress"], "started_at": record["started_at"], "finished_at": _now()},
-                                         run_id=run_id, created_at=record["created_at"])
+            save_repository_scan(self.data_dir, {**scan, "type": "pr_review", "fixture": record["fixture"], "variant": "pull_request",
+                                                 "pull_request": record["pull_request"], "requested_by": record.get("requested_by"),
+                                                 "findings": introduced, "summary": summary,
+                                                 "unused_dependencies": outcome["unused"],
+                                                 "review": {"baseline_run": baseline["id"] if baseline else None,
+                                                            "verdict": outcome["verdict"], "delivery": delivery,
+                                                            "gate": config["gate"]},
+                                                 "progress": record["progress"], "started_at": record["started_at"], "finished_at": _now()},
+                                 run_id=run_id, created_at=record["created_at"])
         except (SourceError, GitHubAppError) as exc:
             self._fail(record, f"No se pudo revisar el PR: {exc}")
         except Exception:  # noqa: BLE001

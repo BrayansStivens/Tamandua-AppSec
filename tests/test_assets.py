@@ -1,6 +1,5 @@
 """Identidad estable de los repositorios: renombrados agrupados, retirados borrados tras el margen."""
 
-import json
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone

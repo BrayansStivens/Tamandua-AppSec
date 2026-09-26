@@ -16,7 +16,6 @@ manuales y las revisiones de PR no esperan detrás de la vigilancia.
 
 from __future__ import annotations
 
-import json
 import os
 import threading
 from datetime import datetime, timezone
@@ -30,10 +29,6 @@ _log = logging_setup.get("pr_watch")
 DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": True}
 BRANCH_PER_POLL = 3     # reanálisis de rama principal encolados por vuelta, como mucho
 BRANCH_QUEUE_LIMIT = 2  # solo si en la cola hay menos que esto
-
-
-def _path(data_dir: Path) -> Path:
-    return data_dir / "pr-watch.json"
 
 
 def load(data_dir: Path) -> dict:

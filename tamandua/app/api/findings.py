@@ -1,4 +1,4 @@
-"""Plazos de corrección (lectura). El cambio (POST /api/sla) sigue en el router clásico."""
+"""Plazos de corrección (lectura). El cambio (POST /api/sla) está en routes/runs.py."""
 
 from __future__ import annotations
 

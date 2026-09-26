@@ -18,10 +18,7 @@ Patrones al estilo glob, relativos a la raíz del repositorio: `fixtures/**`, `d
 
 from __future__ import annotations
 
-import json
-import os
 import re
-import threading
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
@@ -40,10 +37,6 @@ HISTORY = 20
 
 class ExclusionError(ValueError):
     pass
-
-
-def _path(data_dir: Path) -> Path:
-    return data_dir / "exclusions.json"
 
 
 def _load_all(data_dir: Path) -> dict:

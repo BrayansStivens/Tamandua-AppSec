@@ -60,7 +60,7 @@ Hay carpetas que no conviene mirar: ejemplos vulnerables a propósito (como `fix
 
 - Lo que cae en ellas no cuenta como abierto, no entra en el informe ni en el SARIF y **no bloquea PRs**. No desaparece: queda en la pestaña **Excluidos** y cada ejecución dice en sus límites cuántos hallazgos quedaron fuera y por qué patrón.
 - Excluir no es remediar: lo excluido nunca pasa a «remediado». Si se quita la exclusión, vuelve a abierto.
-- Las exclusiones viven en el servidor (`data/exclusions.json`), **no en el repositorio**: un fichero en el repositorio permitiría que un PR se excluyera a sí mismo. Por la misma razón no se aplica el `.gitleaks.toml` del repositorio.
+- Las exclusiones viven en el servidor (en su base de datos), **no en el repositorio**: un fichero en el repositorio permitiría que un PR se excluyera a sí mismo. Por la misma razón no se aplica el `.gitleaks.toml` del repositorio.
 - No se admiten patrones que lo excluyan todo (`**`, `*/**`), rutas absolutas ni `..`.
 
 La identidad del repositorio es la de GitHub (su id numérico): un repositorio renombrado sigue siendo el mismo, y los hallazgos de uno eliminado se retiran tras 24 horas de gracia. Se puede filtrar por ejecución, ver abiertos, remediados o todos, y exportar a PDF, JSON, Markdown, SARIF o Jira. La vista «Estado actual» exporta su registro acumulado por una ruta propia; no se confunde con una ejecución individual. Los dosieres PDF para SOC 2 Tipo II e ISO/IEC 27001:2022 son evidencia técnica para revisión, no certificaciones ni opiniones de cumplimiento.
@@ -170,7 +170,7 @@ Un administrador conecta **Jira Cloud** en **Integraciones** con el sitio, el em
 
 Solo se aceptan sitios `https://<sitio>.atlassian.net` y no se siguen redirecciones, de modo que el panel no puede usarse para lanzar peticiones a otros destinos. Jira Server/Data Center queda fuera a propósito: exigiría aceptar hosts arbitrarios de la red del cliente.
 
-En la tabla de hallazgos, **Crear en Jira** convierte la selección en incidencias (hasta 50 hallazgos por vez; lo descartado en triage no se exporta). Se crea **una incidencia por trabajo de remediación**: los avisos de un mismo paquete van juntos con la versión que los cierra todos, y el código y los secretos van uno a uno. Cada incidencia lleva la etiqueta `appsec-<huella>` de cada hallazgo que cubre. Antes de crear se busca por esas etiquetas y el vínculo se recuerda por repositorio y huella (`data/jira-links.json`), así que volver a exportar —hoy o tras el próximo escaneo— enlaza la incidencia existente en lugar de duplicarla. Si el proyecto no admite fijar la prioridad al crear, se reintenta sin ella.
+En la tabla de hallazgos, **Crear en Jira** convierte la selección en incidencias (hasta 50 hallazgos por vez; lo descartado en triage no se exporta). Se crea **una incidencia por trabajo de remediación**: los avisos de un mismo paquete van juntos con la versión que los cierra todos, y el código y los secretos van uno a uno. Cada incidencia lleva la etiqueta `appsec-<huella>` de cada hallazgo que cubre. Antes de crear se busca por esas etiquetas y el vínculo se recuerda por repositorio y huella (en la base de datos), así que volver a exportar —hoy o tras el próximo escaneo— enlaza la incidencia existente en lugar de duplicarla. Si el proyecto no admite fijar la prioridad al crear, se reintenta sin ella.
 
 ## Motores de análisis
 

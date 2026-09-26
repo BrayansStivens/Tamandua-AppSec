@@ -1,6 +1,5 @@
 """Fase de cumplimiento: paquetes maliciosos, SBOM CycloneDX, VEX desde el triage, EUVD y marcos del informe."""
 
-import json
 import os
 import tempfile
 import unittest

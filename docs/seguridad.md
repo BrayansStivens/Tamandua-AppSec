@@ -12,12 +12,12 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 | Tokens de registros de contenedores | `config/secrets.vault`, cifrados | Solo el servidor. Llegan a Trivy y Grype por variable de entorno (`-e NOMBRE` sin valor en la orden), nunca en la línea de comandos. |
 | Tokens de instalación de GitHub | Memoria, 1 h | Se renuevan solos; nunca se escriben en disco. |
 | Clave maestra | `config/master.key` (0400) o `APPSEC_AGENT_MASTER_KEY` | Quien administra el servidor. |
-| Contraseñas de usuarios | `data/auth/users.json`, solo hash scrypt | Nadie: no son recuperables. |
-| Cookies de sesión | `data/auth/sessions.json`, solo su hash | Copiar el fichero no da acceso. |
+| Contraseñas de usuarios | Tabla `users` de PostgreSQL, solo hash scrypt | Nadie: no son recuperables. |
+| Cookies de sesión | Tabla `sessions`, solo su hash; firmadas con `data/auth/session.key` | Copiar la base no da acceso. |
 
 **Cifrado.** AES-256-GCM, un nonce aleatorio por secreto y el nombre del secreto como dato asociado: un valor cifrado no se puede mover a otra entrada sin que falle el descifrado, y cualquier manipulación se detecta. Si la clave maestra no descifra, el servidor lo dice en lugar de usar datos corruptos.
 
-**Separación.** `config/` (secretos) y `data/` (todo lo demás) son carpetas distintas. `data/` es lo que se suele copiar, enviar para depurar o subir con los logs: no lleva ningún secreto. Para separar también la clave del almacén, define `APPSEC_AGENT_MASTER_KEY` desde tu gestor de secretos en vez de dejar `master.key` junto a `secrets.vault`.
+**Separación.** `config/` (secretos), la base de datos y `data/` (cachés, logs, clave de firma de sesiones) están separados. `data/` es lo que se suele copiar, enviar para depurar o subir con los logs: no lleva ningún secreto. Para separar también la clave del almacén, define `APPSEC_AGENT_MASTER_KEY` desde tu gestor de secretos en vez de dejar `master.key` junto a `secrets.vault`.
 
 **Logs.** No se registran cuerpos de petición, cabeceras, contraseñas, códigos TOTP ni cookies. Además, todo mensaje pasa por un filtro que tacha:
 

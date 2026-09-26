@@ -1,4 +1,4 @@
-"""Kit CRA (lectura). Los cambios (POST /api/cra) siguen en el router clásico."""
+"""Kit CRA (lectura). Los cambios (POST /api/cra) están en routes/cra.py."""
 
 from __future__ import annotations
 

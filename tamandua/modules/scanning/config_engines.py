@@ -454,10 +454,6 @@ def github_actions_files(snapshot: Path) -> list[Path]:
     return found + sorted(path for path in snapshot.rglob("action.y*ml") if path.name in ("action.yml", "action.yaml"))
 
 
-def has_github_actions(snapshot: Path) -> bool:
-    return bool(github_actions_files(snapshot))
-
-
 def run_zizmor(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():

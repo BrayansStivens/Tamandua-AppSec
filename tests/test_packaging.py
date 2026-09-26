@@ -5,7 +5,7 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tamandua.app.http.core import VERSION
+from tamandua.version import VERSION
 from tamandua.modules.scanning.engines import IMAGES
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -24,7 +24,6 @@ import os
 import re
 import threading
 import time
-from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener

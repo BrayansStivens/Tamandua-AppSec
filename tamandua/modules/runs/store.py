@@ -4,12 +4,11 @@ from __future__ import annotations
 from tamandua.modules.findings.triage import LABELS as TRIAGE_LABELS, SUPPRESSED
 
 import json
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
 from tamandua.modules.runs.tables import runs
@@ -22,11 +21,6 @@ def _check_id(run_id: str) -> str:
     if not isinstance(run_id, str) or len(run_id) != 32 or any(ch not in "0123456789abcdef" for ch in run_id):
         raise ValueError("ID de ejecución inválido")
     return run_id
-
-
-def _run_dir(data_dir: Path, run_id: str) -> Path:
-    """Carpeta de una ejecución en el formato antiguo en archivos; solo la usa la importación a PostgreSQL."""
-    return data_dir / "runs" / _check_id(run_id)
 
 
 def _moment(value) -> datetime:
@@ -71,22 +65,6 @@ def _row(record: dict) -> dict:
     if isinstance(item.get("summary"), dict):
         item["summary"] = {key: value for key, value in item["summary"].items() if key != "tools"} | {"tools": item["summary"].get("tools", [])}
     return item
-
-
-def update_index(data_dir: Path, record: dict) -> None:
-    """Compatibilidad: en PostgreSQL el «índice» es la propia tabla; guardar el registro lo actualiza."""
-    save_record(data_dir, record)
-
-
-def rebuild_index(data_dir: Path) -> dict:
-    """Compatibilidad: regenera la fila de listado de cada ejecución desde su registro completo."""
-    rows = {}
-    with db.transaction(data_dir) as connection:
-        for run_id, record in connection.execute(select(runs.c.id, runs.c.record).where(runs.c.tenant_id == TENANT)):
-            row = _row(record)
-            connection.execute(update(runs).where(runs.c.tenant_id == TENANT, runs.c.id == run_id).values(row=row))
-            rows[run_id] = row
-    return rows
 
 
 def page_runs(data_dir: Path, *, limit: int = 25, offset: int = 0, status: str | None = None,
@@ -206,7 +184,7 @@ def _finding_block(finding: dict) -> list[str]:
         if triage.get("reason"):
             detail += f" · motivo: {triage['reason']}"
         lines.append(detail)
-    lines += ["", f"**Por qué esta prioridad:** " + "; ".join((finding.get("priority") or {}).get("factors", [])) or "—",
+    lines += ["", "**Por qué esta prioridad:** " + "; ".join((finding.get("priority") or {}).get("factors", [])) or "—",
               "", f"**Remediación:** {finding['remediation']}"]
     from tamandua.modules.findings.fix_guide import guide
     fix = finding.get("fix") or guide(finding)

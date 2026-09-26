@@ -6,7 +6,6 @@ import shutil
 import tempfile
 import time
 import unittest
-from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -330,9 +329,9 @@ class RouteTests(HttpCase):
             Users(self.data_dir).create("operadora", PASSWORD, role="admin")
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
             cookie = cookies[0].split("; ")[0]
-            with patch("tamandua.app.http.routes_prs.github_installations", return_value=[7]), \
+            with patch("tamandua.app.api.routes.prs.github_installations", return_value=[7]), \
                     fake_github({7: [(1, "org/api"), (2, "org/web")]}, {7: ("org", "selected")}), \
-                    patch("tamandua.app.http.routes_prs.open_pull_requests", side_effect=GitHubAppError(PULLS_FORBIDDEN)):
+                    patch("tamandua.app.api.routes.prs.open_pull_requests", side_effect=GitHubAppError(PULLS_FORBIDDEN)):
                 status, body, _ = self.call("GET", "/api/pull-requests?source_id=github:org/api", headers={"Cookie": cookie})
                 self.assertEqual((status, body["pulls"], body["settings"]["gate"]), (200, [], "high"))
                 self.assertIn("Pull requests", body["pulls_error"])

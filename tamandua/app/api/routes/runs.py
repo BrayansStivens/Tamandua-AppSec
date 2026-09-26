@@ -19,10 +19,8 @@ from tamandua.modules.findings import triage
 from tamandua.modules.compliance import vex
 from tamandua.modules.sources.assets import overview as assets_overview
 from tamandua.modules.intel.advisories import load_feeds, load_recent_cves
-from tamandua.modules.reporting.dashboard import cached as compute_dashboard, zone
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.sources.repositories import find_source
-from tamandua.modules.scanning.engines import docker_available
 from tamandua.modules.scanning.plan import plan as scan_plan
 from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.reporting.pdf import render_pdf
@@ -31,7 +29,8 @@ from tamandua.modules.reporting.audit import ReportError, render_audit_pdf, rend
 from tamandua.modules.runs.kinds import FULL_SCANS
 from tamandua.modules.runs.store import artifact as store_artifact, list_runs, load_run, page_runs, render_asset_report, render_profile_report, render_repository_report
 from tamandua.modules.runs.store import render_repository_sarif, render_tickets
-from tamandua.app.http.core import VERSION, Request, route
+from tamandua.app.api.routing import Request, route
+from tamandua.version import VERSION
 
 STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
 PROFILE_REPORTS = ("report-soc2.md", "report-iso27001.md", "report-custom.md",

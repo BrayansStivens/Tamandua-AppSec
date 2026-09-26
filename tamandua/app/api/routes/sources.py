@@ -15,8 +15,9 @@ from tamandua.modules.integrations.github import forget_app, forget_catalog, ins
 from tamandua.modules.integrations.installations import clear_github, github_connections, github_installations, save_github
 from tamandua.modules.integrations.ai_providers import ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
 from tamandua.modules.sources.repositories import SourceError, find_source, list_repositories, source_page
-from tamandua.modules.runs.store import load_run, render_tickets
-from tamandua.app.http.core import Request, public_url, route
+from tamandua.modules.runs.store import render_tickets
+from tamandua.app.api.routing import Request, route
+from tamandua.app.api.security import public_url
 
 
 

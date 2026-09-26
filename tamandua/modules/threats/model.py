@@ -20,10 +20,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import secrets
-import threading
 import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
@@ -782,23 +780,6 @@ def _scopes_near(model: dict, component: dict | None, flow: dict | None) -> set[
         ends = [component] + [components[f["source"] if f["target"] == component["id"] else f["target"]]
                               for f in model.get("flows", []) if component["id"] in (f["source"], f["target"])]
     return {(item["asset"], item.get("path") or "") for item in ends if item.get("asset")}
-
-
-def _assets_near(model: dict, component: dict | None, flow: dict | None) -> set[str]:
-    """Repositorios cuyo código implementa o toca el elemento.
-
-    Un proceso tiene su propio código: su evidencia sale solo de su repositorio, nunca del de quien lo llama.
-    Un almacén, un tercero o un flujo no tienen código propio: su evidencia está en los procesos que los usan.
-    """
-    components, _ = _index(model)
-    if component is not None and _kind(component) in PROCESSES:
-        return {component["asset"]} if component.get("asset") else set()
-    if flow is not None:
-        ends = [components[flow["source"]], components[flow["target"]]]
-    else:
-        ends = [component] + [components[f["source"] if f["target"] == component["id"] else f["target"]]
-                              for f in model.get("flows", []) if component["id"] in (f["source"], f["target"])]
-    return {item["asset"] for item in ends if item.get("asset")}
 
 
 def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None) -> list[dict]:

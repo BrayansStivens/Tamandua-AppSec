@@ -1,6 +1,5 @@
 """Plazos de corrección: política tolerante, reloj desde la primera detección, API, Resumen e informe."""
 
-import json
 import os
 import tempfile
 import unittest
