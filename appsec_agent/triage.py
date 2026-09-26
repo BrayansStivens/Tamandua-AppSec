@@ -112,7 +112,10 @@ def annotate(data_dir: Path, record: dict, decisions: dict | None = None) -> dic
         findings.append({**finding, "triage": state})
     summary = {**record.get("summary", {}), "triage": counts,
                "actionable": counts["open"] + counts["in_progress"]}
-    return {**record, "findings": findings, "summary": summary}
+    # Cómo corregir cada hallazgo (comando, ejemplo, pasos): se calcula al servirlo, así mejora sin reanalizar.
+    from .fix_guide import attach
+    from .verifications import annotate as verified
+    return {**record, "findings": verified(data_dir, asset_key(record), attach(findings)), "summary": summary}
 
 
 def is_active(finding: dict) -> bool:

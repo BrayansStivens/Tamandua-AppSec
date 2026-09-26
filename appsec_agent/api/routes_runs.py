@@ -473,6 +473,62 @@ def repository_scan(request: Request):
     return request.json(202, {"run": queued})
 
 
+@route("POST", "/api/findings/reverify", action="reverify-finding", body=512)
+def reverify_finding(request: Request):
+    """Vuelve a analizar el activo de un hallazgo (o se engancha al análisis en curso) para ver si sigue ahí."""
+    from .. import verifications
+    from ..assets import asset_key
+    from ..findings_registry import VIEW_PREFIX, load as registry
+    from ..image_scan import ImageError, parse_reference
+    payload, state = request.payload, request.state
+    if (not isinstance(payload, dict) or set(payload) != {"run_id", "fingerprint"} or not isinstance(payload["run_id"], str)
+            or not isinstance(payload["fingerprint"], str) or not re.fullmatch(r"[0-9a-f]{16,64}", payload["fingerprint"])):
+        return request.json(400, {"error": "Hallazgo inválido"})
+    run_id = payload["run_id"]
+    if run_id.startswith(VIEW_PREFIX):
+        key = run_id.removeprefix(VIEW_PREFIX)
+    else:
+        try:
+            key = asset_key(load_run(request.data_dir, run_id))
+        except (ValueError, OSError):
+            return request.json(404, {"error": "Ejecución no encontrada"})
+    entry = registry(request.data_dir, key).get("findings", {}).get(payload["fingerprint"])
+    if entry is None:
+        return request.json(404, {"error": "Ese hallazgo no está en el registro del activo"})
+    origin = entry.get("origin") or {}
+    if origin.get("kind") == "pr" and not origin.get("merged"):
+        return request.json(409, {"error": "Este hallazgo viene de un pull request abierto: se verifica solo en cada push del PR"})
+    by = request.user["username"]
+    current = verifications.in_flight(request.data_dir, key)
+    if current:
+        verifications.record(request.data_dir, key, payload["fingerprint"], current["id"], by=by)
+        return request.json(202, {"run": {"id": current["id"], "status": current["status"]}, "joined": True})
+    base = verifications.latest_scan(request.data_dir, key)
+    if base is None:
+        return request.json(409, {"error": "Este activo no tiene un análisis completo que repetir: lánzalo desde Nuevo análisis"})
+    if state.jobs.pending() >= 20:
+        return request.json(429, {"error": "Demasiados escaneos en cola"})
+    source = base.get("source") or {}
+    if base["type"] == "image_scan":
+        try:
+            image = parse_reference(str((source.get("image") or {}).get("reference") or base.get("fixture") or ""))
+        except ImageError as exc:
+            return request.json(409, {"error": f"No se puede repetir el análisis de la imagen: {exc}"})
+        queued = state.jobs.enqueue_image_scan(image=image, context="", requested_by=by)
+    else:
+        with state.code_lock:
+            tokens = state.code_tokens.copy()
+        found = find_source(tokens, github_installations(request.data_dir), source.get("id") or "")
+        if found is None:
+            return request.json(409, {"error": "El repositorio ya no está disponible con la credencial configurada"})
+        queued = state.jobs.enqueue_repository_scan(source_id=found["id"], source_name=found["name"], allow_osv_upload=False, context="",
+                                                    tokens=tokens, installation_id=found.get("installation_id"), uid=found.get("uid"),
+                                                    requested_by=by, trigger={"kind": "reverify"})
+    verifications.record(request.data_dir, key, payload["fingerprint"], queued["id"], by=by)
+    request.log.info("reverify", extra={"user": by, "reason": f"{key} {payload['fingerprint'][:12]}"})
+    return request.json(202, {"run": queued, "joined": False})
+
+
 IMAGE_SCAN_FIELDS = {"reference", "context"}
 
 

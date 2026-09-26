@@ -201,6 +201,18 @@ def _finding_block(finding: dict) -> list[str]:
         lines.append(detail)
     lines += ["", f"**Por qué esta prioridad:** " + "; ".join((finding.get("priority") or {}).get("factors", [])) or "—",
               "", f"**Remediación:** {finding['remediation']}"]
+    from .fix_guide import guide
+    fix = finding.get("fix") or guide(finding)
+    if fix and (fix["commands"] or fix["example"] or len(fix["steps"]) > 1):
+        # Mismo orden que el panel: pasos, la edición (ejemplo) y el comando al final.
+        lines += ["", "**Cómo corregirlo:**", "", *[f"{index}. {step}" for index, step in enumerate([item for item in fix["steps"] if item], 1)]]
+        example = fix["example"]
+        if example and example.get("before"):
+            lines += ["", "Antes:", "", f"```{example['language']}", example["before"], "```", "", "Después:"]
+        if example:
+            lines += ["", f"```{example['language']}", example["after"], "```"] + ([example["note"]] if example.get("note") else [])
+        for command in fix["commands"]:
+            lines += ["", f"{command['label']}:", "", "```", command["code"], "```"]
     if advisory.get("details"):
         lines += ["", advisory["details"][:800].replace("\n\n", "\n")]
     if advisory.get("references"):

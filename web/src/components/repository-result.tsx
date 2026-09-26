@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowDownToLine, ArrowRight, ChevronDown, ChevronRight, ExternalLink, FileCheck2, Flame, Search, ShieldCheck, SlidersHorizontal, Ticket, Wrench } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { JiraExportDialog, useJiraStatus, type TicketLink } from '@/components/jira'
 import { SUPPRESSED, TriageActions, TriageBadge, TriageDialog, TriageHistory, triageLabel, type TriageState, type TriageStatus } from '@/components/triage'
 import { api, query as buildQuery } from '@/lib/api'
+import { FixSection, Reverify, type FixGuide, type Verification } from '@/components/fix-guide'
 
 export type Priority = { action: 'act' | 'attend' | 'track'; factors: string[] }
 export type Package = { ecosystem: string; name: string; version: string; fixed_version: string | null; introduced: string | null; dev?: boolean; direct?: boolean | null }
 export type Advisory = { id: string; aliases: string[]; summary: string; details: string; cvss_vector: string | null; cvss_score: number | null; published: string | null; modified: string | null; references: string[] }
-export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; related_rules?: string[]; framework?: string; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle; source?: AdvisorySource | null }
+export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; related_rules?: string[]; framework?: string; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle; source?: AdvisorySource | null; fix?: FixGuide | null; verification?: Verification | null }
 // Base de la que sale el aviso y su licencia (appsec_agent/data_sources.py): se atribuye donde se muestra.
 export type AdvisorySource = { id: string; name: string; short?: string; url: string; license: string; terms: 'open' | 'attribution' | 'share-alike' | 'non-commercial' | 'unclear' }
 export type Lifecycle = { status: 'open' | 'fixed' | 'excluded'; excluded?: { pattern: string | null; at: string } | null; origin?: { kind: 'scan' | 'pr'; pr?: number; branch?: string; merged?: boolean }; first_seen?: string; last_seen?: string; fixed?: { at: string; how: string; auto: boolean } | null; reopened_at?: string | null }
@@ -103,6 +104,9 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const toggle = (fingerprints: string[], on: boolean) => setSelected(previous => { const next = new Set(previous); for (const item of fingerprints) { if (on) next.add(item); else next.delete(item) } return next })
   const allOnPage = pageFingerprints.length > 0 && pageFingerprints.every(item => selected.has(item))
   const decided = () => { setDecision(null); setSelected(new Set()); onChanged() }
+  // Mientras alguna verificación está en curso, se refresca la vista (una sola vez para todos los hallazgos).
+  const verifying = findings.some(item => item.verification?.state === 'running')
+  useEffect(() => { if (!verifying) return; const timer = window.setInterval(onChanged, 10_000); return () => window.clearInterval(timer) }, [verifying, onChanged])
   const exportFile = async (artifact: string) => {
     setDownloadError(''); setDownloading(artifact)
     try {
@@ -179,7 +183,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
                 <span className="font-mono text-xs text-app-muted">{group.epss !== null ? `${(group.epss * 100).toFixed(1)}%` : '—'}</span>
                 <span className="text-xs text-app-muted">{scannerLabel[group.scanner] ?? group.scanner}{group.findings[0].tool ? <span className="block text-[11px] text-app-subtle">{toolsOf(group.findings[0])}</span> : null}</span>
               </button>
-              {expanded && <div className="space-y-3 border-t border-app-line bg-inset py-4 pr-4 pl-3">{group.findings.map(finding => <FindingDetail key={finding.finding_id} finding={finding} canAccept={canAccept} onPick={status => setDecision({ status, fingerprints: [finding.fingerprint] })} />)}</div>}
+              {expanded && <div className="space-y-3 border-t border-app-line bg-inset py-4 pr-4 pl-3">{group.findings.map(finding => <FindingDetail key={finding.finding_id} finding={finding} runId={run.id} canAccept={canAccept} onChanged={onChanged} onPick={status => setDecision({ status, fingerprints: [finding.fingerprint] })} />)}</div>}
               </div>
             </div> })}
           <Pagination total={groups.length} limit={PAGE} offset={Math.min(offset, Math.max(0, groups.length - 1))} onPrev={() => setOffset(current => Math.max(0, current - PAGE))} onNext={() => setOffset(current => current + PAGE)} noun={`elementos · ${findings.length} hallazgos`} />
@@ -203,7 +207,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   </div>
 }
 
-function FindingDetail({ finding, canAccept, onPick }: { finding: RepositoryFinding; canAccept: boolean; onPick: (status: TriageStatus) => void }) {
+function FindingDetail({ finding, runId, canAccept, onPick, onChanged }: { finding: RepositoryFinding; runId: string; canAccept: boolean; onPick: (status: TriageStatus) => void; onChanged: () => void }) {
   const advisory = finding.advisory
   const pkg = finding.package
   return <div className="rounded-xl border border-app-line bg-panel p-4">
@@ -217,7 +221,10 @@ function FindingDetail({ finding, canAccept, onPick }: { finding: RepositoryFind
       {finding.kev && <Fact label="CISA KEV">En el catálogo desde {finding.kev.date_added}{finding.kev.ransomware ? ' · usado en campañas de ransomware' : ''}</Fact>}
       {advisory?.cvss_vector && <Fact label="Vector CVSS"><span className="font-mono text-xs break-all">{advisory.cvss_vector}</span></Fact>}
     </div>
-    <div className="mt-3 rounded-lg border border-brand/20 bg-brand/[0.06] p-3 text-sm"><span className="font-medium text-brand">Remediación · </span>{finding.remediation}</div>
+    <FixSection fix={finding.fix} remediation={finding.remediation} />
+    {finding.lifecycle?.status !== 'excluded' && (finding.lifecycle?.status !== 'fixed' || finding.verification) && <Reverify runId={runId} fingerprint={finding.fingerprint} verification={finding.verification}
+      onChanged={onChanged} canVerify={finding.lifecycle?.status !== 'fixed'}
+      blocked={finding.lifecycle?.origin?.kind === 'pr' && !finding.lifecycle.origin.merged ? 'Viene de un pull request abierto: se verifica solo en cada push del PR.' : null} />}
     {finding.priority && <p className="mt-3 text-xs leading-5 text-app-subtle"><span className="font-medium text-app-muted">Por qué esta prioridad: </span>{finding.priority.factors.join(' · ')}</p>}
     {(finding.tool || finding.also_detected_by?.length) && <p className="mt-2 text-xs text-app-subtle">Detectado por {toolLabel[finding.tool ?? ''] ?? finding.tool}{finding.also_detected_by?.length ? ` y ${finding.also_detected_by.map(tool => toolLabel[tool] ?? tool).join(', ')}` : ''}{finding.related_rules?.length ? <> · mismo problema que <span className="font-mono">{finding.related_rules.join(', ')}</span>, unido para no duplicarlo</> : null}.</p>}
     {finding.source?.name && <p className="mt-1 text-xs text-app-subtle">Fuente del aviso: {finding.source.url

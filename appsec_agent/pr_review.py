@@ -108,13 +108,17 @@ def _plural(count: int, one: str, many: str) -> str:
 
 def _rows(findings: list[dict], limit: int = 25) -> list[str]:
     lines = ["| Severidad | Hallazgo | Ubicación | Corrección |", "|---|---|---|---|"]
-    ordered = sorted(findings, key=lambda item: SEVERITY_ORDER.index(item["severity"]) if item["severity"] in SEVERITY_ORDER else 9)
+    from .fix_guide import attach
+    ordered = attach([dict(item) for item in sorted(findings, key=lambda item: SEVERITY_ORDER.index(item["severity"]) if item["severity"] in SEVERITY_ORDER else 9)])
     for finding in ordered[:limit]:
         package = finding.get("package") or {}
         line = finding.get("line") if isinstance(finding.get("line"), int) else 0
         where = (f"`{_cell(package.get('name'), 60)}` {_cell(package.get('version'), 30)}" if package.get("name")
                  else f"`{_cell(finding.get('path'), 80)}:{line}`")
-        fix = (f"Actualizar a `{_cell(package['fixed_version'], 30)}`" if package.get("fixed_version")
+        # Solo un comando que actualiza de verdad (con su versión); «reinstala» o «instala -r» no dicen a qué.
+        commands = [item for item in (finding.get("fix") or {}).get("commands") or [] if item.get("label") == "Actualiza"]
+        fix = (f"`{_cell(commands[0]['code'], 120)}`" if commands and "`" not in commands[0]["code"]
+               else f"Actualizar a `{_cell(package['fixed_version'], 30)}`" if package.get("fixed_version")
                else _cell(finding.get("remediation"), 140))
         lines.append(f"| {SEVERITY_LABEL.get(finding['severity'], finding['severity'])} | {_cell(finding['title'], 80)} | {where} | {fix} |")
     if len(ordered) > limit:
