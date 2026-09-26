@@ -76,6 +76,7 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
+      actions: read           # upload-sarif lee el run en repositorios privados
       security-events: write  # subir el SARIF a code scanning
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
