@@ -10,7 +10,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from appsec_agent import threat_diagram, threat_model as tm
+from tamandua.modules.threats import diagram as threat_diagram
+from tamandua.modules.threats import model as tm
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = sorted((ROOT / "web/src/examples/threat-models").glob("*.json"))

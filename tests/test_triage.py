@@ -7,9 +7,10 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import dashboard, triage
-from appsec_agent.store import load_run, render_repository_report, render_repository_sarif, render_tickets
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.reporting import dashboard
+from tamandua.modules.findings import triage
+from tamandua.modules.runs.store import load_run, render_repository_report, render_repository_sarif, render_tickets
+from tamandua.modules.runs.store import save_repository_scan
 from test_dashboard import _finding, _scan
 
 ADMIN = {"username": "operadora", "role": "admin"}
@@ -76,7 +77,7 @@ class TriageTests(unittest.TestCase):
         report = render_repository_report(record)
         self.assertIn("## Descartados en triage", report)
         self.assertIn("Contenido saneado por DOMPurify", report)
-        with patch("appsec_agent.dashboard.load_recent_cves", return_value={"__meta__": {}, "items": []}):
+        with patch("tamandua.modules.reporting.dashboard.load_recent_cves", return_value={"__meta__": {}, "items": []}):
             kpis = dashboard.compute(self.data_dir, 30)["kpis"]
         self.assertEqual((kpis["open"]["total"], kpis["triage"]["false_positive"]), (1, 1))
 

@@ -10,8 +10,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import batches, github_app, notifications
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.runs import batches
+from tamandua.shared import paths
+from tamandua.modules.integrations import github as github_app
+from tamandua.modules.integrations import notifications
+from tamandua.modules.runs.store import save_repository_scan
 from test_dashboard import _finding, _scan
 
 PUBLIC = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
@@ -23,7 +26,7 @@ class NotificationTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        for patcher in (patch.object(github_app, "CONFIG_DIR", Path(self.directory.name) / "config"),
+        for patcher in (patch.object(paths, "CONFIG_DIR", Path(self.directory.name) / "config"),
                         patch.dict(os.environ, {"APPSEC_AGENT_PUBLIC_URL": "https://tamandua.example.com"}),
                         patch("socket.getaddrinfo", return_value=PUBLIC)):
             patcher.start()
@@ -97,7 +100,7 @@ if __name__ == "__main__":
     unittest.main()
 
 
-from appsec_agent.auth import Users  # noqa: E402
+from tamandua.modules.identity.auth import Users  # noqa: E402
 from test_auth import PASSWORD, HttpCase  # noqa: E402
 
 

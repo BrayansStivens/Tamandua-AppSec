@@ -10,9 +10,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import github_app
-from appsec_agent.github_app import GitHubAppError, config, install_url
-from appsec_agent.integrations import clear_github, github_installation, github_installations, load, save_github
+from tamandua.modules.integrations import github as github_app
+from tamandua.shared import paths
+from tamandua.modules.integrations.github import GitHubAppError, config, install_url
+from tamandua.modules.integrations.installations import clear_github, github_installation, github_installations, load, save_github
 
 try:
     from cryptography.hazmat.primitives import hashes, serialization
@@ -33,7 +34,7 @@ class GitHubAppTests(unittest.TestCase):
         github_app.forget()
         # Sin aislar el almacén, las pruebas leerían las credenciales reales de quien las corre.
         self.store = tempfile.TemporaryDirectory()
-        patcher = patch.object(github_app, "CONFIG_DIR", Path(self.store.name) / "config")
+        patcher = patch.object(paths, "CONFIG_DIR", Path(self.store.name) / "config")
         patcher.start()
         self.addCleanup(patcher.stop)
         self.addCleanup(self.store.cleanup)
@@ -73,7 +74,7 @@ class GitHubAppTests(unittest.TestCase):
             serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
         with self.assertRaises(GitHubAppError):
             github_app.verify_app("4242", weak)
-        with patch.dict(os.environ, {}, clear=True), patch("appsec_agent.github_app._get", side_effect=fake_get):
+        with patch.dict(os.environ, {}, clear=True), patch("tamandua.modules.integrations.github._get", side_effect=fake_get):
             verified = github_app.verify_app(" 4242 ", pem)
             self.assertEqual(seen[0][0], "https://api.github.com/app")
             self.assertNotIn("PRIVATE KEY", seen[0][1])  # a GitHub va un JWT, nunca la clave
@@ -88,7 +89,7 @@ class GitHubAppTests(unittest.TestCase):
             github_app._app_jwt()  # firma con la clave descifrada del almacén
             self.assertTrue(github_app.forget_app())
             self.assertFalse(github_app.config()["configured"])
-        with patch.dict(os.environ, {}, clear=True), patch("appsec_agent.github_app._get", side_effect=GitHubAppError("401")):
+        with patch.dict(os.environ, {}, clear=True), patch("tamandua.modules.integrations.github._get", side_effect=GitHubAppError("401")):
             with self.assertRaises(GitHubAppError):
                 github_app.verify_app("4242", pem)
 
@@ -128,11 +129,11 @@ class GitHubAppTests(unittest.TestCase):
 
     def test_installation_token_is_reused_until_it_is_close_to_expiring(self):
         github_app._tokens[99] = ("ghs_vigente", time.time() + 3600)
-        with patch("appsec_agent.github_app.build_opener", side_effect=AssertionError("pidió token de nuevo")):
+        with patch("tamandua.modules.integrations.github.build_opener", side_effect=AssertionError("pidió token de nuevo")):
             self.assertEqual(github_app.installation_token(99), "ghs_vigente")
         github_app._tokens[99] = ("ghs_por_caducar", time.time() + 60)
-        with patch("appsec_agent.github_app._app_jwt", return_value="jwt"), \
-                patch("appsec_agent.github_app.build_opener") as opener:
+        with patch("tamandua.modules.integrations.github._app_jwt", return_value="jwt"), \
+                patch("tamandua.modules.integrations.github.build_opener") as opener:
             response = opener.return_value.open.return_value.__enter__.return_value
             response.read.return_value = json.dumps({"token": "ghs_nuevo"}).encode()
             self.assertEqual(github_app.installation_token(99), "ghs_nuevo")
@@ -172,8 +173,8 @@ class GitHubAppTests(unittest.TestCase):
         first = [{"id": index, "account": {"login": "org" + str(index), "type": "Organization"}}
                  for index in range(1, 101)]
         second = [{"id": 101, "account": {"login": "extra", "type": "Organization"}}]
-        with patch("appsec_agent.github_app._app_jwt", return_value="jwt"), \
-                patch("appsec_agent.github_app._get", side_effect=[first, second]) as fetch:
+        with patch("tamandua.modules.integrations.github._app_jwt", return_value="jwt"), \
+                patch("tamandua.modules.integrations.github._get", side_effect=[first, second]) as fetch:
             rows = github_app.app_installations()
         self.assertEqual((len(rows), rows[-1]["account"]), (101, "extra"))
         self.assertIn("page=2", fetch.call_args_list[-1].args[0])
@@ -193,8 +194,8 @@ class GitHubAppTests(unittest.TestCase):
                 for index in range(start, min(start + 100, 901))]}
 
         try:
-            with patch("appsec_agent.github_app.installation_token", return_value="token"), \
-                    patch("appsec_agent.github_app._get", side_effect=fetch):
+            with patch("tamandua.modules.integrations.github.installation_token", return_value="token"), \
+                    patch("tamandua.modules.integrations.github._get", side_effect=fetch):
                 started = time.monotonic()
                 first = github_app.installation_repositories_snapshot(12345)
                 second = github_app.installation_repositories_snapshot(12345)
@@ -223,7 +224,7 @@ class CatalogPagingTests(unittest.TestCase):
 
     def test_a_page_costs_one_request_and_the_total_comes_from_github(self):
         from fake_github import fake_github
-        from appsec_agent.repository_sources import source_page
+        from tamandua.modules.sources.repositories import source_page
         with fake_github(self.BIG, self.ACCOUNTS) as calls:
             listing = source_page(None, [7], page=3)
             listed = [url for url in calls if "/installation/repositories" in url]
@@ -233,7 +234,7 @@ class CatalogPagingTests(unittest.TestCase):
 
     def test_pages_continue_across_organizations_and_filter_by_account(self):
         from fake_github import fake_github
-        from appsec_agent.repository_sources import source_page
+        from tamandua.modules.sources.repositories import source_page
         with fake_github(self.BIG, self.ACCOUNTS):
             last = source_page(None, [7, 8], page=37)
             only_beta = source_page(None, [7, 8], account="beta")
@@ -243,7 +244,7 @@ class CatalogPagingTests(unittest.TestCase):
 
     def test_search_uses_github_when_the_whole_account_is_granted(self):
         from fake_github import fake_github
-        from appsec_agent.repository_sources import source_page
+        from tamandua.modules.sources.repositories import source_page
         with fake_github(self.BIG, self.ACCOUNTS) as calls:
             found = source_page(None, [7], query="repo-12 org:otra")
         self.assertIn("/search/repositories", calls[-1])
@@ -254,7 +255,7 @@ class CatalogPagingTests(unittest.TestCase):
 
     def test_one_repository_is_validated_without_listing_the_catalog(self):
         from fake_github import fake_github
-        from appsec_agent.repository_sources import find_source
+        from tamandua.modules.sources.repositories import find_source
         with fake_github(self.BIG, self.ACCOUNTS) as calls:
             found = find_source(None, [7, 8], "github:acme/repo-700")
             by_uid = find_source(None, [7, 8], "github#5001")

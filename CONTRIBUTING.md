@@ -7,10 +7,10 @@ Gracias por el interés. Antes de abrir un PR:
 
    ```bash
    make dev-setup   # una vez
-   make check       # pruebas del backend + tipos y lint del panel
+   make check       # pruebas y contratos de arquitectura del backend + tipos y lint del panel
    ```
 
-   El CI ([`ci.yml`](.github/workflows/ci.yml)) repite esto en cada PR, comprueba que `appsec_agent/static` está
+   El CI ([`ci.yml`](.github/workflows/ci.yml)) repite esto en cada PR, comprueba que `tamandua/app/static` está
    recompilado (`make web`) y analiza el PR con el propio Tamandua: bloquea si introduce algo de severidad alta o superior.
 
 3. Mantén las reglas de la casa:

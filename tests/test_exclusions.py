@@ -5,9 +5,10 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from appsec_agent import exclusions, findings_registry
-from appsec_agent.auth import Users
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.findings import exclusions
+from tamandua.modules.findings import registry as findings_registry
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
 

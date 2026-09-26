@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import threat_model as tm
-from appsec_agent.auth import Users
-from appsec_agent.inventory import collect
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.threats import model as tm
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.scanning.inventory import collect
+from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
 
@@ -277,12 +277,12 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(next(item for item in draft["components"] if item["kind"] == "external")["data"], ["payment"])
 
     def test_live_inventory_from_github_manifests(self):
-        from appsec_agent import inventory
+        from tamandua.modules.scanning import inventory
         files = [("pyproject.toml", b'[project]\ndependencies = ["fastapi>=0.110", "psycopg[binary]", "sqlalchemy", "stripe"]\n'),
                  ("crates/api/Cargo.toml", b'[dependencies]\naxum = "0.7"\nsqlx = { version = "0.8" }\n'),
                  ("../../escape/package.json", b'{"dependencies": {"express": "4"}}')]
-        with patch("appsec_agent.github_app.installation_repository", return_value={"id": REPO, "name": "org/shop", "branch": "main"}), \
-                patch("appsec_agent.github_app.repository_manifests", return_value=files) as fetch:
+        with patch("tamandua.modules.integrations.github.installation_repository", return_value={"id": REPO, "name": "org/shop", "branch": "main"}), \
+                patch("tamandua.modules.integrations.github.repository_manifests", return_value=files) as fetch:
             found = inventory.live(REPO, installation_id=7)
         self.assertEqual(fetch.call_args.args[1:], ("org/shop", "main"))
         self.assertNotIn("npm", found["packages"])  # la ruta que salía del directorio se ignoró

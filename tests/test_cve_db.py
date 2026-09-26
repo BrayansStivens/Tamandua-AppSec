@@ -5,8 +5,10 @@ from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from appsec_agent import cve_db, euvd, findings_registry
-from appsec_agent.auth import Users
+from tamandua.modules.intel import cve_db
+from tamandua.modules.intel import euvd
+from tamandua.modules.findings import registry as findings_registry
+from tamandua.modules.identity.auth import Users
 
 from tests.test_auth import PASSWORD, HttpCase
 
@@ -116,7 +118,7 @@ class CveRoutesTests(HttpCase):
         # Las pruebas no salen a la red: EUVD responde desde aquí.
         self.europe = {"CVE-2026-12345": {"items": [{"id": "EUVD-2026-1", "aliases": "CVE-2026-12345\n", "baseScore": 8.1,
                                                      "baseScoreVersion": "3.1", "exploitedSince": "Sep 1, 2026, 12:00:00 AM"}]}}
-        fake = patch("appsec_agent.euvd._fetch", side_effect=lambda cve: euvd.parse(self.europe.get(cve, {}), cve))
+        fake = patch("tamandua.modules.intel.euvd._fetch", side_effect=lambda cve: euvd.parse(self.europe.get(cve, {}), cve))
         fake.start()
         self.addCleanup(fake.stop)
         Users(self.data_dir).create("analista", PASSWORD)

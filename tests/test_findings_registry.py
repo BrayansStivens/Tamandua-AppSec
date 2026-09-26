@@ -5,8 +5,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from appsec_agent import findings_registry as registry, triage
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.findings import registry
+from tamandua.modules.findings import triage
+from tamandua.modules.runs.store import save_repository_scan
 from test_dashboard import _finding, _scan
 
 KEY = "github#7"
@@ -72,7 +73,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(registry.repair_incomplete_fixes(self.data_dir), 0)  # una sola vez
 
     def test_the_dashboard_ignores_incomplete_scans(self):
-        from appsec_agent import dashboard
+        from tamandua.modules.reporting import dashboard
         self.run_([_finding(A), _finding(B)])
         self.run_([], status="incomplete")
         data = dashboard.compute(self.data_dir)

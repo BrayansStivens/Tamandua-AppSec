@@ -6,6 +6,6 @@ import { fileURLToPath } from 'node:url'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  build: { outDir: '../appsec_agent/static', emptyOutDir: true },
+  build: { outDir: '../tamandua/app/static', emptyOutDir: true },
   server: { proxy: { '/api': 'http://127.0.0.1:8766' } },
 })

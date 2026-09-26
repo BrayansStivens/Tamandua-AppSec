@@ -8,10 +8,12 @@ import xml.etree.ElementTree as ET
 import zlib
 from pathlib import Path
 
-from appsec_agent import threat_diagram, threat_model as tm, threat_report
-from appsec_agent.audit_report import render_audit_pdf, validate_options
-from appsec_agent.remediation import action, fix_groups
-from appsec_agent.technical_report import render_technical_pdf
+from tamandua.modules.threats import diagram as threat_diagram
+from tamandua.modules.threats import model as tm
+from tamandua.modules.threats import report as threat_report
+from tamandua.modules.reporting.audit import render_audit_pdf, validate_options
+from tamandua.modules.findings.remediation import action, fix_groups
+from tamandua.modules.reporting.technical import render_technical_pdf
 from test_threat_model import model
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "web/src/examples/threat-models/stride.json"

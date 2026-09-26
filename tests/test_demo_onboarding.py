@@ -9,9 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import demo, pr_watch, threat_model as tm
-from appsec_agent.auth import Users, totp_code
-from appsec_agent.store import list_runs, save_repository_scan
+from tamandua.modules.lab import demo
+from tamandua.modules.pullrequests import watch as pr_watch
+from tamandua.modules.threats import model as tm
+from tamandua.modules.identity.auth import Users, totp_code
+from tamandua.modules.runs.store import list_runs, save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
 
@@ -27,7 +29,7 @@ class DemoTests(unittest.TestCase):
             return {**_scan("demo · ejemplos vulnerables", [_finding("a" * 64)], datetime.now(timezone.utc).isoformat()),
                     "source": {**source, "sha256": "x"}, "context": kwargs.get("context", "")}
 
-        with tempfile.TemporaryDirectory() as folder, patch("appsec_agent.repository_scan.scan_repository", side_effect=scan):
+        with tempfile.TemporaryDirectory() as folder, patch("tamandua.modules.scanning.repository.scan_repository", side_effect=scan):
             data = Path(folder)
             first = demo.seed(data, fixtures=ROOT / "fixtures", models=ROOT / "web/src/examples/threat-models", report=lambda message: None)
             second = demo.seed(data, fixtures=ROOT / "fixtures", models=ROOT / "web/src/examples/threat-models", report=lambda message: None)

@@ -6,8 +6,10 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from appsec_agent import assets, pr_watch, triage
-from appsec_agent.store import list_runs, page_runs, save_repository_scan
+from tamandua.modules.sources import assets
+from tamandua.modules.pullrequests import watch as pr_watch
+from tamandua.modules.findings import triage
+from tamandua.modules.runs.store import list_runs, page_runs, save_repository_scan
 from test_dashboard import _finding, _scan
 
 

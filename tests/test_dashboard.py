@@ -7,10 +7,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import dashboard
-from appsec_agent.advisories import _parse_nvd
-from appsec_agent.coverage import owasp_coverage, rules_by_category
-from appsec_agent.store import list_runs, page_runs, rebuild_index, save_repository_scan
+from tamandua.modules.reporting import dashboard
+from tamandua.modules.intel.advisories import _parse_nvd
+from tamandua.modules.scanning.coverage import owasp_coverage, rules_by_category
+from tamandua.modules.runs.store import list_runs, page_runs, rebuild_index, save_repository_scan
 
 
 def _finding(fingerprint, severity="high", cwe=(79,), kev=None, epss=None, package="axios"):
@@ -57,7 +57,7 @@ class ConcurrentIndexTests(unittest.TestCase):
     def test_concurrent_writers_do_not_fail_or_lose_rows(self):
         """Antes: temporal con nombre fijo («x») y sin cerrojo → FileExistsError y filas perdidas."""
         import threading
-        from appsec_agent.store import _index_path, update_index, _write_atomic
+        from tamandua.modules.runs.store import _index_path, update_index, _write_atomic
         with tempfile.TemporaryDirectory() as temporary:
             data_dir = Path(temporary)
             (data_dir / "runs").mkdir()
@@ -113,8 +113,8 @@ class CoverageTests(unittest.TestCase):
 class DashboardTests(unittest.TestCase):
     def test_open_fixed_mttr_and_exploitability_come_from_consecutive_runs(self):
         with tempfile.TemporaryDirectory() as temporary, \
-                patch("appsec_agent.dashboard.load_feeds", return_value={"kev": {"__meta__": {"version": "2026.09.22"}, "CVE-2026-1": {"date_added": "2026-09-20", "ransomware": True, "name": "Prueba"}}}), \
-                patch("appsec_agent.dashboard.load_recent_cves", return_value={"__meta__": {"total": 3}, "items": [{"cve": "CVE-2026-9", "published": "2026-09-23T00:00:00", "score": 9.8, "severity": "critical", "description": "axios does something bad"}]}):
+                patch("tamandua.modules.reporting.dashboard.load_feeds", return_value={"kev": {"__meta__": {"version": "2026.09.22"}, "CVE-2026-1": {"date_added": "2026-09-20", "ransomware": True, "name": "Prueba"}}}), \
+                patch("tamandua.modules.reporting.dashboard.load_recent_cves", return_value={"__meta__": {"total": 3}, "items": [{"cve": "CVE-2026-9", "published": "2026-09-23T00:00:00", "score": 9.8, "severity": "critical", "description": "axios does something bad"}]}):
             data_dir = Path(temporary)
             (data_dir / "feeds").mkdir(parents=True)
             now = datetime.now(timezone.utc)
@@ -185,7 +185,7 @@ if __name__ == "__main__":
 class NvdRefreshTests(unittest.TestCase):
     def test_refresh_asks_for_the_newest_page_and_counts(self):
         import tempfile
-        from appsec_agent import advisories
+        from tamandua.modules.intel import advisories
         calls = []
 
         def fetch(params):
@@ -201,7 +201,7 @@ class NvdRefreshTests(unittest.TestCase):
             page = calls[-1]
             self.assertEqual((page["resultsPerPage"], page["startIndex"]), (2000, 3381 - 2000))
             self.assertEqual(len([call for call in calls if call["resultsPerPage"] == 1]), 9)  # 7 días, 30 días y 7 por día
-            with patch("appsec_agent.advisories._refresh_in_background"):
+            with patch("tamandua.modules.intel.advisories._refresh_in_background"):
                 advisories._feed_cache.pop("nvd-recent", None)
                 recent = advisories.load_recent_cves(Path(directory))
             self.assertEqual(recent["items"][0]["cve"], "CVE-2026-2")

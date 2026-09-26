@@ -8,8 +8,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import local_scan
-from appsec_agent.local_scan import EXIT_BLOCKED, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, merge_base, parse_diff, run
+from tamandua.modules.scanning import local as local_scan
+from tamandua.modules.scanning.local import EXIT_BLOCKED, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, merge_base, parse_diff, run
 
 GIT = shutil.which("git")
 
@@ -54,7 +54,7 @@ class GitTests(unittest.TestCase):
         commit = merge_base(self.repo, "main")
         files = {item["filename"]: item for item in local_scan.diff_files(self.repo, commit)}
         self.assertEqual(set(files), {"app.py", "requirements.txt", "nuevo.py"})
-        from appsec_agent.pr_review import changed_lines
+        from tamandua.modules.pullrequests.review import changed_lines
         changed = changed_lines(list(files.values()))
         self.assertEqual((changed["app.py"], changed["nuevo.py"]), ({2, 3}, None))
 
@@ -72,7 +72,7 @@ class GitTests(unittest.TestCase):
         scans = iter([scan_result(head), scan_result(base)])
         with tempfile.TemporaryDirectory() as data, \
                 patch.object(local_scan, "scan_repository", side_effect=lambda *args, **kwargs: next(scans)), \
-                patch("appsec_agent.scanners.docker_available", return_value=True):
+                patch("tamandua.modules.scanning.engines.docker_available", return_value=True):
             result = run(self.repo, data_dir=Path(data), base="main")
         self.assertEqual([item["fingerprint"] for item in result["findings"]], ["eval", "new-sca"])
         self.assertEqual((result["comparison"]["preexisting_in_changed_code"], result["exit_code"]), (1, EXIT_BLOCKED))
@@ -90,8 +90,8 @@ class GateTests(unittest.TestCase):
     def run_with(self, findings, *, status="completed", failed=(), docker=True, fail_on="high", exclude=None):
         with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as data, \
                 patch.object(local_scan, "scan_repository", return_value=scan_result(findings, status, failed)), \
-                patch("appsec_agent.scanners.docker_available", return_value=docker), \
-                patch("appsec_agent.scanners.docker_problem", return_value="Docker no responde."):
+                patch("tamandua.modules.scanning.engines.docker_available", return_value=docker), \
+                patch("tamandua.modules.scanning.engines.docker_problem", return_value="Docker no responde."):
             return run(Path(folder), data_dir=Path(data), fail_on=fail_on, exclude=exclude)
 
     def test_exit_codes(self):

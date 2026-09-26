@@ -8,17 +8,17 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent.domains import DomainError, check_reachability, register_domain, verify_domain
-from appsec_agent.repository_scan import scan_repository
-from appsec_agent.repository_sources import SourceError, _analyzable, _extract_limited, available_sources, list_repositories, snapshot_source
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.sources.domains import DomainError, check_reachability, register_domain, verify_domain
+from tamandua.modules.scanning.repository import scan_repository
+from tamandua.modules.sources.repositories import SourceError, _analyzable, _extract_limited, available_sources, list_repositories, snapshot_source
+from tamandua.modules.runs.store import save_repository_scan
 
 
 class RepositoryWorkflowTests(unittest.TestCase):
     def setUp(self):
         # Estas pruebas cubren el camino interno (sin motores en contenedor). Con Docker
         # presente lanzarían Trivy/Opengrep de verdad: lento y con otro resultado.
-        patcher = patch.dict("appsec_agent.scanners._docker_state", {"ok": False})
+        patcher = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -29,7 +29,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
             secret = "ghp_" + "A" * 36
             (root / "settings.env").write_text(f"TOKEN={secret}\n")
             (root / "requirements.txt").write_text("requests==2.30.0\n")
-            with patch("appsec_agent.repository_scan._query_osv", side_effect=AssertionError("OSV llamado")):
+            with patch("tamandua.modules.scanning.repository._query_osv", side_effect=AssertionError("OSV llamado")):
                 result = scan_repository(root, {"id": "local:fixture", "name": "fixture", "provider": "local"})
             self.assertEqual(result["summary"]["sast"], 1)
             self.assertEqual(result["summary"]["secrets"], 1)
@@ -43,7 +43,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "requirements.txt").write_text("requests==2.30.0\n")
-            with patch("appsec_agent.repository_scan._query_osv", return_value=[{"vulns": [{"id": "CVE-2026-12345"}]}]) as query:
+            with patch("tamandua.modules.scanning.repository._query_osv", return_value=[{"vulns": [{"id": "CVE-2026-12345"}]}]) as query:
                 result = scan_repository(root, {"id": "local:fixture", "name": "fixture"}, allow_osv_upload=True)
             query.assert_called_once()
             self.assertEqual(result["summary"]["sca"], 1)
@@ -77,8 +77,8 @@ class RepositoryWorkflowTests(unittest.TestCase):
             archive.addfile(info, io.BytesIO(content))
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.dict("os.environ", {"GITHUB_TOKEN": "test-token"}), \
-                patch("appsec_agent.repository_sources._request", side_effect=[listing, listing]) as request, \
-                patch("appsec_agent.repository_sources._download_archive",
+                patch("tamandua.modules.sources.repositories._request", side_effect=[listing, listing]) as request, \
+                patch("tamandua.modules.sources.repositories._download_archive",
                       side_effect=lambda *args, **kwargs: args[3].write_bytes(stream.getvalue())) as download:
             entries = list_repositories("github")
             self.assertEqual(entries[0]["id"], "github:owner/project")
@@ -100,8 +100,8 @@ class RepositoryWorkflowTests(unittest.TestCase):
             archive.addfile(info, io.BytesIO(content))
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.dict("os.environ", {"GITHUB_TOKEN": ""}), \
-                patch("appsec_agent.repository_sources._request", side_effect=[listing, listing]) as request, \
-                patch("appsec_agent.repository_sources._download_archive",
+                patch("tamandua.modules.sources.repositories._request", side_effect=[listing, listing]) as request, \
+                patch("tamandua.modules.sources.repositories._download_archive",
                       side_effect=lambda *args, **kwargs: args[3].write_bytes(stream.getvalue())) as download:
             sources = available_sources({"github": "session-secret"})
             self.assertEqual(sources["providers"]["github"]["origin"], "session")
@@ -136,7 +136,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
         # Comprime muy bien: pocos KB en disco declarando 2 MB de contenido.
         self.assertLess(len(blob), 100_000)
         with tempfile.TemporaryDirectory() as temporary, \
-                patch("appsec_agent.repository_sources.MAX_EXPANSION", 500_000):
+                patch("tamandua.modules.sources.repositories.MAX_EXPANSION", 500_000):
             with self.assertRaises(SourceError) as caught:
                 _extract_limited(blob, Path(temporary))
         self.assertIn("bomba de descompresión", str(caught.exception))
@@ -156,8 +156,8 @@ class RepositoryWorkflowTests(unittest.TestCase):
         blob = archive.getvalue()
 
         with tempfile.TemporaryDirectory() as temporary, \
-                patch("appsec_agent.repository_sources.MAX_FILE", 1_000), \
-                patch("appsec_agent.repository_sources.MAX_FILES", 4):
+                patch("tamandua.modules.sources.repositories.MAX_FILE", 1_000), \
+                patch("tamandua.modules.sources.repositories.MAX_FILES", 4):
             root = Path(temporary)
             # Pasarse de los límites no puede ser un error: deja al usuario sin nada.
             stats = _extract_limited(blob, root)
@@ -197,16 +197,16 @@ class RepositoryWorkflowTests(unittest.TestCase):
 
     def test_reachability_refuses_private_targets_without_opening_a_socket(self):
         addresses = [(2, 1, 6, "", ("127.0.0.1", 443))]
-        with patch("appsec_agent.domains.socket.getaddrinfo", return_value=addresses), \
-                patch("appsec_agent.domains.socket.create_connection", side_effect=AssertionError("conexión abierta")):
+        with patch("tamandua.modules.sources.domains.socket.getaddrinfo", return_value=addresses), \
+                patch("tamandua.modules.sources.domains.socket.create_connection", side_effect=AssertionError("conexión abierta")):
             result = check_reachability("https://interno.example.com/")
         self.assertFalse(result["reachable"])
         self.assertEqual(result["status"], "private_address")
 
     def test_reachability_pins_the_resolved_public_address(self):
         addresses = [(2, 1, 6, "", ("93.184.216.34", 443))]
-        with patch("appsec_agent.domains.socket.getaddrinfo", return_value=addresses), \
-                patch("appsec_agent.domains.socket.create_connection", side_effect=OSError("sin ruta")) as connect:
+        with patch("tamandua.modules.sources.domains.socket.getaddrinfo", return_value=addresses), \
+                patch("tamandua.modules.sources.domains.socket.create_connection", side_effect=OSError("sin ruta")) as connect:
             result = check_reachability("https://app.example.com/panel")
         self.assertEqual(connect.call_args.args[0], ("93.184.216.34", 443))
         self.assertEqual(result["status"], "unreachable")
@@ -233,7 +233,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
                     register_domain(root, url)
             record = register_domain(root, "https://app.example.com/path")
             self.assertFalse(record["verified"])
-            with patch("appsec_agent.domains.subprocess.run") as run:
+            with patch("tamandua.modules.sources.domains.subprocess.run") as run:
                 run.return_value.returncode = 0
                 run.return_value.stdout = f'"{record["txt_value"]}"\n'
                 verified = verify_domain(root, record["id"])
@@ -257,15 +257,15 @@ class DownloadTests(unittest.TestCase):
             return self.chunks.pop(0) if self.chunks else b""
 
     def run_download(self, chunks, *, timeout="900"):
-        from appsec_agent import repository_sources
+        from tamandua.modules.sources import repositories as repository_sources
         clock = [0.0]
         response = self.Slow(chunks, lambda: clock.__setitem__(0, clock[0] + 11))
         messages = []
         opener = type("Opener", (), {"open": lambda self, *a, **k: response})()
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.dict("os.environ", {"APPSEC_AGENT_DOWNLOAD_TIMEOUT": timeout}), \
-                patch("appsec_agent.repository_sources.build_opener", return_value=opener), \
-                patch("appsec_agent.repository_sources.time.monotonic", side_effect=lambda: clock[0]):
+                patch("tamandua.modules.sources.repositories.build_opener", return_value=opener), \
+                patch("tamandua.modules.sources.repositories.time.monotonic", side_effect=lambda: clock[0]):
             written = repository_sources._download_archive("https://api.github.com/x", "t", "github", Path(temporary) / "a.tar.gz",
                                                            progress=lambda level, message: messages.append(message))
         return written, messages
@@ -277,7 +277,7 @@ class DownloadTests(unittest.TestCase):
         self.assertIn("Extrayendo", messages[-1])
 
     def test_a_download_that_never_ends_fails_with_a_clear_message(self):
-        from appsec_agent.repository_sources import SourceError
+        from tamandua.modules.sources.repositories import SourceError
         with self.assertRaises(SourceError) as caught:
             self.run_download([b"x"] * 1000, timeout="60")
         self.assertIn("superó 1 min", str(caught.exception))
@@ -291,8 +291,8 @@ class EnginesDownTests(unittest.TestCase):
     """Si los motores no corren (imágenes sin construir), la ejecución no puede presentarse como limpia."""
 
     def test_scan_without_engines_is_incomplete_and_says_why(self):
-        from appsec_agent import repository_scan
-        from appsec_agent.scanners import _result
+        from tamandua.modules.scanning import repository as repository_scan
+        from tamandua.modules.scanning.engines import _result
         down = lambda key: _result(key, "inconclusive", "Imagen no construida")
         messages = []
         with tempfile.TemporaryDirectory() as temporary, \
@@ -314,7 +314,7 @@ class EnginesDownTests(unittest.TestCase):
 class EngineCauseTests(unittest.TestCase):
     def test_the_docker_error_is_shown_without_tokens_or_host_paths(self):
         import subprocess
-        from appsec_agent.scanners import with_cause
+        from tamandua.modules.scanning.engines import with_cause
         failed = subprocess.CompletedProcess([], 125, "", "\x1b[31mdocker: Error response from daemon: invalid mount /c/Users/yo/tamandua/data/work/x "
                                                              "token ghp_abcdefghijklmnopqrstuvwxyz123456\x1b[0m\n")
         with patch.dict("os.environ", {"APPSEC_AGENT_HOST_DATA_DIR": "/c/Users/yo/tamandua/data"}):
@@ -325,7 +325,7 @@ class EngineCauseTests(unittest.TestCase):
 
     def test_the_host_path_is_asked_to_docker_on_any_platform(self):
         import subprocess
-        from appsec_agent import scanners
+        from tamandua.modules.scanning import engines as scanners
         mounts = json.dumps([{"Type": "bind", "Source": "/run/desktop/mnt/host/c/Users/yo/tamandua/data", "Destination": "/data"},
                              {"Type": "bind", "Source": "/var/run/docker.sock", "Destination": "/var/run/docker.sock"}])
         scanners._own_mounts.update(at=None, mounts={})
@@ -340,7 +340,7 @@ class EngineCauseTests(unittest.TestCase):
         scanners._own_mounts.update(at=None, mounts={})
 
     def test_without_docker_answer_a_bad_env_path_is_explained(self):
-        from appsec_agent import scanners
+        from tamandua.modules.scanning import engines as scanners
         scanners._own_mounts.update(at=None, mounts={})
         with patch.dict("os.environ", {"APPSEC_AGENT_DATA_DIR": "/data", "APPSEC_AGENT_HOST_DATA_DIR": "/data", "HOSTNAME": "x"}), \
                 patch.object(scanners, "in_container", return_value=True):
@@ -355,11 +355,11 @@ class DockerAccessTests(unittest.TestCase):
     """Linux y WSL con Docker nativo: el socket es del grupo `docker` y el contenedor puede no estar en él."""
 
     def tearDown(self):
-        from appsec_agent import scanners
+        from tamandua.modules.scanning import engines as scanners
         scanners._docker_state.clear()
 
     def test_a_socket_without_permission_is_explained_with_its_group(self):
-        from appsec_agent import scanners
+        from tamandua.modules.scanning import engines as scanners
         with tempfile.TemporaryDirectory() as temporary:
             socket = Path(temporary) / "docker.sock"
             socket.write_text("")
@@ -372,7 +372,7 @@ class DockerAccessTests(unittest.TestCase):
 
     def test_docker_info_without_server_version_is_not_available(self):
         import subprocess
-        from appsec_agent import scanners
+        from tamandua.modules.scanning import engines as scanners
         scanners._docker_state.clear()
         answer = subprocess.CompletedProcess([], 0, "\n", "permission denied while trying to connect to the Docker daemon socket")
         with patch.object(scanners.shutil, "which", return_value="/usr/bin/docker"), \
@@ -387,7 +387,7 @@ class MakefileEnginesTests(unittest.TestCase):
         """`make engines` lee las imágenes con sed; si cambia su formato en scanners.py, esto avisa."""
         import re
         import subprocess
-        from appsec_agent.scanners import IMAGES
+        from tamandua.modules.scanning.engines import IMAGES
         root = Path(__file__).resolve().parents[1]
         command = re.search(r"^ENGINE_IMAGES := (.+)$", (root / "Makefile").read_text(encoding="utf-8"), re.M).group(1)
         listed = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True, check=True).stdout.split()

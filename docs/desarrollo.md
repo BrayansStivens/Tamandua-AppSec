@@ -8,9 +8,9 @@ Requiere Python 3.12+ y Node 22. Sin Docker no corren los motores (Trivy, Gitlea
 
 ```bash
 make dev-setup   # .venv con las dependencias de Python y node_modules del panel
-make web         # compila el panel en appsec_agent/static/
+make web         # compila el panel en tamandua/app/static/
 make dev         # servidor en http://127.0.0.1:8767 con datos en .dev/ (no toca los de Docker)
-make check       # pruebas del backend + tipos y lint del panel
+make check       # pruebas y contratos de arquitectura del backend + tipos y lint del panel
 ```
 
 `make dev` usa el puerto 8767 y la carpeta `.dev/` para que puedas tenerlo a la vez que la instancia de Docker. Para recarga en caliente del panel, `cd web && npm run dev` (Vite reenvía `/api` al backend).
@@ -60,7 +60,7 @@ Quien actualiza Tamandua ya tiene datos: una versión nueva nunca debe romperlos
 
 1. **Lector tolerante.** El código lee también el formato anterior: `dict.get` con valor por defecto para
    campos nuevos, sin suponer tipos que antes no existían. Leer nunca lanza por un campo que falta.
-2. **Migración si hay que reescribir.** Se añade al final de `MIGRATIONS` en `appsec_agent/migrations.py`:
+2. **Migración si hay que reescribir.** Se añade al final de `MIGRATIONS` en `tamandua/app/data_migrations.py`:
    idempotente (repetirla no daña), con las rutas que toca en `touches` (se copian antes) y rápida en
    instalaciones grandes. Nunca se reordena ni se borra una migración publicada: la versión es su posición.
 3. **Prueba con datos viejos** en `tests/test_migrations.py` (o junto al módulo): se escriben a mano en el

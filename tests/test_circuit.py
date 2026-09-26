@@ -6,10 +6,11 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent.cli import main as cli_main
-from appsec_agent.engine import ProbeError, scan_fixture
-from appsec_agent.fixture import FixtureError, verify_fixture
-from appsec_agent.store import list_runs, load_run, save_run, save_scan
+from tamandua.cli.main import main as cli_main
+from tamandua.modules.lab.engine import ProbeError, scan_fixture
+from tamandua.modules.lab.fixture import FixtureError, verify_fixture
+from tamandua.modules.lab.runs import save_run, save_scan
+from tamandua.modules.runs.store import list_runs, load_run
 
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "tenant-api-lab"
@@ -80,7 +81,7 @@ class CircuitTests(unittest.TestCase):
             self.assertEqual(scan_fixture(root, "fixed")["summary"]["no_issue_observed"], 5)
 
     def test_worker_error_marks_coverage_incomplete(self):
-        with patch("appsec_agent.engine._run_probe", side_effect=ProbeError("fallo controlado")):
+        with patch("tamandua.modules.lab.engine._run_probe", side_effect=ProbeError("fallo controlado")):
             result = scan_fixture(FIXTURE, "fixed")
         self.assertEqual(result["status"], "incomplete")
         self.assertEqual(result["summary"]["needs_follow_up"], 5)

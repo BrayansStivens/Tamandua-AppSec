@@ -1,0 +1,3 @@
+# Solo para desarrollo y CI: no van en la imagen.
+-r requirements.txt
+import-linter==2.15

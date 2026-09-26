@@ -5,9 +5,9 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from appsec_agent.audit_report import ReportError, render_audit_pdf, validate_options
-from appsec_agent.auth import Users
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.reporting.audit import ReportError, render_audit_pdf, validate_options
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
 
@@ -58,16 +58,16 @@ class RouteTests(HttpCase):
         self.assertGreater(len(pdf_all), 0)
 
     def test_the_asset_state_can_be_reported_too(self):
-        from appsec_agent.assets import asset_key
+        from tamandua.modules.sources.assets import asset_key
         status, pdf, _ = self.report({"asset": asset_key(self.run), "status": "all", "fingerprints": ["a" * 64]})
         self.assertEqual(status, 200, pdf)
         self.assertTrue(pdf.startswith(b"%PDF-"))
 
     def test_an_organization_report_includes_its_coverage_against_github(self):
         from fake_github import fake_github
-        from appsec_agent.integrations import save_github
+        from tamandua.modules.integrations.installations import save_github
         save_github(self.data_dir, 7, {"account": "org", "repository_selection": "all"}, "admin")
-        with patch("appsec_agent.api.routes_runs.render_portfolio_pdf", wraps=__import__("appsec_agent.audit_report", fromlist=["x"]).render_portfolio_pdf) as render, \
+        with patch("tamandua.app.http.routes_runs.render_portfolio_pdf", wraps=__import__("tamandua.modules.reporting.audit", fromlist=["x"]).render_portfolio_pdf) as render, \
                 fake_github({7: [(1, "org/api"), (2, "org/web"), (3, "org/infra")]}, {7: ("org", "all")}):
             status, pdf, _ = self.report({"account": "org", "options": {"framework": "iso27001"}})
         self.assertEqual(status, 200, pdf)
@@ -76,7 +76,7 @@ class RouteTests(HttpCase):
         self.assertEqual((coverage["total"], coverage["missing"]), (3, ["org/infra", "org/web"]))
 
     def test_a_selection_of_repositories_goes_into_one_document(self):
-        from appsec_agent.assets import asset_key
+        from tamandua.modules.sources.assets import asset_key
         status, pdf, _ = self.report({"assets": [asset_key(self.run)]})
         self.assertEqual(status, 200, pdf)
         for body, expected in (({"assets": []}, 400), ({"assets": ["no-existe"]}, 404), ({"account": "nadie"}, 404),

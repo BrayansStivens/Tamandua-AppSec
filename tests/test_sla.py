@@ -8,10 +8,13 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import dashboard, findings_registry, sla, triage
-from appsec_agent.audit_report import render_audit_pdf, validate_options
-from appsec_agent.auth import Users
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.reporting import dashboard
+from tamandua.modules.findings import registry as findings_registry
+from tamandua.modules.findings import sla
+from tamandua.modules.findings import triage
+from tamandua.modules.reporting.audit import render_audit_pdf, validate_options
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
 from test_report_design import text as pdf_text

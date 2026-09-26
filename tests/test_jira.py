@@ -9,8 +9,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import jira, triage
-from appsec_agent.store import render_tickets, save_repository_scan
+from tamandua.modules.integrations import jira
+from tamandua.modules.findings import triage
+from tamandua.modules.runs.store import render_tickets, save_repository_scan
 from test_dashboard import _finding, _scan
 
 TOKEN = "ATATT3xFfGF0-token-de-prueba-1234"
@@ -43,7 +44,7 @@ class JiraTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.data_dir = Path(self.directory.name)
-        store = patch("appsec_agent.github_app.CONFIG_DIR", self.data_dir / "config")
+        store = patch("tamandua.shared.paths.CONFIG_DIR", self.data_dir / "config")
         store.start()
         self.addCleanup(store.stop)
         now = datetime.now(timezone.utc).isoformat()

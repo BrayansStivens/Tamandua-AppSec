@@ -8,10 +8,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent.auth import Users
-from appsec_agent.integrations import github_installation
-from appsec_agent.server import make_handler
-from appsec_agent.store import list_runs
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.integrations.installations import github_installation
+from tamandua.app.server import make_handler
+from tamandua.modules.runs.store import list_runs
 
 
 class ServerTests(unittest.TestCase):
@@ -20,11 +20,11 @@ class ServerTests(unittest.TestCase):
         self.data_dir = Path(self.directory.name)
         # El almacén de credenciales del proveedor se aísla: si no, las pruebas
         # verían la App real de quien las ejecuta y dejarían de ser deterministas.
-        store = patch("appsec_agent.github_app.CONFIG_DIR", self.data_dir / "config")
+        store = patch("tamandua.shared.paths.CONFIG_DIR", self.data_dir / "config")
         store.start()
         self.addCleanup(store.stop)
         # El camino con motores en contenedor se prueba en test_scanners; aquí no se lanza Docker.
-        engines = patch.dict("appsec_agent.scanners._docker_state", {"ok": False})
+        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
         engines.start()
         self.addCleanup(engines.stop)
         # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.
@@ -92,7 +92,7 @@ class ServerTests(unittest.TestCase):
         secret = "sk-user-owned-key-000111222333"
         headers = {"Origin": self.origin, "X-AppSec-Agent-Action": "save-ai-key"}
         # Una clave que el proveedor rechaza no se guarda.
-        with patch("appsec_agent.providers.check_provider",
+        with patch("tamandua.modules.integrations.ai_providers.check_provider",
                    return_value={"provider": "openai", "status": "invalid_credentials",
                                  "message": "El proveedor rechazó la comprobación"}):
             status, payload = self.request("POST", "/api/providers/keys",
@@ -104,7 +104,7 @@ class ServerTests(unittest.TestCase):
         self.assertFalse(json.loads(listing)[0]["configured"])
 
         # Aceptada: se guarda, y ni el guardado ni el listado devuelven la clave.
-        with patch("appsec_agent.providers.check_provider",
+        with patch("tamandua.modules.integrations.ai_providers.check_provider",
                    return_value={"provider": "openai", "status": "connected", "message": "ok"}):
             status, payload = self.request("POST", "/api/providers/keys",
                                            json.dumps({"provider": "openai", "action": "save",
@@ -128,7 +128,7 @@ class ServerTests(unittest.TestCase):
     def test_provider_endpoint_never_starts_a_lab_scan_or_exposes_keys(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "server-secret", "ANTHROPIC_API_KEY": "",
                                        "APPSEC_AGENT_BOOTSTRAP": "1"}), \
-                patch("appsec_agent.api.routes_sources.check_provider", return_value={"status": "connected"}) as check:
+                patch("tamandua.app.http.routes_sources.check_provider", return_value={"status": "connected"}) as check:
             status, payload = self.request("GET", "/api/providers")
             self.assertEqual(status, 200)
             self.assertNotIn(b"server-secret", payload)
@@ -144,9 +144,9 @@ class ServerTests(unittest.TestCase):
 
     def test_soc2_export_is_explicitly_non_certifying(self):
         # El laboratorio ya no tiene ruta en la API: la ejecución se crea como lo hace la CLI (scan-fixture).
-        from appsec_agent.cli import DEFAULT_FIXTURE
-        from appsec_agent.engine import scan_fixture
-        from appsec_agent.store import save_scan
+        from tamandua.cli.main import DEFAULT_FIXTURE
+        from tamandua.modules.lab.engine import scan_fixture
+        from tamandua.modules.lab.runs import save_scan
         run_id = save_scan(self.data_dir, scan_fixture(DEFAULT_FIXTURE, "fixed"))["id"]
         status, report = self.request("GET", f"/api/runs/{run_id}/report-soc2.md")
         self.assertEqual(status, 200)
@@ -171,8 +171,8 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 400)
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.dict("os.environ", {"APPSEC_AGENT_SHOW_WORKSPACE": "1"}), \
-                patch("appsec_agent.jobs.snapshot_source") as snapshot, \
-                patch("appsec_agent.repository_scan._query_osv", side_effect=AssertionError("OSV llamado")):
+                patch("tamandua.modules.runs.jobs.snapshot_source") as snapshot, \
+                patch("tamandua.modules.scanning.repository._query_osv", side_effect=AssertionError("OSV llamado")):
             root = Path(temporary)
             (root / "app.py").write_text('db.execute(f"SELECT {user_id}")\n')
             snapshot.return_value = root, {"id": "local:appsec-agent", "name": "Código propio", "provider": "local", "files": 1}
@@ -217,7 +217,7 @@ class ServerTests(unittest.TestCase):
     def test_code_connection_from_ui_validates_lists_and_forgets_token(self):
         secret = "ghp_test_read_only_secret_123"
         headers = {"Origin": self.origin, "X-AppSec-Agent-Action": "connect-code"}
-        with patch("appsec_agent.repository_sources._request", return_value=json.dumps([
+        with patch("tamandua.modules.sources.repositories._request", return_value=json.dumps([
             {"full_name": "example/private", "private": True, "default_branch": "main"}
         ]).encode()) as request:
             status, payload = self.request("POST", "/api/integrations/code", json.dumps({"provider": "github", "token": secret}), headers)
@@ -240,7 +240,7 @@ class ServerTests(unittest.TestCase):
         status, _ = self.request("POST", "/api/integrations/code", body,
                                  {"Origin": "http://evil.test", "X-AppSec-Agent-Action": "connect-code"})
         self.assertEqual(status, 403)
-        with patch("appsec_agent.repository_sources._request", side_effect=Exception("should not call")):
+        with patch("tamandua.modules.sources.repositories._request", side_effect=Exception("should not call")):
             status, _ = self.request("POST", "/api/integrations/code", json.dumps({"provider": "github", "token": "bad token"}),
                                      {"Origin": self.origin, "X-AppSec-Agent-Action": "connect-code"})
             self.assertEqual(status, 400)

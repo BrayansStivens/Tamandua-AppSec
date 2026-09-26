@@ -12,8 +12,8 @@ WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
-# vite.config apunta a ../appsec_agent/static: se respeta el mismo layout que en el repositorio.
-RUN mkdir -p /src/appsec_agent && npm run build
+# vite.config apunta a ../tamandua/app/static: se respeta el mismo layout que en el repositorio.
+RUN mkdir -p /src/tamandua/app && npm run build
 
 # ---------- 2. ejecución ----------
 FROM python:3.12-slim-bookworm@sha256:392307d22300de8b5986851a12d9176dfc0fc073e65bf6523ebd7dcbeb23564e AS app
@@ -35,10 +35,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
+COPY tamandua/ ./tamandua/
 COPY appsec_agent/ ./appsec_agent/
 COPY rules/ ./rules/
 COPY fixtures/tenant-api-lab/ ./fixtures/tenant-api-lab/
-COPY --from=web /src/appsec_agent/static ./appsec_agent/static
+COPY --from=web /src/tamandua/app/static ./tamandua/app/static
 # Usuario sin privilegios; compose alinea su UID/GID con el del host para que data/ y config/ sean tuyos.
 RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin appsec \
  && mkdir -p /data /config && chown -R appsec:appsec /data /config
@@ -47,4 +48,4 @@ VOLUME ["/data", "/config"]
 EXPOSE 8766
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8766/api/health', headers={'Host':'127.0.0.1:8766'}), timeout=4).status == 200 else 1)"]
-CMD ["python", "-m", "appsec_agent", "--data-dir", "/data", "serve", "--port", "8766"]
+CMD ["python", "-m", "tamandua", "--data-dir", "/data", "serve", "--port", "8766"]

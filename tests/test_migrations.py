@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import migrations
-from appsec_agent.migrations import Migration
+from tamandua.app import data_migrations as migrations
+from tamandua.app.data_migrations import Migration
 
 
 class MigrationTests(unittest.TestCase):
@@ -61,8 +61,8 @@ class MigrationTests(unittest.TestCase):
             migrations.upgrade(self.data_dir)
 
     def test_the_old_incomplete_fix_repair_runs_as_a_migration(self):
-        from appsec_agent import findings_registry as registry
-        from appsec_agent.store import save_repository_scan
+        from tamandua.modules.findings import registry
+        from tamandua.modules.runs.store import save_repository_scan
         from test_dashboard import _finding, _scan
         a, b = "a" * 64, "b" * 64
 

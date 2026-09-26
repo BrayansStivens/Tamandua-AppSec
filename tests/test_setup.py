@@ -1,7 +1,7 @@
 import os
 from unittest.mock import patch
 
-from appsec_agent.api import transport_check
+from tamandua.app.http import transport_check
 
 from tests.test_auth import PASSWORD, HttpCase
 

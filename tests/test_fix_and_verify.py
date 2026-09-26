@@ -5,9 +5,12 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import patch
 
-from appsec_agent import findings_registry, fix_guide, triage, verifications
-from appsec_agent.auth import Users
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.findings import registry as findings_registry
+from tamandua.modules.findings import fix_guide
+from tamandua.modules.findings import triage
+from tamandua.modules.findings import verifications
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
 
@@ -37,7 +40,7 @@ class FixGuideTests(unittest.TestCase):
         self.assertEqual(fix_guide.guide(dev)["commands"][0]["code"], "yarn add -D jest@29.7.0")  # no la pasa a producción
 
     def test_the_pull_request_table_only_shows_a_command_that_updates(self):
-        from appsec_agent.pr_review import _rows
+        from tamandua.modules.pullrequests.review import _rows
         finding = {**_finding("e" * 64, "high", package="minimist"), "path": "package-lock.json",
                    "package": {"ecosystem": "npm", "name": "minimist", "version": "0.0.8", "fixed_version": "1.2.6", "direct": False}}
         row = _rows([finding])[-1]
@@ -83,8 +86,8 @@ class ReverifyTests(HttpCase):
 
     def test_reverify_rescans_once_and_reports_the_outcome(self):
         source = {"id": "github:org/api", "name": "org/api", "installation_id": 7, "uid": None}
-        with patch("appsec_agent.api.routes_runs.find_source", return_value=source), \
-                patch("appsec_agent.jobs.ScanJobs.enqueue_repository_scan", return_value={"id": "f" * 32, "status": "queued"}) as enqueue:
+        with patch("tamandua.app.http.routes_runs.find_source", return_value=source), \
+                patch("tamandua.modules.runs.jobs.ScanJobs.enqueue_repository_scan", return_value={"id": "f" * 32, "status": "queued"}) as enqueue:
             status, body, _ = self.reverify("a" * 64)
         self.assertEqual((status, body["joined"], enqueue.call_args.kwargs["trigger"]), (202, False, {"kind": "reverify"}))
         # Termina el análisis: «a» ya no está, «b» sigue.

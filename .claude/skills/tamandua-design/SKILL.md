@@ -24,7 +24,7 @@ Si una regla choca con lo que pide el usuario, pregunta; no la rompas en silenci
 
 ## 2. Informes (PDF y Markdown)
 
-Todo PDF se construye con `appsec_agent/report_design.py` (tokens, `header`, `meta`, `kpis`, `chip`, `table`, `h2`, `build`, `wide_page`). No crees estilos ni colores propios.
+Todo PDF se construye con `tamandua/modules/reporting/design.py` (tokens, `header`, `meta`, `kpis`, `chip`, `table`, `h2`, `build`, `wide_page`). No crees estilos ni colores propios.
 
 **Estructura, en este orden:**
 1. Cabecera: antetítulo (qué tipo de informe), título (el sistema), subtítulo (periodo o descripción) y `meta` (quién, qué, cuándo, referencia).
@@ -52,7 +52,7 @@ Todo PDF se construye con `appsec_agent/report_design.py` (tokens, `header`, `me
 
 ## 3. Diagrama de amenazas
 
-- Colocación: `appsec_agent/threat_diagram.py` y `web/src/components/threat-layout.ts` son **el mismo algoritmo**; si cambias uno, cambia el otro. `tests/test_threat_layout_parity.py` lo comprueba.
+- Colocación: `tamandua/modules/threats/diagram.py` y `web/src/components/threat-layout.ts` son **el mismo algoritmo**; si cambias uno, cambia el otro. `tests/test_threat_layout_parity.py` lo comprueba.
 - Columnas por recorrido de los datos (distancia a los actores), bloques por frontera sin solapes, reordenados por vecinos, rejilla de 8 px, pilas ≤ 5.
 - Colores: paleta de tokens (`COLORS` en Python, `threat-colors.ts` en el panel): `neutral, brand, info, success, warning, attention, danger`. Sin elegir, el del papel del componente; siempre con leyenda. Nunca hexadecimal libre del usuario.
 - Formas: proceso redondeado, almacén entre dos líneas, tercero discontinuo. Flujo sin cifrar: rojo discontinuo.

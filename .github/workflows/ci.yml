@@ -1,7 +1,7 @@
 # Pruebas y análisis de seguridad en cada pull request y en cada push a main.
 #
 # - backend: pruebas de Python.
-# - panel: tipos, lint y que appsec_agent/static está recompilado (el panel servido es el del repositorio).
+# - panel: tipos, lint y que tamandua/app/static está recompilado (el panel servido es el del repositorio).
 # - tamandua: Tamandua se analiza a sí mismo con su CLI (el mismo uso que se documenta en docs/cli.md).
 #   En un PR solo cuenta lo que el PR introduce y bloquea desde severidad alta; en main analiza todo e
 #   informa. fixtures/ son ejemplos vulnerables a propósito: se excluyen y la salida dice cuántos son.
@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Pruebas del backend
+    name: Backend (contratos y pruebas)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -35,7 +35,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Dependencias
-        run: python -m pip install --disable-pip-version-check -r requirements.txt
+        run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+      - name: Contratos de arquitectura
+        run: lint-imports
       - name: Pruebas
         run: python -m unittest discover -s tests
 
@@ -64,9 +66,9 @@ jobs:
       - name: El panel servido está recompilado
         run: |
           (cd web && npm run build)
-          if [ -n "$(git status --porcelain -- appsec_agent/static)" ]; then
-            git status --short -- appsec_agent/static
-            echo "::error::appsec_agent/static no corresponde a web/src: ejecuta «make web» y sube el resultado."
+          if [ -n "$(git status --porcelain -- tamandua/app/static)" ]; then
+            git status --short -- tamandua/app/static
+            echo "::error::tamandua/app/static no corresponde a web/src: ejecuta «make web» y sube el resultado."
             exit 1
           fi
 
@@ -97,12 +99,12 @@ jobs:
           else
             scope=(--fail-on never)  # main: inventario completo en code scanning, sin bloquear
           fi
-          version="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' appsec_agent/api/core.py)"  # la etiqueta que acaba de construir make build
+          version="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' tamandua/version.py)"  # la etiqueta que acaba de construir make build
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)" \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "$PWD":/src:ro -v "$RUNNER_TEMP/tamandua-data":/data \
-            "appsec-agent/app:$version" python -m appsec_agent scan /src --name appsec-agent \
+            "appsec-agent/app:$version" python -m tamandua scan /src --name appsec-agent \
             --exclude fixtures/ "${scope[@]}" --format sarif --output /data/tamandua.sarif
       - name: ¿Hay SARIF?
         id: sarif

@@ -5,9 +5,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import github_app, image_scan
-from appsec_agent.auth import Users
-from appsec_agent.image_scan import ImageError, config_findings, merge_packages, parse_reference
+from tamandua.modules.integrations import github as github_app
+from tamandua.shared import paths
+from tamandua.modules.scanning import image as image_scan
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.scanning.image import ImageError, config_findings, merge_packages, parse_reference
 
 from tests.test_auth import PASSWORD, HttpCase
 
@@ -46,7 +48,7 @@ class CredentialTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
-        patcher = patch.object(github_app, "CONFIG_DIR", Path(self.directory.name) / "config")
+        patcher = patch.object(paths, "CONFIG_DIR", Path(self.directory.name) / "config")
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -70,8 +72,8 @@ class CredentialTests(unittest.TestCase):
             class Done:
                 returncode, stdout, stderr = 0, json.dumps({"Results": [], "Metadata": {}}), ""
             return Done()
-        with patch("appsec_agent.image_scan.docker_available", return_value=True), \
-                patch("appsec_agent.scanners.subprocess.run", side_effect=fake_run):
+        with patch("tamandua.modules.scanning.image.docker_available", return_value=True), \
+                patch("tamandua.modules.scanning.engines.subprocess.run", side_effect=fake_run):
             image_scan.run_trivy_image("ghcr.io/acme/api:1", Path(self.directory.name) / "cache", {}, {"username": "brayan", "token": TOKEN})
         self.assertNotIn(TOKEN, " ".join(captured["argv"]))
         self.assertIn("TRIVY_PASSWORD", captured["argv"])
@@ -130,7 +132,7 @@ class ImageRoutesTests(HttpCase):
             status, body, _ = self.post("/api/images/scans", "scan-image", {"reference": "localhost:5000/app:1"}, self.member)
         self.assertEqual(status, 400)
         self.assertIn("privada", body["error"])
-        with patch("appsec_agent.image_scan.check_registry_address"), \
+        with patch("tamandua.modules.scanning.image.check_registry_address"), \
                 patch.object(self.handler_class.state.jobs, "enqueue_image_scan", return_value={"id": "r1", "status": "queued"}) as enqueue:
             status, body, _ = self.post("/api/images/scans", "scan-image", {"reference": "ghcr.io/acme/api:1"}, self.member)
         self.assertEqual((status, body["image"]["reference"]), (202, "ghcr.io/acme/api:1"))

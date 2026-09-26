@@ -5,7 +5,7 @@ vulnerabilidades. Este documento lista qué se usa, bajo qué licencia y qué ob
 Tamandua como al ofrecerlo como servicio gestionado.
 
 Licencias comprobadas el 2026-09-25 contra el repositorio de cada proyecto (API de GitHub) y los metadatos de
-los paquetes instalados. Revisa este archivo al cambiar una versión fijada en `appsec_agent/scanners.py`.
+los paquetes instalados. Revisa este archivo al cambiar una versión fijada en `tamandua/modules/scanning/engines.py`.
 
 ## Motores de análisis
 
@@ -92,7 +92,7 @@ gratuita con límites compartidos, y Aqua recomienda a los usos empresariales al
    no se analizan en el servicio de pago.
 2. Decidir las fuentes ambiguas (Amazon en primer lugar) pidiendo permiso o excluyéndolas.
 3. ~~Mostrar la fuente de cada aviso~~ Hecho: cada hallazgo de dependencias guarda su fuente y su licencia
-   (`appsec_agent/data_sources.py`); el panel la muestra en el detalle y los informes técnico, de auditoría y
+   (`tamandua/modules/intel/data_sources.py`); el panel la muestra en el detalle y los informes técnico, de auditoría y
    Markdown incluyen «Fuentes de los avisos» con la atribución de cada base y el aviso del NVD. Los análisis
    anteriores a este cambio no tienen fuente registrada hasta que se vuelven a analizar.
 
@@ -111,7 +111,7 @@ técnico, no asesoría legal.
 | pycparser (dependencia de cffi) | BSD-3-Clause |
 | ReportLab | BSD (licencia propia de ReportLab Inc., de tipo BSD) |
 
-**Panel web** (lo que viaja compilado en `appsec_agent/static`): React y React DOM (MIT), @xyflow/react (MIT),
+**Panel web** (lo que viaja compilado en `tamandua/app/static`): React y React DOM (MIT), @xyflow/react (MIT),
 @base-ui/react (MIT), lucide-react (ISC), class-variance-authority (Apache-2.0), qrcode (MIT),
 tw-animate-css (MIT), Tailwind CSS (MIT) y la fuente **Geist** (SIL OFL-1.1: se puede incrustar y
 redistribuir; no se puede vender la fuente por separado).

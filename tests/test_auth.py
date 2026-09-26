@@ -14,11 +14,11 @@ from unittest.mock import patch
 # Contraseña de prueba armada por partes: un literal así lo marcaría (con razón) un detector de secretos.
 NEW_PASSWORD = "-".join(("otra", "frase", "muy", "larga", "99"))
 
-from appsec_agent import auth
-from appsec_agent.auth import AuthError, Authenticator, Locked, Users, totp_code
-from appsec_agent.cli import main as cli
-from appsec_agent.api import PREFIXES, ROUTES
-from appsec_agent.server import make_handler
+from tamandua.modules.identity import auth
+from tamandua.modules.identity.auth import AuthError, Authenticator, Locked, Users, totp_code
+from tamandua.cli.main import main as cli
+from tamandua.app.http import PREFIXES, ROUTES
+from tamandua.app.server import make_handler
 
 PASSWORD = "correcto-caballo-bateria"
 ORIGIN = "http://127.0.0.1:8766"
@@ -130,10 +130,10 @@ class HttpCase(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.data_dir = Path(self.directory.name)
-        store = patch("appsec_agent.github_app.CONFIG_DIR", self.data_dir / "config")
+        store = patch("tamandua.shared.paths.CONFIG_DIR", self.data_dir / "config")
         store.start()
         self.addCleanup(store.stop)
-        engines = patch.dict("appsec_agent.scanners._docker_state", {"ok": False})
+        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
         # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.
         policy = patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"})
         policy.start()

@@ -27,22 +27,37 @@ flowchart LR
   app -- "feeds públicos" --> feeds["CISA KEV · EPSS"]
 ```
 
-## Componentes
+## Estructura del código
 
-| Módulo | Qué hace |
-| --- | --- |
-| `api/` | Tabla de rutas con una sola tubería de seguridad: host permitido → CSRF (Origin + cabecera de acción) → sesión → segundo factor → rol → tamaño del cuerpo. Los manejadores no leen cabeceras ni cookies por su cuenta. |
-| `auth.py` | Usuarios (scrypt), sesiones del lado del servidor, TOTP con códigos de respaldo, invitaciones y límite de intentos. |
-| `vault.py` | Almacén de secretos AES-256-GCM en `config/`. |
-| `github_app.py` | Verificación de la App, JWT RS256, tokens de instalación en memoria, lectura de repositorios y PRs, comentarios y estados de commit. |
-| `jobs.py` / `worker.py` | Cola de análisis con un trabajador; al arrancar, lo que quedó a medias se marca como fallido. |
-| `repository_scan.py` / `scanners.py` | Instantánea del repositorio, plan de escaneo y ejecución de los motores. |
-| `findings_registry.py` | Estado actual por repositorio: cada hallazgo con su origen, primera y última vez, y remediación automática o manual. |
-| `pr_watch.py` / `pr_review.py` | Vigilante de PRs por sondeo y revisión de lo que introduce cada commit. |
-| `advisories.py` / `cve_db.py` | KEV, EPSS, OSV y la copia local de NVD con búsqueda (SQLite + FTS5). |
-| `threat_model.py` / `inventory.py` | Modelos STRIDE a partir del inventario de los repositorios y de sus hallazgos. |
-| `jira.py` | Exportación idempotente de hallazgos a Jira Cloud. |
-| `web/` | Panel React + TypeScript con shadcn/ui; se compila a `appsec_agent/static/`. |
+Monolito modular (`tamandua/`), con capas que comprueba import-linter en cada PR (`make arch`, ver `pyproject.toml`):
+
+```
+tamandua/
+  cli/          línea de comandos (scan para CI, demo, usuarios…)
+  app/          composición: servidor HTTP y rutas (http/), migraciones de datos al arrancar, estáticos del panel
+  modules/      el negocio, un paquete por contexto; no importa de app/ ni de cli/
+    identity/       usuarios, sesiones, TOTP
+    sources/        repositorios, activos (identidad estable), dominios
+    scanning/       motores (engines, config_engines), plan, inventario, análisis de repositorio, imagen y local, OWASP
+    runs/           ejecuciones, cola de análisis y lotes
+    findings/       registro y ciclo de vida, triage, exclusiones, guía de corrección, reverificación, plazos (SLA)
+    intel/          avisos, KEV/EPSS, copia local de NVD, EUVD, fuentes y licencias
+    compliance/     SBOM, VEX, kit CRA
+    reporting/      informes PDF/Markdown, diseño común, Resumen
+    integrations/   GitHub App, Jira, avisos (Slack/Teams/webhook), claves de IA
+    pullrequests/   revisión de PR y vigilancia
+    threats/        modelado de amenazas, diagrama e informe
+    lab/            laboratorio sintético (tenant-api-lab) y datos de demostración; el producto no lo usa
+  shared/       transversal sin negocio: logs, almacén cifrado, rutas; no importa de modules/
+```
+
+La seguridad de la API está en un solo sitio (`app/http/core.py`): host permitido → CSRF (Origin + cabecera de acción) →
+sesión → segundo factor → rol → tamaño del cuerpo. Los manejadores no leen cabeceras ni cookies por su cuenta.
+El panel React + TypeScript (`web/`) se compila a `tamandua/app/static/`.
+
+Hacia dónde va (por fases): API con FastAPI y esquemas tipados, PostgreSQL con migraciones Alembic, cola de trabajos
+durable sobre Postgres con un `worker` separado (el único con acceso a Docker) y el panel organizado por funcionalidad
+con TanStack Query. `python -m appsec_agent` y las variables `APPSEC_AGENT_*` siguen funcionando.
 
 ## Flujo de un análisis
 
@@ -73,7 +88,7 @@ config/
   master.key        clave maestra (si no viene del entorno)
 ```
 
-**Actualizar sin romper los datos.** Al arrancar (panel o CLI), `appsec_agent/migrations.py` compara la versión
+**Actualizar sin romper los datos.** Al arrancar (panel o CLI), `tamandua/app/data_migrations.py` compara la versión
 guardada en `data-version.json` con la del código y aplica, en orden y una sola vez, las migraciones pendientes,
 tras copiar a `data/backups/` solo lo que van a tocar. Cada paso guarda su versión: si uno falla, el siguiente
 arranque reanuda desde ahí. Una instalación nueva nace en la última versión; unos datos de una versión más nueva

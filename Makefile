@@ -3,7 +3,7 @@
 
 SHELL := /bin/sh
 COMPOSE ?= docker compose
-VERSION := $(shell sed -n 's/^VERSION = "\(.*\)"/\1/p' appsec_agent/api/core.py)
+VERSION := $(shell sed -n 's/^VERSION = "\(.*\)"/\1/p' tamandua/version.py)
 PORT := $(shell sed -n 's/^APPSEC_PORT=//p' .env 2>/dev/null | tail -n1)
 PUBLIC_URL := $(shell sed -n 's/^APPSEC_AGENT_PUBLIC_URL=//p' .env 2>/dev/null | tail -n1)
 HOST_PORT := $(if $(PORT),$(PORT),8766)
@@ -27,10 +27,10 @@ export DOCKER_SOCKET_GID
 # Imágenes publicadas de los motores, fijadas por digest, leídas del código (sin Python ni la imagen de la app).
 # `make engines` las descarga desde el host: se ve el progreso, no hay límite de tiempo y no depende
 # de los permisos del socket dentro del contenedor.
-ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' appsec_agent/scanners.py
+ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' tamandua/modules/scanning/engines.py
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor setup build up down restart status logs ps setup-code engines scan demo update backup shell cli \
+.PHONY: arch help doctor setup build up down restart status logs ps setup-code engines scan demo update backup shell cli \
         clean purge dev-setup dev test lint web check
 
 ## —— Uso ———————————————————————————————————————————————————————————————
@@ -67,7 +67,7 @@ restart: ## Reinicia la app (marca como fallidos los análisis en curso)
 status: ## Estado de los contenedores y de los motores
 	@$(COMPOSE) ps
 	@echo
-	@$(COMPOSE) exec -T appsec python -m appsec_agent engines 2>/dev/null || echo "La app no está en marcha: make up"
+	@$(COMPOSE) exec -T appsec python -m tamandua engines 2>/dev/null || echo "La app no está en marcha: make up"
 
 ps: status
 
@@ -93,11 +93,11 @@ engines: ## Descarga las imágenes de los motores que falten (Trivy, OSV-Scanner
 
 scan: ## Analiza una carpeta local: make scan DIR=../mi-repo ARGS="--base main --fail-on high"
 	@[ -d "$(DIR)" ] || { echo 'Indica la carpeta: make scan DIR=../mi-repo (y opciones en ARGS="--base main")'; exit 2; }
-	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro appsec python -m appsec_agent scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
+	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro appsec python -m tamandua scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
 
 demo: ## Datos de demostración: analiza los ejemplos vulnerables e importa un modelo de amenazas (IMAGE=nginx:1.21 añade una imagen)
 	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath fixtures)":/demo/fixtures:ro -v "$(abspath web/src/examples/threat-models)":/demo/models:ro \
-		appsec python -m appsec_agent --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
+		appsec python -m tamandua --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
 
 update: ## Actualiza el código (git pull) y reconstruye
 	git pull --ff-only
@@ -110,7 +110,7 @@ shell: ## Abre una terminal dentro del contenedor
 	$(COMPOSE) exec appsec sh
 
 cli: ## CLI de la app: make cli ARGS="user list"
-	$(COMPOSE) exec appsec python -m appsec_agent --data-dir /data $(ARGS)
+	$(COMPOSE) exec appsec python -m tamandua --data-dir /data $(ARGS)
 
 clean: ## Para todo y borra las imágenes locales (conserva data/ y config/)
 	$(COMPOSE) down --rmi all
@@ -124,20 +124,23 @@ purge: ## ¡BORRA data/ y config/! Pide CONFIRM=borrar
 
 dev-setup: ## Crea .venv e instala dependencias de Python y del panel
 	$(PYTHON) -m venv $(VENV)
-	$(VENV)/bin/pip install -q -r requirements.txt
+	$(VENV)/bin/pip install -q -r requirements-dev.txt
 	cd web && npm ci --no-audit --no-fund
 
 dev: ## Servidor local sin contenedor en 127.0.0.1:8767 (motores vía tu Docker)
 	APPSEC_AGENT_PUBLIC_URL=http://127.0.0.1:8767 APPSEC_AGENT_ALLOWED_ORIGINS=http://127.0.0.1:8767,http://localhost:8767 \
-	APPSEC_AGENT_CONFIG_DIR=$(CURDIR)/.dev/config $(VENV)/bin/python -m appsec_agent --data-dir .dev/data serve --port 8767
+	APPSEC_AGENT_CONFIG_DIR=$(CURDIR)/.dev/config $(VENV)/bin/python -m tamandua --data-dir .dev/data serve --port 8767
 
-web: ## Compila el panel en appsec_agent/static/
+web: ## Compila el panel en tamandua/app/static/
 	cd web && npm run build
 
 test: ## Pruebas del backend
 	$(VENV)/bin/python -m unittest discover -s tests
 
+arch: ## Contratos de arquitectura (import-linter, ver pyproject.toml)
+	$(VENV)/bin/lint-imports
+
 lint: ## Lint y tipos del panel
 	cd web && npx tsc -b && npm run lint
 
-check: test lint ## Pruebas + lint (lo que se exige antes de un PR)
+check: test arch lint ## Pruebas, contratos de arquitectura y lint (lo que se exige antes de un PR)

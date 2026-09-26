@@ -1,0 +1,33 @@
+[project]
+name = "tamandua"
+dynamic = ["version"]
+description = "Seguridad de aplicaciones autoalojada: qué corregir primero, cómo, y la evidencia para el auditor."
+requires-python = ">=3.12"
+license = "AGPL-3.0-only"
+
+[tool.setuptools.dynamic]
+version = { attr = "tamandua.version.VERSION" }
+
+# Contratos de arquitectura (import-linter): los comprueba `make arch` y el CI.
+[tool.importlinter]
+root_packages = ["tamandua"]
+
+[[tool.importlinter.contracts]]
+name = "Capas: la composición usa el negocio; el negocio no conoce la composición; lo compartido no conoce el negocio"
+type = "layers"
+layers = [
+    "tamandua.cli",
+    "tamandua.app",
+    "tamandua.modules",
+    "tamandua.shared",
+]
+
+[[tool.importlinter.contracts]]
+name = "El laboratorio sintético no se usa desde el producto"
+type = "forbidden"
+source_modules = [
+    "tamandua.modules.identity", "tamandua.modules.sources", "tamandua.modules.scanning", "tamandua.modules.runs",
+    "tamandua.modules.findings", "tamandua.modules.intel", "tamandua.modules.compliance", "tamandua.modules.reporting",
+    "tamandua.modules.integrations", "tamandua.modules.pullrequests", "tamandua.modules.threats",
+]
+forbidden_modules = ["tamandua.modules.lab"]

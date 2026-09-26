@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import scanners
-from appsec_agent.scanners import _pick_fixed, merge_secrets, parse_gitleaks, parse_opengrep, parse_trivy
+from tamandua.modules.scanning import engines as scanners
+from tamandua.modules.scanning.engines import _pick_fixed, merge_secrets, parse_gitleaks, parse_opengrep, parse_trivy
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -30,7 +30,7 @@ class TrivyParserTests(unittest.TestCase):
         self.assertIn("de 4.17.20 a 4.17.21", lodash["remediation"])
         self.assertEqual(lodash["cve"], ["CVE-2021-23337"])
         # Misma huella que produciría el camino OSV para el mismo aviso: no duplica tickets entre motores.
-        from appsec_agent.advisories import fingerprint
+        from tamandua.modules.intel.advisories import fingerprint
         self.assertEqual(lodash["fingerprint"], fingerprint("sca", "CVE-2021-23337", "npm", "lodash", "4.17.20"))
 
     def test_kev_and_epss_enrich_priority(self):
@@ -113,7 +113,7 @@ class OpengrepParserTests(unittest.TestCase):
 class RunnerTests(unittest.TestCase):
     def test_without_docker_each_engine_declares_not_tested_and_never_runs(self):
         with patch.dict(scanners._docker_state, {"ok": False}), \
-                patch("appsec_agent.scanners._run", side_effect=AssertionError("lanzó un contenedor")):
+                patch("tamandua.modules.scanning.engines._run", side_effect=AssertionError("lanzó un contenedor")):
             for runner in (lambda: scanners.run_opengrep(Path(".")), lambda: scanners.run_gitleaks(Path(".")),
                            lambda: scanners.run_trivy(Path("."), Path("/tmp/x"), {})):
                 result = runner()
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
 class DevDependencyTests(unittest.TestCase):
     def test_dev_dependencies_are_included_marked_and_deprioritized(self):
-        from appsec_agent.scanners import parse_trivy
+        from tamandua.modules.scanning.engines import parse_trivy
         vector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
         def vuln(name, pkg_id):
             return {"VulnerabilityID": f"CVE-2026-{len(name)}000", "PkgID": pkg_id, "PkgName": name, "InstalledVersion": "1.0.0",

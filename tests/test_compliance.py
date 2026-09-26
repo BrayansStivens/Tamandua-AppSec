@@ -8,11 +8,17 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import cra, cve_db, euvd, fix_guide, sbom, triage, vex
-from appsec_agent.advisories import dependency_finding
-from appsec_agent.audit_report import FRAMEWORKS, render_audit_pdf, validate_options
-from appsec_agent.auth import Users
-from appsec_agent.store import save_repository_scan
+from tamandua.modules.compliance import cra
+from tamandua.modules.intel import cve_db
+from tamandua.modules.intel import euvd
+from tamandua.modules.findings import fix_guide
+from tamandua.modules.compliance import sbom
+from tamandua.modules.findings import triage
+from tamandua.modules.compliance import vex
+from tamandua.modules.intel.advisories import dependency_finding
+from tamandua.modules.reporting.audit import FRAMEWORKS, render_audit_pdf, validate_options
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_cve_db import nvd_entry
 from test_dashboard import _finding, _scan
@@ -41,7 +47,7 @@ class MaliciousTests(unittest.TestCase):
         self.assertIn("paquete malicioso", other["fix"]["steps"][0])
         self.assertFalse(any("Actualiza" in step for step in finding["fix"]["steps"]))
         # Los informes (tabla y «qué hacer primero») dicen lo mismo que el panel, y lo malicioso va primero.
-        from appsec_agent.remediation import action, fix_groups
+        from tamandua.modules.findings.remediation import action, fix_groups
         groups = fix_groups([_finding("c" * 64, "critical", package="axios"), finding, other])
         self.assertTrue(groups[0]["malicious"])
         self.assertTrue(action(groups[0], short=True).startswith("Eliminar event-stream 3.3.6"))
@@ -172,7 +178,7 @@ class EuvdRouteTests(HttpCase):
         connection.close()
         payload = {"items": [{"id": "EUVD-2026-5", "aliases": "CVE-2026-55555", "baseScore": 7.5, "baseScoreVersion": "3.1",
                               "baseScoreVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}]}
-        with patch("appsec_agent.euvd._fetch", side_effect=lambda cve: euvd.parse(payload, cve)):
+        with patch("tamandua.modules.intel.euvd._fetch", side_effect=lambda cve: euvd.parse(payload, cve)):
             status, body, _ = self.call("GET", "/api/cve-db/item?id=CVE-2026-55555", headers=cookie)
         self.assertEqual((status, body["score"], body["severity"], body["score_source"]), (200, 7.5, "high", "euvd"))
 

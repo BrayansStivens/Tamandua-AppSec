@@ -4,9 +4,9 @@ import json
 import unittest
 from pathlib import Path
 
-from appsec_agent.dependency_merge import family, merge_dependencies, package_name
-from appsec_agent.repository_sources import _analyzable, is_manifest
-from appsec_agent.scanners import parse_osv_scanner, parse_trivy
+from tamandua.modules.scanning.dependency_merge import family, merge_dependencies, package_name
+from tamandua.modules.sources.repositories import _analyzable, is_manifest
+from tamandua.modules.scanning.engines import parse_osv_scanner, parse_trivy
 
 OUTPUTS = Path(__file__).parent / "engine-outputs"
 FEEDS = {"kev": {}, "epss": {}}
@@ -61,7 +61,7 @@ class ManifestTests(unittest.TestCase):
         import io
         import tarfile
         import tempfile
-        from appsec_agent.repository_sources import MAX_FILE, _extract_limited
+        from tamandua.modules.sources.repositories import MAX_FILE, _extract_limited
         buffer = io.BytesIO()
         with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
             for name, size in (("repo/web/package-lock.json", MAX_FILE + 10), ("repo/web/app.js", MAX_FILE + 10)):

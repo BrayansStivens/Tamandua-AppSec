@@ -5,8 +5,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from appsec_agent.api.core import VERSION
-from appsec_agent.scanners import IMAGES
+from tamandua.app.http.core import VERSION
+from tamandua.modules.scanning.engines import IMAGES
 
 ROOT = Path(__file__).resolve().parents[1]
 

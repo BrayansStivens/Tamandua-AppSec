@@ -8,8 +8,9 @@ from pathlib import Path
 from unittest.mock import patch
 from urllib.error import HTTPError
 
-from appsec_agent import github_app
-from appsec_agent.providers import _NoRedirect, check_provider, provider_status
+from tamandua.modules.integrations import github as github_app
+from tamandua.shared import paths
+from tamandua.modules.integrations.ai_providers import _NoRedirect, check_provider, provider_status
 
 
 class FakeResponse:
@@ -28,14 +29,14 @@ class ProviderTests(unittest.TestCase):
         # El almacén de claves se aísla: sin esto las pruebas leerían la credencial
         # real de quien las ejecuta y podrían filtrarla en un mensaje de fallo.
         self.store = tempfile.TemporaryDirectory()
-        patcher = patch.object(github_app, "CONFIG_DIR", Path(self.store.name) / "config")
+        patcher = patch.object(paths, "CONFIG_DIR", Path(self.store.name) / "config")
         patcher.start()
         self.addCleanup(patcher.stop)
         self.addCleanup(self.store.cleanup)
 
     def test_missing_keys_never_call_network(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "", "ANTHROPIC_API_KEY": ""}), \
-                patch("appsec_agent.providers.build_opener") as transport:
+                patch("tamandua.modules.integrations.ai_providers.build_opener") as transport:
             self.assertEqual([item["configured"] for item in provider_status()], [False, False])
             self.assertEqual(check_provider("openai")["status"], "not_configured")
             transport.assert_not_called()
@@ -46,7 +47,7 @@ class ProviderTests(unittest.TestCase):
             ("anthropic", "ANTHROPIC_API_KEY", "api.anthropic.com", "X-api-key"),
         ):
             with self.subTest(provider=provider), patch.dict("os.environ", {env_name: "test-secret"}), \
-                    patch("appsec_agent.providers.build_opener") as opener:
+                    patch("tamandua.modules.integrations.ai_providers.build_opener") as opener:
                 opener.return_value.open.return_value = FakeResponse()
                 result = check_provider(provider)
                 self.assertEqual(result["status"], "connected")
@@ -59,7 +60,7 @@ class ProviderTests(unittest.TestCase):
     def test_provider_error_does_not_echo_credential_or_response_body(self):
         error = HTTPError("https://api.openai.com/v1/models", 401, "secret in remote body", {}, io.BytesIO(b"test-secret"))
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-secret"}), \
-                patch("appsec_agent.providers.build_opener") as opener:
+                patch("tamandua.modules.integrations.ai_providers.build_opener") as opener:
             opener.return_value.open.side_effect = error
             result = check_provider("openai")
         self.assertEqual(result["status"], "invalid_credentials")

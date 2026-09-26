@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import batches
-from appsec_agent.auth import Users
-from appsec_agent.integrations import save_github
+from tamandua.modules.runs import batches
+from tamandua.modules.identity.auth import Users
+from tamandua.modules.integrations.installations import save_github
 from fake_github import fake_github
 from test_auth import PASSWORD, HttpCase
 
@@ -54,7 +54,7 @@ class BatchLogicTests(unittest.TestCase):
         self.assertEqual((current["id"], index), (batch["id"], 0))
 
     def test_progress_comes_from_the_real_runs(self):
-        from appsec_agent.store import save_repository_scan
+        from tamandua.modules.runs.store import save_repository_scan
         from test_dashboard import _finding, _scan
         batch = batches.create(self.data, [item("acme/a"), item("acme/b"), item("acme/c")], by="ana", label="tres")
         run = save_repository_scan(self.data, {**_scan("acme/a", [_finding("a" * 64, "critical")], datetime.now(timezone.utc).isoformat()),
@@ -70,8 +70,8 @@ class BatchLogicTests(unittest.TestCase):
 
 class ImageBatchTests(unittest.TestCase):
     def test_images_are_batched_by_full_reference_and_fed_to_the_image_scanner(self):
-        from appsec_agent.image_scan import parse_reference
-        from appsec_agent.jobs import ScanJobs
+        from tamandua.modules.scanning.image import parse_reference
+        from tamandua.modules.runs.jobs import ScanJobs
         with tempfile.TemporaryDirectory() as folder:
             data = Path(folder)
             items = [{"kind": "image", "image": parse_reference(reference)} for reference in ("nginx:1.21", "nginx:1.27-alpine", "nginx:1.21")]
@@ -90,7 +90,7 @@ class WorkerTests(unittest.TestCase):
     def test_the_real_worker_goes_through_the_whole_batch(self):
         """El trabajador toma los repositorios del lote uno a uno cuando no tiene otra cosa, hasta terminarlo."""
         import time
-        from appsec_agent.jobs import ScanJobs
+        from tamandua.modules.runs.jobs import ScanJobs
         from test_dashboard import _finding, _scan
 
         def snapshot(source_id, destination, tokens, installation, progress=None):
@@ -100,8 +100,8 @@ class WorkerTests(unittest.TestCase):
         def scan(root, source, **kwargs):
             return _scan(source["name"], [_finding(source["name"].encode().hex().ljust(64, "0")[:64], "high")], datetime.now(timezone.utc).isoformat())
 
-        with tempfile.TemporaryDirectory() as folder, patch("appsec_agent.jobs.snapshot_source", side_effect=snapshot), \
-                patch("appsec_agent.jobs.scan_repository", side_effect=scan):
+        with tempfile.TemporaryDirectory() as folder, patch("tamandua.modules.runs.jobs.snapshot_source", side_effect=snapshot), \
+                patch("tamandua.modules.runs.jobs.scan_repository", side_effect=scan):
             data = Path(folder)
             batch = batches.create(data, [item("acme/a"), item("acme/b"), item("acme/c")], by="ana", label="tres")
             jobs = ScanJobs(data)
@@ -123,7 +123,7 @@ class BatchRouteTests(HttpCase):
             self.member = self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})[2][0].split("; ")[0]
         save_github(self.data_dir, 7, {"account": "acme", "repository_selection": "all"}, "admin")
         # El trabajador no toma nada del lote durante la prueba: aquí solo se prueba la API.
-        patcher = patch("appsec_agent.jobs.ScanJobs._feed_batch")
+        patcher = patch("tamandua.modules.runs.jobs.ScanJobs._feed_batch")
         patcher.start()
         self.addCleanup(patcher.stop)
 

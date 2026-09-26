@@ -6,7 +6,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from appsec_agent import github_app, logging_setup, vault
+from tamandua.modules.integrations import github as github_app
+from tamandua.shared import paths
+from tamandua.shared import log as logging_setup
+from tamandua.shared import vault
 
 # Valores sintéticos armados por partes: el repositorio no lleva literales con forma de credencial.
 OPENAI_KEY = "-".join(("sk", "proj", "valor", "muy", "secreto", "123"))
@@ -18,7 +21,7 @@ class VaultTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.config = Path(self.directory.name) / "config"
-        patcher = patch.object(github_app, "CONFIG_DIR", self.config)
+        patcher = patch.object(paths, "CONFIG_DIR", self.config)
         patcher.start()
         self.addCleanup(patcher.stop)
         environment = patch.dict(os.environ, {}, clear=True)

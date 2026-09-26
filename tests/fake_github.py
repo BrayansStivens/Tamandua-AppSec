@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from urllib.parse import parse_qs, unquote, urlsplit
 from unittest.mock import patch
 
-from appsec_agent import github_app
+from tamandua.modules.integrations import github as github_app
 
 
 def _item(uid: int, name: str) -> dict:
@@ -58,10 +58,10 @@ def fake_github(repos: dict[int, list[tuple[int, str]]], accounts: dict[int, tup
 
     github_app.forget()
     try:
-        with patch("appsec_agent.github_app._get", side_effect=get), \
-                patch("appsec_agent.github_app.installation_token", side_effect=lambda installation: f"token-{installation}"), \
-                patch("appsec_agent.github_app._scoped_repository", side_effect=scoped), \
-                patch("appsec_agent.github_app._app_jwt", return_value="jwt"):
+        with patch("tamandua.modules.integrations.github._get", side_effect=get), \
+                patch("tamandua.modules.integrations.github.installation_token", side_effect=lambda installation: f"token-{installation}"), \
+                patch("tamandua.modules.integrations.github._scoped_repository", side_effect=scoped), \
+                patch("tamandua.modules.integrations.github._app_jwt", return_value="jwt"):
             yield calls
     finally:
         github_app.forget()

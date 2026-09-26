@@ -9,7 +9,7 @@ target="backups/$stamp"
 running=$(docker compose ps --status running --services 2>/dev/null | grep -x appsec || true)
 
 if [ -n "$running" ]; then
-  active=$(docker compose exec -T appsec python -c "from pathlib import Path; from appsec_agent.store import list_runs; print(sum(1 for r in list_runs(Path('/data')) if r.get('status') in ('queued', 'running')))" 2>/dev/null || echo 0)
+  active=$(docker compose exec -T appsec python -c "from pathlib import Path; from tamandua.modules.runs.store import list_runs; print(sum(1 for r in list_runs(Path('/data')) if r.get('status') in ('queued', 'running')))" 2>/dev/null || echo 0)
   if [ "${active:-0}" != "0" ] && [ "${FORCE:-}" != "1" ]; then
     echo "Hay $active análisis en marcha. Espera a que terminen o usa FORCE=1 (se marcarán como fallidos)." >&2
     exit 1
