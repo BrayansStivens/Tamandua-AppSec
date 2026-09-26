@@ -54,8 +54,8 @@ def _scan_command(args) -> int:
     return EXIT_OK if code == EXIT_INCOMPLETE and args.allow_incomplete else code
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="appsec-agent", description="Prototipo local de evaluación AppSec")
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="tamandua", description="Tamandua: seguridad de aplicaciones autoalojada")
     parser.add_argument("--data-dir", type=Path, default=None,
                         help="Directorio de artefactos locales (por defecto ./data; en `scan`, ~/.cache/tamandua)")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -120,9 +120,14 @@ def main(argv: list[str] | None = None) -> int:
             action.add_argument("--password-stdin", action="store_true")
     worker = commands.add_parser("worker", help="Ejecutar los análisis de la cola y las tareas periódicas (el servicio `worker` de compose)")
     worker.add_argument("--check", action="store_true", help="Salud: 0 si este worker ha dado señales de vida hace poco (healthcheck)")
-    panel = commands.add_parser("serve", help="Abrir el panel web local de solo lectura")
+    panel = commands.add_parser("serve", help="Abrir el panel web")
     panel.add_argument("--port", type=int, default=8766)
     panel.add_argument("--bind", default=None, help="Interfaz de escucha; por defecto 127.0.0.1 (o APPSEC_AGENT_BIND)")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "scan":
         # Se ejecuta dentro del repositorio del usuario: sus datos (y la caché de avisos) no van a parar a él.

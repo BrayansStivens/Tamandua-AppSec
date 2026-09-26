@@ -18,9 +18,9 @@ make check       # pruebas y contratos de arquitectura del backend + tipos y lin
 La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 
 ```bash
-.venv/bin/python -m appsec_agent --data-dir .dev/data sources
-.venv/bin/python -m appsec_agent --data-dir .dev/data scan-repository --source-id local:appsec-agent
-.venv/bin/python -m appsec_agent --data-dir .dev/data runs
+.venv/bin/python -m tamandua --data-dir .dev/data sources
+.venv/bin/python -m tamandua --data-dir .dev/data scan-repository --source-id local:appsec-agent
+.venv/bin/python -m tamandua --data-dir .dev/data runs
 ```
 
 ## Laboratorio sintético
@@ -28,7 +28,7 @@ La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 `fixtures/tenant-api-lab` es una API de prueba con cinco fallos conocidos y sus variantes corregidas. Sirve para comprobar el motor de pruebas dinámicas durante el desarrollo; no aparece en el panel.
 
 ```bash
-.venv/bin/python -m appsec_agent --data-dir .dev/data scan-fixture --variant both
+.venv/bin/python -m tamandua --data-dir .dev/data scan-fixture --variant both
 ```
 
 ## Paginación de la API

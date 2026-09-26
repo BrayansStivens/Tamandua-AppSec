@@ -53,6 +53,7 @@ Abre <http://127.0.0.1:8766>, crea el administrador con el código y sigue **Pri
 | [Instalación](docs/instalacion.md) | Requisitos, primer arranque, actualizar, copias de seguridad, desinstalar |
 | [Conectar GitHub](docs/github-app.md) | Crear la GitHub App paso a paso y revisar PRs |
 | [Terminal y CI](docs/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos para CI |
+| [Skills para asistentes](skills/README.md) | Claude Code, Cursor o Codex corrigen lo que encuentra Tamandua y lo verifican, o lo montan en tu CI |
 | [Funcionalidades](docs/funcionalidades.md) | Qué hace cada parte y con qué criterio |
 | [Configuración](docs/configuracion.md) | Variables de `.env` |
 | [Seguridad](docs/seguridad.md) | Secretos, transporte, qué sale de tu máquina y concesiones |

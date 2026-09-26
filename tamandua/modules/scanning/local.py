@@ -1,4 +1,4 @@
-"""Análisis de una carpeta local: `appsec-agent scan`. Para la terminal, pre-commit y CI.
+"""Análisis de una carpeta local: `tamandua scan`. Para la terminal, pre-commit y CI.
 
 Sin `--base` se analiza todo. Con `--base main` se analiza también el punto de partida
 (el merge-base con esa rama) y se informa solo de lo que el cambio introduce: lo que ya
@@ -270,11 +270,14 @@ def render_text(result: dict, *, limit: int = 50) -> str:
 
 
 def render_json(result: dict) -> str:
+    from tamandua.modules.findings.fix_guide import attach
     fields = ("fingerprint", "severity", "scanner", "tool", "also_detected_by", "rule_id", "title", "path", "line",
-              "cwe", "cve", "ghsa", "package", "remediation", "priority", "kev", "epss")
+              "cwe", "cve", "ghsa", "package", "malicious", "remediation", "fix", "priority", "kev", "epss")
     payload = {key: result.get(key) for key in ("target", "status", "comparison", "fail_on", "excluded", "engines", "not_analyzed", "exit_code")}
     payload["gate"] = result["gate"]
-    payload["findings"] = [{key: item.get(key) for key in fields if item.get(key) is not None} for item in result["findings"]]
+    # `fix`: la misma guía de corrección que el panel (pasos, órdenes y ejemplo), para quien corrige desde la terminal.
+    findings = attach([dict(item) for item in result["findings"]])
+    payload["findings"] = [{key: item.get(key) for key in fields if item.get(key) is not None} for item in findings]
     return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
 
 

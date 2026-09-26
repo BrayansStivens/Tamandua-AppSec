@@ -114,7 +114,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)" \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "$PWD":/src:ro -v "$RUNNER_TEMP/tamandua-data":/data \
-            appsec-agent/app:0.9 python -m appsec_agent scan /src --name "$REPO_NAME" \
+            appsec-agent/app:0.9 python -m tamandua scan /src --name "$REPO_NAME" \
             --base "origin/$BASE_REF" --format sarif --output /data/tamandua.sarif
       - uses: github/codeql-action/upload-sarif@v4
         if: always()
@@ -140,7 +140,7 @@ tamandua:
     - >
       docker run --rm -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)"
       --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/src:ro -v /tmp/tamandua-data:/data
-      appsec-agent/app:0.9 python -m appsec_agent scan /src --name "$CI_PROJECT_NAME"
+      appsec-agent/app:0.9 python -m tamandua scan /src --name "$CI_PROJECT_NAME"
       --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
 ```
 

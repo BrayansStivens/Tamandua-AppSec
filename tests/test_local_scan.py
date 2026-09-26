@@ -1,4 +1,4 @@
-"""`appsec-agent scan`: carpeta local, comparación con la rama base, umbral y códigos de salida."""
+"""`tamandua scan`: carpeta local, comparación con la rama base, umbral y códigos de salida."""
 
 import json
 import shutil
@@ -133,9 +133,11 @@ class GateTests(unittest.TestCase):
                 self.run_with([], exclude=bad)
 
     def test_json_and_sarif_are_machine_readable(self):
-        result = self.run_with([finding("a", "x.py", 3, "critical")])
+        result = self.run_with([finding("a", "x.py", 3, "critical"), finding("b", ".env", 1, scanner="secrets")])
         payload = json.loads(local_scan.render_json(result))
         self.assertEqual((payload["exit_code"], payload["findings"][0]["path"]), (EXIT_BLOCKED, "x.py"))
+        secret = next(item for item in payload["findings"] if item["scanner"] == "secrets")
+        self.assertTrue(secret["fix"]["steps"])  # la guía de corrección viaja con el hallazgo
         sarif = json.loads(local_scan.render_sarif(result))
         self.assertEqual(sarif["runs"][0]["results"][0]["level"], "error")
         self.assertEqual(sarif["runs"][0]["tool"]["driver"]["rules"][0]["properties"]["security-severity"], "9.5")

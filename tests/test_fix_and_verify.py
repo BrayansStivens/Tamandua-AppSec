@@ -69,6 +69,16 @@ class FixGuideTests(unittest.TestCase):
         self.assertTrue(secret["steps"][0].startswith("Revoca o rota la credencial"))
 
 
+class FixCommandSafetyTests(unittest.TestCase):
+    def test_names_that_look_like_options_or_shell_never_reach_a_command(self):
+        """Los hallazgos viajan en `scan --format json` a asistentes que pueden ejecutar `fix.commands`."""
+        for name, fixed in (("--registry", "1.3.0"), ("left-pad;id", "1.3.0"), ("left-pad", "-1"), ("$(id)", "1.3.0")):
+            fix = fix_guide.guide(dependency("package.json", name, "1.0.0", fixed, ecosystem="npm", direct=True))
+            self.assertEqual(fix["commands"], [], name)
+        safe = fix_guide.guide(dependency("package.json", "@scope/left-pad", "1.0.0", "1.3.0", ecosystem="npm", direct=True))
+        self.assertEqual(safe["commands"][0]["code"], "npm install @scope/left-pad@1.3.0")
+
+
 class ReverifyTests(HttpCase):
     def setUp(self):
         super().setUp()

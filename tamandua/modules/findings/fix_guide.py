@@ -19,8 +19,9 @@ import re
 from tamandua.modules.intel.advisories import compare_versions
 from tamandua.modules.findings.fix_examples import EXAMPLES
 
-SAFE_NAME = re.compile(r"[A-Za-z0-9@/._:+-]{1,200}")
-SAFE_VERSION = re.compile(r"[A-Za-z0-9._+~:-]{1,100}")
+# Lo que entra en una orden: sin metacaracteres de shell y sin empezar por «-» (se leería como una opción del gestor).
+SAFE_NAME = re.compile(r"[A-Za-z0-9@._][A-Za-z0-9@/._:+-]{0,199}")
+SAFE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+~:-]{0,99}")
 # «Reverificar» analiza la rama principal remota (o la imagen publicada), no la copia local.
 VERIFY = "Después: sube el cambio a la rama principal y pulsa «Reverificar» (o espera al análisis automático de la rama)."
 VERIFY_DEPENDENCY = ("Después: regenera el lockfile, sube el cambio a la rama principal y pulsa «Reverificar» "
