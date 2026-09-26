@@ -51,6 +51,20 @@ tamandua/
   shared/       transversal sin negocio: logs, almacén cifrado, rutas; no importa de modules/
 ```
 
+El panel (`web/src`) sigue la misma idea, por funcionalidad (Feature-Sliced Design ligero), con capas que comprueba
+`tests/test_web_layers.py`: una capa no importa de las de arriba.
+
+```
+web/src/
+  app/        composición: App (navegación), proveedores (TanStack Query)
+  pages/      una pantalla por vista (Resumen, Hallazgos, CVE tracker, Cumplimiento…)
+  features/   auth, onboarding, analyses, sources, findings, integrations, threats
+  shared/     ui (Base UI + Tailwind), charts, api (cliente, tipos generados del OpenAPI, consultas), lib
+```
+
+Los datos del servidor van con TanStack Query (`shared/api/queries.ts`): caché compartida entre vistas y sondeo solo
+mientras hay algo en marcha. Los tipos de las rutas migradas salen del OpenAPI (`make openapi`).
+
 La seguridad de la API está en un solo sitio (`app/http/core.py`): host permitido → CSRF (Origin + cabecera de acción) →
 sesión → segundo factor → rol → tamaño del cuerpo. Los manejadores no leen cabeceras ni cookies por su cuenta.
 El panel React + TypeScript (`web/`) se compila a `tamandua/app/static/`.

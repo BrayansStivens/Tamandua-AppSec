@@ -30,7 +30,7 @@ class LayoutParityTests(unittest.TestCase):
     def test_editor_and_exports_place_every_example_the_same(self):
         with tempfile.TemporaryDirectory() as folder:
             script = Path(folder) / "layout.ts"
-            shutil.copy(ROOT / "web/src/components/threat-layout.ts", script)
+            shutil.copy(ROOT / "web/src/features/threats/threat-layout.ts", script)
             for path in EXAMPLES:
                 model = tm.from_portable(json.loads(path.read_text(encoding="utf-8")))
                 model = {**model, "components": [{**item, "position": None} for item in model["components"]]}

@@ -10,6 +10,9 @@
 - Arquitectura: monolito modular en `tamandua/` (ver `docs/arquitectura.md`). Código de negocio en
   `tamandua/modules/<contexto>/`; `modules` no importa de `app`/`cli` y `shared` no importa de `modules`. Lo comprueba
   `make arch` (import-linter). Un contexto nuevo o una dependencia nueva entre contextos se discute antes.
+- Panel: por funcionalidad en `web/src/{app,pages,features,shared}` (una capa no importa de las de arriba; lo
+  comprueba `tests/test_web_layers.py`). Datos del servidor con TanStack Query (`shared/api/queries.ts`), sin
+  `setInterval` ni `fetch` sueltos para lo nuevo.
 - API: rutas nuevas en FastAPI (`tamandua/app/api/<contexto>.py`) con esquemas Pydantic y `guard(Policy(...))`; el
   router clásico (`app/http/routes_*.py`) solo se toca para migrar rutas de ahí. Tras cambiar una ruta: `make openapi`
   (el panel usa los tipos generados de `web/src/shared/api/`; el CI comprueba que están al día).

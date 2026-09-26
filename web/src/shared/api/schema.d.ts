@@ -490,7 +490,7 @@ export interface operations {
     dashboard_api_dashboard_get: {
         parameters: {
             query?: {
-                days?: 7 | 30 | 90 | 365;
+                days?: number;
                 tz?: string | null;
             };
             header?: never;

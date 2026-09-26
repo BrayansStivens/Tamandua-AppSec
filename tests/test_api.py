@@ -35,7 +35,11 @@ class StackTests(HttpCase):
         cookie = {"Cookie": cookies[0].split("; ")[0]}
         self.assertIn("HttpOnly", cookies[0])  # la cookie del clásico cruza el adaptador intacta
         self.assertEqual(self.call("GET", "/api/sla", headers=cookie)[0], 200)
-        self.assertEqual(self.call("GET", "/api/dashboard?days=12", headers=cookie), (400, {"error": "Parámetros inválidos"}, []))
+        self.assertEqual(self.call("GET", "/api/dashboard?days=12", headers=cookie), (400, {"error": "Ventana inválida"}, []))
+        # Los valores válidos llegan como texto en la URL (el panel siempre manda days y tz).
+        for days in (7, 30, 90, 365):
+            status, body, _ = self.call("GET", f"/api/dashboard?days={days}&tz=America/Bogota", headers=cookie)
+            self.assertEqual((status, body["window_days"]), (200, days))
         self.assertEqual(self.call("GET", "/api/no-existe", headers=cookie)[0], 404)
         # CSRF: un POST sin la cabecera de acción no pasa, venga de donde venga.
         self.assertEqual(self.call("POST", "/api/sla", {"days": {}}, {**cookie, "Origin": ORIGIN})[0], 403)

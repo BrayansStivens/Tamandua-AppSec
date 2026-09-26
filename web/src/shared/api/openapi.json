@@ -39,12 +39,6 @@
             "in": "query",
             "required": false,
             "schema": {
-              "enum": [
-                7,
-                30,
-                90,
-                365
-              ],
               "type": "integer",
               "default": 30,
               "title": "Days"

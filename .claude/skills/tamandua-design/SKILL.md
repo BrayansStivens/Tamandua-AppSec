@@ -18,8 +18,8 @@ Si una regla choca con lo que pide el usuario, pregunta; no la rompas en silenci
 - **Movimiento**: animaciones con `motion-safe:`; `prefers-reduced-motion` las apaga.
 - **Tamaños**: texto ≥ 11 px; objetivos de clic ≥ 24 px (`min-h-6`, `size-6`).
 - **Semántica y ARIA en español**: `aria-pressed` (conmutadores), `aria-expanded`, `aria-current`, `role="radiogroup"`/`radio` con `aria-checked`, `role="status"`/`alert`/`progressbar`; cada input con su `<label htmlFor>`; `CardTitle` es un encabezado real.
-- **Carga**: esqueletos con la forma del contenido (`Bone`, `SkeletonList`, `SkeletonTable`, `SkeletonTiles`, `SkeletonCard` de `components/loading.tsx`), anunciados una vez ("Cargando …"). Nunca un estado vacío falso mientras carga.
-- **Ley de Hick**: una acción principal y el resto en un menú (`components/ui/menu.tsx`); navegación agrupada; lo avanzado tras «Más opciones»/«Más filtros». Formularios con valores por defecto: se puede generar sin tocar nada.
+- **Carga**: esqueletos con la forma del contenido (`Bone`, `SkeletonList`, `SkeletonTable`, `SkeletonTiles`, `SkeletonCard` de `shared/ui/loading.tsx`), anunciados una vez ("Cargando …"). Nunca un estado vacío falso mientras carga.
+- **Ley de Hick**: una acción principal y el resto en un menú (`shared/ui/menu.tsx`); navegación agrupada; lo avanzado tras «Más opciones»/«Más filtros». Formularios con valores por defecto: se puede generar sin tocar nada.
 - **Listas largas**: paginación o búsqueda en el servidor; nunca cargar todo.
 
 ## 2. Informes (PDF y Markdown)
@@ -52,7 +52,7 @@ Todo PDF se construye con `tamandua/modules/reporting/design.py` (tokens, `heade
 
 ## 3. Diagrama de amenazas
 
-- Colocación: `tamandua/modules/threats/diagram.py` y `web/src/components/threat-layout.ts` son **el mismo algoritmo**; si cambias uno, cambia el otro. `tests/test_threat_layout_parity.py` lo comprueba.
+- Colocación: `tamandua/modules/threats/diagram.py` y `web/src/features/threats/threat-layout.ts` son **el mismo algoritmo**; si cambias uno, cambia el otro. `tests/test_threat_layout_parity.py` lo comprueba.
 - Columnas por recorrido de los datos (distancia a los actores), bloques por frontera sin solapes, reordenados por vecinos, rejilla de 8 px, pilas ≤ 5.
 - Colores: paleta de tokens (`COLORS` en Python, `threat-colors.ts` en el panel): `neutral, brand, info, success, warning, attention, danger`. Sin elegir, el del papel del componente; siempre con leyenda. Nunca hexadecimal libre del usuario.
 - Formas: proceso redondeado, almacén entre dos líneas, tercero discontinuo. Flujo sin cifrar: rojo discontinuo.

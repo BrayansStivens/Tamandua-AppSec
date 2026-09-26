@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from tamandua.app.api.deps import Context, guard
+from tamandua.app.api.deps import ApiError, Context, guard
 from tamandua.modules.reporting.dashboard import cached, zone
 
 router = APIRouter(tags=["resumen"])
+WINDOWS = (7, 30, 90, 365)
 
 
 class Dashboard(BaseModel):
@@ -31,5 +32,8 @@ class Dashboard(BaseModel):
 
 
 @router.get("/api/dashboard", response_model=Dashboard)
-def dashboard(days: Literal[7, 30, 90, 365] = 30, tz: str | None = None, context: Context = Depends(guard())) -> dict:
+def dashboard(days: int = 30, tz: str | None = None, context: Context = Depends(guard())) -> dict:
+    # Entero y comprobado a mano: un Literal[7, 30, …] rechazaba el «30» que llega como texto en la URL.
+    if days not in WINDOWS:
+        raise ApiError(400, "Ventana inválida")
     return cached(context.data_dir, days, zone(tz))

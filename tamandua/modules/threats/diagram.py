@@ -1,6 +1,6 @@
 """Diagrama del modelo de amenazas: colocación automática, colores y dibujo (SVG y PDF).
 
-La colocación es la misma que la del editor del panel (web/src/components/threat-layout.ts); si cambia
+La colocación es la misma que la del editor del panel (web/src/features/threats/threat-layout.ts); si cambia
 una, cambia la otra. Principios, para que un humano lo entienda y lo quiera editar:
 - Columnas según el recorrido de los datos, no según el tipo: lo que entra desde Internet a la izquierda,
   lo que recibe datos a su derecha y los terceros al final. Los flujos de vuelta (respuestas, webhooks)

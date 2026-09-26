@@ -10,7 +10,7 @@ Se escribe **Tamandua**, sin tilde, en la marca; en texto en español se puede d
 
 <img src="assets/tamandua.svg" width="96" alt="Logo de Tamandua">
 
-El tamandúa, de perfil, atrapa un bug amarillo con la lengua sobre un cuadrado violeta redondeado. El archivo fuente es [`assets/tamandua.svg`](assets/tamandua.svg) (el mismo que usa el panel como favicon); en el panel lo dibuja `web/src/components/brand-mark.tsx`.
+El tamandúa, de perfil, atrapa un bug amarillo con la lengua sobre un cuadrado violeta redondeado. El archivo fuente es [`assets/tamandua.svg`](assets/tamandua.svg) (el mismo que usa el panel como favicon); en el panel lo dibuja `web/src/shared/ui/brand-mark.tsx`.
 
 - Tamaño mínimo: 16 px (favicon). Por debajo de 24 px el bug deja de leerse, pero la silueta se reconoce.
 - No se deforma, no se gira y no se cambian sus colores; sobre fondos violetas usa el logo sobre blanco o negro.
