@@ -79,6 +79,8 @@ La página muestra, para cada CVE, severidad y CVSS, EPSS, si está en CISA KEV,
 
 **Avisos nuevos sin reanalizar.** Cada análisis guarda sus dependencias con versión. Una vez al día (`APPSEC_AGENT_ADVISORY_WATCH_HOURS`) se contrastan con la base OSV actualizada usando OSV-Scanner **sin conexión**: se descargan los avisos, la lista de dependencias no sale del servidor. Lo que el registro no conocía se abre como una ejecución «Avisos nuevos» que solo añade: el siguiente análisis completo manda. Los paquetes del sistema operativo de las imágenes se revisan al reanalizarlas.
 
+**Avisos (Integraciones → Avisos).** Un administrador añade canales de Slack, Microsoft Teams (Workflows) o un webhook genérico y elige qué eventos recibe (hallazgos nuevos desde un umbral de severidad, lotes terminados). Un mensaje por análisis, agrupado: los cinco más graves, el recuento y un enlace al panel si `APPSEC_AGENT_PUBLIC_URL` está definido. Las URL se guardan cifradas y no vuelven al navegador; el webhook genérico firma cada aviso con HMAC-SHA256 (`X-Tamandua-Signature`). Las revisiones de PR no avisan aquí: ya comentan en el PR.
+
 La revisión escanea el commit de cabeza con los mismos motores y cuenta solo lo que el PR **introduce**:
 
 - un hallazgo de código o secreto cuenta si cae en una línea añadida o modificada del diff; uno de dependencias, si el PR toca el manifiesto que lo declara;

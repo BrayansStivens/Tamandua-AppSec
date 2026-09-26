@@ -88,6 +88,7 @@ def apply(data_dir: Path, record: dict) -> dict:
         entries = state["findings"]
         present = {item["fingerprint"]: item for item in record.get("findings", [])}
         opened = fixed = 0
+        new: list[str] = []
         for digest, finding in present.items():
             entry = entries.get(digest)
             if entry is None:
@@ -96,8 +97,10 @@ def apply(data_dir: Path, record: dict) -> dict:
                                            if record["type"] == "pr_review" else {"kind": "advisory"}
                                            if record["type"] == "advisory_watch" else {"kind": "scan"}}
                 opened += 1
+                new.append(digest)
             elif entry["status"] == "fixed":
                 opened += 1
+                new.append(digest)
                 entry["reopened_at"] = stamp
             if record["type"] in FULL_SCANS:
                 entry["origin"] = {"kind": "scan"}  # ya está en la rama principal
@@ -132,7 +135,7 @@ def apply(data_dir: Path, record: dict) -> dict:
     _reopen_manual(data_dir, record, set(present))
     if opened or fixed:
         _log.info("registry_updated", extra={"run_id": record["id"], "reason": f"{key}: {opened} abiertos, {fixed} remediados"})
-    return {"opened": opened, "fixed": fixed}
+    return {"opened": opened, "fixed": fixed, "new": new}
 
 
 def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) -> dict:

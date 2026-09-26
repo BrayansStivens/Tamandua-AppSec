@@ -11,7 +11,7 @@ export type Verification = { run_id: string; by: string; at: string; state: 'run
 
 const when = (value?: string | null) => value ? ` del ${new Date(value).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}` : ''
 
-function CodeBlock({ code, label }: { code: string; label: string }) {
+export function CodeBlock({ code, label }: { code: string; label: string }) {
   const [copied, setCopied] = useState(false)
   const copy = (event: React.MouseEvent<HTMLButtonElement>) => {
     const block = event.currentTarget.parentElement?.querySelector('code')

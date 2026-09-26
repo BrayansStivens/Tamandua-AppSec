@@ -581,6 +581,39 @@ def image_batch(request: Request):
     return request.json(202, batches.summary(request.data_dir, batch))
 
 
+@route("GET", "/api/notifications", admin=True)
+def notification_list(request: Request):
+    """Canales de aviso (Slack, Teams, webhook): nunca devuelve la URL ni el secreto de firma."""
+    from .. import notifications
+    return request.json(200, {"channels": notifications.channels(), "kinds": notifications.KINDS, "events": notifications.EVENTS,
+                              "thresholds": list(notifications.THRESHOLDS), "links": bool(notifications.panel_link())})
+
+
+@route("POST", "/api/notifications", admin=True, action="notifications", body=4096)
+def notification_change(request: Request):
+    from .. import notifications
+    payload = request.payload
+    if not isinstance(payload, dict) or payload.get("op") not in ("save", "remove", "test"):
+        return request.json(400, {"error": "Solicitud inválida"})
+    try:
+        if payload["op"] == "save":
+            if set(payload) != {"op", "kind", "name", "url", "events", "threshold"}:
+                return request.json(400, {"error": "Solicitud inválida"})
+            row, secret = notifications.save(payload["kind"], payload["name"], payload["url"], payload["events"], payload["threshold"],
+                                             by=request.user["username"])
+            return request.json(200, {"channel": row, "secret": secret})
+        if set(payload) != {"op", "id"} or not isinstance(payload["id"], str):
+            return request.json(400, {"error": "Solicitud inválida"})
+        if payload["op"] == "remove":
+            notifications.remove(payload["id"], by=request.user["username"])
+            return request.json(200, {"channels": notifications.channels()})
+        ok, detail = notifications.test(payload["id"])
+        # 200 también si falla: el panel muestra el detalle (p. ej. HTTP 404) y el estado actualizado del canal.
+        return request.json(200, {"ok": ok, "detail": detail, "channels": notifications.channels()})
+    except notifications.NotificationError as exc:
+        return request.json(400, {"error": str(exc)})
+
+
 @route("GET", "/api/registries")
 def registry_list(request: Request):
     from ..image_scan import registries

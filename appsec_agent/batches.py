@@ -107,18 +107,23 @@ def cancel(data_dir: Path, batch_id: str, *, by: str) -> dict:
 
 def take_next(data_dir: Path) -> tuple[dict, int] | None:
     """El siguiente repositorio pendiente del lote activo (y lo marca como tomado). None si no queda nada."""
+    finished = None
     with _lock:
         batch = active(data_dir)
         if batch is None:
             return None
         index = next((position for position, item in enumerate(batch["items"]) if not item.get("run_id") and not item.get("error")), None)
-        if index is None:
-            batch.update(status="done", finished_at=_now())
+        if index is not None:
+            batch["items"][index]["run_id"] = "pending"
             _write(data_dir, batch)
-            return None
-        batch["items"][index]["run_id"] = "pending"
+            return batch, index
+        batch.update(status="done", finished_at=_now())
         _write(data_dir, batch)
-        return batch, index
+        finished = batch
+    # Fuera del cerrojo: el aviso consulta el progreso real (las ejecuciones) y no bloquea a nadie.
+    from . import notifications
+    notifications.on_batch(summary(data_dir, finished))
+    return None
 
 
 def release_taken(data_dir: Path) -> None:

@@ -143,7 +143,13 @@ def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = Non
                      replace=run_id is not None)
     # Toda ejecución terminada, venga de donde venga (trabajador o CLI), actualiza el registro de hallazgos.
     from .findings_registry import apply
-    apply(data_dir, saved)
+    changes = apply(data_dir, saved)
+    # Lo nuevo que importa, a los canales configurados (Slack, Teams, webhook). En segundo plano: no retrasa nada.
+    if changes.get("new"):
+        from . import notifications, triage
+        opened = set(changes["new"])
+        active = [item for item in triage.annotate(data_dir, saved).get("findings", []) if item["fingerprint"] in opened and triage.is_active(item)]
+        notifications.on_run(saved, active)
     return saved
 
 

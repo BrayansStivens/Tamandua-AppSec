@@ -4,6 +4,7 @@ import type { SessionUser } from '@/components/auth/session'
 import { CodeSources } from '@/components/code-sources'
 import { JiraCard } from '@/components/jira'
 import { RegistriesCard } from '@/components/registries'
+import { NotificationsCard } from '@/components/notifications'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ComingSoonCard } from '@/components/coming-soon'
@@ -33,6 +34,7 @@ export function Integrations({ user }: { user: SessionUser }) {
       {user.role !== 'admin' && <div className="rounded-xl border border-app-line bg-app-soft px-4 py-3 text-sm text-app-muted">Conectar proveedores y guardar claves es cosa de un administrador; aquí ves su estado.</div>}
       <CodeSources canManage={user.role === 'admin'} />
       <RegistriesCard canManage={user.role === 'admin'} />
+      {user.role === 'admin' && <NotificationsCard />}
       <Card className="border-app-line bg-panel"><CardHeader><CardTitle>Gestión de incidencias</CardTitle><CardDescription>Convierte hallazgos pendientes en incidencias de tu equipo, sin duplicados entre escaneos.</CardDescription></CardHeader><CardContent><JiraCard canManage={user.role === 'admin'} /></CardContent></Card>
       <ComingSoonCard title="Asistencia con IA" icon={<KeyRound className="size-5" />}
         description="Explicación de cada hallazgo y propuesta de parche con tu propia clave de OpenAI o Anthropic. Hoy la IA no participa en ningún análisis, así que no hace falta guardar ninguna clave."
