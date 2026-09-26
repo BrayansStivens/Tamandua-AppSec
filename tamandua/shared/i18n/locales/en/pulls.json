@@ -70,6 +70,7 @@
     "invalid_pull": "Invalid pull request",
     "repo_not_in_app": "Repository not available in the connected GitHub App",
     "no_head": "GitHub didn't return the PR's head commit",
-    "too_many_branches": "Choose up to {{max}} target branches"
+    "too_many_branches": "Choose up to {{max}} target branches",
+    "review_in_progress": "A review of #{{number}} at this commit is already queued or running."
   }
 }

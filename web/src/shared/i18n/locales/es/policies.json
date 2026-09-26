@@ -1,0 +1,30 @@
+{
+  "load_failed": "No se pudo cargar esta política.",
+  "sla": {
+    "title": "Plazos de corrección",
+    "summary_item": "{{level}} {{value}}",
+    "days_short": "{{days}} d",
+    "no_deadline": "sin plazo",
+    "dialog_help": "Días para corregir un hallazgo, contados desde que se detecta, en todos los repositorios. Deja un campo vacío para que esa severidad no venza. Por defecto: 7, 30, 90 y 180 días.",
+    "days_label": "{{level}} (días)",
+    "placeholder": "Sin plazo",
+    "invalid": "Cada plazo es un número entero de días entre 1 y 3650, o vacío para dejarlo sin plazo.",
+    "changed_by": "Último cambio de {{by}}.",
+    "changed_by_at": "Último cambio de {{by}}, {{date}}.",
+    "defaults": "Valores por defecto.",
+    "saved": "Guardado. Las fechas límite se recalculan."
+  },
+  "secrets": {
+    "title": "Detección de secretos predeterminada",
+    "engine_defaults": "Reglas integradas de Gitleaks y Trivy",
+    "view": "Ver"
+  },
+  "help": {
+    "title": "Cómo se aplican las políticas",
+    "sla": "Los plazos se aplican a todos los repositorios, al Resumen y a los informes. El reloj corre sobre lo abierto; lo remediado y las excepciones aprobadas nunca vencen.",
+    "secrets": "La detección de secretos predeterminada se aplica en cada análisis de repositorio y revisión de PR. Se ignora el .gitleaks.toml del repositorio, así que un PR no puede debilitar la detección.",
+    "repository": "Un repositorio puede sumar entradas propias desde Hallazgos, nunca quitar lo predeterminado.",
+    "critical": "Un secreto expuesto siempre es crítico.",
+    "admin_only": "Solo un administrador las cambia."
+  }
+}

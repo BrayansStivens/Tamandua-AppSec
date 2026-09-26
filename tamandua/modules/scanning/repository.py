@@ -18,7 +18,7 @@ from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
 from tamandua.modules.scanning import secret_rules
-from tamandua.modules.scanning.engines import IMAGES, SEVERITY_NAME, and_list, docker_available, joined as join_messages, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from tamandua.modules.scanning.engines import IMAGES, SECRET_SEVERITY, SEVERITY_NAME, and_list, docker_available, joined as join_messages, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
 from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
@@ -53,6 +53,8 @@ def _finding(scanner: str, rule: str, title, path: str, line: int, severity: str
              reason, cwe: int, owasp: str, *, cve: list[str] | None = None,
              ghsa: list[str] | None = None) -> dict:
     fingerprint = hashlib.sha256(f"{scanner}|{rule}|{path}|{line}".encode()).hexdigest()
+    if scanner == "secrets":
+        severity = SECRET_SEVERITY
     action = "attend" if severity in ("critical", "high") else "track"
     return {"finding_id": fingerprint[:16], "fingerprint": fingerprint, "scanner": scanner, "rule_id": rule,
             "title": title, "path": path, "line": line, "severity": severity,
@@ -98,7 +100,7 @@ def _secret_candidates(path: Path, relative: str) -> list[dict]:
         for name, pattern in SECRET_RULES:
             if pattern.search(line):
                 result.append(_finding("secrets", name.upper().replace(" ", "-"),
-                                       SECRET_TITLES[name], relative, number, "high",
+                                       SECRET_TITLES[name], relative, number, SECRET_SEVERITY,
                                        msg("scanning.internal.secret_reason"), 798, "A04:2025"))
     return result
 
@@ -198,8 +200,8 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         sast = run_opengrep(root)
         report("ok" if sast["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Opengrep", detail=sast["detail"]))
         report("info", msg("scanning.progress.gitleaks", version=IMAGES["gitleaks"]["version"]))
-        # The organization's secret detection settings apply to both secret engines.
-        secret_settings = secret_rules.for_scan(data_dir)
+        # The defaults plus this repository's own entries apply to both secret engines.
+        secret_settings = secret_rules.for_scan(data_dir, source.get("uid") or source.get("id") or source.get("name"))
         secrets_gitleaks = run_gitleaks(root, secret_settings)
         report("ok" if secrets_gitleaks["status"] != "inconclusive" else "warn",
                msg("scanning.progress.engine", engine="Gitleaks", detail=secrets_gitleaks["detail"]))

@@ -22,6 +22,7 @@
     "analyses": "Análisis",
     "repositories": "Repositorios",
     "pulls": "Pull requests",
+    "policies": "Políticas",
     "integrations": "Integraciones",
     "users": "Usuarios",
     "new": "Nuevo análisis",
@@ -41,7 +42,8 @@
     "cves": "Todas las vulnerabilidades publicadas en NVD, con explotación activa (KEV) y probabilidad de explotación (EPSS), buscables en local.",
     "compliance": "Plazos de notificación del Reglamento de Ciberresiliencia de la UE para tus productos, con el borrador listo. El SBOM y el VEX se exportan desde Hallazgos.",
     "threats": "Modela el sistema con el enfoque que prefieras (STRIDE, LINDDUN, PASTA, árboles de ataque, ATT&CK) y contrasta las amenazas con los análisis.",
-    "default": "Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles."
+    "default": "Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles.",
+    "policies": "Reglas que se aplican a todos los repositorios."
   },
   "theme": {
     "label": "Apariencia",

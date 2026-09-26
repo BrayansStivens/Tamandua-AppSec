@@ -11,8 +11,13 @@ export const keys = {
   dashboard: (days: number, tz?: string) => ['dashboard', days, tz] as const,
   sla: ['sla'] as const,
   cra: ['cra'] as const,
+  craOverview: ['cra', 'overview'] as const,
+  craAssets: ['cra', 'assets'] as const,
   secretRules: ['secret-rules'] as const,
   secretBuiltinRules: ['secret-rules', 'builtin'] as const,
+  assetSecretsAll: ['secret-rules', 'asset'] as const,
+  assetSecrets: (key: string) => ['secret-rules', 'asset', key] as const,
+  exclusions: (key: string) => ['exclusions', key] as const,
 }
 
 const active = (status?: string) => status === 'queued' || status === 'running'
@@ -31,9 +36,23 @@ export const runQuery = <T extends { status: string }>(id: string) => queryOptio
 })
 
 export const slaQuery = () => queryOptions({ queryKey: keys.sla, queryFn: ({ signal }) => apiGet('/api/sla', undefined, { signal }) })
-export const craQuery = () => queryOptions({ queryKey: keys.cra, queryFn: ({ signal }) => apiGet('/api/cra', undefined, { signal }) })
+export const craQuery = () => queryOptions({ queryKey: keys.craOverview, queryFn: ({ signal }) => apiGet('/api/cra', undefined, { signal }) })
+// Assets that can still be marked as CRA products, searched by name (the picker shows the first matches).
+export const craAssetsQuery = (q: string) => queryOptions({
+  queryKey: [...keys.craAssets, q], staleTime: 30_000,
+  queryFn: ({ signal }) => apiGet('/api/cra/assets', { q: q || undefined, limit: 20 }, { signal }),
+})
 export const secretRulesQuery = () => queryOptions({ queryKey: keys.secretRules, queryFn: ({ signal }) => apiGet('/api/secrets/config', undefined, { signal }) })
 // The built-in rule list only changes with the pinned Gitleaks image.
+// A repository's excluded paths (table route: typed here by hand).
+export type Exclusions = { patterns: string[]; reason: string | null; by: string | null; at: string | null }
+export const exclusionsQuery = (key: string) => queryOptions({
+  queryKey: keys.exclusions(key), queryFn: ({ signal }) => api.get<Exclusions>(`/api/assets/exclusions?${query({ key })}`, { signal }),
+})
+// A repository's own secret detection entries, added to the defaults in its scans.
+export const assetSecretsQuery = (key: string) => queryOptions({
+  queryKey: keys.assetSecrets(key), queryFn: ({ signal }) => apiGet('/api/assets/secrets', { key }, { signal }),
+})
 export const secretBuiltinRulesQuery = () => queryOptions({
   queryKey: keys.secretBuiltinRules, staleTime: Infinity,
   queryFn: ({ signal }) => apiGet('/api/secrets/builtin-rules', undefined, { signal }),

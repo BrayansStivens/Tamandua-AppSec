@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { ChevronDown, ExternalLink, GitPullRequest, LoaderCircle, Play, RefreshCw, Search } from 'lucide-react'
+import { ChevronDown, ExternalLink, GitPullRequest, LoaderCircle, Play, RefreshCw, RotateCw, Search } from 'lucide-react'
 import { Input } from '@/shared/ui/input'
 import type { SessionUser } from '@/features/auth/session'
 import { Pager } from '@/features/sources/source-search'
@@ -15,6 +15,7 @@ import { Button } from '@/shared/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
 import { api, query as toQuery } from '@/shared/api/http'
+import { apiPost } from '@/shared/api/client'
 import { readRoute, setRouteParam } from '@/shared/lib/route'
 import { formatDate } from '@/shared/lib/types'
 import { formatList } from '@/shared/i18n/format'
@@ -32,7 +33,7 @@ const gateInline = { critical: 'gate_inline.critical', high: 'gate_inline.high',
 function reviewBadge(pull: Pull, t: TFunction<'pulls'>) {
   const review = pull.review
   if (!review) return <Badge variant="outline" className="border-app-line text-app-muted">{t('badge.not_reviewed')}</Badge>
-  if (review.status === 'queued' || review.status === 'running') return <Badge variant="outline" className="border-info-line text-info"><LoaderCircle className="size-3 animate-spin" />{t('badge.reviewing')}</Badge>
+  if (review.status === 'queued' || review.status === 'running') return <Badge variant="outline" className="border-info-line text-info"><LoaderCircle className="size-3 motion-safe:animate-spin" />{t('badge.reviewing')}</Badge>
   if (review.status === 'failed') return <Badge variant="outline" className="border-danger-line text-danger">{t('badge.failed')}</Badge>
   if (!review.current) return <Badge variant="outline" className="border-warning-line text-warning">{t('badge.new_commits')}</Badge>
   const blocking = (review.severities.critical ?? 0) + (review.severities.high ?? 0)
@@ -49,6 +50,7 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
   const [permissions, setPermissions] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [queuedNumber, setQueuedNumber] = useState<number | null>(null)
   const [version, setVersion] = useState(0)
   const admin = user.role === 'admin'
 
@@ -83,13 +85,17 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
     try { const settings = await api.post<Settings>('/api/pull-requests/settings', 'pr-settings', { source_id: sourceId, ...change }); setListing(previous => previous ? { ...previous, settings: { ...previous.settings, ...settings } } : previous); setVersion(value => value + 1) }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy('') }
   }
+  // Review (again) the PR's latest commit now; the list polls while it is queued or running.
   const review = async (number: number) => {
     if (!sourceId) return
-    setBusy(`pr-${number}`); setError('')
-    try { await api.post('/api/pull-requests/review', 'review-pr', { source_id: sourceId, number }); await load() }
+    setBusy(`pr-${number}`); setError(''); setQueuedNumber(null)
+    try { await apiPost('/api/pull-requests/review', 'review-pr', { source_id: sourceId, number }); setQueuedNumber(number); await load() }
     catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy('') }
   }
   const canWrite = permissions.pull_requests === 'write' && permissions.statuses === 'write'
+  // Announced while that review waits or runs; the row badge takes over afterwards.
+  const queuedPull = listing?.pulls.find(pull => pull.number === queuedNumber)
+  const notice = queuedPull?.review && ['queued', 'running'].includes(queuedPull.review.status) ? t('list.queued_notice', { number: queuedPull.number }) : ''
   const settings = listing?.settings
 
   if (connected === null) return error ? <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>
@@ -100,7 +106,7 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
     <WatchPanel key={version} admin={admin} onChanged={() => void load()} onSelect={setSelected} selected={sourceId} />
     <div className="min-w-0 space-y-5">
     <Card className="border-app-line bg-panel"><CardHeader className="gap-3">
-      <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="truncate">{selected?.name ?? t('repo.choose')}</CardTitle><CardDescription className="mt-1 leading-6">{t('repo.description')}</CardDescription></div>
+      <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="truncate">{selected?.name ?? t('repo.choose')}</CardTitle><CardDescription className="mt-1">{t('repo.description')}</CardDescription></div>
         {settings && <Badge variant="outline" className={settings.enabled ? 'border-brand/30 text-brand' : 'border-app-line text-app-muted'}>{settings.enabled ? t('repo.watching') : t('repo.not_watching')}</Badge>}</div>
       {settings && <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-app-line bg-inset px-4 py-3 text-sm">
         <label className="flex items-center gap-2"><input type="checkbox" className="size-4 accent-brand" checked={settings.post_comment} disabled={!admin || !!busy} onChange={event => void save({ post_comment: event.target.checked })} />{t('repo.post_comment')}</label>
@@ -111,13 +117,22 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
       {settings?.uid && <TargetBranches key={settings.uid} uid={settings.uid} name={selected?.name ?? ''}
         saved={settings.base_branches ?? []} defaultBranch={settings.default_branch ?? null} admin={admin}
         onSaved={branches => { setListing(previous => previous ? { ...previous, settings: { ...previous.settings, base_branches: branches } } : previous); setVersion(value => value + 1) }} />}
-      {settings && !settings.enabled && <p className="text-xs leading-5 text-app-subtle">{t('repo.enable_hint')}</p>}
-      {settings?.enabled && settings.branch && <p className="text-xs leading-5 text-app-subtle">{settings.branch_scan
-        ? <Trans t={t} i18nKey="repo.branch_scanned" values={{ branch: settings.branch_scan.branch ?? settings.default_branch ?? '—', date: formatDate(settings.branch_scan.at), sha: settings.branch_scan.head_sha.slice(0, 7), minutes: settings.branch_min_minutes ?? 60 }} components={{ code: <span className="font-mono" /> }} />
-        : t('repo.branch_pending', { minutes: settings.branch_min_minutes ?? 60 })}</p>}
+      {settings && !settings.enabled && <p className="text-xs text-app-subtle">{t('repo.enable_hint')}</p>}
+      {settings?.enabled && settings.branch && <p className="text-xs text-app-subtle">{settings.branch_scan
+        ? <Trans t={t} i18nKey="repo.branch_scanned" values={{ branch: settings.branch_scan.branch ?? settings.default_branch ?? '—', date: formatDate(settings.branch_scan.at), sha: settings.branch_scan.head_sha.slice(0, 7) }} components={{ code: <span className="font-mono" /> }} />
+        : t('repo.branch_pending')}</p>}
       {settings?.post_comment && !canWrite && admin && <p className="text-xs leading-5 text-warning"><Trans t={t} i18nKey="repo.missing_write" components={{ b: <strong /> }} /></p>}
+      <details className="text-xs text-app-muted">
+        <summary className="min-h-6 cursor-pointer py-1 text-app-subtle">{t('repo.help_title')}</summary>
+        <ul className="mt-1.5 list-disc space-y-1 pl-5 leading-5">
+          <li>{t('repo.help_status')}</li>
+          <li>{t('repo.help_branches', { minutes: settings?.branch_min_minutes ?? 60 })}</li>
+          <li>{t('repo.help_rescan')}</li>
+        </ul>
+      </details>
     </CardHeader></Card>
     {error && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">{error}</div>}
+    <p role="status" className="text-sm text-brand empty:hidden">{notice}</p>
     <Card className="border-app-line bg-panel"><CardContent className="p-0">
       <div className="flex items-center justify-between border-b border-app-line px-5 py-3 text-sm"><span className="font-medium">{listing ? t('list.title_count', { total: listing.pulls.length }) : t('list.title')}</span><Button size="sm" variant="ghost" onClick={() => void load()}><RefreshCw />{t('common:actions.refresh')}</Button></div>
       {!listing ? <SkeletonList rows={4} action label={t('loading.pulls')} />
@@ -127,13 +142,26 @@ export function PullRequests({ user, onOpenRun }: { user: SessionUser; onOpenRun
           <div className="min-w-0 flex-1"><a href={pull.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium hover:underline"><GitPullRequest className="size-4 text-app-subtle" />#{pull.number} {pull.title}<ExternalLink className="size-3 text-app-subtle" /></a>
             <p className="mt-0.5 text-xs text-app-subtle">{pull.author} · {pull.head_ref} → {pull.base_ref} · <span className="font-mono">{pull.head_sha?.slice(0, 7)}</span>{pull.draft ? ` · ${t('list.draft')}` : ''}{pull.review ? ` · ${t('list.reviewed', { date: formatDate(pull.review.created_at) })}` : ''}</p></div>
           {reviewBadge(pull, t)}
-          {/* Una acción según el estado: con revisión al día, verla; si no (o hay commits nuevos), revisar. */}
-          {pull.review && pull.review.current && pull.review.status !== 'queued' && pull.review.status !== 'running'
-            ? <Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => onOpenRun(pull.review!.run_id)}>{t('list.view_result')}</Button>
-            : <Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={!!busy || (!!pull.review && ['queued', 'running'].includes(pull.review.status))} onClick={() => void review(pull.number)}>{busy === `pr-${pull.number}` ? <LoaderCircle className="animate-spin" /> : <Play />}{t('list.review_now')}</Button>}
+          <PullActions pull={pull} busy={busy === `pr-${pull.number}`} disabled={!!busy} onReview={() => void review(pull.number)} onOpen={onOpenRun} />
         </div>)}</div>}
     </CardContent></Card>
     </div>
+  </div>
+}
+
+// View the result when the review is current and review its latest commit again (e.g. after a policy changed); a
+// commit not reviewed yet gets "Review now". While a review waits or runs, the row badge says so and nothing else shows.
+function PullActions({ pull, busy, disabled, onReview, onOpen }: { pull: Pull; busy: boolean; disabled: boolean; onReview: () => void; onOpen: (id: string) => void }) {
+  const { t } = useTranslation('pulls')
+  const review = pull.review
+  if (review && (review.status === 'queued' || review.status === 'running')) return null
+  const rescan = !!review && review.current
+  const viewable = rescan && review.status !== 'failed'
+  return <div className="flex items-center gap-2">
+    {viewable && <Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => onOpen(review.run_id)}>{t('list.view_result')}</Button>}
+    <Button size="sm" variant={viewable ? 'ghost' : 'outline'} className={viewable ? '' : 'border-app-line bg-app-soft'} disabled={disabled} onClick={onReview}
+      aria-label={rescan ? t('list.rescan_pr', { number: pull.number }) : t('list.review_pr', { number: pull.number })}>
+      {busy ? <LoaderCircle className="motion-safe:animate-spin" /> : rescan ? <RotateCw /> : <Play />}{rescan ? t('list.rescan') : t('list.review_now')}</Button>
   </div>
 }
 
@@ -180,12 +208,12 @@ function WatchPanel({ admin, onChanged, onSelect, selected }: { admin: boolean; 
     ...(row.enabled ? [row.post_comment ? t('watch.comments') : t('watch.panel_only'), t(gateInline[row.gate]), ...(row.base_branches?.length ? [t('watch.targets', { branches: formatList(row.base_branches) })] : []), ...(row.branch ? [t('watch.branch_current')] : [])] : [t('watch.not_watched')]),
     ...(row.reviewed ? [t('watch.reviewed', { count: row.reviewed })] : []),
   ].join(' · ')
-  return <Card className="border-app-line bg-panel"><CardHeader className="gap-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{t('watch.title', { total: data.enabled })}</CardTitle><CardDescription className="mt-1">{t('watch.description', { minutes: Math.round(data.interval / 60) })} {admin ? t('watch.admin_hint') : t('watch.member_hint')}</CardDescription></div>
+  return <Card className="border-app-line bg-panel"><CardHeader className="gap-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>{t('watch.title', { total: data.enabled })}</CardTitle><CardDescription className="mt-1">{t('watch.description', { minutes: Math.round(data.interval / 60) })}{admin ? '' : ` ${t('watch.member_hint')}`}</CardDescription></div>
     {admin && <Menu><MenuTrigger render={<Button size="sm" variant="outline" disabled={busy} className="border-app-line bg-app-soft" />}>{t('watch.bulk')}<ChevronDown className="size-3.5" /></MenuTrigger>
       <MenuContent><MenuItem onClick={enableAll}>{t('watch.watch_all')}</MenuItem><MenuItem disabled={data.enabled === 0} onClick={() => void apply({ all: true }, false)}>{t('watch.unwatch_all')}</MenuItem></MenuContent></Menu>}</div>
     <div className="flex flex-wrap items-center gap-2"><div className="relative"><Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-app-subtle" /><Input aria-label={t('watch.search')} value={filter} onChange={event => { setFilter(event.target.value); setPage(1) }} placeholder={t('watch.search_placeholder')} className="h-8 w-56 border-app-line bg-app-soft pl-8 text-xs" /></div>
       <label className="flex items-center gap-2 text-xs text-app-muted"><input type="checkbox" className="size-4 accent-brand" checked={onlyEnabled} onChange={event => { setOnlyEnabled(event.target.checked); setPage(1) }} />{t('watch.only_watched')}</label>
-      {admin && picked.size > 0 && <><span className="text-xs text-app-muted">{t('watch.selected', { count: picked.size })}</span><Button size="sm" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, true)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy && <LoaderCircle className="animate-spin" />}{t('watch.enable')}</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, false)}>{t('watch.disable')}</Button><Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>{t('watch.clear_selection')}</Button></>}</div>
+      {admin && picked.size > 0 && <><span className="text-xs text-app-muted">{t('watch.selected', { count: picked.size })}</span><Button size="sm" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, true)} className="bg-primary text-primary-foreground hover:bg-primary/90">{busy && <LoaderCircle className="motion-safe:animate-spin" />}{t('watch.enable')}</Button><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={busy} onClick={() => void apply({ source_ids: [...picked] }, false)}>{t('watch.disable')}</Button><Button size="sm" variant="ghost" onClick={() => setPicked(new Set())}>{t('watch.clear_selection')}</Button></>}</div>
     {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
     {data.partial && <p role="status" className="text-xs text-app-muted">{t('watch.partial')}</p>}
   </CardHeader><CardContent className="space-y-3 p-0 pb-4"><div className="max-h-96 overflow-y-auto border-t border-app-line">

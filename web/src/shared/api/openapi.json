@@ -78,12 +78,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "Invalid parameters",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -215,12 +215,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "Invalid parameters",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -281,12 +281,80 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "Invalid parameters",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cve-db/affected": {
+      "get": {
+        "tags": [
+          "intel"
+        ],
+        "summary": "Affected",
+        "description": "Your repositories with a finding that cites this CVE (open or fixed), one page at a time.",
+        "operationId": "affected_api_cve_db_affected_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedAssetPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -322,7 +390,6 @@
           "compliance"
         ],
         "summary": "Overview",
-        "description": "Any session can read it (the team needs to know what is due); only an administrator changes it.",
         "operationId": "overview_api_cra_get",
         "responses": {
           "200": {
@@ -331,6 +398,190 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CraOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cra/products": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Products",
+        "operationId": "products_api_cra_products_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CraProductPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cra/events": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Events",
+        "description": "Most urgent first. The ENISA draft is only built for the events on the page.",
+        "operationId": "events_api_cra_events_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CraEventPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cra/assets": {
+      "get": {
+        "tags": [
+          "compliance"
+        ],
+        "summary": "Assets",
+        "description": "Analyzed assets that can still be marked as products, filtered by name.",
+        "operationId": "assets_api_cra_assets_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 25,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CraAssetPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -367,12 +618,54 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "Invalid parameters",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pull-requests/review": {
+      "post": {
+        "tags": [
+          "pull-requests"
+        ],
+        "summary": "Review Now",
+        "description": "Reviews (or reviews again) a pull request's head commit now, whether the repository is watched or not.",
+        "operationId": "review_now_api_pull_requests_review_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewQueued"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -409,12 +702,12 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "Invalid parameters",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -471,12 +764,96 @@
               }
             }
           },
-          "422": {
-            "description": "Validation Error",
+          "400": {
+            "description": "Invalid parameters",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets/secrets": {
+      "get": {
+        "tags": [
+          "scanning"
+        ],
+        "summary": "Asset Config",
+        "description": "A repository's own secret detection entries (empty: it uses the defaults as they are).",
+        "operationId": "asset_config_api_assets_secrets_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200,
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetSecretConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "scanning"
+        ],
+        "summary": "Save Asset Config",
+        "description": "Replaces a repository's own entries; they add to the defaults from its next scan. A reason is required.",
+        "operationId": "save_asset_config_api_assets_secrets_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetSecretConfigIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetSecretConfig"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -532,6 +909,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 5,
             "title": "Packages"
           }
         },
@@ -544,6 +922,170 @@
           "packages"
         ],
         "title": "AffectedAsset"
+      },
+      "AffectedAssetPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AffectedAsset"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AffectedAssetPage"
+      },
+      "AssetSecretConfig": {
+        "properties": {
+          "allowlist": {
+            "$ref": "#/components/schemas/SecretAllowlistView"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/SecretRuleView"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Rules"
+          },
+          "disabled_rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 222,
+            "title": "Disabled Rules"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/SecretHistoryEntry"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "History"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/SecretLimits"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "defaults": {
+            "$ref": "#/components/schemas/SecretCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "allowlist",
+          "rules",
+          "disabled_rules",
+          "reason",
+          "by",
+          "at",
+          "history",
+          "limits",
+          "key",
+          "defaults"
+        ],
+        "title": "AssetSecretConfig",
+        "description": "A repository's own entries, added to the defaults (`defaults` counts them) in its scans."
+      },
+      "AssetSecretConfigIn": {
+        "properties": {
+          "allowlist": {
+            "$ref": "#/components/schemas/SecretAllowlist"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/SecretRule"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Rules"
+          },
+          "disabled_rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 400,
+            "title": "Disabled Rules"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Reason"
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 200,
+            "title": "Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "allowlist",
+          "rules",
+          "disabled_rules",
+          "reason",
+          "key"
+        ],
+        "title": "AssetSecretConfigIn"
       },
       "BuiltinRule": {
         "properties": {
@@ -585,6 +1127,7 @@
               "$ref": "#/components/schemas/BuiltinRule"
             },
             "type": "array",
+            "maxItems": 222,
             "title": "Rules"
           }
         },
@@ -613,6 +1156,76 @@
           "name"
         ],
         "title": "CraAsset"
+      },
+      "CraAssetPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CraAsset"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "CraAssetPage"
+      },
+      "CraCounts": {
+        "properties": {
+          "products": {
+            "type": "integer",
+            "title": "Products"
+          },
+          "unscanned": {
+            "type": "integer",
+            "title": "Unscanned"
+          },
+          "events": {
+            "type": "integer",
+            "title": "Events"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "assets": {
+            "type": "integer",
+            "title": "Assets"
+          },
+          "candidates": {
+            "type": "integer",
+            "title": "Candidates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "products",
+          "unscanned",
+          "events",
+          "pending",
+          "assets",
+          "candidates"
+        ],
+        "title": "CraCounts"
       },
       "CraEvent": {
         "properties": {
@@ -670,6 +1283,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 10,
             "title": "Packages"
           },
           "kev": {
@@ -708,6 +1322,7 @@
               "$ref": "#/components/schemas/CraStage"
             },
             "type": "array",
+            "maxItems": 3,
             "title": "Stages"
           },
           "done": {
@@ -739,40 +1354,52 @@
         ],
         "title": "CraEvent"
       },
-      "CraOverview": {
+      "CraEventPage": {
         "properties": {
-          "products": {
-            "items": {
-              "$ref": "#/components/schemas/CraProduct"
-            },
-            "type": "array",
-            "title": "Products"
-          },
-          "events": {
+          "items": {
             "items": {
               "$ref": "#/components/schemas/CraEvent"
             },
             "type": "array",
-            "title": "Events"
+            "maxItems": 100,
+            "title": "Items"
           },
-          "assets": {
-            "items": {
-              "$ref": "#/components/schemas/CraAsset"
-            },
-            "type": "array",
-            "title": "Assets"
+          "total": {
+            "type": "integer",
+            "title": "Total"
           },
-          "reporting_page": {
-            "type": "string",
-            "title": "Reporting Page"
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
           }
         },
         "type": "object",
         "required": [
-          "products",
-          "events",
-          "assets",
-          "reporting_page"
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "CraEventPage"
+      },
+      "CraOverview": {
+        "properties": {
+          "reporting_page": {
+            "type": "string",
+            "title": "Reporting Page"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/CraCounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reporting_page",
+          "counts"
         ],
         "title": "CraOverview"
       },
@@ -844,6 +1471,38 @@
           "last_complete"
         ],
         "title": "CraProduct"
+      },
+      "CraProductPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CraProduct"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "CraProductPage"
       },
       "CraStage": {
         "properties": {
@@ -1018,6 +1677,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 20,
             "title": "Cwe"
           },
           "references": {
@@ -1026,6 +1686,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 10,
             "title": "References"
           },
           "kev_detail": {
@@ -1060,13 +1721,6 @@
                 "type": "null"
               }
             ]
-          },
-          "affected": {
-            "items": {
-              "$ref": "#/components/schemas/AffectedAsset"
-            },
-            "type": "array",
-            "title": "Affected"
           }
         },
         "type": "object",
@@ -1086,8 +1740,7 @@
           "references",
           "kev_detail",
           "score_source",
-          "euvd",
-          "affected"
+          "euvd"
         ],
         "title": "CveDetail"
       },
@@ -1098,6 +1751,7 @@
               "$ref": "#/components/schemas/CveRow"
             },
             "type": "array",
+            "maxItems": 100,
             "title": "Items"
           },
           "total": {
@@ -1259,6 +1913,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 366,
             "title": "Issues Over Time"
           },
           "open_vs_fixed": {
@@ -1267,6 +1922,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 366,
             "title": "Open Vs Fixed"
           },
           "top_assets": {
@@ -1275,6 +1931,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 10,
             "title": "Top Assets"
           },
           "by_cwe": {
@@ -1283,6 +1940,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 8,
             "title": "By Cwe"
           },
           "exploitability": {
@@ -1296,6 +1954,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 365,
             "title": "Activity"
           },
           "recent_runs": {
@@ -1304,6 +1963,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 8,
             "title": "Recent Runs"
           },
           "top_issues": {
@@ -1312,6 +1972,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 8,
             "title": "Top Issues"
           },
           "kev_news": {
@@ -1330,6 +1991,7 @@
               "type": "object"
             },
             "type": "array",
+            "maxItems": 20,
             "title": "Tools"
           }
         },
@@ -1449,19 +2111,6 @@
         ],
         "title": "Euvd"
       },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "type": "array",
-            "title": "Detail"
-          }
-        },
-        "type": "object",
-        "title": "HTTPValidationError"
-      },
       "Health": {
         "properties": {
           "status": {
@@ -1512,6 +2161,59 @@
           "version"
         ],
         "title": "Health"
+      },
+      "QueuedRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "QueuedRun"
+      },
+      "ReviewIn": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
+            "title": "Source Id"
+          },
+          "number": {
+            "type": "integer",
+            "exclusiveMaximum": 1000000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Number"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source_id",
+          "number"
+        ],
+        "title": "ReviewIn"
+      },
+      "ReviewQueued": {
+        "properties": {
+          "run": {
+            "$ref": "#/components/schemas/QueuedRun"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run"
+        ],
+        "title": "ReviewQueued"
       },
       "ScanBranch": {
         "properties": {
@@ -1629,6 +2331,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 100,
             "title": "Regexes"
           },
           "paths": {
@@ -1636,6 +2339,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 100,
             "title": "Paths"
           },
           "stopwords": {
@@ -1643,6 +2347,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 100,
             "title": "Stopwords"
           }
         },
@@ -1664,6 +2369,7 @@
               "$ref": "#/components/schemas/SecretRuleView"
             },
             "type": "array",
+            "maxItems": 50,
             "title": "Rules"
           },
           "disabled_rules": {
@@ -1671,6 +2377,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 222,
             "title": "Disabled Rules"
           },
           "reason": {
@@ -1711,6 +2418,7 @@
               "$ref": "#/components/schemas/SecretHistoryEntry"
             },
             "type": "array",
+            "maxItems": 20,
             "title": "History"
           },
           "limits": {
@@ -1767,6 +2475,29 @@
         ],
         "title": "SecretConfigIn"
       },
+      "SecretCounts": {
+        "properties": {
+          "rules": {
+            "type": "integer",
+            "title": "Rules"
+          },
+          "disabled": {
+            "type": "integer",
+            "title": "Disabled"
+          },
+          "allowlist": {
+            "type": "integer",
+            "title": "Allowlist"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rules",
+          "disabled",
+          "allowlist"
+        ],
+        "title": "SecretCounts"
+      },
       "SecretHistoryEntry": {
         "properties": {
           "at": {
@@ -1794,7 +2525,8 @@
                 "items": {
                   "type": "string"
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 20
               },
               "type": "object"
             },
@@ -1867,16 +2599,6 @@
             "type": "array",
             "maxItems": 50,
             "title": "Keywords"
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "critical",
-              "high",
-              "medium",
-              "low"
-            ],
-            "title": "Severity"
           }
         },
         "additionalProperties": false,
@@ -1884,8 +2606,7 @@
         "required": [
           "id",
           "description",
-          "regex",
-          "severity"
+          "regex"
         ],
         "title": "SecretRule"
       },
@@ -1908,17 +2629,8 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 10,
             "title": "Keywords"
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "critical",
-              "high",
-              "medium",
-              "low"
-            ],
-            "title": "Severity"
           }
         },
         "type": "object",
@@ -1926,8 +2638,7 @@
           "id",
           "description",
           "regex",
-          "keywords",
-          "severity"
+          "keywords"
         ],
         "title": "SecretRuleView"
       },
@@ -2067,6 +2778,7 @@
               "type": "string"
             },
             "type": "array",
+            "maxItems": 10,
             "title": "Base Branches"
           },
           "default_branch": {
@@ -2114,45 +2826,19 @@
         ],
         "title": "TargetBranchesIn"
       },
-      "ValidationError": {
-        "properties": {
-          "loc": {
-            "items": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
-            "type": "array",
-            "title": "Location"
-          },
-          "msg": {
-            "type": "string",
-            "title": "Message"
-          },
-          "type": {
-            "type": "string",
-            "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
-          }
-        },
+      "Error": {
+        "title": "Error",
         "type": "object",
         "required": [
-          "loc",
-          "msg",
-          "type"
+          "error"
         ],
-        "title": "ValidationError"
+        "properties": {
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "description": "In the reader's language."
+          }
+        }
       }
     },
     "securitySchemes": {

@@ -33,7 +33,7 @@
   },
   "repo": {
     "choose": "Elige un repositorio",
-    "description": "Cada commit nuevo de un PR se analiza y se compara con su rama de destino: solo cuenta lo que el PR introduce. Sus hallazgos entran en el estado del repositorio y se remedian solos cuando un commit posterior los quita o el PR se cierra sin merge.",
+    "description": "Cada commit se compara con su rama de destino: solo cuenta lo que el PR introduce.",
     "watching": "Vigilancia activa",
     "not_watching": "Sin vigilancia",
     "post_comment": "Comentar y marcar el commit en GitHub",
@@ -41,10 +41,14 @@
     "gate": "Bloquear desde",
     "gate_label": "Umbral de bloqueo",
     "admin_only": "Solo un administrador cambia esta configuración.",
-    "enable_hint": "Actívala con su interruptor en la lista para que cada push se revise solo, o usa «Revisar ahora» en un PR.",
-    "branch_scanned": "Ramas de destino: {{branch}} se analizó por última vez tras un cambio el {{date}} (commit <code>{{sha}}</code>). Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min por rama.",
-    "branch_pending": "Ramas de destino: se analizarán en la próxima vuelta del vigilante. Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min por rama.",
-    "missing_write": "La GitHub App instalada aún no puede comentar: falta <b>Pull requests</b> y <b>Commit statuses</b> en escritura. Las revisiones se hacen igual y se ven aquí; en cuanto la instalación acepte esos permisos, se publicarán en GitHub."
+    "enable_hint": "Sin vigilancia: actívala en la lista o revisa un PR a mano.",
+    "branch_scanned": "Rama de destino {{branch}} analizada el {{date}} (<code>{{sha}}</code>).",
+    "branch_pending": "Las ramas de destino se analizarán en la próxima vuelta del vigilante.",
+    "missing_write": "La GitHub App aún no puede comentar: necesita escritura en <b>Pull requests</b> y <b>Commit statuses</b>. Las revisiones se ven aquí igual.",
+    "help_title": "Cómo funciona la revisión de PRs",
+    "help_status": "Los hallazgos entran en el estado del repositorio y se remedian solos cuando un commit posterior los quita o el PR se cierra sin merge.",
+    "help_branches": "Tras un merge, cada rama de destino se reanaliza como mucho una vez cada {{minutes}} min.",
+    "help_rescan": "Reanalizar vuelve a revisar el último commit del PR, por ejemplo después de cambiar una política."
   },
   "list": {
     "title": "PRs abiertos",
@@ -53,12 +57,15 @@
     "draft": "borrador",
     "reviewed": "revisado {{date}}",
     "view_result": "Ver resultado",
-    "review_now": "Revisar ahora"
+    "review_now": "Revisar ahora",
+    "rescan": "Reanalizar",
+    "rescan_pr": "Reanalizar el PR #{{number}}",
+    "review_pr": "Revisar el PR #{{number}}",
+    "queued_notice": "PR #{{number}} en cola para revisión."
   },
   "watch": {
     "title": "Repositorios vigilados · {{total}}",
-    "description": "Los activados revisan solos cada PR nuevo o cada push hacia sus ramas de destino y reanalizan esas ramas cuando cambian (se comprueba cada {{minutes}} min).",
-    "admin_hint": "Actívalos uno a uno o en bloque.",
+    "description": "Los vigilados revisan solos cada push de sus PRs (se comprueba cada {{minutes}} min).",
     "member_hint": "Solo un administrador cambia qué se vigila.",
     "bulk": "Acciones en bloque",
     "watch_all": "Vigilar todos los repositorios",
@@ -90,7 +97,7 @@
   },
   "targets": {
     "title": "Ramas de destino",
-    "description": "Solo se revisan los PRs hacia estas ramas, cada uno contra el último análisis de su rama de destino.",
+    "description": "Solo se revisan los PRs hacia estas ramas.",
     "default": "Rama predeterminada ({{branch}})",
     "default_unknown": "Rama predeterminada",
     "input_label": "Añadir una rama de destino a {{name}}",

@@ -120,6 +120,21 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
     return app
 
 
+def _invalid_parameters_as_400(document: dict) -> None:
+    """FastAPI documents a 422 with its own error body; this API answers invalid input with a 400 {"error": …}."""
+    schemas = document.setdefault("components", {}).setdefault("schemas", {})
+    for name in ("HTTPValidationError", "ValidationError"):
+        schemas.pop(name, None)
+    schemas["Error"] = {"title": "Error", "type": "object", "required": ["error"],
+                        "properties": {"error": {"type": "string", "title": "Error", "description": "In the reader's language."}}}
+    for operations in document.get("paths", {}).values():
+        for operation in operations.values():
+            responses = operation.get("responses", {})
+            if responses.pop("422", None) is not None:
+                responses["400"] = {"description": "Invalid parameters",
+                                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+
+
 def openapi_document(data_dir: Path | None = None) -> str:
     """El esquema OpenAPI de las rutas migradas, para generar el cliente TypeScript del panel (make openapi)."""
     from fastapi.openapi.utils import get_openapi
@@ -127,6 +142,7 @@ def openapi_document(data_dir: Path | None = None) -> str:
     for module in ROUTERS:
         app.include_router(module.router)
     document = get_openapi(title=app.title, version=app.version, routes=app.routes)
+    _invalid_parameters_as_400(document)
     # Cómo se autentica la API: la cookie de sesión (HttpOnly) en todo, salvo lo que cada ruta declare como público.
     # Los POST exigen además Origin y la cabecera X-Tamandua-Action (CSRF), que la cookie sola no cubre.
     document.setdefault("components", {})["securitySchemes"] = {

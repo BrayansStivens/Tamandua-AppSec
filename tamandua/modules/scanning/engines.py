@@ -337,8 +337,13 @@ SEVERITY_NAME = {"critical": msg("scanning.severity.critical"), "high": msg("sca
                  "medium": msg("scanning.severity.medium"), "low": msg("scanning.severity.low"), "info": msg("scanning.severity.info")}
 
 
+SECRET_SEVERITY = "critical"  # an exposed secret is always critical, whatever the engine or the rule says
+
+
 def _base(scanner: str, rule: str, title, path: str, line: int, severity: str, *, reason,
           remediation, cwe: list[int], owasp: str, confidence: int, digest: str, tool: str) -> dict:
+    if scanner == "secrets":
+        severity = SECRET_SEVERITY
     action = "act" if severity == "critical" else "attend" if severity == "high" else "track"
     return {"finding_id": digest[:16], "fingerprint": digest, "scanner": scanner, "tool": tool, "rule_id": rule,
             "title": title[:200] if isinstance(title, str) else title, "path": path, "line": line, "severity": severity,
@@ -563,11 +568,10 @@ def _trivy_secret(entry: dict, target: str, custom: dict | None = None) -> dict:
     rule = str(entry.get("RuleID") or "secret")
     if rule in (custom or {}):
         return _custom_secret(custom[rule], rule, target, line, tool="trivy", confidence=8)
-    severity = SEVERITY_LABEL.get(str(entry.get("Severity", "")).upper(), "high")
     # Nunca se guarda el valor: Trivy ya lo redacta, y aquí ni siquiera se lee.
     category = entry.get("Category")
     return _base("secrets", rule, (SECRET_TITLES.get(rule) or msg("scanning.secrets.exposed_titled", title=str(entry.get("Title") or rule))),
-                 target, line, severity, tool="trivy",
+                 target, line, SECRET_SEVERITY, tool="trivy",
                  reason=msg("scanning.secrets.trivy_reason", category=str(category), path=target, line=line) if category
                  else msg("scanning.secrets.trivy_reason_generic", path=target, line=line),
                  remediation=msg("scanning.secrets.rotate"),
@@ -784,8 +788,8 @@ def secret_title(rule: str) -> dict:
 
 
 def _custom_secret(rule: dict, rule_id: str, path: str, line: int, *, tool: str, confidence: int) -> dict:
-    """A finding from an organization rule: its description (as written, one language) and its severity."""
-    return _base("secrets", rule_id, rule["description"], path, line, rule["severity"], tool=tool,
+    """A finding from a custom rule: its description (as written, one language) as the title."""
+    return _base("secrets", rule_id, rule["description"], path, line, SECRET_SEVERITY, tool=tool,
                  reason=msg("scanning.secrets.custom_reason", rule=rule["id"], path=path, line=line),
                  remediation=msg("scanning.secrets.rotate"), cwe=[798], owasp="A04:2025", confidence=confidence,
                  digest=_stable("secrets", rule_id, path, str(line)))
@@ -803,9 +807,8 @@ def parse_gitleaks(payload: list, custom: dict | None = None) -> list[dict]:
         if rule in (custom or {}):
             findings.append(_custom_secret(custom[rule], rule, path, line, tool="gitleaks", confidence=8 if entropy >= 3.5 else 6))
             continue
-        severity = "medium" if rule.startswith("generic") else "high"
         # El valor nunca se lee: gitleaks corre con --redact y aquí solo se toman regla, archivo y línea.
-        findings.append(_base("secrets", rule, secret_title(rule), path, line, severity, tool="gitleaks",
+        findings.append(_base("secrets", rule, secret_title(rule), path, line, SECRET_SEVERITY, tool="gitleaks",
                               reason=msg("scanning.secrets.gitleaks_reason", rule=rule, path=path, line=line, entropy=f"{entropy:.1f}"),
                               remediation=msg("scanning.secrets.rotate"),
                               cwe=[798], owasp="A04:2025", confidence=8 if entropy >= 3.5 else 6,

@@ -18,7 +18,7 @@ from tamandua.modules.runs.store import load_run, save_repository_scan, render_p
 from tamandua.modules.reporting.pdf import render_pdf
 from tamandua.shared.i18n import text
 from fake_github import fake_github
-from test_auth import PASSWORD, HttpCase
+from test_auth import ORIGIN, PASSWORD, HttpCase
 
 SHA = "c" * 40
 APP = "import subprocess\n\ndef old(cmd):\n    return subprocess.run(cmd, shell=True)\n\n\ndef new(user):\n    return eval(user)\n"
@@ -331,6 +331,7 @@ class RouteTests(HttpCase):
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
             cookie = cookies[0].split("; ")[0]
             with patch("tamandua.app.api.routes.prs.github_installations", return_value=[7]), \
+                    patch("tamandua.app.api.pullrequests.github_installations", return_value=[7]), \
                     fake_github({7: [(1, "org/api"), (2, "org/web")]}, {7: ("org", "selected")}), \
                     patch("tamandua.app.api.routes.prs.open_pull_requests", side_effect=GitHubAppError(PULLS_FORBIDDEN)):
                 status, body, _ = self.call("GET", "/api/pull-requests?source_id=github:org/api", headers={"Cookie": cookie})
@@ -354,6 +355,43 @@ class RouteTests(HttpCase):
                 self.assertEqual(status, 400)
                 status, _, _ = self.call("GET", "/api/pull-requests?source_id=github:org/fantasma", headers={"Cookie": cookie})
                 self.assertEqual(status, 400)
+
+    def test_anyone_signed_in_rescans_a_pull_request_once_at_a_time(self):
+        Users(self.data_dir).create("analista", PASSWORD)
+        _, _, cookies = self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})
+        cookie = cookies[0].split("; ")[0]
+        pull = {"number": 5, "title": "Add login", "url": "https://github.com/org/api/pull/5", "author": "ana", "draft": False,
+                "head_sha": SHA, "head_ref": "feature", "base_ref": "main", "updated_at": None, "state": "open", "merged": False, "closed_at": None}
+        body = {"source_id": "github:org/api", "number": 5}
+
+        def review(action, payload, session=None):
+            return self.call("POST", "/api/pull-requests/review", payload, {"Origin": ORIGIN, "X-Tamandua-Action": action,
+                                                                            "Content-Type": "application/json", **({"Cookie": session} if session else {})})
+        self.assertEqual(review("review-pr", body)[0], 401)
+        with patch("tamandua.app.api.pullrequests.github_installations", return_value=[7]), \
+                fake_github({7: [(1, "org/api")]}, {7: ("org", "selected")}), \
+                patch("tamandua.app.api.pullrequests.pull_request", side_effect=lambda installation, name, number: dict(pull)) as fetched:
+            self.assertEqual(review("wrong-action", body, cookie)[0], 403)
+            for bad in ({**body, "number": True}, {**body, "number": 0}, {**body, "extra": 1}, {**body, "source_id": "gitlab:1"}):
+                self.assertEqual(review("review-pr", bad, cookie)[0], 400, bad)
+            self.assertEqual(review("review-pr", {**body, "source_id": "github:org/ghost"}, cookie)[0], 400)
+            status, queued, _ = review("review-pr", body, cookie)
+            self.assertEqual((status, queued["run"]["status"]), (202, "queued"))
+            self.assertEqual(fetched.call_args.args[1:], ("org/api", 5))
+            record = load_run(self.data_dir, queued["run"]["id"])
+            self.assertEqual((record["requested_by"], record["source"]["uid"], record["pull_request"]["head_sha"]), ("analista", "github#1", SHA))
+            # The same commit is already queued: a second click doesn't queue it twice.
+            status, answer, _ = review("review-pr", body, cookie)
+            self.assertEqual(status, 409)
+            self.assertIn("#5", answer["error"])
+            # Finished: it can be scanned again (e.g. after the settings changed).
+            self.state.jobs._save({**record, "status": "completed"})
+            status, again, _ = review("review-pr", body, cookie)
+            self.assertEqual(status, 202)
+            self.assertNotEqual(again["run"]["id"], queued["run"]["id"])
+            # A new head commit is a different review even while the previous one is still queued.
+            pull["head_sha"] = "d" * 40
+            self.assertEqual(review("review-pr", body, cookie)[0], 202)
 
 if __name__ == "__main__":
     unittest.main()

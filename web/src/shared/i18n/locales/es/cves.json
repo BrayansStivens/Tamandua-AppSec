@@ -96,6 +96,8 @@
     "open_one": "{{count}} abierto", "open_other": "{{count}} abiertos",
     "fixed": "remediado",
     "not_affected": "Ningún repositorio analizado tiene este CVE entre sus hallazgos.",
-    "references": "Referencias"
+    "references": "Referencias",
+    "repos_noun": "repositorios",
+    "loading_repos": "Cargando repositorios afectados"
   }
 }

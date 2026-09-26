@@ -308,7 +308,7 @@ def config_findings(metadata: dict, image: dict) -> list[dict]:
     for entry in config.get("Env") or []:
         name, _, value = str(entry).partition("=")
         if value.strip() and not value.startswith("$") and SECRET_NAME.search(name):
-            findings.append(_config_finding("IMG-ENV-SECRET", msg("scanning.image.rules.env_secret.title", name=name), "high",
+            findings.append(_config_finding("IMG-ENV-SECRET", msg("scanning.image.rules.env_secret.title", name=name), "critical",
                 msg("scanning.image.rules.env_secret.reason", name=name), msg("scanning.image.rules.env_secret.remediation"),
                 798, asset, f"env:{name}", path=f"ENV {name}"))
     for index, step in enumerate(history):

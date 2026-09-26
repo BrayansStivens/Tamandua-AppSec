@@ -14,7 +14,8 @@
     "not_scanned": "Your products don't have a completed full scan yet; without one there's no way to know whether anything needs reporting.",
     "none_in_kev": "None of the vulnerabilities in your scanned products is in the CISA KEV catalog. This is checked on every scan.",
     "unscanned_one": "{{count}} without a full scan.",
-    "unscanned_other": "{{count}} without a full scan."
+    "unscanned_other": "{{count}} without a full scan.",
+    "noun": "possible notifications"
   },
   "products": {
     "title": "Products under the CRA",
@@ -29,7 +30,10 @@
     "asset": "Repository or image",
     "choose": "Choose…",
     "name": "Product name (as marketed)",
-    "support_until": "Supported until"
+    "support_until": "Supported until",
+    "loading": "Loading products",
+    "noun": "products",
+    "no_candidates": "No repository or image to mark with that name"
   },
   "event": {
     "ransomware": "ransomware",

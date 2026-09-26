@@ -1,16 +1,21 @@
-"""Organization-wide secret detection settings (Gitleaks and Trivy): anyone signed in reads them, an admin changes them."""
+"""Secret detection settings (Gitleaks and Trivy), organization defaults and per repository: anyone signed in reads
+them (without the patterns unless an admin), an admin changes them."""
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from tamandua.app.api.deps import ApiError, Context, Policy, guard
+from tamandua.modules.findings import registry as findings_registry
+from tamandua.modules.findings.exclusions import ASSET_KEY
 from tamandua.modules.scanning import secret_rules
 from tamandua.modules.scanning.engines import IMAGES
 from tamandua.modules.scanning.secret_builtin_rules import GITLEAKS_DEFAULT_RULES, TRIVY_EQUIVALENTS
+from tamandua.modules.sources.assets import overview as assets_overview
+from tamandua.shared.i18n import msg
 
 router = APIRouter(tags=["scanning"])
 
@@ -32,7 +37,6 @@ class SecretRule(BaseModel):
     description: str = Field(max_length=_TEXT)
     regex: str = Field(max_length=_TEXT)
     keywords: list[str] = Field(default_factory=list, max_length=50)
-    severity: Literal["critical", "high", "medium", "low"]
 
 
 class SecretConfigIn(BaseModel):
@@ -47,7 +51,7 @@ class SecretHistoryEntry(BaseModel):
     at: str
     by: str
     reason: str | None
-    changes: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
+    changes: dict[str, dict[str, Annotated[list[str], Field(max_length=secret_rules.CHANGES_SHOWN)]]] = Field(default_factory=dict)
 
 
 class SecretLimits(BaseModel):
@@ -59,28 +63,43 @@ class SecretLimits(BaseModel):
 
 
 class SecretAllowlistView(BaseModel):
-    regexes: list[str]
-    paths: list[str]
-    stopwords: list[str]
+    regexes: list[str] = Field(max_length=secret_rules.MAX_ENTRIES)
+    paths: list[str] = Field(max_length=secret_rules.MAX_ENTRIES)
+    stopwords: list[str] = Field(max_length=secret_rules.MAX_ENTRIES)
 
 
 class SecretRuleView(BaseModel):
     id: str
     description: str
     regex: str
-    keywords: list[str]
-    severity: Literal["critical", "high", "medium", "low"]
+    keywords: list[str] = Field(max_length=secret_rules.MAX_KEYWORDS)
 
 
 class SecretConfig(BaseModel):
     allowlist: SecretAllowlistView
-    rules: list[SecretRuleView]
-    disabled_rules: list[str]
+    rules: list[SecretRuleView] = Field(max_length=secret_rules.MAX_RULES)
+    disabled_rules: list[str] = Field(max_length=secret_rules.MAX_DISABLED)
     reason: str | None
     by: str | None
     at: str | None
-    history: list[SecretHistoryEntry]
+    history: list[SecretHistoryEntry] = Field(max_length=secret_rules.HISTORY)
     limits: SecretLimits
+
+
+class AssetSecretConfigIn(SecretConfigIn):
+    key: str = Field(max_length=200)
+
+
+class SecretCounts(BaseModel):
+    rules: int
+    disabled: int
+    allowlist: int
+
+
+class AssetSecretConfig(SecretConfig):
+    """A repository's own entries, added to the defaults (`defaults` counts them) in its scans."""
+    key: str
+    defaults: SecretCounts
 
 
 class BuiltinRule(BaseModel):
@@ -91,7 +110,7 @@ class BuiltinRule(BaseModel):
 class BuiltinRules(BaseModel):
     engine: str
     version: str
-    rules: list[BuiltinRule]
+    rules: list[BuiltinRule] = Field(max_length=len(GITLEAKS_DEFAULT_RULES))
 
 
 HIDDEN = "••••••"
@@ -127,6 +146,42 @@ def save_config(body: SecretConfigIn,
     except secret_rules.SecretRulesError as exc:
         raise ApiError(400, exc.message, **({"field": exc.field} if exc.field else {})) from exc
     return _view(saved)
+
+
+def _asset_key(key: str) -> str:
+    # Images don't run the repository secret engines: their settings would never apply.
+    if not ASSET_KEY.fullmatch(key) or key.startswith("image:"):
+        raise ApiError(400, msg("api.invalid_repository"))
+    return key
+
+
+def _asset_view(context: Context, key: str, settings: dict) -> dict:
+    view = {**_view(settings), "key": key, "defaults": secret_rules.counts(secret_rules.get(context.data_dir))}
+    return view if (context.user or {}).get("role") == "admin" else _redacted(view)
+
+
+@router.get("/api/assets/secrets", response_model=AssetSecretConfig)
+def asset_config(key: str = Query(max_length=200), context: Context = Depends(guard())) -> dict:
+    """A repository's own secret detection entries (empty: it uses the defaults as they are)."""
+    key = _asset_key(key)
+    return _asset_view(context, key, secret_rules.get(context.data_dir, key))
+
+
+@router.post("/api/assets/secrets", response_model=AssetSecretConfig)
+def save_asset_config(body: AssetSecretConfigIn,
+                      context: Context = Depends(guard(Policy(admin=True, action="save-asset-secret-rules", body=200_000)))) -> dict:
+    """Replaces a repository's own entries; they add to the defaults from its next scan. A reason is required."""
+    key = _asset_key(body.key)
+    state = findings_registry.load(context.data_dir, key)
+    name = state["name"] or next((row["name"] for row in assets_overview(context.data_dir) if row["key"] == key), None)
+    if name is None and not state["findings"]:
+        raise ApiError(404, msg("api.repository_not_found"))
+    try:
+        saved = secret_rules.save(context.data_dir, body.model_dump(exclude={"reason", "key"}), reason=body.reason,
+                                  user=context.user, asset=key, name=name)
+    except secret_rules.SecretRulesError as exc:
+        raise ApiError(400, exc.message, **({"field": exc.field} if exc.field else {})) from exc
+    return _asset_view(context, key, saved)
 
 
 @router.get("/api/secrets/builtin-rules", response_model=BuiltinRules)

@@ -70,6 +70,7 @@
     "invalid_pull": "Pull request inválido",
     "repo_not_in_app": "Repositorio no disponible en la GitHub App conectada",
     "no_head": "GitHub no devolvió el commit de cabeza del PR",
-    "too_many_branches": "Elige como máximo {{max}} ramas de destino"
+    "too_many_branches": "Elige como máximo {{max}} ramas de destino",
+    "review_in_progress": "Ya hay una revisión de #{{number}} en este commit en cola o en curso."
   }
 }

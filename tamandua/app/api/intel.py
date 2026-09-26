@@ -7,15 +7,16 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from tamandua.app.api.deps import ApiError, Context, guard
-from tamandua.modules.findings.registry import assets_with_cve, open_cves
+from tamandua.app.api.paging import MAX_LIMIT, MAX_OFFSET, Page, Paging, paging
+from tamandua.modules.findings.registry import PACKAGES_SHOWN, assets_with_cve, open_cves
 from tamandua.modules.intel import cve_db, euvd
 from tamandua.shared.i18n import msg
 
 router = APIRouter(tags=["intel"])
-MAX_OFFSET = 10_000  # más allá, que se acote con filtros: evita OFFSET caros
+CVE_ID = re.compile(r"CVE-\d{4}-\d{4,7}")
 
 
 class CveRow(BaseModel):
@@ -33,7 +34,7 @@ class CveRow(BaseModel):
 
 
 class CvePage(BaseModel):
-    items: list[CveRow]
+    items: list[CveRow] = Field(max_length=MAX_LIMIT)
     total: int
     limit: int
     offset: int
@@ -56,18 +57,28 @@ class AffectedAsset(BaseModel):
     name: str
     open: int
     fixed: int
-    packages: list[str]
+    packages: list[str] = Field(max_length=PACKAGES_SHOWN)
+
+
+class AffectedAssetPage(Page[AffectedAsset]):
+    pass
 
 
 class CveDetail(CveRow):
     vector: str | None
     modified: str | None
-    cwe: list[str]
-    references: list[dict[str, Any]]
+    cwe: list[str] = Field(max_length=cve_db.MAX_CWES)
+    references: list[dict[str, Any]] = Field(max_length=cve_db.MAX_REFERENCES)
     kev_detail: dict[str, Any] | None
     score_source: str | None
     euvd: Euvd | None
-    affected: list[AffectedAsset]
+
+
+def _cve_id(value: str) -> str:
+    identifier = value.strip().upper()
+    if not CVE_ID.fullmatch(identifier):
+        raise ApiError(400, msg("api.invalid_cve"))
+    return identifier
 
 
 @router.get("/api/cve-db", response_model=CvePage)
@@ -77,7 +88,7 @@ def search(q: str = "", severity: str | None = None, sort: str = "published", ye
     query = q.strip()
     severity = severity or None
     if (len(query) > 100 or (severity and severity not in cve_db.SEVERITIES) or sort not in cve_db.SORTS
-            or not 1 <= limit <= 100 or not 0 <= offset <= MAX_OFFSET
+            or not 1 <= limit <= MAX_LIMIT or not 0 <= offset <= MAX_OFFSET
             or (year is not None and not 1999 <= year <= datetime.now(timezone.utc).year + 1)):
         raise ApiError(400, msg("api.invalid_parameters"))
     own = open_cves(context.data_dir)
@@ -93,9 +104,7 @@ def overview(context: Context = Depends(guard())) -> dict[str, Any]:
 
 @router.get("/api/cve-db/item", response_model=CveDetail)
 def item(id: str = "", context: Context = Depends(guard())) -> dict:  # noqa: A002 — nombre del parámetro público
-    identifier = id.strip().upper()
-    if not re.fullmatch(r"CVE-\d{4}-\d{4,7}", identifier):
-        raise ApiError(400, msg("api.invalid_cve"))
+    identifier = _cve_id(id)
     detail = cve_db.detail(context.data_dir, identifier)
     if detail is None:
         raise ApiError(404, msg("api.cve_not_found"))
@@ -105,4 +114,11 @@ def item(id: str = "", context: Context = Depends(guard())) -> dict:  # noqa: A0
     if detail.get("score") is None and europe and europe.get("score") is not None:
         detail.update(score=europe["score"], severity=europe["severity"], version=europe["version"],
                       vector=detail.get("vector") or europe["vector"], score_source="euvd")
-    return context.render({**detail, "euvd": europe, "affected": assets_with_cve(context.data_dir, identifier)})
+    return context.render({**detail, "euvd": europe})
+
+
+@router.get("/api/cve-db/affected", response_model=AffectedAssetPage)
+def affected(id: str = "", page: Paging = Depends(paging(10)),  # noqa: A002 — public parameter name
+             context: Context = Depends(guard())) -> dict:
+    """Your repositories with a finding that cites this CVE (open or fixed), one page at a time."""
+    return context.render(assets_with_cve(context.data_dir, _cve_id(id), limit=page.limit, offset=page.offset))

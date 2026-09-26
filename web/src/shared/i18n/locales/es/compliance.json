@@ -14,7 +14,8 @@
     "not_scanned": "Tus productos aún no tienen un análisis completo terminado: sin él no se puede saber si hay algo que notificar.",
     "none_in_kev": "Ninguna vulnerabilidad de tus productos analizados está en el catálogo CISA KEV. Se revisa en cada análisis.",
     "unscanned_one": "{{count}} sin análisis completo.",
-    "unscanned_other": "{{count}} sin análisis completo."
+    "unscanned_other": "{{count}} sin análisis completo.",
+    "noun": "posibles notificaciones"
   },
   "products": {
     "title": "Productos bajo el CRA",
@@ -29,7 +30,10 @@
     "asset": "Repositorio o imagen",
     "choose": "Elige…",
     "name": "Nombre comercial del producto",
-    "support_until": "Soporte hasta"
+    "support_until": "Soporte hasta",
+    "loading": "Cargando productos",
+    "noun": "productos",
+    "no_candidates": "Ningún repositorio o imagen por marcar con ese nombre"
   },
   "event": {
     "ransomware": "ransomware",

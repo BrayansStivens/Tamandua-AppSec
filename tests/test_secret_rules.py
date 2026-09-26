@@ -1,22 +1,30 @@
-"""Organization secret detection settings: validation, generated engine configs, engine wiring and who may change them."""
+"""Secret detection settings (defaults and per repository): validation, merge, generated engine configs, engine wiring
+and who may change them."""
 
 import json
 import subprocess
 import tempfile
 import tomllib
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 from tamandua.modules.identity.auth import Users
 from tamandua.modules.scanning import engines
+from tamandua.modules.runs.store import save_repository_scan
 from tamandua.modules.scanning import secret_rules as sr
+from tamandua.modules.sources import assets
+from tamandua.shared import documents
 from tamandua.shared.i18n import text
 from test_auth import ORIGIN, PASSWORD, HttpCase
+from test_dashboard import _scan
 
 ADMIN = {"username": "operadora", "role": "admin"}
 RULE = {"id": "acme-token", "description": "ACME internal token", "regex": r"ACME-TOKEN-[0-9a-f]{32}",
-        "keywords": ["ACME-TOKEN"], "severity": "critical"}
+        "keywords": ["ACME-TOKEN"]}
+KEY = "github#7"
+QUERY_KEY = "github%237"
 
 
 def settings(**changes):
@@ -52,7 +60,7 @@ class ValidationTests(unittest.TestCase):
         error = self.assert_rejected(settings(allowlist={"regexes": [".*"], "paths": [], "stopwords": []}), "allowlist.regexes.0")
         self.assertEqual(error.message["$t"], "scanning.secret_rules.errors.allow_everything")
 
-    def test_limits_ids_and_severity(self):
+    def test_limits_and_ids(self):
         self.assert_rejected(settings(rules=[{**RULE, "id": f"r{index}"} for index in range(sr.MAX_RULES + 1)]), "rules")
         self.assert_rejected(settings(allowlist={"regexes": [f"x{index}" for index in range(101)]}), "allowlist.regexes")
         self.assert_rejected(settings(rules=[{**RULE, "regex": "a" * 501}]), "rules.0.regex")
@@ -60,7 +68,8 @@ class ValidationTests(unittest.TestCase):
             with self.subTest(id=bad):
                 self.assert_rejected(settings(rules=[{**RULE, "id": bad}]), "rules.0.id")
         self.assert_rejected(settings(rules=[RULE, RULE]), "rules.1.id")
-        self.assert_rejected(settings(rules=[{**RULE, "severity": "info"}]), "rules.0.severity")
+        # Custom detectors have no severity (a secret is always critical): an old client's value is dropped.
+        self.assertNotIn("severity", sr.normalize(settings(rules=[{**RULE, "severity": "low"}]))["rules"][0])
         self.assert_rejected(settings(rules=[{**RULE, "description": "x"}]), "rules.0.description")
         self.assert_rejected(settings(rules=[{**RULE, "keywords": [f"k{index}" for index in range(11)]}]), "rules.0.keywords")
         self.assert_rejected(settings(disabled_rules=["not-a-gitleaks-rule"]), "disabled_rules")
@@ -102,6 +111,25 @@ class ValidationTests(unittest.TestCase):
             self.assertIsNone(sr.for_scan(data_dir))
 
 
+class ReadLimitsTests(unittest.TestCase):
+    def test_reading_keeps_the_limits_the_api_declares_even_for_an_older_document(self):
+        from tamandua.shared import documents
+        with tempfile.TemporaryDirectory() as folder:
+            data_dir = Path(folder)
+            many = [f"item-{index}" for index in range(sr.MAX_ENTRIES + 50)]
+            documents.save(data_dir, sr.DOCUMENT, {
+                "allowlist": {"regexes": many, "paths": many, "stopwords": many},
+                "rules": [{**RULE, "id": f"rule-{index}", "keywords": many} for index in range(sr.MAX_RULES + 5)],
+                "disabled_rules": many * 3,
+                "history": [{"at": "2026-09-26", "by": "ana", "reason": "x", "changes": {"paths": {"added": many}}}] * (sr.HISTORY + 5)})
+            view = sr.get(data_dir)
+            self.assertEqual({name: len(items) for name, items in view["allowlist"].items()},
+                             {"regexes": sr.MAX_ENTRIES, "paths": sr.MAX_ENTRIES, "stopwords": sr.MAX_ENTRIES})
+            self.assertEqual((len(view["rules"]), len(view["rules"][0]["keywords"]), len(view["disabled_rules"])),
+                             (sr.MAX_RULES, sr.MAX_KEYWORDS, sr.MAX_DISABLED))
+            self.assertEqual((len(view["history"]), len(view["history"][0]["changes"]["paths"]["added"])), (sr.HISTORY, sr.CHANGES_SHOWN))
+
+
 class GitleaksConfigTests(unittest.TestCase):
     def test_extends_defaults_with_rules_disabled_and_one_allowlist(self):
         config = tomllib.loads(sr.gitleaks_toml(sr.normalize(settings(
@@ -129,7 +157,7 @@ class GitleaksConfigTests(unittest.TestCase):
         ]
         for description in hostile:
             with self.subTest(description=description):
-                rule = {"id": "acme-token", "description": description, "regex": r"KEY='[A-Z]{10}'\\d", "keywords": [], "severity": "low"}
+                rule = {"id": "acme-token", "description": description, "regex": r"KEY='[A-Z]{10}'\\d", "keywords": []}
                 raw = sr.gitleaks_toml({**sr.empty(), "rules": [rule]})
                 config = tomllib.loads(raw)
                 self.assertEqual(config["rules"], [{"id": "tamandua-acme-token", "description": description,
@@ -227,7 +255,7 @@ class EngineWiringTests(unittest.TestCase):
         renamed = {**self.settings, "rules": [{**self.settings["rules"][0], "description": "Other text", "severity": "low"}]}
         again = engines.parse_gitleaks(report, sr.custom_rules(renamed))[0]
         self.assertEqual(again["fingerprint"], custom["fingerprint"])
-        self.assertEqual(again["title"], "Other text")
+        self.assertEqual((again["title"], again["severity"]), ("Other text", "critical"))
 
     def test_rejected_config_is_inconclusive_never_clean(self):
         stderr = "8:22AM FTL unable to load gitleaks config, err: While parsing config: toml: bad\n"
@@ -347,6 +375,175 @@ class SecretRulesApiTests(HttpCase):
         self.assertEqual((status, body["field"]), (400, "reason"))
         self.assertEqual(self.call("GET", "/api/secrets/config", headers={"Cookie": admin})[1]["rules"], [])
 
+
+
+OWN = {"id": "beta-key", "description": "Beta partner key", "regex": r"BETA-[0-9A-F]{24}", "keywords": ["beta-"]}
+
+
+class RepositorySettingsTests(unittest.TestCase):
+    """A repository's own entries add to the defaults; they never replace or weaken them."""
+
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self.folder.cleanup)
+        self.data_dir = Path(self.folder.name)
+
+    def test_effective_settings_are_the_union_of_defaults_and_the_repository(self):
+        sr.save(self.data_dir, settings(rules=[RULE], disabled_rules=["jwt"], allowlist={"paths": ["fixtures/"], "stopwords": ["example"]}),
+                reason="Organization defaults", user=ADMIN)
+        sr.save(self.data_dir, settings(rules=[OWN], disabled_rules=["jwt", "generic-api-key"],
+                                        allowlist={"paths": ["fixtures/", "samples/"], "regexes": ["BETA-0{24}"]}),
+                reason="Beta partner integration", user=ADMIN, asset=KEY, name="org/app")
+        effective = sr.for_scan(self.data_dir, KEY)
+        self.assertEqual([rule["id"] for rule in effective["rules"]], ["acme-token", "beta-key"])
+        self.assertEqual(effective["disabled_rules"], ["generic-api-key", "jwt"])
+        self.assertEqual(effective["allowlist"], {"regexes": ["BETA-0{24}"], "paths": ["fixtures/**", "samples/**"], "stopwords": ["example"]})
+        # Other repositories (and a scan without a repository) get the defaults alone; the defaults document is untouched.
+        for other in ("github#8", None):
+            self.assertEqual([rule["id"] for rule in sr.for_scan(self.data_dir, other)["rules"]], ["acme-token"])
+        self.assertEqual(sr.get(self.data_dir)["disabled_rules"], ["jwt"])
+        self.assertEqual(sr.get(self.data_dir, KEY)["history"][0]["reason"], "Beta partner integration")
+        # Only a repository's entries: a scan still applies them with no defaults at all.
+        sr.save(self.data_dir, settings(), reason="Back to the engine defaults", user=ADMIN)
+        self.assertEqual([rule["id"] for rule in sr.for_scan(self.data_dir, KEY)["rules"]], ["beta-key"])
+        self.assertIsNone(sr.for_scan(self.data_dir, "github#8"))
+
+    def test_rule_ids_never_clash_between_defaults_and_repositories(self):
+        sr.save(self.data_dir, settings(rules=[RULE]), reason="Organization defaults", user=ADMIN)
+        with self.assertRaises(sr.SecretRulesError) as caught:
+            sr.save(self.data_dir, settings(rules=[OWN, {**RULE, "description": "Same id"}]), reason="Clash with a default", user=ADMIN, asset=KEY)
+        self.assertEqual((caught.exception.field, caught.exception.message["$t"]), ("rules.1.id", "scanning.secret_rules.errors.rule_id_default"))
+        sr.save(self.data_dir, settings(rules=[OWN]), reason="Beta partner integration", user=ADMIN, asset=KEY, name="org/app")
+        with self.assertRaises(sr.SecretRulesError) as caught:
+            sr.save(self.data_dir, settings(rules=[RULE, OWN]), reason="Clash with a repository", user=ADMIN)
+        self.assertEqual(caught.exception.field, "rules.1.id")
+        self.assertEqual(text(caught.exception.message, "en"), "The ID beta-key is already used by a rule of org/app. Choose another one.")
+        # Should a clash still reach a scan (two saves at once), the default rule wins and the engines see one id.
+        documents.save(self.data_dir, sr.ASSET_PREFIX + KEY, {**settings(rules=[{**RULE, "description": "Repository copy"}])})
+        rules = sr.for_scan(self.data_dir, KEY)["rules"]
+        self.assertEqual([(rule["id"], rule["description"]) for rule in rules], [("acme-token", "ACME internal token")])
+
+    def test_stored_severity_is_ignored(self):
+        documents.save(self.data_dir, sr.DOCUMENT, settings(rules=[{**RULE, "severity": "low"}]))
+        documents.save(self.data_dir, sr.ASSET_PREFIX + KEY, settings(rules=[{**OWN, "severity": "medium"}]))
+        for rule in sr.for_scan(self.data_dir, KEY)["rules"]:
+            self.assertNotIn("severity", rule)
+        self.assertEqual(json.loads(sr.trivy_secret_config(sr.for_scan(self.data_dir, KEY)))["rules"][1]["severity"], "CRITICAL")
+
+    def test_purging_a_repository_forgets_its_settings(self):
+        sr.save(self.data_dir, settings(rules=[OWN]), reason="Beta partner integration", user=ADMIN, asset=KEY)
+        sr.save(self.data_dir, settings(rules=[RULE]), reason="Organization defaults", user=ADMIN)
+        assets.purge(self.data_dir, KEY)
+        self.assertEqual(sr.get(self.data_dir, KEY)["rules"], [])
+        self.assertEqual(documents.names(self.data_dir, sr.ASSET_PREFIX), [])
+        self.assertEqual([rule["id"] for rule in sr.get(self.data_dir)["rules"]], ["acme-token"])
+
+    def test_a_repository_scan_applies_its_own_entries(self):
+        sr.save(self.data_dir, settings(rules=[OWN]), reason="Beta partner integration", user=ADMIN, asset=KEY)
+        from tamandua.modules.scanning import repository
+        seen = []
+        with patch.object(repository, "docker_available", return_value=True), \
+                patch.object(repository, "run_opengrep", return_value=_tool("opengrep")), \
+                patch.object(repository, "run_gitleaks", side_effect=lambda root, applied: seen.append(applied) or _tool("gitleaks")), \
+                patch.object(repository, "run_trivy", side_effect=lambda root, cache, feeds, applied: seen.append(applied) or _tool("trivy")), \
+                patch.object(repository, "run_osv_scanner", return_value=_tool("osv-scanner")), \
+                patch.object(repository, "run_checkov", return_value=_tool("checkov")), \
+                patch.object(repository, "run_zizmor", return_value=_tool("zizmor")), \
+                patch.object(repository, "host_mount_problem", return_value=None), \
+                patch.object(repository, "load_feeds", return_value={"kev": {}, "epss": {}}):
+            root = self.data_dir / "snapshot"
+            root.mkdir()
+            repository.scan_repository(root, {"id": "github:org/app", "uid": KEY, "name": "org/app", "provider": "github"}, data_dir=self.data_dir)
+            repository.scan_repository(root, {"id": "github:org/other", "uid": "github#8", "name": "org/other", "provider": "github"}, data_dir=self.data_dir)
+        self.assertEqual([rule["id"] for rule in seen[0]["rules"]], ["beta-key"])
+        self.assertIs(seen[0], seen[1])
+        self.assertEqual(seen[2:], [None, None])
+
+
+def _tool(key):
+    return {"tool": key, "name": key, "version": "1", "image": "x", "duration_s": 0, "status": "completed", "detail": "", "findings": []}
+
+
+class SecretsAreAlwaysCriticalTests(unittest.TestCase):
+    def test_every_secret_engine_reports_critical(self):
+        generic = [{"RuleID": "generic-api-key", "File": "/src/app.py", "StartLine": 2, "Entropy": 3.0}]
+        self.assertEqual(engines.parse_gitleaks(generic)[0]["severity"], "critical")
+        custom = engines.parse_gitleaks([{"RuleID": "tamandua-acme-token", "File": "/src/a.py", "StartLine": 1}],
+                                        sr.custom_rules({"rules": [{**RULE, "severity": "low"}]}))[0]
+        self.assertEqual((custom["severity"], custom["priority"]["action"]), ("critical", "act"))
+        payload = {"Results": [{"Target": "app/settings.py", "Class": "secret", "Secrets": [
+            {"RuleID": "github-pat", "StartLine": 3, "Severity": "LOW", "Title": "GitHub PAT"},
+            {"RuleID": "tamandua-acme-token", "StartLine": 9, "Severity": "MEDIUM", "Title": "ACME"}]}]}
+        self.assertEqual({item["severity"] for item in engines.parse_trivy(payload, {}, sr.custom_rules({"rules": [RULE]}))}, {"critical"})
+
+    def test_images_and_the_internal_patterns_too(self):
+        from tamandua.modules.scanning import repository
+        from tamandua.modules.scanning.image import config_findings, parse_reference
+        metadata = {"ImageConfig": {"created": "2099-01-01T00:00:00Z", "config": {"User": "app", "Env": ["NPM_TOKEN=npm_secretvalue123"],
+                                                                                   "Healthcheck": {"Test": ["CMD", "true"]}}, "history": []}}
+        found = [item for item in config_findings(metadata, parse_reference("ghcr.io/acme/api:1.0")) if item["scanner"] == "secrets"]
+        self.assertEqual([(item["rule_id"], item["severity"]) for item in found], [("IMG-ENV-SECRET", "critical")])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "config.py"
+            path.write_text('TOKEN = "ghp_' + "a" * 36 + '"\n', encoding="utf-8")
+            self.assertEqual([item["severity"] for item in repository._secret_candidates(path, "config.py")], ["critical"])
+
+
+class AssetSecretApiTests(HttpCase):
+    def setUp(self):
+        super().setUp()
+        Users(self.data_dir).create("analista", PASSWORD)
+        Users(self.data_dir).create("operadora", PASSWORD, role="admin")
+        record = _scan("org/app", [], datetime.now(timezone.utc).isoformat())
+        record["source"].update(uid=KEY)
+        save_repository_scan(self.data_dir, record)
+        self.member, self.admin = self.cookie("analista"), self.cookie("operadora")
+
+    def cookie(self, username):
+        _, _, cookies = self.post("/api/auth/login", "login", {"username": username, "password": PASSWORD})
+        return cookies[0].split("; ")[0]
+
+    def save(self, body, cookie, action="save-asset-secret-rules", **headers):
+        return self.call("POST", "/api/assets/secrets", body,
+                         {"Origin": ORIGIN, "X-Tamandua-Action": action, "Content-Type": "application/json", "Cookie": cookie, **headers})
+
+    def body(self, **changes):
+        return {**settings(rules=[OWN], allowlist={"regexes": ["BETA-0{24}"], "paths": ["samples/"], "stopwords": []}),
+                "reason": "Beta partner integration", "key": KEY, **changes}
+
+    def test_admins_customize_a_repository_members_see_the_shape(self):
+        status, view, _ = self.call("GET", f"/api/assets/secrets?key={QUERY_KEY}", headers={"Cookie": self.member})
+        self.assertEqual((status, view["rules"], view["key"], view["defaults"]), (200, [], KEY, {"rules": 0, "disabled": 0, "allowlist": 0}))
+        self.assertEqual(self.save(self.body(), self.member)[0], 403)
+        self.assertEqual(self.save(self.body(), self.admin, action="save-secret-rules")[0], 403)
+        self.assertEqual(self.save(self.body(key="github#999"), self.admin)[0], 404)
+        self.assertEqual(self.save(self.body(key="image:ghcr.io/acme/api"), self.admin)[0], 400)
+        self.assertEqual(self.save(self.body(key="github#7\nfake log"), self.admin)[0], 400)
+        self.assertEqual(self.save({**self.body(), "rules": [{**OWN, "severity": "high"}]}, self.admin)[0], 400)
+        status, saved, _ = self.save(self.body(), self.admin)
+        self.assertEqual((status, saved["rules"][0]["id"], saved["by"], saved["key"]), (200, "beta-key", "operadora", KEY))
+        member_view = self.call("GET", f"/api/assets/secrets?key={QUERY_KEY}", headers={"Cookie": self.member})[1]
+        self.assertEqual((member_view["rules"][0]["regex"], member_view["allowlist"]["regexes"], member_view["allowlist"]["paths"]),
+                         ("••••••", ["••••••"], ["samples/**"]))
+        self.assertNotIn("BETA-", json.dumps(member_view))
+        self.assertEqual(self.call("GET", f"/api/assets/secrets?key={QUERY_KEY}", headers={"Cookie": self.admin})[1]["rules"][0]["regex"], OWN["regex"])
+        # The defaults stay as they were; a rule id already used by the repository is refused with a pointer to it.
+        self.assertEqual(self.call("GET", "/api/secrets/config", headers={"Cookie": self.admin})[1]["rules"], [])
+        status, body, _ = self.call("POST", "/api/secrets/config", {**settings(rules=[OWN]), "reason": "Move it to the defaults"},
+                                    {"Origin": ORIGIN, "X-Tamandua-Action": "save-secret-rules", "Content-Type": "application/json",
+                                     "Cookie": self.admin, "Accept-Language": "en"})
+        self.assertEqual((status, body["field"]), (400, "rules.0.id"))
+        self.assertIn("org/app", body["error"])
+
+    def test_a_clash_with_a_default_is_a_400_on_the_field(self):
+        status, _, _ = self.call("POST", "/api/secrets/config", {**settings(rules=[RULE]), "reason": "Organization defaults"},
+                                 {"Origin": ORIGIN, "X-Tamandua-Action": "save-secret-rules", "Content-Type": "application/json", "Cookie": self.admin})
+        self.assertEqual(status, 200)
+        status, body, _ = self.save(self.body(rules=[OWN, RULE]), self.admin)
+        self.assertEqual((status, body["field"]), (400, "rules.1.id"))
+        self.assertIn("regla predeterminada", body["error"])
+        view = self.call("GET", f"/api/assets/secrets?key={QUERY_KEY}", headers={"Cookie": self.member})[1]
+        self.assertEqual((view["rules"], view["defaults"]["rules"]), ([], 1))
 
 if __name__ == "__main__":
     unittest.main()

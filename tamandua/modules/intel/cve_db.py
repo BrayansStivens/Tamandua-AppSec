@@ -38,6 +38,8 @@ PAGE = 1000
 MAX_BODY = 80_000_000
 SYNC_EVERY = 2 * 3600
 WINDOW_DAYS = 120
+MAX_CWES = 20
+MAX_REFERENCES = 10
 SEVERITIES = ("critical", "high", "medium", "low", "none")
 SORTS = {"published": "c.published DESC", "score": "c.score IS NULL, c.score DESC, c.published DESC",
          "epss": "e.score IS NULL, e.score DESC, c.published DESC"}
@@ -117,10 +119,10 @@ def parse_entry(entry: dict) -> tuple | None:
         break
     description = next((item.get("value") for item in cve.get("descriptions", []) if item.get("lang") == "en"), "") or ""
     cwes = sorted({item.get("value") for weakness in cve.get("weaknesses", []) for item in weakness.get("description", [])
-                   if isinstance(item.get("value"), str) and item["value"].startswith("CWE-")})
+                   if isinstance(item.get("value"), str) and item["value"].startswith("CWE-")})[:MAX_CWES]
     # Las 10 primeras referencias con su etiqueta principal: el detalle completo sigue en NVD y la base no se dispara.
     references = [{"url": item["url"][:500], "tags": (item.get("tags") or [])[:1]} for item in cve.get("references", [])
-                  if isinstance(item.get("url"), str) and item["url"].startswith(("https://", "http://"))][:10]
+                  if isinstance(item.get("url"), str) and item["url"].startswith(("https://", "http://"))][:MAX_REFERENCES]
     return (identifier, int(identifier[4:8]), cve.get("published"), cve.get("lastModified"), cve.get("vulnStatus"),
             severity if severity in SEVERITIES else None, score if isinstance(score, (int, float)) else None,
             vector, version, description[:4000], ",".join(cwes) or None, json.dumps(references, ensure_ascii=False, separators=(",", ":")))
@@ -350,7 +352,7 @@ def detail(data_dir: Path, identifier: str) -> dict | None:
         connection.close()
     item = _item(row)
     item.update(description=row["description"], vector=row["vector"], modified=row["modified"],
-                cwe=(row["cwe"] or "").split(",") if row["cwe"] else [], references=json.loads(row["refs"] or "[]"),
+                cwe=(row["cwe"] or "").split(",")[:MAX_CWES] if row["cwe"] else [], references=json.loads(row["refs"] or "[]")[:MAX_REFERENCES],
                 kev_detail={"date_added": row["kev_added"], "due_date": row["due_date"], "ransomware": bool(row["ransomware"]),
                             "name": row["kev_name"]} if row["kev_added"] else None)
     return item

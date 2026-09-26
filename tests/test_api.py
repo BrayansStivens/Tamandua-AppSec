@@ -15,9 +15,33 @@ ROOT = Path(__file__).resolve().parents[1]
 class OpenApiTests(unittest.TestCase):
     def test_document_lists_the_migrated_routes_and_matches_the_committed_copy(self):
         document = json.loads(openapi_document())
-        self.assertTrue({"/api/health", "/api/dashboard", "/api/cve-db", "/api/cve-db/item", "/api/sla", "/api/cra"} <= set(document["paths"]))
+        self.assertTrue({"/api/health", "/api/dashboard", "/api/cve-db", "/api/cve-db/item", "/api/cve-db/affected", "/api/sla", "/api/cra",
+                         "/api/cra/products", "/api/cra/events", "/api/cra/assets"} <= set(document["paths"]))
         # El panel se genera de esta copia: si la API cambia, `make openapi` (el CI lo comprueba).
         self.assertEqual(openapi_document(), (ROOT / "web/src/shared/api/openapi.json").read_text())
+
+    def test_every_array_in_the_committed_copy_declares_its_maximum(self):
+        # Checkov CKV_OPENAPI_21: an array without maxItems is an unbounded response; each bound is enforced by the server.
+        unbounded = []
+
+        def walk(node, path):
+            if isinstance(node, dict):
+                if node.get("type") == "array" and not isinstance(node.get("maxItems"), int):
+                    unbounded.append(path)
+                for key, value in node.items():
+                    walk(value, f"{path}/{key}")
+            elif isinstance(node, list):
+                for index, value in enumerate(node):
+                    walk(value, f"{path}/{index}")
+        walk(json.loads((ROOT / "web/src/shared/api/openapi.json").read_text()), "")
+        self.assertEqual(unbounded, [])
+
+    def test_invalid_input_is_documented_as_the_400_the_api_answers(self):
+        document = json.loads(openapi_document())
+        self.assertNotIn("HTTPValidationError", document["components"]["schemas"])
+        responses = document["paths"]["/api/cra/events"]["get"]["responses"]
+        self.assertEqual((set(responses), responses["400"]["content"]["application/json"]["schema"]),
+                         ({"200", "400"}, {"$ref": "#/components/schemas/Error"}))
 
 
 class OpenApiSecurityTests(unittest.TestCase):

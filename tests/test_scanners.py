@@ -68,7 +68,7 @@ class GitleaksParserTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         finding = findings[0]
         self.assertEqual((finding["rule_id"], finding["path"], finding["line"]), ("slack-bot-token", "config.py", 4))
-        self.assertEqual(finding["severity"], "high")
+        self.assertEqual(finding["severity"], "critical")
         # El valor no viaja: ni las claves crudas de gitleaks ni el token, ni siquiera redactado.
         self.assertFalse({"Secret", "Match", "Fingerprint"} & set(finding))
         serialized = json.dumps(finding)

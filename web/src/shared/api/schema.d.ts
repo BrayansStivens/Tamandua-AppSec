@@ -89,6 +89,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cve-db/affected": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Affected
+         * @description Your repositories with a finding that cites this CVE (open or fixed), one page at a time.
+         */
+        get: operations["affected_api_cve_db_affected_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sla": {
         parameters: {
             query?: never;
@@ -116,11 +136,65 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Overview
-         * @description Any session can read it (the team needs to know what is due); only an administrator changes it.
-         */
+        /** Overview */
         get: operations["overview_api_cra_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cra/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Products */
+        get: operations["products_api_cra_products_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cra/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Events
+         * @description Most urgent first. The ENISA draft is only built for the events on the page.
+         */
+        get: operations["events_api_cra_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cra/assets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assets
+         * @description Analyzed assets that can still be marked as products, filtered by name.
+         */
+        get: operations["assets_api_cra_assets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -143,6 +217,26 @@ export interface paths {
          * @description Branches whose PRs are reviewed; an empty list means the repository's default branch.
          */
         post: operations["target_branches_api_pull_requests_branches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/pull-requests/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Now
+         * @description Reviews (or reviews again) a pull request's head commit now, whether the repository is watched or not.
+         */
+        post: operations["review_now_api_pull_requests_review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -193,6 +287,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Asset Config
+         * @description A repository's own secret detection entries (empty: it uses the defaults as they are).
+         */
+        get: operations["asset_config_api_assets_secrets_get"];
+        put?: never;
+        /**
+         * Save Asset Config
+         * @description Replaces a repository's own entries; they add to the defaults from its next scan. A reason is required.
+         */
+        post: operations["save_asset_config_api_assets_secrets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/secrets/builtin-rules": {
         parameters: {
             query?: never;
@@ -230,6 +348,52 @@ export interface components {
             /** Packages */
             packages: string[];
         };
+        /** AffectedAssetPage */
+        AffectedAssetPage: {
+            /** Items */
+            items: components["schemas"]["AffectedAsset"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /**
+         * AssetSecretConfig
+         * @description A repository's own entries, added to the defaults (`defaults` counts them) in its scans.
+         */
+        AssetSecretConfig: {
+            allowlist: components["schemas"]["SecretAllowlistView"];
+            /** Rules */
+            rules: components["schemas"]["SecretRuleView"][];
+            /** Disabled Rules */
+            disabled_rules: string[];
+            /** Reason */
+            reason: string | null;
+            /** By */
+            by: string | null;
+            /** At */
+            at: string | null;
+            /** History */
+            history: components["schemas"]["SecretHistoryEntry"][];
+            limits: components["schemas"]["SecretLimits"];
+            /** Key */
+            key: string;
+            defaults: components["schemas"]["SecretCounts"];
+        };
+        /** AssetSecretConfigIn */
+        AssetSecretConfigIn: {
+            allowlist: components["schemas"]["SecretAllowlist"];
+            /** Rules */
+            rules: components["schemas"]["SecretRule"][];
+            /** Disabled Rules */
+            disabled_rules: string[];
+            /** Reason */
+            reason: string;
+            /** Key */
+            key: string;
+        };
         /** BuiltinRule */
         BuiltinRule: {
             /** Id */
@@ -252,6 +416,32 @@ export interface components {
             key: string;
             /** Name */
             name: string;
+        };
+        /** CraAssetPage */
+        CraAssetPage: {
+            /** Items */
+            items: components["schemas"]["CraAsset"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** CraCounts */
+        CraCounts: {
+            /** Products */
+            products: number;
+            /** Unscanned */
+            unscanned: number;
+            /** Events */
+            events: number;
+            /** Pending */
+            pending: number;
+            /** Assets */
+            assets: number;
+            /** Candidates */
+            candidates: number;
         };
         /** CraEvent */
         CraEvent: {
@@ -288,16 +478,22 @@ export interface components {
             /** Draft */
             draft: string;
         };
+        /** CraEventPage */
+        CraEventPage: {
+            /** Items */
+            items: components["schemas"]["CraEvent"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
         /** CraOverview */
         CraOverview: {
-            /** Products */
-            products: components["schemas"]["CraProduct"][];
-            /** Events */
-            events: components["schemas"]["CraEvent"][];
-            /** Assets */
-            assets: components["schemas"]["CraAsset"][];
             /** Reporting Page */
             reporting_page: string;
+            counts: components["schemas"]["CraCounts"];
         };
         /** CraProduct */
         CraProduct: {
@@ -315,6 +511,17 @@ export interface components {
             by?: string | null;
             /** At */
             at?: string | null;
+        };
+        /** CraProductPage */
+        CraProductPage: {
+            /** Items */
+            items: components["schemas"]["CraProduct"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
         };
         /** CraStage */
         CraStage: {
@@ -375,8 +582,6 @@ export interface components {
             /** Score Source */
             score_source: string | null;
             euvd: components["schemas"]["Euvd"] | null;
-            /** Affected */
-            affected: components["schemas"]["AffectedAsset"][];
         };
         /** CvePage */
         CvePage: {
@@ -493,11 +698,6 @@ export interface components {
             /** Published */
             published: string | null;
         };
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
         /** Health */
         Health: {
             /** Status */
@@ -510,6 +710,24 @@ export interface components {
             workers?: number | null;
             /** Queued */
             queued?: number | null;
+        };
+        /** QueuedRun */
+        QueuedRun: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+        };
+        /** ReviewIn */
+        ReviewIn: {
+            /** Source Id */
+            source_id: string;
+            /** Number */
+            number: number;
+        };
+        /** ReviewQueued */
+        ReviewQueued: {
+            run: components["schemas"]["QueuedRun"];
         };
         /** ScanBranch */
         ScanBranch: {
@@ -577,6 +795,15 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** SecretCounts */
+        SecretCounts: {
+            /** Rules */
+            rules: number;
+            /** Disabled */
+            disabled: number;
+            /** Allowlist */
+            allowlist: number;
+        };
         /** SecretHistoryEntry */
         SecretHistoryEntry: {
             /** At */
@@ -615,11 +842,6 @@ export interface components {
             regex: string;
             /** Keywords */
             keywords?: string[];
-            /**
-             * Severity
-             * @enum {string}
-             */
-            severity: "critical" | "high" | "medium" | "low";
         };
         /** SecretRuleView */
         SecretRuleView: {
@@ -631,11 +853,6 @@ export interface components {
             regex: string;
             /** Keywords */
             keywords: string[];
-            /**
-             * Severity
-             * @enum {string}
-             */
-            severity: "critical" | "high" | "medium" | "low";
         };
         /**
          * SlaDays
@@ -687,18 +904,13 @@ export interface components {
             /** Branches */
             branches: string[];
         };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
+        /** Error */
+        Error: {
+            /**
+             * Error
+             * @description In the reader's language.
+             */
+            error: string;
         };
     };
     responses: never;
@@ -750,13 +962,13 @@ export interface operations {
                     "application/json": components["schemas"]["Dashboard"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Invalid parameters */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -788,13 +1000,13 @@ export interface operations {
                     "application/json": components["schemas"]["CvePage"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Invalid parameters */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -841,13 +1053,46 @@ export interface operations {
                     "application/json": components["schemas"]["CveDetail"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Invalid parameters */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    affected_api_cve_db_affected_get: {
+        parameters: {
+            query?: {
+                id?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectedAssetPage"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -892,6 +1137,103 @@ export interface operations {
             };
         };
     };
+    products_api_cra_products_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CraProductPage"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    events_api_cra_events_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CraEventPage"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    assets_api_cra_assets_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CraAssetPage"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     target_branches_api_pull_requests_branches_post: {
         parameters: {
             query?: never;
@@ -914,13 +1256,46 @@ export interface operations {
                     "application/json": components["schemas"]["TargetBranches"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Invalid parameters */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    review_now_api_pull_requests_review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewQueued"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -947,13 +1322,13 @@ export interface operations {
                     "application/json": components["schemas"]["ScanBranch"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Invalid parameters */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
@@ -1000,13 +1375,77 @@ export interface operations {
                     "application/json": components["schemas"]["SecretConfig"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+            /** @description Invalid parameters */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    asset_config_api_assets_secrets_get: {
+        parameters: {
+            query: {
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetSecretConfig"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    save_asset_config_api_assets_secrets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssetSecretConfigIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssetSecretConfig"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

@@ -1,14 +1,15 @@
-"""Revisión de pull requests: qué repositorios se vigilan, sus PRs abiertos y revisar uno ahora."""
+"""Revisión de pull requests: qué repositorios se vigilan y sus PRs abiertos (revisar uno ahora: api/pullrequests.py)."""
 
 from __future__ import annotations
 
 import re
 
 from tamandua.modules.pullrequests import watch as pr_watch
-from tamandua.modules.integrations.github import GitHubAppError, installation_repositories, installation_repository, open_pull_requests, pull_request
+from tamandua.modules.integrations.github import GitHubAppError, installation_repositories, open_pull_requests
 from tamandua.modules.sources.repositories import source_page
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.runs.store import list_runs
+from tamandua.app.api.pullrequests import SOURCE_ID, installation_entry
 from tamandua.app.api.routing import Request, problem, route
 from tamandua.app.api.routes.sources import paging
 from tamandua.shared.i18n import msg
@@ -16,16 +17,9 @@ from tamandua.shared.i18n import msg
 
 def _lookup(request: Request, source_id) -> tuple[int, dict] | None:
     """Solo repositorios que la instalación cubre: su instalación y su fila."""
-    if not isinstance(source_id, str) or not re.fullmatch(r"github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", source_id):
+    if not isinstance(source_id, str) or not re.fullmatch(SOURCE_ID, source_id):
         return None
-    for installation in github_installations(request.data_dir):
-        try:
-            entry = installation_repository(installation, source_id)
-        except GitHubAppError:
-            continue
-        if entry:
-            return installation, entry
-    return None
+    return installation_entry(request.data_dir, source_id)
 
 
 def _repository(request: Request, source_id) -> tuple[int, str, str] | None:
@@ -144,28 +138,3 @@ def pr_settings(request: Request):
     except ValueError as exc:
         return request.json(400, {"error": problem(exc)})
     return request.json(200, results[0] if "source_id" in payload else {"updated": len(results)})
-
-
-@route("POST", "/api/pull-requests/review", action="review-pr", body=256)
-def review_now(request: Request):
-    payload = request.payload
-    if (not isinstance(payload, dict) or set(payload) != {"source_id", "number"}
-            or not isinstance(payload["number"], int) or isinstance(payload["number"], bool)):
-        return request.json(400, {"error": msg("pulls.errors.invalid_pull")})
-    found = _lookup(request, payload["source_id"])
-    if found is None:
-        return request.json(400, {"error": msg("pulls.errors.repo_not_in_app")})
-    installation, entry = found
-    repository, uid = entry["name"], entry["uid"]
-    try:
-        pull = pull_request(installation, repository, payload["number"])
-    except GitHubAppError as exc:
-        return request.json(400, {"error": problem(exc)})
-    if not pull["head_sha"]:
-        return request.json(400, {"error": msg("pulls.errors.no_head")})
-    if request.state.jobs.pending() >= 20:
-        return request.json(429, {"error": msg("api.queue_full")})
-    queued = request.state.jobs.enqueue_pr_review(source_id=payload["source_id"], uid=uid, pull=pull, installation_id=installation,
-                                                  requested_by=request.user["username"],
-                                                  default_branch=entry.get("branch"))
-    return request.json(202, {"run": queued})

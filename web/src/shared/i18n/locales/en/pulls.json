@@ -33,7 +33,7 @@
   },
   "repo": {
     "choose": "Choose a repository",
-    "description": "Every new commit on a pull request is scanned and compared with its target branch, so only what the pull request introduces counts. Its findings join the repository's status and are marked fixed automatically when a later commit removes them or the pull request is closed without merging.",
+    "description": "Each commit is compared with its target branch: only what the PR introduces counts.",
     "watching": "Watching",
     "not_watching": "Not watched",
     "post_comment": "Comment and set the commit status on GitHub",
@@ -41,10 +41,14 @@
     "gate": "Block at",
     "gate_label": "Blocking threshold",
     "admin_only": "Only an administrator can change these settings.",
-    "enable_hint": "Turn it on with its switch in the list so every push gets reviewed automatically, or use \"Review now\" on a pull request.",
-    "branch_scanned": "Target branches: {{branch}} was last scanned after a change on {{date}} (commit <code>{{sha}}</code>). After a merge, the repository status catches up on its own, at most once every {{minutes}} min per branch.",
-    "branch_pending": "Target branches: they will be scanned on the watcher's next pass. After a merge, the repository status catches up on its own, at most once every {{minutes}} min per branch.",
-    "missing_write": "The installed GitHub App can't comment yet: it needs write access to <b>Pull requests</b> and <b>Commit statuses</b>. Reviews still run and show up here; once the installation accepts those permissions, they'll be posted on GitHub."
+    "enable_hint": "Not watched: turn it on in the list, or review a PR by hand.",
+    "branch_scanned": "Target branch {{branch}} scanned {{date}} (<code>{{sha}}</code>).",
+    "branch_pending": "Target branches will be scanned on the watcher's next pass.",
+    "missing_write": "The GitHub App can't comment yet: it needs write access to <b>Pull requests</b> and <b>Commit statuses</b>. Reviews still show up here.",
+    "help_title": "How PR reviews work",
+    "help_status": "Findings join the repository's status and are marked fixed when a later commit removes them or the PR closes without merging.",
+    "help_branches": "After a merge, each target branch is scanned again at most once every {{minutes}} min.",
+    "help_rescan": "Re-scan reviews the PR's latest commit again, for example after changing a policy."
   },
   "list": {
     "title": "Open pull requests",
@@ -53,13 +57,16 @@
     "draft": "draft",
     "reviewed": "reviewed {{date}}",
     "view_result": "View result",
-    "review_now": "Review now"
+    "review_now": "Review now",
+    "rescan": "Re-scan",
+    "rescan_pr": "Re-scan PR #{{number}}",
+    "review_pr": "Review PR #{{number}}",
+    "queued_notice": "PR #{{number}} queued for review."
   },
   "watch": {
     "title": "Watched repositories · {{total}}",
-    "description": "Enabled repositories review every new pull request or push into their target branches automatically and rescan those branches when they change (checked every {{minutes}} min).",
-    "admin_hint": "Turn them on one by one or in bulk.",
-    "member_hint": "Only an administrator can change what's watched.",
+    "description": "Watched repositories review every PR push on their own (checked every {{minutes}} min).",
+    "member_hint": "Only an admin changes what's watched.",
     "bulk": "Bulk actions",
     "watch_all": "Watch all repositories",
     "unwatch_all": "Stop watching all",
@@ -90,7 +97,7 @@
   },
   "targets": {
     "title": "Target branches",
-    "description": "Only pull requests into these branches are reviewed, each one against the latest scan of its target branch.",
+    "description": "Only PRs into these branches are reviewed.",
     "default": "Default branch ({{branch}})",
     "default_unknown": "Default branch",
     "input_label": "Add a target branch to {{name}}",

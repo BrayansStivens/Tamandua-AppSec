@@ -32,6 +32,7 @@ STAGES = (("early_warning", msg("compliance.cra.stages.early_warning"), timedelt
 STAGE_IDS = tuple(stage for stage, _, _ in STAGES)
 REPORTING_PAGE = "https://digital-strategy.ec.europa.eu/en/policies/cra-reporting"
 NAME_MAX = 120
+PACKAGES_SHOWN = 10  # per event
 
 
 class CraError(ValueError):
@@ -145,7 +146,7 @@ def events(data_dir: Path, *, now: datetime | None = None) -> list[dict]:
                     "final_report": fixed_at + STAGES[2][2] if fixed_at else None}
             stages = [_stage(stage, label, dues[stage], sent.get(stage), now) for stage, label, _ in STAGES]
             result.append({"id": identifier, "asset": key, "product": product["name"], "support_until": product.get("support_until"),
-                           "cve": cve, "title": event["title"], "severity": event["severity"], "packages": sorted(event["packages"])[:10],
+                           "cve": cve, "title": event["title"], "severity": event["severity"], "packages": sorted(event["packages"])[:PACKAGES_SHOWN],
                            "kev": {"date_added": event["kev"].get("date_added"), "ransomware": bool(event["kev"].get("ransomware")),
                                    "name": event["kev"].get("name")},
                            "aware_at": event["aware"].isoformat() if event["aware"] else None,
@@ -175,18 +176,49 @@ def draft(event: dict, locale: str | None = None) -> str:
     return text(draft_message(event), locale)
 
 
-def overview(data_dir: Path) -> dict:
-    """Lo que muestra la vista Cumplimiento: productos (con su último análisis completo), eventos con su borrador y
-    los activos que se pueden marcar. Sin un análisis completo terminado, «nada por notificar» no significaría nada."""
-    from tamandua.modules.runs.kinds import FULL_SCANS
+def _catalog(data_dir: Path) -> tuple[dict[str, str], dict[str, str]]:
+    """Analyzed assets (key → latest name, most recent first) and when each last finished a complete scan."""
+    from tamandua.modules.runs.kinds import FINDING_RUNS, FULL_SCANS
     from tamandua.modules.runs.store import list_runs
-    from tamandua.modules.sources.assets import asset_key, overview as assets_overview
-    assets = {row["key"]: row.get("name") or row["key"] for row in assets_overview(data_dir)}
+    from tamandua.modules.sources.assets import asset_key
+    names: dict[str, str] = {}
     complete: dict[str, str] = {}
     for row in list_runs(data_dir):  # de más reciente a más antiguo
+        if row["type"] not in FINDING_RUNS:
+            continue
+        key = asset_key(row)
+        names.setdefault(key, (row.get("source") or {}).get("name") or key)
         if row["type"] in FULL_SCANS and row["status"] == "completed":
-            complete.setdefault(asset_key(row), row["created_at"])
-    products = [{"key": key, **product, "asset": assets.get(key, key), "last_complete": complete.get(key)}
-                for key, product in load(data_dir)["products"].items()]
-    return {"products": products, "events": [{**event, "draft": draft_message(event)} for event in events(data_dir)],
-            "reporting_page": REPORTING_PAGE, "assets": [{"key": key, "name": name} for key, name in assets.items()]}
+            complete.setdefault(key, row["created_at"])
+    return names, complete
+
+
+def products(data_dir: Path) -> list[dict]:
+    """The assets marked as CRA products, with their latest complete scan (without one, "nothing to report" means nothing)."""
+    names, complete = _catalog(data_dir)
+    return [{"key": key, **product, "asset": names.get(key, key), "last_complete": complete.get(key)}
+            for key, product in load(data_dir)["products"].items()]
+
+
+def candidates(data_dir: Path, *, query: str = "") -> list[dict]:
+    """Analyzed assets that are not products yet, optionally filtered by name."""
+    names, _ = _catalog(data_dir)
+    marked = load(data_dir)["products"]
+    needle = query.strip().lower()
+    return [{"key": key, "name": name} for key, name in names.items()
+            if key not in marked and (not needle or needle in name.lower())]
+
+
+def with_draft(event: dict) -> dict:
+    return {**event, "draft": draft_message(event)}
+
+
+def overview(data_dir: Path) -> dict:
+    """What the Compliance view summarizes; the lists themselves are paged (products, events, candidates)."""
+    names, complete = _catalog(data_dir)
+    marked = load(data_dir)["products"]
+    found = events(data_dir)
+    return {"reporting_page": REPORTING_PAGE,
+            "counts": {"products": len(marked), "unscanned": sum(1 for key in marked if key not in complete),
+                       "events": len(found), "pending": sum(1 for event in found if not event["done"]),
+                       "assets": len(names), "candidates": sum(1 for key in names if key not in marked)}}

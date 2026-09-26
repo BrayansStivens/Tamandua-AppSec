@@ -1,26 +1,22 @@
 import { useCallback, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Eye, KeyRound, LoaderCircle, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { LoaderCircle, Plus, Trash2, X } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Combobox, type ComboOption } from '@/shared/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/shared/ui/dialog'
 import { ApiError } from '@/shared/api/http'
-import { apiPost, type PostBody, type Response } from '@/shared/api/client'
-import { keys, secretBuiltinRulesQuery, secretRulesQuery } from '@/shared/api/queries'
-import { Bone } from '@/shared/ui/loading'
+import type { PostBody, Response } from '@/shared/api/client'
+import { secretBuiltinRulesQuery } from '@/shared/api/queries'
 import { formatDate } from '@/shared/lib/types'
 
-type SecretConfig = Response<'/api/secrets/config'>
-type Body = PostBody<'/api/secrets/config'>
-type Severity = SecretConfig['rules'][number]['severity']
-type RuleDraft = { key: number; id: string; description: string; regex: string; keywords: string; severity: Severity }
+export type SecretConfig = Response<'/api/secrets/config'>
+export type SecretBody = PostBody<'/api/secrets/config'>
+type RuleDraft = { key: number; id: string; description: string; regex: string; keywords: string }
 type Form = { regexes: string; paths: string; stopwords: string; rules: RuleDraft[]; disabled: string[]; reason: string }
 type Problem = { field?: string; message: string }
 
-const SEVERITIES = [['critical', 'common:severity.critical'], ['high', 'common:severity.high'], ['medium', 'common:severity.medium'], ['low', 'common:severity.low']] as const
-const SEVERITY_LABEL = Object.fromEntries(SEVERITIES) as Record<Severity, typeof SEVERITIES[number][1]>
 const LISTS = ['regexes', 'paths', 'stopwords'] as const
 const LIST_LABEL = { regexes: 'secret_rules.allow_regexes', paths: 'secret_rules.allow_paths', stopwords: 'secret_rules.allow_stopwords' } as const
 const LIST_HELP = { regexes: 'secret_rules.allow_regexes_help', paths: 'secret_rules.allow_paths_help', stopwords: 'secret_rules.allow_stopwords_help' } as const
@@ -32,74 +28,43 @@ const CHANGE_LABEL: Record<string, string> = {
   'disabled_rules.added': 'secret_rules.changes.disabled_added', 'disabled_rules.removed': 'secret_rules.changes.disabled_removed',
 }
 // Fields the form can point at; any other server error is shown above the buttons.
-const KNOWN_FIELD = /^(allowlist\.(regexes|paths|stopwords)|rules\.\d+\.(id|description|regex|keywords|severity)|disabled_rules|reason)(\.|$)/
+const KNOWN_FIELD = /^(allowlist\.(regexes|paths|stopwords)|rules\.\d+\.(id|description|regex|keywords)|disabled_rules|reason)(\.|$)/
 const area = 'w-full rounded-lg border border-app-line bg-app px-3 py-2 font-mono text-xs leading-5 text-app-fg aria-invalid:border-danger-line'
-const select = 'h-8 w-full rounded-lg border border-app-line bg-app px-2 text-sm text-app-fg'
 
 let nextKey = 0
 const lines = (value: string) => value.split('\n').map(line => line.trim()).filter(Boolean)
-const count = (config: SecretConfig) => ({ rules: config.rules.length, disabled: config.disabled_rules.length,
-  allowlist: LISTS.reduce((total, name) => total + config.allowlist[name].length, 0) })
 
 function toForm(config: SecretConfig): Form {
   return { regexes: config.allowlist.regexes.join('\n'), paths: config.allowlist.paths.join('\n'), stopwords: config.allowlist.stopwords.join('\n'),
-    rules: config.rules.map(rule => ({ ...rule, keywords: rule.keywords.join(', '), key: nextKey++ })), disabled: [...config.disabled_rules], reason: '' }
+    rules: config.rules.map(rule => ({ id: rule.id, description: rule.description, regex: rule.regex, keywords: rule.keywords.join(', '), key: nextKey++ })), disabled: [...config.disabled_rules], reason: '' }
 }
 
-function toBody(form: Form): Body {
+function toBody(form: Form): SecretBody {
   return { allowlist: { regexes: lines(form.regexes), paths: lines(form.paths), stopwords: lines(form.stopwords) },
-    rules: form.rules.map(rule => ({ id: rule.id.trim(), description: rule.description.trim(), regex: rule.regex.trim(), severity: rule.severity,
+    rules: form.rules.map(rule => ({ id: rule.id.trim(), description: rule.description.trim(), regex: rule.regex.trim(),
       keywords: rule.keywords.split(',').map(word => word.trim()).filter(Boolean) })),
     disabled_rules: form.disabled, reason: form.reason.trim() }
 }
 
-// Organization-wide secret detection (Gitleaks and Trivy): who reads it, what it changes, and why each change was made.
-// It lives on the server, not in the repository: a PR can't weaken detection.
-export function SecretRulesCard({ canEdit }: { canEdit: boolean }) {
-  const { t } = useTranslation('findings')
-  const queryClient = useQueryClient()
-  const query = useQuery(secretRulesQuery())
-  const config = query.data ?? null
-  const [open, setOpen] = useState(false)
-  const [notice, setNotice] = useState('')
-
-  if (!config) return <div className="rounded-xl border border-app-line bg-inset px-4 py-3 text-sm">
-    {query.isError
-      ? <p role="alert" className="flex flex-wrap items-center gap-2 text-xs text-danger">{t('secret_rules.load_failed')}
-        <Button size="xs" variant="outline" onClick={() => void query.refetch()}>{t('common:actions.retry')}</Button></p>
-      : <div role="status" aria-label={t('common:state.loading')}><Bone className="h-4 w-2/3" /><Bone className="mt-2 h-3 w-full" /></div>}
-  </div>
-  const totals = count(config)
-  const configured = totals.rules + totals.disabled + totals.allowlist > 0
-  const summary = [t('secret_rules.count_rules', { count: totals.rules }), t('secret_rules.count_disabled', { count: totals.disabled }),
-    t('secret_rules.count_allowlist', { count: totals.allowlist })].join(' · ')
-  return <div className="rounded-xl border border-app-line bg-inset px-4 py-3 text-sm">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex min-w-0 items-start gap-2">
-        <KeyRound aria-hidden className="mt-0.5 size-4 shrink-0 text-app-subtle" />
-        <div className="min-w-0">
-          <p className="font-medium text-app-secondary">{t('secret_rules.card_title')} <span className="font-normal text-app-muted">{configured ? summary : t('secret_rules.defaults')}</span></p>
-          <p className="mt-1 text-xs leading-5 text-app-subtle">{t('secret_rules.scope')}{' '}
-            {config.by && config.at ? t('secret_rules.changed_by_at', { by: config.by, date: formatDate(config.at) }) : ''}{canEdit ? '' : ` ${t('secret_rules.admin_only')}`}</p>
-        </div>
-      </div>
-      <Button size="sm" variant="outline" onClick={() => { setNotice(''); setOpen(true) }}>{canEdit ? <><Pencil />{t('common:actions.edit')}</> : <><Eye />{t('secret_rules.view')}</>}</Button>
-    </div>
-    <p role="status" className="mt-2 text-xs text-brand empty:hidden">{notice}</p>
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{t('secret_rules.title')}</DialogTitle>
-          <DialogDescription>{t('secret_rules.dialog_help')}</DialogDescription>
-        </DialogHeader>
-        {open && (canEdit
-          ? <SecretRulesForm config={config} onCancel={() => setOpen(false)}
-            onSaved={saved => { queryClient.setQueryData(keys.secretRules, saved); setOpen(false); setNotice(t('secret_rules.saved')) }} />
-          : <SecretRulesView config={config} />)}
-        <History entries={config.history} />
-      </DialogContent>
-    </Dialog>
-  </div>
+// Secret detection settings (the defaults or one repository's own entries) in a dialog: the form for an admin, a
+// read-only view (without the patterns) for everyone else, and the history of changes.
+export function SecretRulesDialog<C extends SecretConfig>({ open, onOpenChange, title, description, config, canEdit, save, onSaved, children }: {
+  open: boolean; onOpenChange: (open: boolean) => void; title: string; description: string; config: C; canEdit: boolean
+  save: (body: SecretBody) => Promise<C>; onSaved: (saved: C) => void; children?: ReactNode
+}) {
+  return <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="max-w-3xl">
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
+      </DialogHeader>
+      {children}
+      {open && (canEdit
+        ? <SecretRulesForm config={config} save={save} onCancel={() => onOpenChange(false)} onSaved={onSaved} />
+        : <SecretRulesView config={config} />)}
+      <History entries={config.history} />
+    </DialogContent>
+  </Dialog>
 }
 
 function Section({ title, help, children }: { title: string; help?: string; children: ReactNode }) {
@@ -121,7 +86,7 @@ function SecretRulesView({ config }: { config: SecretConfig }) {
     <Section title={t('secret_rules.custom_rules')} help={t('secret_rules.custom_rules_help')}>
       {config.rules.length ? <ul className="space-y-2">{config.rules.map(rule => <li key={rule.id} className="rounded-lg border border-app-line bg-app px-3 py-2">
         <p className="flex flex-wrap items-baseline gap-x-2 text-sm"><span className="font-medium text-app-secondary">{rule.description}</span>
-          <span className="text-xs text-app-muted">{rule.id} · {t(SEVERITY_LABEL[rule.severity])}</span></p>
+          <span className="text-xs text-app-muted">{rule.id}</span></p>
         <code className="mt-1 block font-mono text-xs break-all text-app-muted">{rule.regex}</code>
         {rule.keywords.length ? <p className="mt-1 text-xs text-app-subtle">{t('secret_rules.keywords_list', { keywords: rule.keywords.join(', ') })}</p> : null}
       </li>)}</ul> : <p className="text-xs text-app-subtle">{none}</p>}
@@ -131,7 +96,9 @@ function SecretRulesView({ config }: { config: SecretConfig }) {
   </div>
 }
 
-function SecretRulesForm({ config, onSaved, onCancel }: { config: SecretConfig; onSaved: (saved: SecretConfig) => void; onCancel: () => void }) {
+function SecretRulesForm<C extends SecretConfig>({ config, save: submit, onSaved, onCancel }: {
+  config: C; save: (body: SecretBody) => Promise<C>; onSaved: (saved: C) => void; onCancel: () => void
+}) {
   const { t } = useTranslation('findings')
   const id = useId()
   const catalogQuery = useQuery(secretBuiltinRulesQuery())
@@ -155,7 +122,7 @@ function SecretRulesForm({ config, onSaved, onCancel }: { config: SecretConfig; 
 
   // The control an error points at: it gets the focus (and the scroll) so the reason is in view, not above the fold.
   const targetOf = (field?: string) => {
-    const rule = field ? /^rules\.(\d+)\.(id|description|regex|keywords|severity)/.exec(field) : null
+    const rule = field ? /^rules\.(\d+)\.(id|description|regex|keywords)/.exec(field) : null
     if (rule) return form.rules[Number(rule[1])] ? `${id}-rule-${form.rules[Number(rule[1])].key}-${rule[2]}` : null
     const list = field ? /^allowlist\.(regexes|paths|stopwords)/.exec(field) : null
     if (list) return `${id}-${list[1]}`
@@ -171,7 +138,7 @@ function SecretRulesForm({ config, onSaved, onCancel }: { config: SecretConfig; 
     if (form.reason.trim().length < 5) { report({ field: 'reason', message: t('secret_rules.reason_required') }); return }
     setBusy(true); setProblem(null)
     try {
-      onSaved(await apiPost('/api/secrets/config', 'save-secret-rules', toBody(form)))
+      onSaved(await submit(toBody(form)))
     } catch (caught) {
       report({ field: caught instanceof ApiError ? caught.field : undefined, message: caught instanceof Error ? caught.message : String(caught) })
     } finally { setBusy(false) }
@@ -193,17 +160,10 @@ function SecretRulesForm({ config, onSaved, onCancel }: { config: SecretConfig; 
             {error && <p id={`${base}-${name}-error`} className="text-xs text-danger">{error}</p>}
           </div>
         }
-        const severityError = fieldError('severity')
         return <fieldset key={rule.key} className="space-y-2 rounded-lg border border-app-line bg-inset px-3 py-3">
           <legend className="sr-only">{t('secret_rules.rule_number', { number: index + 1 })}</legend>
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_9rem_auto] sm:items-end">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             {input('id', t('secret_rules.rule_id'), { placeholder: 'acme-api-token', maxLength: 60 })}
-            <div className="space-y-1">
-              <label htmlFor={`${base}-severity`} className="text-[11px] font-medium text-app-muted">{t('secret_rules.severity')}</label>
-              <select id={`${base}-severity`} value={rule.severity} onChange={event => setRule(rule.key, { severity: event.target.value as Severity })}
-                aria-invalid={!!severityError || undefined} aria-describedby={severityError ? `${base}-severity-error` : undefined} className={select}>{SEVERITIES.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select>
-              {severityError && <p id={`${base}-severity-error`} className="text-xs text-danger">{severityError}</p>}
-            </div>
             <Button type="button" size="icon-sm" variant="ghost" onClick={() => set({ rules: form.rules.filter(item => item.key !== rule.key) })}
               aria-label={t('secret_rules.remove_rule', { id: rule.id || index + 1 })} title={t('secret_rules.remove_rule', { id: rule.id || index + 1 })}><Trash2 /></Button>
           </div>
@@ -214,7 +174,7 @@ function SecretRulesForm({ config, onSaved, onCancel }: { config: SecretConfig; 
       })}
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" size="sm" variant="outline" disabled={form.rules.length >= limits.rules}
-          onClick={() => set({ rules: [...form.rules, { key: nextKey++, id: '', description: '', regex: '', keywords: '', severity: 'high' }] })}><Plus />{t('secret_rules.add_rule')}</Button>
+          onClick={() => set({ rules: [...form.rules, { key: nextKey++, id: '', description: '', regex: '', keywords: '' }] })}><Plus />{t('secret_rules.add_rule')}</Button>
         <span className="text-xs text-app-subtle">{t('secret_rules.rules_limit', { count: form.rules.length, max: limits.rules })}</span>
       </div>
     </Section>

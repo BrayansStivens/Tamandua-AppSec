@@ -7,9 +7,7 @@ import { RunProgress, type RunningRun } from '@/features/analyses/run-progress'
 import { Card, CardContent } from '@/shared/ui/card'
 import { Combobox, type ComboOption } from '@/shared/ui/combobox'
 import { assetOption, type Asset } from '@/features/sources/asset-picker'
-import { ExclusionsCard } from '@/features/findings/exclusions'
-import { SlaPolicyCard } from '@/features/findings/sla-policy'
-import { SecretRulesCard } from '@/features/findings/secret-rules'
+import { RepositorySettings } from '@/features/findings/repository-settings'
 import { Skeleton } from '@/shared/ui/loading'
 import { api, query } from '@/shared/api/http'
 import { readRoute, setRouteParam } from '@/shared/lib/route'
@@ -24,7 +22,7 @@ const RUN_STATUS: Record<string, string> = {
 }
 
 // Hallazgos por repositorio: el estado actual es el último escaneo completo; se puede filtrar por ejecución.
-export function Findings({ user, requestedRun, onNew }: { user: SessionUser; requestedRun: string | null; onNew: () => void }) {
+export function Findings({ user, requestedRun, onNew, onOpenPolicies }: { user: SessionUser; requestedRun: string | null; onNew: () => void; onOpenPolicies: () => void }) {
   const { t } = useTranslation('findings')
   const [asset, setAsset] = useState<Asset | null>(null)
   // Resumen del activo para el selector: se refresca tras cada carga (p. ej. cuando termina un análisis) sin volver a disparar la carga.
@@ -95,12 +93,9 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
         search={searchRuns} onSelect={option => { setRun(option.id); setRunLabel(option.id === CURRENT ? null : option) }} emptyText={t('page.no_runs')} /></div>
     </div>
     {asset?.removed_at && <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger"><TriangleAlert className="mt-0.5 size-4 shrink-0" /><span>{t('page.removed', { date: formatDate(asset.removed_at) })}</span></div>}
-    {/* Configuración a la vista pero en una sola fila: la lista de hallazgos es lo importante. */}
-    {run === CURRENT && asset && <div className="grid items-start gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-      <ExclusionsCard key={asset.key} assetKey={asset.key} canEdit={user.role === 'admin'} onChanged={() => void load()} />
-      <SlaPolicyCard canEdit={user.role === 'admin'} onChanged={() => void load()} />
-      <SecretRulesCard canEdit={user.role === 'admin'} />
-    </div>}
+    {/* This repository's own settings in one strip: the findings list is what matters. Global policies live in Policies. */}
+    {run === CURRENT && asset && <RepositorySettings key={asset.key} assetKey={asset.key} name={asset.name} secrets={!asset.key.startsWith('image:')}
+      canEdit={user.role === 'admin'} onChanged={() => void load()} onOpenPolicies={onOpenPolicies} />}
     {run === CURRENT && <div className="flex flex-wrap gap-1.5">{([['open', t('page.tabs.open')], ['fixed', t('page.tabs.fixed')], ['excluded', t('page.tabs.excluded')], ['all', t('common:state.all')]] as const)
       .filter(([key]) => key !== 'excluded' || tab === 'excluded' || (counts?.excluded ?? 0) > 0)
       .map(([key, text]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)} className={`rounded-lg border px-3 py-1.5 text-sm ${tab === key ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{text}{counts ? ` · ${key === 'open' ? counts.open + counts.suppressed : key === 'fixed' ? counts.fixed : key === 'excluded' ? (counts.excluded ?? 0) : counts.open + counts.suppressed + counts.fixed + (counts.excluded ?? 0)}` : ''}</button>)}</div>}

@@ -3,7 +3,7 @@
 const SLUGS: Record<string, string> = {
   overview: 'resumen', analyses: 'analisis', new: 'nuevo', findings: 'hallazgos', coverage: 'cobertura', threats: 'amenazas',
   repositories: 'repositorios', pulls: 'pull-requests', domains: 'dominios', integrations: 'integraciones',
-  users: 'usuarios', account: 'cuenta', cves: 'cve-tracker', compliance: 'cumplimiento',
+  users: 'usuarios', account: 'cuenta', cves: 'cve-tracker', compliance: 'cumplimiento', policies: 'politicas',
 }
 const VIEWS: Record<string, string> = Object.fromEntries(Object.entries(SLUGS).map(([view, slug]) => [slug, view]))
 

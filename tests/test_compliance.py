@@ -238,10 +238,48 @@ class CraRouteTests(HttpCase):
             self.assertEqual(self.call("GET", "/api/cra", headers={"Cookie": member})[0], 200)
             self.assertEqual(self.post("/api/cra", "cra", body, member)[0], 403)
             status, state, _ = self.post("/api/cra", "cra", body, admin)
-            self.assertEqual((status, state["products"][0]["name"], bool(state["products"][0]["last_complete"])), (200, "API", True))
+            self.assertEqual((status, state["counts"]["products"], state["counts"]["candidates"]), (200, 1, 0))
+            _, page, _ = self.call("GET", "/api/cra/products", headers={"Cookie": member})
+            self.assertEqual((page["total"], page["items"][0]["name"], bool(page["items"][0]["last_complete"])), (1, "API", True))
             for bad in ({**body, "key": "github:otro"}, {**body, "extra": 1}, {"op": "mark", "event": "x|y", "stage": "early_warning", "sent": "si"},
                         {**body, "support_until": "mañana"}):
                 self.assertEqual(self.post("/api/cra", "cra", bad, admin)[0], 400, bad)
+
+
+class CraPagingTests(HttpCase):
+    def test_products_events_and_assets_are_paged_on_the_server(self):
+        Users(self.data_dir).create("miembro", PASSWORD)
+        cookie = {"Cookie": self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})[2][0].split("; ")[0]}
+        kev = {"date_added": "2026-09-20", "due_date": None, "ransomware": False, "name": "Exploited"}
+        stamp = datetime.now(timezone.utc).isoformat()
+        findings = {"org/a": [{**_finding("a" * 64, "critical", kev=kev, package="lodash"), "cve": ["CVE-2026-1111"]},
+                              {**_finding("b" * 64, "high", kev=kev, package="qs"), "cve": ["CVE-2026-3333"]}],
+                    "org/b": [{**_finding("c" * 64, "critical", kev=kev, package="axios"), "cve": ["CVE-2026-4444"]}], "org/c": []}
+        for name, items in findings.items():
+            save_repository_scan(self.data_dir, _scan(name, items, stamp), created_at=stamp)
+        for name in ("org/a", "org/b"):
+            cra.set_product(self.data_dir, f"github:{name}", name=name.upper(), support_until=None, user=ADMIN)
+
+        status, overview, _ = self.call("GET", "/api/cra", headers=cookie)
+        self.assertEqual((status, overview["counts"]), (200, {"products": 2, "unscanned": 0, "events": 3, "pending": 3, "assets": 3, "candidates": 1}))
+        _, first, _ = self.call("GET", "/api/cra/products?limit=1", headers=cookie)
+        _, second, _ = self.call("GET", "/api/cra/products?limit=1&offset=1", headers=cookie)
+        self.assertEqual((first["total"], first["limit"], [item["name"] for item in first["items"] + second["items"]]), (2, 1, ["ORG/A", "ORG/B"]))
+        _, events, _ = self.call("GET", "/api/cra/events?limit=2", headers=cookie)
+        self.assertEqual((events["total"], len(events["items"]), events["offset"]), (3, 2, 0))
+        self.assertIn("CVE-", events["items"][0]["draft"])  # rendered for the reader
+        _, rest, _ = self.call("GET", "/api/cra/events?limit=2&offset=2", headers=cookie)
+        self.assertEqual(len(rest["items"]), 1)
+        self.assertEqual({event["cve"] for event in events["items"] + rest["items"]}, {"CVE-2026-1111", "CVE-2026-3333", "CVE-2026-4444"})
+        _, assets, _ = self.call("GET", "/api/cra/assets", headers=cookie)
+        self.assertEqual((assets["total"], assets["items"]), (1, [{"key": "github:org/c", "name": "org/c"}]))
+        self.assertEqual(self.call("GET", "/api/cra/assets?q=ORG/C", headers=cookie)[1]["total"], 1)
+        self.assertEqual(self.call("GET", "/api/cra/assets?q=nada", headers=cookie)[1]["total"], 0)
+        for path in ("/api/cra/products", "/api/cra/events", "/api/cra/assets"):
+            for bad in ("limit=0", "limit=101", "offset=-1", "offset=10001", "limit=diez"):
+                self.assertEqual(self.call("GET", f"{path}?{bad}", headers=cookie), (400, {"error": "Parámetros inválidos"}, []), (path, bad))
+            self.assertEqual(self.call("GET", f"{path}?limit=500")[0], 401, path)
+        self.assertEqual(self.call("GET", "/api/cra/assets?q=" + "a" * 101, headers=cookie)[0], 400)
 
 
 class FrameworkTests(unittest.TestCase):

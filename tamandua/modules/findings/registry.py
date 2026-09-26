@@ -288,28 +288,38 @@ def resolve(data_dir: Path, run_id: str) -> dict:
     return load_run(data_dir, run_id)
 
 
-def assets_with_cve(data_dir: Path, cve: str) -> list[dict]:
-    """Repositorios con un hallazgo que cita este CVE, para responder «¿me afecta?» desde el tracker (índice GIN)."""
-    by_asset: dict[str, list[dict]] = {}
+PACKAGES_SHOWN = 5  # per affected repository in the CVE tracker
+
+
+def assets_with_cve(data_dir: Path, cve: str, *, limit: int, offset: int) -> dict:
+    """Repositorios con un hallazgo que cita este CVE, para responder «¿me afecta?» desde el tracker (índice GIN).
+
+    One page of repositories, ordered by key: `{items, total, limit, offset}`."""
+    cites = (registry_findings.c.tenant_id == TENANT, registry_findings.c.cves.any_() == cve)
     with db.transaction(data_dir) as connection:
+        total = connection.execute(select(func.count(func.distinct(registry_findings.c.asset_key))).where(*cites)).scalar_one()
+        keys = list(connection.execute(select(registry_findings.c.asset_key).where(*cites).group_by(registry_findings.c.asset_key)
+                                       .order_by(registry_findings.c.asset_key).limit(limit).offset(offset)).scalars())
+        by_asset: dict[str, list[dict]] = {key: [] for key in keys}
         for key, entry in connection.execute(select(registry_findings.c.asset_key, registry_findings.c.entry)
-                                             .where(registry_findings.c.tenant_id == TENANT, registry_findings.c.cves.any_() == cve)
-                                             .order_by(registry_findings.c.asset_key)):
-            by_asset.setdefault(key, []).append(entry)
+                                             .where(*cites, registry_findings.c.asset_key.in_(keys))):
+            by_asset[key].append(entry)
         names = dict(connection.execute(select(registry_assets.c.asset_key, registry_assets.c.name)
-                                        .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key.in_(list(by_asset)))).all())
+                                        .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key.in_(keys))).all())
+
     def packages(hits: list[dict]) -> list:
         # Titles may be messages: dedup and sort by their text, return the values as stored (rendered by the reader).
         labels = {}
         for entry in hits:
             value = (entry["finding"].get("package") or {}).get("name") or entry["finding"].get("title", "")
             labels.setdefault(text(value, "en"), value)
-        return [labels[label] for label in sorted(labels)][:5]
-    return [{"asset": key, "name": names.get(key) or key,
-             "open": sum(1 for entry in hits if entry.get("status") == "open"),
-             "fixed": sum(1 for entry in hits if entry.get("status") == "fixed"),
-             "packages": packages(hits)}
-            for key, hits in by_asset.items()]
+        return [labels[label] for label in sorted(labels)][:PACKAGES_SHOWN]
+    items = [{"asset": key, "name": names.get(key) or key,
+              "open": sum(1 for entry in hits if entry.get("status") == "open"),
+              "fixed": sum(1 for entry in hits if entry.get("status") == "fixed"),
+              "packages": packages(hits)}
+             for key, hits in by_asset.items()]
+    return {"items": items, "total": total, "limit": limit, "offset": offset}
 
 
 def open_cves(data_dir: Path) -> frozenset[str]:

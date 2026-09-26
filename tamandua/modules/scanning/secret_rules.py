@@ -1,4 +1,8 @@
-"""Organization-wide secret detection settings for Gitleaks and Trivy: allowlist, custom rules and disabled built-ins.
+"""Secret detection settings for Gitleaks and Trivy: allowlist, custom rules and disabled built-ins.
+
+Organization defaults apply to every repository; a repository may add its own entries on top (`asset`). A scan applies
+the union of both (`merged`); a repository rule can't reuse the id of a default rule. Custom detectors have no
+severity: a secret finding is always critical.
 
 They live on the server, never in the repository: a pull request must not be able to weaken detection (that is also
 why a repository's own `.gitleaks.toml` is stripped from the snapshot). Every change records who, when and why.
@@ -24,6 +28,7 @@ from tamandua.shared.i18n import msg, text
 
 _log = logging_setup.get("secret-rules")
 DOCUMENT = "secret-detection"
+ASSET_PREFIX = "secret-detection/"  # one document per repository, by asset key
 MAX_RULES = 50
 MAX_ENTRIES = 100
 MAX_REGEX = 500
@@ -31,7 +36,8 @@ MAX_DESCRIPTION = 120
 MAX_KEYWORDS = 10
 MAX_REPEAT = 1000
 HISTORY = 20
-SEVERITIES = ("critical", "high", "medium", "low")
+CHANGES_SHOWN = 20  # per list in a history entry
+MAX_DISABLED = len(GITLEAKS_DEFAULT_RULES)
 RULE_ID = re.compile(r"[a-z0-9-]{1,60}")
 KEYWORD = re.compile(r"[a-z0-9_.:=@/+-]{1,60}")
 STOPWORD = re.compile(r"[a-z0-9_.-]{3,60}")
@@ -54,19 +60,37 @@ def empty() -> dict:
     return {"allowlist": {name: [] for name in LISTS}, "rules": [], "disabled_rules": []}
 
 
-def _stored(data_dir: Path) -> dict:
-    payload = documents.load(data_dir, DOCUMENT, {})
+def _document(asset: str | None) -> str:
+    return ASSET_PREFIX + asset if asset else DOCUMENT
+
+
+def _stored(data_dir: Path, asset: str | None = None) -> dict:
+    payload = documents.load(data_dir, _document(asset), {})
     return payload if isinstance(payload, dict) else {}
 
 
-def get(data_dir: Path) -> dict:
-    payload = _stored(data_dir)
+def _stored_rule(rule: dict) -> dict:
+    # Older documents carry a `severity` per rule: ignored, a secret is always critical.
+    return {"id": rule.get("id"), "description": rule.get("description"), "regex": rule.get("regex"),
+            "keywords": list(rule.get("keywords") or [])[:MAX_KEYWORDS]}
+
+
+def _history_entry(entry: dict) -> dict:
+    changes = {name: {kind: list(items)[:CHANGES_SHOWN] for kind, items in change.items()}
+               for name, change in (entry.get("changes") or {}).items()}
+    return {**entry, "changes": changes}
+
+
+def get(data_dir: Path, asset: str | None = None) -> dict:
+    """The organization defaults, or with `asset` only that repository's own entries."""
+    # Capped as on save, so what is read keeps the limits the API declares even if the stored document is older.
+    payload = _stored(data_dir, asset)
     allowlist = payload.get("allowlist") or {}
-    return {"allowlist": {name: list(allowlist.get(name) or []) for name in LISTS},
-            "rules": [dict(rule) for rule in payload.get("rules") or []],
-            "disabled_rules": list(payload.get("disabled_rules") or []),
+    return {"allowlist": {name: list(allowlist.get(name) or [])[:MAX_ENTRIES] for name in LISTS},
+            "rules": [_stored_rule(rule) for rule in (payload.get("rules") or [])[:MAX_RULES]],
+            "disabled_rules": list(payload.get("disabled_rules") or [])[:MAX_DISABLED],
             "reason": payload.get("reason"), "by": payload.get("by"), "at": payload.get("at"),
-            "history": list(payload.get("history") or [])}
+            "history": [_history_entry(entry) for entry in list(payload.get("history") or [])[-HISTORY:]]}
 
 
 def configured(settings: dict | None) -> bool:
@@ -79,15 +103,32 @@ def counts(settings: dict) -> dict:
             "allowlist": sum(len(settings["allowlist"][name]) for name in LISTS)}
 
 
-def for_scan(data_dir: Path | None) -> dict | None:
-    """The settings a scan applies, or None. A standalone CLI scan without a database runs with the defaults."""
+def merged(defaults: dict, own: dict | None) -> dict:
+    """What applies to a repository: the defaults plus its own entries. On a rule id clash (only possible through a
+    race between two saves) the default rule wins."""
+    if not own:
+        return {"allowlist": {name: list(defaults["allowlist"][name]) for name in LISTS}, "rules": list(defaults["rules"]),
+                "disabled_rules": list(defaults["disabled_rules"])}
+    taken = {rule["id"] for rule in defaults["rules"]}
+    return {"allowlist": {name: _unique(defaults["allowlist"][name] + own["allowlist"][name]) for name in LISTS},
+            "rules": defaults["rules"] + [rule for rule in own["rules"] if rule["id"] not in taken],
+            "disabled_rules": sorted(set(defaults["disabled_rules"]) | set(own["disabled_rules"]))}
+
+
+def for_scan(data_dir: Path | None, asset: str | None = None) -> dict | None:
+    """The settings a scan of `asset` applies, or None. A standalone CLI scan without a database runs with the defaults."""
     if data_dir is None:
         return None
     try:
-        settings = get(data_dir)
+        settings = merged(get(data_dir), get(data_dir, asset) if asset else None)
     except db.DatabaseNotConfigured:
         return None
     return settings if configured(settings) else None
+
+
+def forget(data_dir: Path, asset: str) -> None:
+    """A purged repository takes its own entries with it."""
+    documents.delete(data_dir, _document(asset))
 
 
 # --- Validation ------------------------------------------------------------------------
@@ -243,10 +284,7 @@ def _rule(raw, index: int, seen: set[str]) -> dict:
         if word and not KEYWORD.fullmatch(word):
             raise SecretRulesError(msg("scanning.secret_rules.errors.keyword_invalid", keyword=word[:60]), f"{field}.keywords")
         keywords.append(word)
-    severity = raw.get("severity")
-    if severity not in SEVERITIES:
-        raise SecretRulesError(msg("scanning.secret_rules.errors.severity_invalid", id=identifier), f"{field}.severity")
-    return {"id": identifier, "description": description, "regex": regex, "keywords": _unique(keywords), "severity": severity}
+    return {"id": identifier, "description": description, "regex": regex, "keywords": _unique(keywords)}
 
 
 def normalize(raw) -> dict:
@@ -274,7 +312,7 @@ def normalize(raw) -> dict:
     seen: set[str] = set()
     rules = [_rule(item, index, seen) for index, item in enumerate(rules_raw)]
     disabled_raw = raw.get("disabled_rules") or []
-    if not isinstance(disabled_raw, list) or len(disabled_raw) > len(GITLEAKS_DEFAULT_RULES):
+    if not isinstance(disabled_raw, list) or len(disabled_raw) > MAX_DISABLED:
         raise SecretRulesError(msg("scanning.secret_rules.errors.not_list"), "disabled_rules")
     builtin = set(GITLEAKS_DEFAULT_RULES)
     for rule in disabled_raw:
@@ -287,32 +325,56 @@ def normalize(raw) -> dict:
 def _changes(before: dict, after: dict) -> dict:
     """What a save changed, compactly, for the history."""
     def diff(old: list, new: list) -> dict:
-        return {"added": [item for item in new if item not in old][:20], "removed": [item for item in old if item not in new][:20]}
+        return {"added": [item for item in new if item not in old][:CHANGES_SHOWN],
+                "removed": [item for item in old if item not in new][:CHANGES_SHOWN]}
     old_rules = {rule["id"]: rule for rule in before["rules"]}
     new_rules = {rule["id"]: rule for rule in after["rules"]}
     changes = {name: diff(before["allowlist"][name], after["allowlist"][name]) for name in LISTS}
     changes["rules"] = {**diff(list(old_rules), list(new_rules)),
-                        "changed": [key for key in new_rules if key in old_rules and new_rules[key] != old_rules[key]][:20]}
+                        "changed": [key for key in new_rules if key in old_rules and new_rules[key] != old_rules[key]][:CHANGES_SHOWN]}
     changes["disabled_rules"] = diff(before["disabled_rules"], after["disabled_rules"])
     return {key: {kind: items for kind, items in value.items() if items} for key, value in changes.items()
             if any(value.values())}
 
 
-def save(data_dir: Path, raw, *, reason: str | None, user: dict) -> dict:
+def _clash(rules: list[dict], taken: set[str], message) -> None:
+    for index, rule in enumerate(rules):
+        if rule["id"] in taken:
+            raise SecretRulesError(message(rule["id"]), f"rules.{index}.id")
+
+
+def _check_ids(data_dir: Path, settings: dict, asset: str | None) -> None:
+    """Rule ids are unique across the defaults and every repository: each one names one detector in the engines."""
+    if asset:
+        _clash(settings["rules"], {rule["id"] for rule in get(data_dir)["rules"]},
+               lambda rule: msg("scanning.secret_rules.errors.rule_id_default", id=rule))
+        return
+    for name in documents.names(data_dir, ASSET_PREFIX):
+        stored = documents.load(data_dir, name, {})
+        own = {rule.get("id") for rule in (stored.get("rules") or [])} if isinstance(stored, dict) else set()
+        repository = (stored.get("name") if isinstance(stored, dict) else None) or name.removeprefix(ASSET_PREFIX)
+        _clash(settings["rules"], own, lambda rule: msg("scanning.secret_rules.errors.rule_id_repository", id=rule, repository=repository))
+
+
+def save(data_dir: Path, raw, *, reason: str | None, user: dict, asset: str | None = None, name: str | None = None) -> dict:
+    """Replaces the defaults, or with `asset` that repository's own entries (`name` is kept to name it in errors)."""
     settings = normalize(raw)
     note = " ".join(str(reason or "").split())[:300]
     if len(note) < 5:
         raise SecretRulesError(msg("scanning.secret_rules.errors.reason_required"), "reason")
+    _check_ids(data_dir, settings, asset)
     stamp = datetime.now(timezone.utc).isoformat()
-    with documents.lock(data_dir, DOCUMENT):
-        previous = get(data_dir)
+    document = _document(asset)
+    with documents.lock(data_dir, document):
+        previous = get(data_dir, asset)
         entry = {"at": stamp, "by": user["username"], "reason": note, "changes": _changes(previous, settings)}
         history = (previous["history"] + [entry])[-HISTORY:]
-        documents.save(data_dir, DOCUMENT, {**settings, "reason": note, "by": user["username"], "at": stamp, "history": history})
+        documents.save(data_dir, document, {**settings, "reason": note, "by": user["username"], "at": stamp, "history": history,
+                                            **({"name": str(name or asset)[:200]} if asset else {})})
     _log.info("secret_rules_saved", extra={"user": user["username"], "reason":
-                                           f"{len(settings['rules'])} rules, {len(settings['disabled_rules'])} disabled, "
+                                           f"{asset or 'defaults'}: {len(settings['rules'])} rules, {len(settings['disabled_rules'])} disabled, "
                                            f"{sum(len(items) for items in settings['allowlist'].values())} allowlist entries"})
-    return get(data_dir)
+    return get(data_dir, asset)
 
 
 # --- Engine configuration --------------------------------------------------------------
@@ -402,7 +464,7 @@ def trivy_secret_config(settings: dict) -> str:
     config: dict = {}
     if settings["rules"]:
         config["rules"] = [{"id": engine_id(rule["id"]), "category": "Tamandua", "title": rule["description"],
-                            "severity": rule["severity"].upper(), "regex": rule["regex"],
+                            "severity": "CRITICAL", "regex": rule["regex"],
                             **({"keywords": rule["keywords"]} if rule["keywords"] else {})} for rule in settings["rules"]]
     if allow:
         config["allow-rules"] = allow

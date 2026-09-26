@@ -10,7 +10,9 @@ import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/shared/ui/sheet'
 import { Bone, Skeleton, SkeletonList } from '@/shared/ui/loading'
+import { Pagination } from '@/shared/ui/pagination'
 import { api, query } from '@/shared/api/http'
+import { usePaged } from '@/shared/lib/usePaged'
 import { readRoute, writeRoute } from '@/shared/lib/route'
 import { formatDay, formatNumber, formatPercent } from '@/shared/i18n/format'
 
@@ -24,8 +26,9 @@ export type CveOverview = {
 }
 type Euvd = { id: string; url: string | null; score: number | null; severity: string | null; exploited_since: string | null }
 type CveDetail = CveRow & { vector: string | null; modified: string | null; cwe: string[]; references: { url: string; tags: string[] }[]; score_source?: 'nvd' | 'euvd' | null; euvd?: Euvd | null
-  kev_detail: { date_added: string; due_date?: string; ransomware: boolean; name: string | null } | null
-  affected: { asset: string; name: string; open: number; fixed: number; packages: string[] }[] }
+  kev_detail: { date_added: string; due_date?: string; ransomware: boolean; name: string | null } | null }
+type AffectedAsset = { asset: string; name: string; open: number; fixed: number; packages: string[] }
+const AFFECTED_PAGE = 10
 
 // [value, catalog key]
 const SEVERITIES: [string, string][] = [['', 'cves:filters.all_severities'], ['critical', 'common:severity.critical'], ['high', 'common:severity.high'], ['medium', 'common:severity.medium'], ['low', 'common:severity.low'], ['none', 'cves:unscored']]
@@ -194,6 +197,8 @@ function CveSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
     queryFn: ({ signal }) => api.get<CveDetail>(`/api/cve-db/item?${query({ id: id ?? '' })}`, { signal }) })
   const item = detail.data ?? null
   const error = detail.error ? (detail.error instanceof Error ? detail.error.message : String(detail.error)) : ''
+  // Which of your repositories cite it: paged on the server (a widespread CVE can be in hundreds).
+  const affected = usePaged<AffectedAsset>('/api/cve-db/affected', { id: id ?? '' }, AFFECTED_PAGE, 0, !!id)
   return <Sheet open={!!id} onOpenChange={next => { if (!next) onClose() }}>
     <SheetContent side="right" className="w-full overflow-y-auto border-app-line sm:max-w-xl">
       <SheetHeader className="border-b border-app-line pb-4"><SheetTitle className="font-mono text-lg">{id}</SheetTitle>
@@ -216,8 +221,11 @@ function CveSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
           {item.vector && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">{t('sheet.vector')}</h3><code className="block rounded-md bg-inset px-2.5 py-1.5 font-mono text-xs break-all">{item.vector}</code></section>}
           {item.cwe.length > 0 && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">{t('sheet.weakness')}</h3><div className="flex flex-wrap gap-1.5">{item.cwe.map(cwe => <a key={cwe} href={`https://cwe.mitre.org/data/definitions/${cwe.slice(4)}.html`} target="_blank" rel="noreferrer" className="rounded-md border border-app-line px-2 py-0.5 font-mono text-xs hover:bg-app-soft">{cwe}</a>)}</div></section>}
           <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">{t('sheet.in_repos')}</h3>
-            {item.affected.length ? <div className="space-y-1.5">{item.affected.map(asset => <div key={asset.asset} className="flex items-center justify-between gap-2 rounded-lg border border-app-line px-3 py-2 text-sm"><span className="min-w-0"><span className="block truncate font-medium">{asset.name}</span><span className="text-xs text-app-subtle">{asset.packages.join(', ')}</span></span>
-              {asset.open ? <Badge variant="outline" className="border-transparent bg-danger-solid text-[11px] text-on-solid">{t('sheet.open', { count: asset.open })}</Badge> : <Badge variant="outline" className="border-app-line text-[11px] text-app-muted"><ShieldCheck className="size-3" />{t('sheet.fixed')}</Badge>}</div>)}</div>
+            {affected.error ? <p role="alert" className="text-sm text-danger">{affected.error}</p>
+              : !affected.items.length && affected.loading ? <SkeletonList rows={2} dense label={t('sheet.loading_repos')} />
+              : affected.total ? <div className={`space-y-1.5 transition-opacity ${affected.loading ? 'opacity-60' : ''}`}>{affected.items.map(asset => <div key={asset.asset} className="flex items-center justify-between gap-2 rounded-lg border border-app-line px-3 py-2 text-sm"><span className="min-w-0"><span className="block truncate font-medium">{asset.name}</span><span className="text-xs text-app-subtle">{asset.packages.join(', ')}</span></span>
+              {asset.open ? <Badge variant="outline" className="border-transparent bg-danger-solid text-[11px] text-on-solid">{t('sheet.open', { count: asset.open })}</Badge> : <Badge variant="outline" className="border-app-line text-[11px] text-app-muted"><ShieldCheck className="size-3" />{t('sheet.fixed')}</Badge>}</div>)}
+                {affected.total > affected.limit && <div className="rounded-lg border border-app-line"><Pagination total={affected.total} limit={affected.limit} offset={affected.offset} onPrev={affected.prev} onNext={affected.next} noun={t('sheet.repos_noun')} /></div>}</div>
               : <p className="text-sm text-app-muted">{t('sheet.not_affected')}</p>}</section>
           {item.references.length > 0 && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">{t('sheet.references')}</h3><ul className="space-y-1">{item.references.map(reference => <li key={reference.url} className="flex items-start gap-1.5 text-xs"><ExternalLink className="mt-0.5 size-3 shrink-0 text-app-subtle" /><a href={reference.url} target="_blank" rel="noreferrer noopener" className="min-w-0 break-all text-app-secondary hover:underline">{reference.url}</a>{reference.tags[0] && <span className="shrink-0 text-app-subtle">{reference.tags[0]}</span>}</li>)}</ul></section>}
           <div className="flex flex-wrap gap-2 border-t border-app-line pt-4"><a href={`https://nvd.nist.gov/vuln/detail/${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">NVD <ExternalLink className="size-3" /></a><a href={`https://www.cve.org/CVERecord?id=${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">CVE.org <ExternalLink className="size-3" /></a>{item.euvd?.url && <a href={item.euvd.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">EUVD <ExternalLink className="size-3" /></a>}</div>

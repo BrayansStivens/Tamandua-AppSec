@@ -96,6 +96,8 @@
     "open_one": "{{count}} open", "open_other": "{{count}} open",
     "fixed": "fixed",
     "not_affected": "No scanned repository has this CVE among its findings.",
-    "references": "References"
+    "references": "References",
+    "repos_noun": "repositories",
+    "loading_repos": "Loading affected repositories"
   }
 }

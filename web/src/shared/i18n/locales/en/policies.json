@@ -1,0 +1,30 @@
+{
+  "load_failed": "Couldn't load this policy.",
+  "sla": {
+    "title": "Remediation deadlines",
+    "summary_item": "{{level}} {{value}}",
+    "days_short": "{{days}} d",
+    "no_deadline": "no due date",
+    "dialog_help": "Days to fix a finding, counted from first detection, for every repository. Leave a field empty so that severity never comes due. Defaults: 7, 30, 90 and 180 days.",
+    "days_label": "{{level}} (days)",
+    "placeholder": "No due date",
+    "invalid": "Each due date is a whole number of days from 1 to 3650, or empty to leave it unset.",
+    "changed_by": "Last changed by {{by}}.",
+    "changed_by_at": "Last changed by {{by}}, {{date}}.",
+    "defaults": "Default values.",
+    "saved": "Saved. Due dates are recalculated."
+  },
+  "secrets": {
+    "title": "Secret detection · defaults",
+    "engine_defaults": "Gitleaks and Trivy built-in rules",
+    "view": "View"
+  },
+  "help": {
+    "title": "How policies apply",
+    "sla": "Deadlines apply to every repository, the Overview and reports. The clock runs on open findings; fixed ones and approved exceptions never come due.",
+    "secrets": "Secret detection defaults apply to every repository scan and PR review. A repository's own .gitleaks.toml is ignored, so a PR can't weaken detection.",
+    "repository": "A repository can add its own entries from Findings, never remove a default.",
+    "critical": "An exposed secret is always critical.",
+    "admin_only": "Only an admin can change them."
+  }
+}

@@ -142,14 +142,39 @@ class CveRoutesTests(HttpCase):
     def test_item_says_which_repositories_it_affects(self):
         findings_registry._save(self.data_dir, {"asset": "github#1", "name": "acme/web", "findings": {
             "abc": {"status": "open", "finding": {"cve": ["CVE-2026-12345"], "package": {"name": "fastjson"}}}}})
+        status, body, _ = self.call("GET", "/api/cve-db/affected?id=cve-2026-12345", headers=self.cookie)
+        self.assertEqual((status, body), (200, {"items": [{"asset": "github#1", "name": "acme/web", "open": 1, "fixed": 0, "packages": ["fastjson"]}],
+                                                "total": 1, "limit": 10, "offset": 0}))
         status, body, _ = self.call("GET", "/api/cve-db/item?id=cve-2026-12345", headers=self.cookie)
         self.assertEqual(status, 200)
-        self.assertEqual(body["affected"], [{"asset": "github#1", "name": "acme/web", "open": 1, "fixed": 0, "packages": ["fastjson"]}])
+        self.assertNotIn("affected", body)
         # NVD lo puntúa: EUVD solo añade que se explota; la puntuación sigue siendo la de NVD.
         self.assertEqual((body["score_source"], body["score"], body["euvd"]["exploited_since"]), ("nvd", 9.8, "2026-09-01"))
         status, body, _ = self.call("GET", "/api/cve-db/overview", headers=self.cookie)
         self.assertEqual((status, body["count"], body["sync"]["phase"]), (200, 1, "pending"))
         self.assertNotIn("nvd_api_key", json.dumps(body).lower())
+
+    def test_affected_repositories_are_paged_on_the_server(self):
+        for number in range(1, 13):  # 12 repositories cite it; one more cites another CVE
+            findings_registry._save(self.data_dir, {"asset": f"github#{number:02d}", "name": f"acme/repo-{number:02d}", "findings": {
+                "abc": {"status": "fixed" if number % 3 == 0 else "open", "finding": {"cve": ["CVE-2026-12345"], "package": {"name": f"lib{number}"}}}}})
+        findings_registry._save(self.data_dir, {"asset": "github#99", "name": "acme/other", "findings": {
+            "x": {"status": "open", "finding": {"cve": ["CVE-2026-20001"]}}}})
+        status, first, _ = self.call("GET", "/api/cve-db/affected?id=CVE-2026-12345&limit=5", headers=self.cookie)
+        self.assertEqual((status, first["total"], first["limit"], first["offset"]), (200, 12, 5, 0))
+        self.assertEqual([item["asset"] for item in first["items"]], [f"github#{number:02d}" for number in range(1, 6)])
+        _, last, _ = self.call("GET", "/api/cve-db/affected?id=CVE-2026-12345&limit=5&offset=10", headers=self.cookie)
+        self.assertEqual(([item["name"] for item in last["items"]], last["total"]), (["acme/repo-11", "acme/repo-12"], 12))
+        self.assertEqual((last["items"][1]["open"], last["items"][1]["fixed"]), (0, 1))
+        _, beyond, _ = self.call("GET", "/api/cve-db/affected?id=CVE-2026-12345&offset=50", headers=self.cookie)
+        self.assertEqual((beyond["items"], beyond["total"]), ([], 12))
+        _, none, _ = self.call("GET", "/api/cve-db/affected?id=CVE-2026-00001", headers=self.cookie)
+        self.assertEqual((none["items"], none["total"]), ([], 0))
+        for bad in ("limit=0", "limit=101", "limit=x", "offset=-1", "offset=10001"):
+            self.assertEqual(self.call("GET", f"/api/cve-db/affected?id=CVE-2026-12345&{bad}", headers=self.cookie),
+                             (400, {"error": "Parámetros inválidos"}, []), bad)
+        self.assertEqual(self.call("GET", "/api/cve-db/affected?id=../../etc", headers=self.cookie)[0], 400)
+        self.assertEqual(self.call("GET", "/api/cve-db/affected?id=CVE-2026-12345&limit=500")[0], 401)  # the session first
 
     def test_only_mine_filters_to_open_cves_in_my_assets(self):
         connection = cve_db.connect(self.data_dir)

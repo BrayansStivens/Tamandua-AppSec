@@ -22,6 +22,7 @@
     "analyses": "Scans",
     "repositories": "Repositories",
     "pulls": "Pull requests",
+    "policies": "Policies",
     "integrations": "Integrations",
     "users": "Users",
     "new": "New scan",
@@ -41,7 +42,8 @@
     "cves": "Every vulnerability published in NVD, with active exploitation (KEV) and exploit probability (EPSS), searchable locally.",
     "compliance": "EU Cyber Resilience Act reporting deadlines for your products, with the draft ready. Export the SBOM and VEX from Findings.",
     "threats": "Model the system with the approach you prefer (STRIDE, LINDDUN, PASTA, attack trees, ATT&CK) and check the threats against your scans.",
-    "default": "Results for the selected target, with steps and coverage limits in plain view."
+    "default": "Results for the selected target, with steps and coverage limits in plain view.",
+    "policies": "Rules that apply to every repository."
   },
   "theme": {
     "label": "Appearance",

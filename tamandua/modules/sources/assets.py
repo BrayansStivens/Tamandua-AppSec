@@ -136,7 +136,7 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
 
 
 def purge(data_dir: Path, uid: str) -> int:
-    """Borra ejecuciones, triage, tickets enlazados, vigilancia y ajustes de rama de un repositorio. Devuelve ejecuciones borradas."""
+    """Borra ejecuciones, triage, tickets enlazados, vigilancia, ajustes de rama y de secretos de un repositorio. Devuelve ejecuciones borradas."""
     from tamandua.modules.pullrequests import watch as pr_watch
     from tamandua.modules.findings import triage
     from tamandua.modules.findings import registry as findings_registry
@@ -151,6 +151,8 @@ def purge(data_dir: Path, uid: str) -> int:
         registry.pop(uid, None)
     from tamandua.modules.findings.exclusions import forget as forget_exclusions
     forget_exclusions(data_dir, uid)
+    from tamandua.modules.scanning import secret_rules
+    secret_rules.forget(data_dir, uid)
     _log.warning("repo_purged", extra={"reason": f"{uid}: {removed} ejecuciones borradas"})
     return removed
 

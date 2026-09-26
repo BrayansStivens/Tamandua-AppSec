@@ -26,6 +26,13 @@ from tamandua.modules.findings.triage import annotate, is_active, load as load_t
 from tamandua.shared.i18n import msg
 
 SEVERITIES = ("critical", "high", "medium", "low")
+# How much of each list the Summary shows (the API declares these bounds).
+TOP_ASSETS = 10
+TOP_CWES = 8
+TOP_ISSUES = 8
+RECENT_RUNS = 8
+ACTIVITY_DAYS = 365
+MAX_TOOLS = 20
 # CWEs with a short name in the catalog (`reports.dashboard.cwe.<id>`).
 CWE_NAMED = frozenset((79, 89, 78, 22, 502, 798, 295, 918, 601, 347, 327, 328, 916, 95, 1333, 1321, 400, 770, 20, 200, 287, 352, 611, 94,
                        1104, 285, 306, 74, 1336, 915, 125, 787, 119, 120, 416, 415, 476, 190, 191, 401, 404, 674, 835, 362, 367, 369, 908,
@@ -182,7 +189,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
 
     activity: Counter = Counter(_day(row["created_at"]) for row in rows)
     year = [{"day": _day((now - timedelta(days=offset)).isoformat()), "runs": activity.get(_day((now - timedelta(days=offset)).isoformat()), 0)}
-            for offset in range(364, -1, -1)]
+            for offset in range(ACTIVITY_DAYS - 1, -1, -1)]
 
     # Los feeds solo se leen si alguna ejecución ya los descargó: abrir el panel no sale a la red.
     feeds = load_feeds(data_dir) if (data_dir / "feeds").is_dir() else {"kev": {}}
@@ -218,7 +225,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
     top_issues = sorted(open_findings, key=lambda pair: (
         {"act": 0, "attend": 1, "track": 2}.get((pair[1].get("priority") or {}).get("action"), 3),
         SEVERITIES.index(pair[1]["severity"]) if pair[1]["severity"] in SEVERITIES else 9,
-        -((pair[1].get("epss") or {}).get("score") or 0)))[:8]
+        -((pair[1].get("epss") or {}).get("score") or 0)))[:TOP_ISSUES]
     latest = records[-1] if records else None
     return {
         "window_days": days, "generated_at": now.isoformat(),
@@ -233,11 +240,11 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                               **{level: over_time.get(_day((now - timedelta(days=offset)).isoformat()), Counter()).get(level, 0) for level in SEVERITIES}}
                              for offset in range(days, -1, -1)],
         "open_vs_fixed": open_vs_fixed,
-        "top_assets": top_assets[:10],
-        "by_cwe": [{"cwe": cwe, "name": msg(f"reports.dashboard.cwe.{cwe}") if cwe in CWE_NAMED else None, "count": count} for cwe, count in cwe_counter.most_common(8)],
+        "top_assets": top_assets[:TOP_ASSETS],
+        "by_cwe": [{"cwe": cwe, "name": msg(f"reports.dashboard.cwe.{cwe}") if cwe in CWE_NAMED else None, "count": count} for cwe, count in cwe_counter.most_common(TOP_CWES)],
         "exploitability": {"kev": kev_items[:25], "high_epss": epss_items[:25], "kev_total": len(kev_items), "epss_total": len(epss_items)},
         "activity": year,
-        "recent_runs": rows[:8],
+        "recent_runs": rows[:RECENT_RUNS],
         "top_issues": [{"title": finding["title"], "severity": finding["severity"], "asset": asset,
                         "action": (finding.get("priority") or {}).get("action"), "run_id": next((r["last_run"] for r in top_assets if r["name"] == asset), None),
                         "epss": (finding.get("epss") or {}).get("score"), "kev": bool(finding.get("kev")), "fingerprint": finding["fingerprint"],
@@ -245,7 +252,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                         if (asset, finding["fingerprint"]) in deadlines else None}
                        for asset, finding in top_issues],
         "kev_news": kev_news, "cve_news": cve_news,
-        "tools": (latest or {}).get("summary", {}).get("tools", []),
+        "tools": ((latest or {}).get("summary", {}).get("tools") or [])[:MAX_TOOLS],
     }
 
 

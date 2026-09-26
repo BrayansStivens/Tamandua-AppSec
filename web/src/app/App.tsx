@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Fragment } from 'rea
 import { Trans, useTranslation } from 'react-i18next'
 import {
   ChevronRight, Clock3, GitPullRequest, LayoutDashboard, Network,
-  Landmark, LogOut, Menu, Monitor, Moon, Play, PlugZap, Radar, SearchCheck, Shield, ShieldAlert, Sun, Layers3, UserRound, UsersRound,
+  Landmark, LogOut, Menu, Monitor, Moon, Play, PlugZap, Radar, ScrollText, SearchCheck, Shield, ShieldAlert, Sun, Layers3, UserRound, UsersRound,
   Bug,
 } from 'lucide-react'
 import { BrandLockup } from '@/shared/ui/brand-mark'
@@ -29,6 +29,7 @@ import { Integrations } from '@/pages/Integrations'
 import { PullRequests } from '@/pages/PullRequests'
 import { ThreatModels } from '@/pages/ThreatModels'
 import { Compliance } from '@/pages/Compliance'
+import { Policies } from '@/pages/Policies'
 import type { RunRow } from '@/shared/lib/types'
 import { LocaleSwitch } from '@/shared/i18n/locale-switch'
 import { formatDate } from '@/shared/i18n/format'
@@ -37,7 +38,7 @@ import { Button } from '@/shared/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/shared/ui/sheet'
 
-type View = 'overview' | 'analyses' | 'new' | 'findings' | 'coverage' | 'repositories' | 'domains' | 'integrations' | 'account' | 'users' | 'pulls' | 'threats' | 'cves' | 'compliance'
+type View = 'overview' | 'analyses' | 'new' | 'findings' | 'coverage' | 'repositories' | 'domains' | 'integrations' | 'account' | 'users' | 'pulls' | 'threats' | 'cves' | 'compliance' | 'policies'
 type Theme = 'system' | 'light' | 'dark'
 
 // Ley de Hick: tres grupos con nombre en vez de once opciones seguidas. Lo que aún no funciona
@@ -57,6 +58,7 @@ const navigation: { id: string; label: string; items: { id: View; label: string;
     { id: 'pulls', label: 'items.pulls', icon: GitPullRequest },
   ] },
   { id: 'settings', label: 'groups.settings', items: [
+    { id: 'policies', label: 'items.policies', icon: ScrollText },
     { id: 'integrations', label: 'items.integrations', icon: PlugZap },
     { id: 'users', label: 'items.users', icon: UsersRound },
   ] },
@@ -65,6 +67,7 @@ const DESCRIPTION: Partial<Record<View, string>> = {
   overview: 'descriptions.overview', analyses: 'descriptions.analyses', new: 'descriptions.new', repositories: 'descriptions.repositories',
   domains: 'descriptions.domains', integrations: 'descriptions.integrations', account: 'descriptions.account', users: 'descriptions.users',
   pulls: 'descriptions.pulls', cves: 'descriptions.cves', compliance: 'descriptions.compliance', threats: 'descriptions.threats',
+  policies: 'descriptions.policies',
 }
 
 function App({ user, session }: { user: SessionUser; session: SessionActions }) {
@@ -182,7 +185,8 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     if (view === 'cves') return <CveTracker onNew={() => selectView('new')} />
     if (view === 'compliance') return <Compliance user={user} onNew={() => selectView('new')} />
     if (view === 'pulls') return <PullRequests user={user} onOpenRun={id => openRun(id, 'findings')} />
-    if (view === 'findings') return <Findings key={selectedId ?? 'current'} user={user} requestedRun={selectedId} onNew={() => selectView('new')} />
+    if (view === 'findings') return <Findings key={selectedId ?? 'current'} user={user} requestedRun={selectedId} onNew={() => selectView('new')} onOpenPolicies={() => selectView('policies')} />
+    if (view === 'policies') return <Policies user={user} />
     if (view === 'coverage') return <CoverageView />
     if (view === 'account') return <Account user={user} onChanged={session.reload} />
     if (view === 'users' && user.role === 'admin') return <Users me={user} />
