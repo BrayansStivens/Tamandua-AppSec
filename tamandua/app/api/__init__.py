@@ -21,6 +21,7 @@ from tamandua.app.api import compliance, findings, intel, reporting, routing, sy
 from tamandua.app.api.deps import ApiError
 from tamandua.app.api.routes import auth, cra, prs, runs, sources, threats  # noqa: F401 — registran sus rutas
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
+from tamandua.modules.identity.auth import COOKIE_NAME
 from tamandua.version import VERSION
 
 ROUTERS = (system, reporting, intel, findings, compliance)
@@ -95,4 +96,10 @@ def openapi_document(data_dir: Path | None = None) -> str:
     app = FastAPI(title="Tamandua", version=VERSION)
     for module in ROUTERS:
         app.include_router(module.router)
-    return json.dumps(get_openapi(title=app.title, version=app.version, routes=app.routes), ensure_ascii=False, indent=2) + "\n"
+    document = get_openapi(title=app.title, version=app.version, routes=app.routes)
+    # Cómo se autentica la API: la cookie de sesión (HttpOnly) en todo, salvo lo que cada ruta declare como público.
+    # Los POST exigen además Origin y la cabecera X-Tamandua-Action (CSRF), que la cookie sola no cubre.
+    document.setdefault("components", {})["securitySchemes"] = {
+        "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Sesión iniciada en el panel."}}
+    document["security"] = [{"session": []}]
+    return json.dumps(document, ensure_ascii=False, indent=2) + "\n"

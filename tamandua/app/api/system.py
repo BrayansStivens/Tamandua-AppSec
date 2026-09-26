@@ -20,7 +20,9 @@ class Health(BaseModel):
     queued: int | None = None
 
 
-@router.get("/api/health", response_model=Health, response_model_exclude_none=True)
+# Pública: sin sesión solo dice que responde; con sesión, también el estado de los workers.
+@router.get("/api/health", response_model=Health, response_model_exclude_none=True,
+            openapi_extra={"security": [{}, {"session": []}]})
 def health(context: Context = Depends(guard(Policy(public=True, enrolment=True)))) -> Health:
     # Sin sesión la salud solo confirma que el proceso responde: nada del estado interno.
     if context.user is None:

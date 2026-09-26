@@ -23,7 +23,13 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {},
+          {
+            "session": []
+          }
+        ]
       }
     },
     "/api/dashboard": {
@@ -1453,6 +1459,19 @@
         ],
         "title": "ValidationError"
       }
+    },
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "tamandua_session",
+        "description": "Sesión iniciada en el panel."
+      }
     }
-  }
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ]
 }

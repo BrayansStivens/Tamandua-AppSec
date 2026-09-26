@@ -16,14 +16,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    for column in ("row", "record"):
-        op.execute(f"""UPDATE runs SET "{column}" = ("{column}" - 'fixture') || jsonb_build_object('target', "{column}"->'fixture')
-                       WHERE "{column}" ? 'fixture'""")
+    # Sentencias literales (sin construir SQL con cadenas): una por columna.
+    op.execute("""UPDATE runs SET "row" = ("row" - 'fixture') || jsonb_build_object('target', "row"->'fixture')
+                  WHERE "row" ? 'fixture'""")
+    op.execute("""UPDATE runs SET record = (record - 'fixture') || jsonb_build_object('target', record->'fixture')
+                  WHERE record ? 'fixture'""")
     op.execute("""UPDATE documents SET body = jsonb_set(body, '{github}', jsonb_build_array(body->'github'))
                   WHERE name = 'integrations' AND jsonb_typeof(body->'github') = 'object'""")
 
 
 def downgrade() -> None:
-    for column in ("row", "record"):
-        op.execute(f"""UPDATE runs SET "{column}" = ("{column}" - 'target') || jsonb_build_object('fixture', "{column}"->'target')
-                       WHERE "{column}" ? 'target'""")
+    op.execute("""UPDATE runs SET "row" = ("row" - 'target') || jsonb_build_object('fixture', "row"->'target')
+                  WHERE "row" ? 'target'""")
+    op.execute("""UPDATE runs SET record = (record - 'target') || jsonb_build_object('fixture', record->'target')
+                  WHERE record ? 'target'""")

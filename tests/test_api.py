@@ -20,6 +20,16 @@ class OpenApiTests(unittest.TestCase):
         self.assertEqual(openapi_document(), (ROOT / "web/src/shared/api/openapi.json").read_text())
 
 
+class OpenApiSecurityTests(unittest.TestCase):
+    def test_document_declares_the_session_cookie_and_the_public_health_route(self):
+        from tamandua.modules.identity.auth import COOKIE_NAME
+        document = json.loads(openapi_document())
+        self.assertEqual(document["components"]["securitySchemes"]["session"], {
+            "type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Sesión iniciada en el panel."})
+        self.assertEqual(document["security"], [{"session": []}])
+        self.assertEqual(document["paths"]["/api/health"]["get"]["security"], [{}, {"session": []}])
+
+
 class StackTests(HttpCase):
     def test_same_security_for_typed_and_table_routes(self):
         # Ruta migrada (FastAPI) y ruta clásica (adaptador): mismo 401, mismas cabeceras.
