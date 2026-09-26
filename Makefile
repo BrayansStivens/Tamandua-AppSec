@@ -30,7 +30,7 @@ export DOCKER_SOCKET_GID
 ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' appsec_agent/scanners.py
 
 .DEFAULT_GOAL := help
-.PHONY: help doctor setup build up down restart status logs ps setup-code engines scan update backup shell cli \
+.PHONY: help doctor setup build up down restart status logs ps setup-code engines scan demo update backup shell cli \
         clean purge dev-setup dev test lint web check
 
 ## —— Uso ———————————————————————————————————————————————————————————————
@@ -94,6 +94,10 @@ engines: ## Descarga las imágenes de los motores que falten (Trivy, OSV-Scanner
 scan: ## Analiza una carpeta local: make scan DIR=../mi-repo ARGS="--base main --fail-on high"
 	@[ -d "$(DIR)" ] || { echo 'Indica la carpeta: make scan DIR=../mi-repo (y opciones en ARGS="--base main")'; exit 2; }
 	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath $(DIR))":/src:ro appsec python -m appsec_agent scan /src --name "$(notdir $(abspath $(DIR)))" $(ARGS)
+
+demo: ## Datos de demostración: analiza los ejemplos vulnerables e importa un modelo de amenazas (IMAGE=nginx:1.21 añade una imagen)
+	@$(COMPOSE) run --rm --no-deps -T -v "$(abspath fixtures)":/demo/fixtures:ro -v "$(abspath web/src/examples/threat-models)":/demo/models:ro \
+		appsec python -m appsec_agent --data-dir /data demo --fixtures /demo/fixtures --models /demo/models $(if $(IMAGE),--image "$(IMAGE)",)
 
 update: ## Actualiza el código (git pull) y reconstruye
 	git pull --ff-only

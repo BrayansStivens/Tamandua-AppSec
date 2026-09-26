@@ -161,7 +161,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     if (view === 'analyses') return <AnalysisList refreshKey={rows.length * 1000 + rows.filter(row => row.status === 'running' || row.status === 'queued').length} onOpen={id => openRun(id, 'findings')} onNew={() => selectView('new')} viewer={{ username: user.username, admin: user.role === 'admin' }} />
     if (view === 'repositories') return <CodeSources showRepositories runs={rows} onScan={scanSource} canManage={user.role === 'admin'} />
     if (view === 'domains') return <ComingSoonPage title="Pruebas dinámicas de aplicaciones web y API (DAST)" description="Pruebas dinámicas (DAST) contra tus aplicaciones en marcha, solo sobre dominios cuya propiedad hayas demostrado." plan={['Verificación de propiedad del dominio por DNS TXT (ya implementada, se activará con el resto)', 'Escaneo activo con ZAP o Nuclei en un contenedor aislado, con límites de velocidad y de alcance', 'Autenticación en la aplicación con una cuenta de prueba que tú declares', 'Hallazgos con la petición y la respuesta que los demuestran, en el mismo ciclo de vida que los del código']} />
-    if (view === 'overview') return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
+    if (view === 'overview') return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onNavigate={view => selectView(view as View)} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
     if (view === 'threats') return <ThreatModels user={user} onOpenRun={id => openRun(id, 'findings')} />
     if (view === 'cves') return <CveTracker onNew={() => selectView('new')} />
     if (view === 'pulls') return <PullRequests user={user} onOpenRun={id => openRun(id, 'findings')} />
@@ -170,7 +170,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     if (view === 'account') return <Account user={user} onChanged={session.reload} />
     if (view === 'users' && user.role === 'admin') return <Users me={user} />
     if (view === 'integrations') return <Integrations user={user} />
-    return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
+    return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onNavigate={view => selectView(view as View)} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
   }
 
   return <div className="min-h-screen bg-app text-app-fg"><TopProgress /><div className="flex min-h-screen">

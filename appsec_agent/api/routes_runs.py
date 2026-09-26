@@ -509,6 +509,8 @@ def reverify_finding(request: Request):
     if state.jobs.pending() >= 20:
         return request.json(429, {"error": "Demasiados escaneos en cola"})
     source = base.get("source") or {}
+    if source.get("id") == "local:demo-ejemplos":
+        return request.json(409, {"error": "Son datos de demostración: se vuelven a analizar con «make demo». Reverificar funciona en tus repositorios e imágenes."})
     if base["type"] == "image_scan":
         try:
             image = parse_reference(str((source.get("image") or {}).get("reference") or base.get("fixture") or ""))
@@ -579,6 +581,27 @@ def image_batch(request: Request):
         return request.json(409, {"error": str(exc)})
     request.log.info("scan_image_batch", extra={"user": request.user["username"], "reason": label})
     return request.json(202, batches.summary(request.data_dir, batch))
+
+
+@route("GET", "/api/onboarding")
+def onboarding(request: Request):
+    """Primeros pasos, deducidos del estado real (nada se marca a mano): el Resumen los muestra hasta completarlos."""
+    from .. import notifications, pr_watch
+    from ..kinds import FULL_SCANS
+    runs = list_runs(request.data_dir)
+    try:
+        alerts = bool(notifications.channels())
+    except Exception:  # noqa: BLE001 — sin bóveda legible, el paso simplemente queda pendiente
+        alerts = False
+    return request.json(200, {
+        "mfa": bool((request.user.get("totp") or {}).get("enabled")),
+        "github": bool(github_installations(request.data_dir)),
+        # La demo no cuenta como «tu primer análisis»: es para ver la herramienta, no tu código.
+        "analyzed": any(row["type"] in FULL_SCANS and row["status"] == "completed"
+                        and (row.get("source") or {}).get("id") != "local:demo-ejemplos" for row in runs),
+        "demo": any((row.get("source") or {}).get("id") == "local:demo-ejemplos" for row in runs),
+        "watching": any(config.get("enabled") for config in pr_watch.load(request.data_dir)["repositories"].values()),
+        "alerts": alerts, "admin": request.user.get("role") == "admin"})
 
 
 @route("GET", "/api/notifications", admin=True)

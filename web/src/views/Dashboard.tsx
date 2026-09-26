@@ -1,3 +1,4 @@
+import { GettingStarted } from '@/components/getting-started'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Activity, ArrowRight, Flame, RefreshCw, ShieldAlert, Wrench } from 'lucide-react'
 import { ActivityHeatmap, FoundVsFixed, HBars, SeverityBar, StackedSeverityBars, sevColor, sevName } from '@/components/charts/charts'
@@ -15,7 +16,7 @@ const SEVERITY_ES: Record<string, string> = { critical: 'crítica', high: 'alta'
 const SeveritySkyline = lazy(() => import('@/components/charts/skyline').then(module => ({ default: module.SeveritySkyline })))
 const WINDOWS: [number, string][] = [[7, 'Últimos 7 días'], [30, 'Últimos 30 días'], [90, 'Últimos 90 días'], [365, 'Último año']]
 
-export function Dashboard({ onOpenRun, onNew, onTracker }: { onOpenRun: (id: string) => void; onNew: () => void; onTracker: (id?: string) => void }) {
+export function Dashboard({ onOpenRun, onNew, onTracker, onNavigate }: { onOpenRun: (id: string) => void; onNew: () => void; onTracker: (id?: string) => void; onNavigate: (view: string) => void }) {
   const [days, setDays] = useState(30)
   const [data, setData] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +32,8 @@ export function Dashboard({ onOpenRun, onNew, onTracker }: { onOpenRun: (id: str
       <div className="flex items-center gap-2"><Select value={String(days)} onValueChange={value => setDays(Number(value ?? 30))}><SelectTrigger size="sm" className="min-w-40 border-app-line bg-app-soft text-app-secondary">{WINDOWS.find(([value]) => value === days)?.[1]}</SelectTrigger><SelectContent align="end" className="border border-app-line bg-panel p-1 text-app-fg shadow-xl">{WINDOWS.map(([value, label]) => <SelectItem key={value} value={String(value)}>{label}</SelectItem>)}</SelectContent></Select><Button variant="ghost" size="icon-sm" aria-label="Actualizar" onClick={() => void load()}><RefreshCw /></Button></div>
     </div>
 
-    {empty && <Card className="border-app-line bg-panel"><CardContent className="flex flex-col items-center gap-3 py-12 text-center"><Activity className="size-7 text-app-subtle" /><p className="font-medium">Todavía no hay ejecuciones</p><p className="max-w-md text-sm text-app-muted">El panel se calcula a partir de tus escaneos: hallazgos abiertos por severidad, qué se corrigió entre ejecuciones, exploitabilidad y actividad.</p><Button onClick={onNew} className="bg-primary text-primary-foreground hover:bg-primary/90">Nuevo análisis <ArrowRight /></Button></CardContent></Card>}
+    <GettingStarted onNavigate={onNavigate} />
+    {empty && <Card className="border-app-line bg-panel"><CardContent className="flex flex-col items-center gap-3 py-12 text-center"><Activity className="size-7 text-app-subtle" /><p className="font-medium">Todavía no hay ejecuciones</p><p className="max-w-md text-sm text-app-muted">El panel se calcula a partir de tus escaneos: hallazgos abiertos por severidad, qué se corrigió entre ejecuciones, exploitabilidad y actividad.</p><Button variant="outline" onClick={onNew} className="border-app-line bg-app-soft">Nuevo análisis <ArrowRight /></Button></CardContent></Card>}
 
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
       <Kpi label="Puntuación" value={kpis.security_score.value} suffix="/100" hint={kpis.security_score.formula} tone={kpis.security_score.value >= 80 ? 'teal' : kpis.security_score.value >= 50 ? 'amber' : 'rose'} />

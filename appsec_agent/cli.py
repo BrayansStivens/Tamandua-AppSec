@@ -86,6 +86,10 @@ def main(argv: list[str] | None = None) -> int:
     local.add_argument("--name", help="Nombre a mostrar (por defecto, el de la carpeta; útil dentro de un contenedor)")
     image = commands.add_parser("scan-image", help="Analizar una imagen de contenedor desde su registro, sin ejecutarla")
     image.add_argument("--reference", required=True, help="registro/repositorio:etiqueta, p. ej. ghcr.io/acme/api:1.4")
+    demo = commands.add_parser("demo", help="Cargar datos de demostración: analiza los ejemplos vulnerables e importa un modelo de amenazas")
+    demo.add_argument("--fixtures", type=Path, default=Path("fixtures"), help="Carpeta con sast-samples y scanner-samples")
+    demo.add_argument("--models", type=Path, default=Path("web/src/examples/threat-models"), help="Carpeta con los modelos de ejemplo")
+    demo.add_argument("--image", help="Además, analizar esta imagen pública (p. ej. nginx:1.21)")
     commands.add_parser("providers", help="Mostrar qué proveedores de IA tienen credencial en el servidor")
     commands.add_parser("github-app", help="Estado de la GitHub App de este servidor (sin secretos)")
     engines = commands.add_parser("engines", help="Estado de las imágenes de los motores de análisis")
@@ -164,6 +168,16 @@ def main(argv: list[str] | None = None) -> int:
                               "summary": {key: record["summary"].get(key) for key in ("candidates", "severities", "agreement", "kev")}},
                              ensure_ascii=False, indent=2))
             return 3 if record["status"] == "incomplete" else 2 if record["summary"]["candidates"] else 0
+        if args.command == "demo":
+            from .demo import seed
+            from .image_scan import ImageError
+            try:
+                result = seed(args.data_dir, fixtures=args.fixtures, models=args.models, image=args.image,
+                              report=lambda message: print(message, flush=True))
+            except (FileNotFoundError, ImageError) as exc:
+                parser.exit(1, f"Error: {exc}\n")
+            print("Listo: abre el panel y mira Resumen, Hallazgos y Amenazas.")
+            return 0 if result.get("code", {}).get("status") == "completed" else 3
         if args.command == "providers":
             print(json.dumps(provider_status(), ensure_ascii=False, indent=2))
             return 0

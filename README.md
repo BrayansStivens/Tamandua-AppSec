@@ -4,56 +4,61 @@
 
 <p align="center"><strong>Se come tus bugs.</strong> Seguridad de aplicaciones autoalojada, libre y sin enviar tu código a nadie.</p>
 
-Seguridad de aplicaciones **autoalojada** para personas y equipos pequeños. Conectas tus repositorios de GitHub y Tamandua los analiza, comenta en tus pull requests lo que introducen y lleva el estado de cada hallazgo hasta que se corrige. Todo corre en tu máquina, con tus credenciales: tu código no va a ningún servicio nuestro.
+Tamandua analiza tus repositorios e imágenes de contenedor, te dice **qué corregir primero y cómo** (el comando exacto o un ejemplo de código), comprueba que quedó corregido y **vigila solo** lo que cambia después. Todo corre en tu máquina, con tus credenciales: tu código no va a ningún servicio nuestro.
 
 > Estado: **beta (v0.9)**. Funcional y con pruebas, pero la API y los formatos de `data/` aún pueden cambiar entre versiones.
 
+## Por qué Tamandua
+
+- **Autoalojado y libre (AGPL-3.0).** El código, las dependencias y los hallazgos se quedan en tu servidor.
+- **Un solo sitio para todo:** código (SAST), dependencias, secretos, infraestructura como código, pipelines e imágenes, con siete motores abiertos y sin duplicados entre ellos.
+- **Del hallazgo a la corrección verificada:** prioridad real (CISA KEV y EPSS), comando de corrección por gestor de paquetes, botón «Reverificar» y remediación automática cuando deja de aparecer.
+- **En español y pensado para equipos pequeños**, con evidencia lista para auditorías SOC 2 e ISO 27001 y modelado de amenazas conectado a los hallazgos reales.
+
 ## Qué hace
 
-- **Análisis de código** con Trivy (dependencias, IaC, secretos), Gitleaks (secretos), Opengrep con 58 reglas SAST propias en JavaScript/TypeScript, Python, Java, Go, PHP, Ruby y C#, **Checkov** (Terraform, CloudFormation, Kubernetes, Helm, pipelines…) y **zizmor** (GitHub Actions). Si dos motores ven lo mismo, queda un solo hallazgo. El código nunca se ejecuta.
-- **Imágenes de contenedor** desde su registro (Docker Hub, GHCR, ECR…), sin ejecutarlas: paquetes con **Trivy + Grype**, secretos en capas, en `ENV` y en el historial de construcción, y configuración con reglas propias y **Checkov** sobre el historial de construcción.
-- **Priorización real**: cada aviso de dependencia se cruza con CISA KEV (explotación activa) y EPSS (probabilidad de explotación), con la versión exacta que lo corrige.
-- **Revisión de pull requests**: solo cuenta lo que el PR introduce; publica un comentario y un estado de commit que puede bloquear el merge según el umbral que elijas.
-- **Ciclo de vida de hallazgos** por repositorio: remediación automática cuando un escaneo o un commit del PR ya no lo encuentra, triage con motivo e historial.
-- **CVE tracker**: copia local completa de NVD con buscador, filtros por severidad/año/KEV y «¿te afecta?».
-- **Modelado de amenazas** STRIDE propuesto a partir de tus repositorios, con editor visual de diagramas y amenazas con indicios en hallazgos reales.
-- **Informes** PDF paginados para hallazgos y amenazas (general, SOC 2 Tipo II e ISO/IEC 27001:2022), además de JSON, Markdown y SARIF; exportación a **Jira** sin duplicados.
-- **Equipo**: invitaciones, roles y segundo factor (TOTP).
+| | |
+| --- | --- |
+| **Encontrar** | Opengrep con 58 reglas propias (JS/TS, Python, Java, Go, PHP, Ruby, C#), Gitleaks, Trivy y OSV-Scanner para dependencias, Checkov y zizmor para IaC y GitHub Actions, Trivy + Grype para imágenes. El código nunca se ejecuta. Uno o varios repositorios, una organización entera o varias imágenes a la vez. |
+| **Priorizar** | Cada aviso cruzado con CISA KEV (explotación activa) y EPSS (probabilidad de explotación); las dependencias agrupadas por paquete con la versión que cierra todos sus avisos. |
+| **Corregir** | En cada hallazgo, cómo corregirlo: el comando de tu gestor (npm, pip, Poetry, Go, Cargo, Maven…), el override si es transitiva, un ejemplo antes/después para el código o los pasos para rotar un secreto. Exportación a Jira sin duplicados. |
+| **Verificar** | «Reverificar» vuelve a analizar y te dice «Corregido ✓» o «Sigue presente». En los pull requests solo cuenta lo que el PR introduce, con comentario y estado que puede bloquear el merge. |
+| **Vigilar** | Reanálisis automático cuando cambia la rama principal, avisos nuevos a diario contra tus dependencias (sin conexión) y mensajes a **Slack, Teams o un webhook** cuando aparece algo que importa. |
+| **Demostrar** | Informes PDF técnicos y de evidencia (SOC 2 Tipo II, ISO/IEC 27001:2022, consolidado de organización), SARIF, JSON y Markdown; modelado de amenazas (STRIDE, LINDDUN, PASTA, árboles, ATT&CK) con diagrama; CVE tracker local de NVD. |
 
-**En desarrollo** (se ven en gris en el panel y aún no dan resultados): pruebas dinámicas (DAST) de aplicaciones web y API sobre dominios verificados, GitLab, Bitbucket y Azure DevOps, y asistencia con IA opcional. También vendrá una API pública con tokens. El análisis desde la terminal y en CI ya está: [docs/cli.md](docs/cli.md).
+**En desarrollo** (en gris en el panel): pruebas dinámicas (DAST), GitLab/Bitbucket/Azure DevOps (hoy se cubren con [`scan` en CI](docs/cli.md)) y asistencia con IA opcional.
 
-## Inicio rápido
+## Pruébalo en 5 minutos
 
-Necesitas **Docker** (Engine 24+ con Compose v2.24+), **make** y **git**, 4 GB de memoria y 8 GB de disco libres. `make doctor` comprueba todo; detalles en [docs/instalacion.md](docs/instalacion.md).
+Necesitas **Docker** (Engine 24+ con Compose v2.24+), **make** y **git**, 4 GB de memoria y 8 GB de disco. `make doctor` lo comprueba.
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git
 cd appsec-agent
 make up
+make demo
 ```
 
-`make up` crea tu `.env`, construye las imágenes, descarga los motores que falten, arranca y te muestra la URL y el **código de configuración**. `make help` lista el resto (logs, copias de seguridad, actualizar…); están todos en [docs/contenedores.md](docs/contenedores.md).
+`make up` construye, descarga los motores, arranca y te muestra la URL y el **código de configuración**. `make demo` analiza de verdad los ejemplos vulnerables que trae el repositorio e importa un modelo de amenazas, para ver Tamandua funcionando sin conectar nada (`make demo IMAGE=nginx:1.21` añade una imagen).
 
-Abre <http://127.0.0.1:8766> y:
-
-1. **Crea el administrador** con el código que imprimió el servidor. Solo sirve una vez: así nadie más que quien controla el servidor puede reclamar la instancia. Después activa el segundo factor.
-2. **Crea tu GitHub App** en *Integraciones*: el panel te guía paso a paso con los permisos exactos y al final pegas el App ID y subes la clave `.pem`. También en [docs/github-app.md](docs/github-app.md).
-3. **Instálala** en los repositorios que quieras (*Only select repositories*) y lanza el primer análisis desde *Repositorios*.
+Abre <http://127.0.0.1:8766>, crea el administrador con el código y sigue **Primeros pasos** en el Resumen. La guía completa, con qué es opcional: [docs/inicio-rapido.md](docs/inicio-rapido.md).
 
 ## Documentación
 
 | | |
 | --- | --- |
+| [Inicio rápido](docs/inicio-rapido.md) | De cero al primer hallazgo corregido, y qué configurar después |
 | [Instalación](docs/instalacion.md) | Requisitos, primer arranque, actualizar, copias de seguridad, desinstalar |
 | [Conectar GitHub](docs/github-app.md) | Crear la GitHub App paso a paso y revisar PRs |
-| [Contenedores y Makefile](docs/contenedores.md) | Comandos `make`, imágenes y endurecimiento |
+| [Terminal y CI](docs/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos para CI |
+| [Funcionalidades](docs/funcionalidades.md) | Qué hace cada parte y con qué criterio |
 | [Configuración](docs/configuracion.md) | Variables de `.env` |
 | [Seguridad](docs/seguridad.md) | Secretos, transporte, qué sale de tu máquina y concesiones |
-| [Funcionalidades](docs/funcionalidades.md) | Qué hace cada parte y con qué criterio |
+| [Contenedores y Makefile](docs/contenedores.md) | Comandos `make`, imágenes y endurecimiento |
 | [Arquitectura](docs/arquitectura.md) | Componentes, flujo de un análisis y datos en disco |
 | [Solución de problemas](docs/solucion-problemas.md) | Errores frecuentes |
-| [Terminal y CI](docs/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos para CI |
 | [Desarrollo](docs/desarrollo.md) | Sin contenedores, CLI y pruebas |
+| [Software de terceros](THIRD_PARTY_NOTICES.md) | Licencias de los motores, las bases de avisos y las dependencias |
 
 ## Seguridad, en corto
 
@@ -61,7 +66,7 @@ Abre <http://127.0.0.1:8766> y:
 - GitHub App con solo cuatro permisos (`contents: read`, `metadata: read`, `pull_requests: write`, `statuses: write`), sin webhooks ni OAuth; tokens de una hora en memoria. Para varias organizaciones se configura como **Any account** y se conecta cada instalación explícitamente en el panel.
 - Panel en `127.0.0.1` por defecto. Si lo publicas fuera de tu máquina sin **HTTPS**, el servidor no arranca.
 - Credenciales de registros privados cifradas y pasadas a los motores por variable de entorno; los registros de red interna se bloquean salvo permiso expreso.
-- Sin telemetría. Solo se consulta OSV con los nombres de tus dependencias si lo autorizas en cada análisis.
+- Sin telemetría. Las bases de avisos se descargan y se consultan en local; tus dependencias solo salen hacia OSV si lo autorizas en un análisis. Los avisos solo van a los canales que configures.
 - **Concesión:** la app lanza los motores por el socket de Docker, lo que equivale a root en el host. Expón el panel solo a gente de confianza.
 
 Para reportar una vulnerabilidad: [SECURITY.md](SECURITY.md).

@@ -183,7 +183,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
                 <span className="font-mono text-xs text-app-muted">{group.epss !== null ? `${(group.epss * 100).toFixed(1)}%` : '—'}</span>
                 <span className="text-xs text-app-muted">{scannerLabel[group.scanner] ?? group.scanner}{group.findings[0].tool ? <span className="block text-[11px] text-app-subtle">{toolsOf(group.findings[0])}</span> : null}</span>
               </button>
-              {expanded && <div className="space-y-3 border-t border-app-line bg-inset py-4 pr-4 pl-3">{group.findings.map(finding => <FindingDetail key={finding.finding_id} finding={finding} runId={run.id} canAccept={canAccept} onChanged={onChanged} onPick={status => setDecision({ status, fingerprints: [finding.fingerprint] })} />)}</div>}
+              {expanded && <div className="space-y-3 border-t border-app-line bg-inset py-4 pr-4 pl-3">{group.findings.map(finding => <FindingDetail key={finding.finding_id} finding={finding} runId={run.id} demo={(run.source as { id?: string } | undefined)?.id === 'local:demo-ejemplos'} canAccept={canAccept} onChanged={onChanged} onPick={status => setDecision({ status, fingerprints: [finding.fingerprint] })} />)}</div>}
               </div>
             </div> })}
           <Pagination total={groups.length} limit={PAGE} offset={Math.min(offset, Math.max(0, groups.length - 1))} onPrev={() => setOffset(current => Math.max(0, current - PAGE))} onNext={() => setOffset(current => current + PAGE)} noun={`elementos · ${findings.length} hallazgos`} />
@@ -207,7 +207,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   </div>
 }
 
-function FindingDetail({ finding, runId, canAccept, onPick, onChanged }: { finding: RepositoryFinding; runId: string; canAccept: boolean; onPick: (status: TriageStatus) => void; onChanged: () => void }) {
+function FindingDetail({ finding, runId, demo, canAccept, onPick, onChanged }: { finding: RepositoryFinding; runId: string; demo: boolean; canAccept: boolean; onPick: (status: TriageStatus) => void; onChanged: () => void }) {
   const advisory = finding.advisory
   const pkg = finding.package
   return <div className="rounded-xl border border-app-line bg-panel p-4">
@@ -224,7 +224,8 @@ function FindingDetail({ finding, runId, canAccept, onPick, onChanged }: { findi
     <FixSection fix={finding.fix} remediation={finding.remediation} />
     {finding.lifecycle?.status !== 'excluded' && (finding.lifecycle?.status !== 'fixed' || finding.verification) && <Reverify runId={runId} fingerprint={finding.fingerprint} verification={finding.verification}
       onChanged={onChanged} canVerify={finding.lifecycle?.status !== 'fixed'}
-      blocked={finding.lifecycle?.origin?.kind === 'pr' && !finding.lifecycle.origin.merged ? 'Viene de un pull request abierto: se verifica solo en cada push del PR.' : null} />}
+      blocked={demo ? 'Datos de demostración: se vuelven a analizar con «make demo».'
+        : finding.lifecycle?.origin?.kind === 'pr' && !finding.lifecycle.origin.merged ? 'Viene de un pull request abierto: se verifica solo en cada push del PR.' : null} />}
     {finding.priority && <p className="mt-3 text-xs leading-5 text-app-subtle"><span className="font-medium text-app-muted">Por qué esta prioridad: </span>{finding.priority.factors.join(' · ')}</p>}
     {(finding.tool || finding.also_detected_by?.length) && <p className="mt-2 text-xs text-app-subtle">Detectado por {toolLabel[finding.tool ?? ''] ?? finding.tool}{finding.also_detected_by?.length ? ` y ${finding.also_detected_by.map(tool => toolLabel[tool] ?? tool).join(', ')}` : ''}{finding.related_rules?.length ? <> · mismo problema que <span className="font-mono">{finding.related_rules.join(', ')}</span>, unido para no duplicarlo</> : null}.</p>}
     {finding.source?.name && <p className="mt-1 text-xs text-app-subtle">Fuente del aviso: {finding.source.url

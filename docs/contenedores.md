@@ -42,6 +42,7 @@ Funciona igual en macOS (Apple Silicon e Intel), Linux y Windows con WSL o Git B
 | `make setup` | Solo crea `.env` y las carpetas; no toca un `.env` existente. |
 | `make build` | Construye las imágenes de la app y de Opengrep. |
 | `make up` | Construye si hace falta, arranca, descarga los motores que falten y muestra URL y código. |
+| `make demo` | Analiza los ejemplos vulnerables del repositorio e importa un modelo de amenazas, para probar sin conectar nada. `IMAGE=nginx:1.21` añade una imagen. |
 | `make down` | Para y elimina los contenedores. `data/` y `config/` se conservan. |
 | `make restart` | Reinicia la app. Los análisis en curso se marcan como fallidos. |
 | `make status` | Estado de los contenedores y de las imágenes de los motores. |
