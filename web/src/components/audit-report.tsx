@@ -68,12 +68,12 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
       <DialogDescription>Un PDF conciso con alcance, método, hallazgos con su estado, excepciones aprobadas y firmas. Todo es opcional: sin tocar nada se genera con valores por defecto.</DialogDescription></DialogHeader>
     <form className="space-y-5" onSubmit={submit}>
       {/* Ley de Hick: ocho marcos en un selector, con lo que aporta el elegido debajo. */}
-      <div className="space-y-2"><span id="audit-framework" className={label}>Marco</span>
+      <div className="space-y-2"><label htmlFor="audit-framework" className={label}>Marco</label>
         <Select value={framework} onValueChange={value => setFramework((value ?? 'general') as Framework)}>
-          <SelectTrigger aria-labelledby="audit-framework" className="w-full border-app-line bg-inset">{FRAMEWORKS.find(([id]) => id === framework)?.[1]}</SelectTrigger>
+          <SelectTrigger id="audit-framework" className="w-full border-app-line bg-inset">{FRAMEWORKS.find(([id]) => id === framework)?.[1]}</SelectTrigger>
           <SelectContent className="border border-app-line bg-panel p-1 text-app-fg shadow-xl">{FRAMEWORKS.map(([id, text]) => <SelectItem key={id} value={id}>{text}</SelectItem>)}</SelectContent>
         </Select>
-        <p className="text-xs text-app-muted">{FRAMEWORKS.find(([id]) => id === framework)?.[2]}. La relación con cada control es orientativa.</p></div>
+        <p className="text-xs text-app-muted">{FRAMEWORKS.find(([id]) => id === framework)?.[2]}.{framework === 'general' ? '' : ' La relación con cada control es orientativa.'}</p></div>
 
       {portfolio ? <p className="rounded-lg border border-app-line bg-inset p-3 text-sm text-app-muted">Todos los repositorios analizados de la organización, su cobertura frente a GitHub (cuáles no tienen un análisis completo), los críticos y altos abiertos y las excepciones, en un solo documento.</p>
       : <fieldset className="space-y-2"><legend className={label}>Hallazgos del informe</legend>

@@ -52,8 +52,8 @@ def _artifact(request: Request, record: dict, artifact: str):
                             "application/sarif+json")
     if artifact == SBOM_FILE and repository:
         scan = sbom.latest_scan(request.data_dir, record["source"]["id"]) if record["type"] == "asset_state" else record
-        if scan is None or scan.get("type") not in FULL_SCANS:
-            return request.json(404, {"error": "El SBOM sale de un análisis completo terminado: este activo aún no tiene uno."})
+        if scan is None or scan.get("type") not in FULL_SCANS or scan.get("status") != "completed":
+            return request.json(404, {"error": "El SBOM sale de un análisis completo que haya terminado: este no lo es."})
         return _json_file(request, sbom.cyclonedx(scan, version=VERSION), "application/vnd.cyclonedx+json")
     if artifact == VEX_FILE and repository:
         return _json_file(request, vex.openvex(record, version=VERSION), "application/json")

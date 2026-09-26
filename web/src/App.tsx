@@ -168,7 +168,7 @@ function App({ user, session }: { user: SessionUser; session: SessionActions }) 
     if (view === 'overview') return <Dashboard onOpenRun={id => openRun(id, 'findings')} onNew={() => selectView('new')} onNavigate={view => selectView(view as View)} onTracker={id => id ? writeRoute('cves', { id }) : selectView('cves')} />
     if (view === 'threats') return <ThreatModels user={user} onOpenRun={id => openRun(id, 'findings')} />
     if (view === 'cves') return <CveTracker onNew={() => selectView('new')} />
-    if (view === 'compliance') return <Compliance user={user} />
+    if (view === 'compliance') return <Compliance user={user} onNew={() => selectView('new')} />
     if (view === 'pulls') return <PullRequests user={user} onOpenRun={id => openRun(id, 'findings')} />
     if (view === 'findings') return <Findings key={selectedId ?? 'current'} user={user} requestedRun={selectedId} onNew={() => selectView('new')} />
     if (view === 'coverage') return <CoverageView />

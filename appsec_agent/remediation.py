@@ -48,7 +48,7 @@ def fix_groups(findings: list[dict], *, by_rule: bool = False) -> list[dict]:
     result = []
     for key, items in groups.items():
         entry = {"kind": key[0], "severity": _worst(items), "items": items, "counts": _counts(items), "ids": _ids(items),
-                 "kev": any(item.get("kev") for item in items),
+                 "kev": any(item.get("kev") for item in items), "malicious": any(item.get("malicious") for item in items),
                  "epss": max(((item.get("epss") or {}).get("score") or 0 for item in items), default=0)}
         if key[0] == "package":
             fixes = [item["package"]["fixed_version"] for item in items if item["package"].get("fixed_version")]
@@ -60,12 +60,16 @@ def fix_groups(findings: list[dict], *, by_rule: bool = False) -> list[dict]:
         elif key[0] == "rule":
             entry.update(rule=key[2], title=items[0].get("title") or key[2])
         result.append(entry)
-    return sorted(result, key=lambda entry: (not entry["kev"], ORDER.get(entry["severity"], 9), -len(entry["items"]), -entry["epss"],
+    # Lo malicioso y lo explotado activamente, primero.
+    return sorted(result, key=lambda entry: (not entry["malicious"], not entry["kev"], ORDER.get(entry["severity"], 9), -len(entry["items"]), -entry["epss"],
                                              entry.get("path") or entry["items"][0].get("path") or ""))
 
 
 def action(entry: dict, *, short: bool = False) -> str:
     """Qué hacer, en una frase. `short`: para una celda de tabla (el detalle lleva la guía completa)."""
+    if entry.get("malicious"):
+        # Código hostil: no hay versión que «corrija», se quita (mismo criterio que la guía de corrección del panel).
+        return f"Eliminar {entry.get('name') or 'el paquete'} {entry.get('version') or ''} y rotar las credenciales de donde se instaló".replace("  ", " ")
     if entry["kind"] == "package":
         name, count = entry["name"], len(entry["items"])
         fixed = sum(1 for item in entry["items"] if item["package"].get("fixed_version"))

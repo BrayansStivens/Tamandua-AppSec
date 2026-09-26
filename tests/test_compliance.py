@@ -40,6 +40,11 @@ class MaliciousTests(unittest.TestCase):
         fix_guide.attach([finding, other])
         self.assertIn("paquete malicioso", other["fix"]["steps"][0])
         self.assertFalse(any("Actualiza" in step for step in finding["fix"]["steps"]))
+        # Los informes (tabla y «qué hacer primero») dicen lo mismo que el panel, y lo malicioso va primero.
+        from appsec_agent.remediation import action, fix_groups
+        groups = fix_groups([_finding("c" * 64, "critical", package="axios"), finding, other])
+        self.assertTrue(groups[0]["malicious"])
+        self.assertTrue(action(groups[0], short=True).startswith("Eliminar event-stream 3.3.6"))
 
 
 class SbomAndVexTests(unittest.TestCase):
@@ -70,6 +75,12 @@ class SbomAndVexTests(unittest.TestCase):
         document = sbom.cyclonedx(record, version="0.9", now=NOW)
         self.assertEqual(document["components"][0]["purl"], "pkg:deb/debian/libc6@2.31-13")
         self.assertEqual((document["metadata"]["component"]["type"], document["metadata"]["lifecycles"][0]["phase"]), ("container", "post-build"))
+
+    def test_an_incomplete_inventory_is_declared_not_presented_as_complete(self):
+        record = {**self.record(), "steps": [{"name": "Trivy", "status": "inconclusive", "tool": {"name": "trivy"}}]}
+        document = sbom.cyclonedx(record, version="0.9", now=NOW)
+        self.assertEqual(document["compositions"], [{"aggregate": "incomplete", "assemblies": ["pkg:github/acme/api"]}])
+        self.assertNotIn("compositions", sbom.cyclonedx(self.record(), version="0.9", now=NOW))
 
     def test_an_old_scan_without_inventory_still_gives_a_valid_document(self):
         document = sbom.cyclonedx({"id": "x", "source": {"name": "viejo"}}, version="0.9", now=NOW)
@@ -116,6 +127,8 @@ class ExportRouteTests(HttpCase):
         status, body, _ = self.get(f"/api/assets/export?key={self.key}&artifact=vex.openvex.json&status=open")
         self.assertEqual((status, body["statements"][0]["status"]), (200, "not_affected"))  # también lo descartado
         self.assertEqual(self.get(f"/api/assets/export?key={self.key}&artifact=sbom.xml")[0], 404)
+        broken = save_repository_scan(self.data_dir, {**_scan("org/api", [], datetime.now(timezone.utc).isoformat()), "status": "incomplete"})
+        self.assertEqual(self.get(f"/api/runs/{broken['id']}/sbom.cdx.json")[0], 404)  # no se exporta como si hubiera terminado
 
 
 class EuvdTests(unittest.TestCase):
@@ -219,13 +232,20 @@ class CraRouteTests(HttpCase):
             self.assertEqual(self.call("GET", "/api/cra", headers={"Cookie": member})[0], 200)
             self.assertEqual(self.post("/api/cra", "cra", body, member)[0], 403)
             status, state, _ = self.post("/api/cra", "cra", body, admin)
-            self.assertEqual((status, state["products"][0]["name"]), (200, "API"))
+            self.assertEqual((status, state["products"][0]["name"], bool(state["products"][0]["last_complete"])), (200, "API", True))
             for bad in ({**body, "key": "github:otro"}, {**body, "extra": 1}, {"op": "mark", "event": "x|y", "stage": "early_warning", "sent": "si"},
                         {**body, "support_until": "mañana"}):
                 self.assertEqual(self.post("/api/cra", "cra", bad, admin)[0], 400, bad)
 
 
 class FrameworkTests(unittest.TestCase):
+    def test_controls_that_rely_on_deadlines_say_whether_the_report_has_them(self):
+        from test_report_design import text as pdf_text
+        findings = [{**_finding("a" * 64, "critical"), "triage": {"status": "open"}}]
+        record = {"id": "r", "type": "repository_scan", "created_at": "2026-09-25", "source": {"name": "acme/api"}}
+        content = pdf_text(render_audit_pdf(record, findings, validate_options({"framework": "pci"}, default_by="ana"), version="0.9"))
+        self.assertIn("no incluye los plazos", content)
+
     def test_every_framework_renders(self):
         findings = [{**_finding("a" * 64, "critical"), "triage": {"status": "open"}}]
         record = {"id": "r", "type": "repository_scan", "created_at": "2026-09-25", "source": {"name": "acme/api"}}

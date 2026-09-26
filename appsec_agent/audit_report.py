@@ -15,7 +15,7 @@ import html
 from datetime import date, datetime, timezone
 
 from reportlab.lib.units import mm
-from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table
+from reportlab.platypus import CondPageBreak, KeepTogether, Paragraph, Spacer, Table
 
 from .data_sources import attribution
 from .remediation import action, counts_text, fix_groups
@@ -43,13 +43,13 @@ FRAMEWORKS = {
         ("6.2.4", "Prevenir ataques comunes en el software", "Análisis estático del código propio contra inyección, XSS, deserialización y demás fallos comunes."),
         ("6.3.1", "Identificar vulnerabilidades y clasificar su riesgo", "Hallazgos con severidad, explotación activa (CISA KEV) y probabilidad (EPSS)."),
         ("6.3.2", "Inventario del software y sus componentes", "Inventario de dependencias exportable como SBOM (CycloneDX) desde cada análisis."),
-        ("6.3.3", "Parches críticos en el plazo de un mes", "Plazos de corrección por severidad y hallazgos fuera de plazo (sección «Plazos de corrección»)."),
+        ("6.3.3", "Parches críticos en el plazo de un mes", "Plazos de corrección por severidad y hallazgos fuera de plazo."),
     ]),
     "cra": ("Reglamento de Ciberresiliencia (UE) 2024/2847", [
         ("Anexo I, II.1", "Identificar y documentar vulnerabilidades y componentes", "Hallazgos por análisis e inventario de componentes exportable como SBOM CycloneDX."),
         ("Anexo I, II.2", "Abordar y remediar las vulnerabilidades sin demora", "Estado de cada vulnerabilidad, acción recomendada y plazos de corrección."),
         ("Anexo I, II.3", "Pruebas y revisiones de seguridad periódicas", "Análisis automatizados en cada cambio y en la rama principal, con su cobertura."),
-        ("Art. 14", "Notificar vulnerabilidades explotadas activamente", "Vulnerabilidades en el catálogo CISA KEV señaladas como explotación activa conocida."),
+        ("Art. 14", "Notificar vulnerabilidades explotadas activamente", "Insumo: vulnerabilidades del catálogo CISA KEV señaladas como explotación activa. El registro de las notificaciones está en la vista Cumplimiento de Tamandua."),
     ]),
     "br-cmn": ("Brasil · Res. CMN 4.893 (con los cambios de la 5.274/2025)", [
         ("Vulnerabilidades", "Prevención y tratamiento continuo de vulnerabilidades", "Hallazgos identificados, priorizados y con su estado y plazo de corrección."),
@@ -196,16 +196,26 @@ def _deadlines(groups: list[dict], summary: dict | None) -> list:
     return story
 
 
+MALICIOUS_MARK = '<br/><font color="#b71824"><b>Paquete malicioso conocido (OpenSSF)</b></font>'
 KEV_MARK = '<br/><font color="#b71824"><b>Explotación activa conocida (CISA KEV)</b></font>'
 
 
-def _controls(framework_label: str, controls: list) -> list:
+DEADLINE_WORDS = ("plazo", "Plazo")
+
+
+def _controls(framework_label: str, controls: list, *, deadlines: bool) -> list:
+    # Si algún control se apoya en los plazos, se dice si este informe los trae: la evidencia cuadra con lo entregado.
+    cites = any(word in text for _, _, text in controls for word in DEADLINE_WORDS)
+    note = [] if not cites else [Paragraph(
+        "Los plazos de corrección están en la sección «Plazos de corrección» de este informe." if deadlines else
+        "Este informe no incluye los plazos de corrección: genéralo desde el estado actual del repositorio (Hallazgos → Estado actual) "
+        "para que los traiga.", STYLE["note"])]
     return [h2(f"Controles relacionados · {framework_label}"),
             _grid([[Paragraph("Control", STYLE["head"]), Paragraph("Qué aporta esta evidencia", STYLE["head"])]]
                   + [[Paragraph(f"<b>{html.escape(code)}</b><br/>{html.escape(name)}", STYLE["cell"]), Paragraph(html.escape(text), STYLE["cell"])]
                      for code, name, text in controls], [42 * mm, WIDTH - 42 * mm]),
             Paragraph("La relación con cada control es orientativa: la eficacia del control la evalúa el auditor con el resto de la "
-                      "documentación del equipo (política, responsables, frecuencia y muestras del periodo).", STYLE["note"])]
+                      "documentación del equipo (política, responsables, frecuencia y muestras del periodo).", STYLE["note"]), *note]
 
 
 def _detail_block(entry: dict) -> list:
@@ -269,7 +279,7 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
                            + (f" Se agrupan en {_n(len(groups), 'acción', 'acciones')}: los avisos de una misma dependencia se cierran con una sola actualización."
                               if len(groups) < len(findings) else ""), 900), STYLE["body"])]
     if controls:
-        story += _controls(framework_label, controls)
+        story += _controls(framework_label, controls, deadlines=bool(((record.get("summary") or {}).get("sla") or {}).get("days")))
     # Método y cobertura: qué se ejecutó y qué no, sin el volcado técnico.
     engines = [step for step in record.get("steps") or [] if (step.get("tool") or {}).get("version")]
     method = [f"Análisis estático del {analysed}, sin ejecutar el código ni enviarlo a servicios externos."]
@@ -290,12 +300,12 @@ def render_audit_pdf(record: dict, findings: list[dict], options: dict, *, versi
     if sources:
         story += [Paragraph("Fuentes de los avisos", STYLE["h3"]), *bullets([_t(line, 300) for line in sources], "note")]
     # Hallazgos: una fila por acción (una dependencia con todos sus avisos, o un hallazgo de código).
-    story.append(h2(f"Hallazgos ({len(findings)})"))
+    story += [CondPageBreak(55 * mm), h2(f"Hallazgos ({len(findings)})")]  # sin título huérfano al pie de página
     if findings:
         rows = [[Paragraph(label, STYLE["head"]) for label in ("Severidad", "Hallazgo", "Ubicación", "Estado", "Detectado", "Acción recomendada")]]
         for entry in groups:
             text, where = _group_cells(entry, record.get("created_at"))
-            text += KEV_MARK if entry["kev"] else ""
+            text += (MALICIOUS_MARK if entry.get("malicious") else "") + (KEV_MARK if entry["kev"] else "")
             rows.append([_chip(entry["severity"]), Paragraph(text, STYLE["cell"]), Paragraph(where, STYLE["cellmuted"]),
                          Paragraph(_t(_status_text(entry["items"]), 60), STYLE["cell"]),
                          Paragraph(_first_seen(entry["items"], record.get("created_at")), STYLE["cellmuted"]),
@@ -396,7 +406,7 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
         lines.append(f"Sin ningún análisis ({len(missing)}): {listing(missing, 40)}.")
     story += [Paragraph("•&nbsp;&nbsp;" + _t(line, 1200), STYLE["body"]) for line in lines]
     if controls:
-        story += _controls(framework_label, controls)
+        story += _controls(framework_label, controls, deadlines=False)
     sources = attribution([finding for item in items for finding in item["findings"]])
     story += [h2("Método"),
               Paragraph("•&nbsp;&nbsp;Análisis estático de cada repositorio (código, dependencias, secretos, infraestructura y pipelines), "
@@ -422,7 +432,7 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
         table = [[Paragraph(label, STYLE["head"]) for label in ("Severidad", "Repositorio", "Hallazgo", "Detectado", "Acción recomendada")]]
         for name, entry in open_items[:400]:
             text, _ = _group_cells(entry, None)
-            text += KEV_MARK if entry["kev"] else ""
+            text += (MALICIOUS_MARK if entry.get("malicious") else "") + (KEV_MARK if entry["kev"] else "")
             table.append([_chip(entry["severity"]), Paragraph(_t(name, 60), STYLE["cellmuted"]), Paragraph(text, STYLE["cell"]),
                           Paragraph(_first_seen(entry["items"], None), STYLE["cellmuted"]), Paragraph(_t(action(entry, short=True), 160), STYLE["cell"])])
         story.append(_grid(table, [19 * mm, 36 * mm, 57 * mm, 17 * mm, WIDTH - 129 * mm], zebra=True))

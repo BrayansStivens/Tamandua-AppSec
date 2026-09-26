@@ -99,6 +99,8 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const findings = useMemo(() => run.findings ?? [], [run.findings])
   // Los plazos solo existen en el estado del registro (lo pendiente con fecha de detección), no en una ejecución suelta.
   const hasSla = useMemo(() => findings.some(item => item.sla), [findings])
+  // El SBOM sale de un análisis completo terminado (o del último, en el estado del activo); una revisión de PR no lo tiene.
+  const sbomAvailable = run.type === 'asset_state' || ((run.type === 'repository_scan' || run.type === 'image_scan') && run.status === 'completed')
   // Las cifras de arriba cuentan solo lo pendiente: lo descartado en triage no es trabajo.
   const active = useMemo(() => findings.filter(item => !SUPPRESSED.includes(statusOf(item))), [findings])
   const count = (predicate: (item: RepositoryFinding) => boolean) => active.filter(predicate).length
@@ -205,7 +207,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
     {/* Ley de Hick: el informe habitual a mano y los demás formatos agrupados en un menú. */}
     <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" onClick={() => void exportFile('report.pdf')}><ArrowDownToLine />{downloading === 'report.pdf' ? 'Preparando…' : 'Informe PDF'}</Button>
       <Menu><MenuTrigger render={<Button variant="outline" size="sm" disabled={downloading !== null} className="border-app-line bg-app-soft" />}>{downloading && downloading !== 'report.pdf' ? 'Preparando…' : 'Más formatos'}<ChevronDown className="size-3.5" /></MenuTrigger>
-        <MenuContent align="start"><MenuGroup label="Auditoría"><MenuItem onClick={() => setAuditOpen(true)}><FileCheck2 />Evidencia para auditoría (SOC 2, ISO)…</MenuItem></MenuGroup>{RUN_EXPORTS.map(group => <MenuGroup key={group.label} label={group.label}>{group.items.map(([label, artifact]) => <MenuItem key={artifact} onClick={() => void exportFile(artifact)}>{label}</MenuItem>)}</MenuGroup>)}</MenuContent></Menu></div>
+        <MenuContent align="start"><MenuGroup label="Auditoría"><MenuItem onClick={() => setAuditOpen(true)}><FileCheck2 />Evidencia para auditoría (SOC 2, ISO, PCI, CRA…)…</MenuItem></MenuGroup>{RUN_EXPORTS.map(group => <MenuGroup key={group.label} label={group.label}>{group.items.filter(([, artifact]) => artifact !== 'sbom.cdx.json' || sbomAvailable).map(([label, artifact]) => <MenuItem key={artifact} onClick={() => void exportFile(artifact)}>{label}</MenuItem>)}</MenuGroup>)}</MenuContent></Menu></div>
     {downloadError && <div role="alert" className="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">No se pudo descargar el informe: {downloadError}</div>}
 
     {auditOpen && <AuditReportDialog open onClose={() => setAuditOpen(false)} name={(run.source as { name?: string } | undefined)?.name ?? 'hallazgos'}

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from .. import cra
-from ..assets import overview as assets_overview
+from ..assets import asset_key, overview as assets_overview
+from ..kinds import FULL_SCANS
+from ..store import list_runs
 from .core import Request, route
 
 
@@ -11,7 +13,13 @@ from .core import Request, route
 def cra_state(request: Request):
     """Lo ve cualquier sesión (el equipo necesita saber qué vence); solo un administrador lo cambia."""
     assets = {row["key"]: row.get("name") or row["key"] for row in assets_overview(request.data_dir)}
-    products = [{"key": key, **product, "asset": assets.get(key, key)} for key, product in cra.load(request.data_dir)["products"].items()]
+    # Sin un análisis completo terminado, «nada por notificar» no significaría nada: se dice por producto.
+    complete: dict[str, str] = {}
+    for row in list_runs(request.data_dir):  # de más reciente a más antiguo
+        if row["type"] in FULL_SCANS and row["status"] == "completed":
+            complete.setdefault(asset_key(row), row["created_at"])
+    products = [{"key": key, **product, "asset": assets.get(key, key), "last_complete": complete.get(key)}
+                for key, product in cra.load(request.data_dir)["products"].items()]
     events = [{**event, "draft": cra.draft(event)} for event in cra.events(request.data_dir)]
     return request.json(200, {"products": products, "events": events, "reporting_page": cra.REPORTING_PAGE,
                               "assets": [{"key": key, "name": name} for key, name in assets.items()]})

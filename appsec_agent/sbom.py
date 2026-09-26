@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .advisory_watch import purl as build_purl
+from .report_design import coverage_gaps
 
 SPEC = "1.6"
 TOOL_URL = "https://github.com/BrayansStivens/appsec-agent"
@@ -106,6 +107,7 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None) -> dic
             direct.append(reference)
     # Sin información de relación (análisis antiguos o imágenes), el producto depende de todo lo inventariado.
     depends_on = direct if known_relation else list(components)
+    gaps = coverage_gaps(record.get("steps") or [])
     stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     scanned = record.get("finished_at") or record.get("created_at")
     return {
@@ -121,6 +123,7 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None) -> dic
             "properties": [
                 {"name": "tamandua:run", "value": str(record.get("id") or "")},
                 {"name": "tamandua:analizado", "value": str(scanned or "")},
+                *([{"name": "tamandua:sin-completar", "value": ", ".join(gaps)}] if gaps else []),
                 {"name": "tamandua:origen", "value": "Inventario de Trivy sobre los manifiestos y lockfiles analizados"
                                                     + (" y los paquetes del sistema de la imagen" if root["type"] == "container" else "")
                                                     + ". Sin proveedor ni hash por componente: no se infieren."},
@@ -128,6 +131,8 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None) -> dic
         },
         "components": list(components.values()),
         "dependencies": [{"ref": root["bom-ref"], "dependsOn": depends_on}],
+        # Si algún motor no terminó, el inventario puede estar incompleto: se declara, nunca se da por completo.
+        **({"compositions": [{"aggregate": "incomplete", "assemblies": [root["bom-ref"]]}]} if gaps else {}),
     }
 
 
