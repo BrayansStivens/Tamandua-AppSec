@@ -66,10 +66,17 @@ class ServerTests(unittest.TestCase):
         status, _ = self.request("POST", "/api/images/scans", json.dumps({"reference": "https://example.com/x"}),
                                  {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-image"})
         self.assertEqual(status, 400)
-        for path in ("/assets/../store.py", "/assets/..%2f..%2fversion.py", "/assets/%2e%2e/%2e%2e/version.py", "/assets/.."):
+        for path in ("/assets/../store.py", "/assets/..%2f..%2fversion.py", "/assets/%2e%2e/%2e%2e/version.py", "/assets/%2e%2e"):
             status, _ = self.request("GET", path)
             self.assertEqual(status, 404, path)
         self.assertEqual(list_runs(self.data_dir), [])
+
+    def test_serves_the_panel_and_its_assets(self):
+        response = asgi.request(self.client, "GET", "/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.headers["content-type"])
+        asset = next(part for part in response.text.split('"') if part.startswith("/assets/"))
+        self.assertEqual(asgi.request(self.client, "GET", asset).status_code, 200)
 
     def test_unknown_method_or_path_is_a_plain_404(self):
         for method, path in (("POST", "/api/runs/abc"), ("PUT", "/api/runs"), ("DELETE", "/api/health"), ("GET", "/api/sla/")):

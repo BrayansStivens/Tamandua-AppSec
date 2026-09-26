@@ -35,6 +35,9 @@ def upgrade() -> None:
     if os.environ.get("APPSEC_AGENT_DB_ISOLATE") == "data-dir":
         return
     with db.engine().begin() as connection:
+        # API y worker arrancan a la vez: sin cerrojo, los dos crearían las mismas tablas y uno fallaría.
+        # El segundo espera aquí y, al entrar, Alembic ya ve el esquema al día.
+        db.lock(connection, "schema-upgrade")
         settings = config()
         settings.attributes["connection"] = connection
         command.upgrade(settings, "head")

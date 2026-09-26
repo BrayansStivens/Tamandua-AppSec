@@ -32,7 +32,7 @@ from tamandua.modules.runs.store import render_repository_sarif, render_tickets
 from tamandua.app.api.routing import Request, route
 from tamandua.version import VERSION
 
-STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+STATIC_DIR = Path(__file__).resolve().parents[2] / "static"  # tamandua/app/static
 PROFILE_REPORTS = ("report-soc2.md", "report-iso27001.md", "report-custom.md",
                    "report-soc2.pdf", "report-iso27001.pdf", "report-custom.pdf")
 
