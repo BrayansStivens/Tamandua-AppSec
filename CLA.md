@@ -4,7 +4,7 @@ English · [Español](CLA.es.md)
 
 Version 1.0 · September 23, 2026
 
-*This English version is the governing text; the Spanish version is provided for convenience.*
+*This agreement is published in English and in Spanish ([CLA.es.md](CLA.es.md)). Both versions are equally authoritative and express the same agreement; you may read and sign either one.*
 
 Thank you for contributing. This agreement clarifies the rights in what you contribute, so that the project can remain free software and, at the same time, sustain itself through a possible commercial edition. **You keep the copyright in your contribution**: you do not assign it to us; you grant us a broad license to use it.
 

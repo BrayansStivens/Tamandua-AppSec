@@ -4,7 +4,7 @@
 
 Versión 1.0 · 23 de septiembre de 2026
 
-*La versión en inglés ([CLA.md](CLA.md)) es el texto que rige; esta versión en español se ofrece solo para facilitar la lectura.*
+*Este acuerdo se publica en inglés ([CLA.md](CLA.md)) y en español. Las dos versiones son igualmente válidas y expresan el mismo acuerdo; puedes leer y firmar cualquiera de ellas.*
 
 Gracias por contribuir. Este acuerdo aclara los derechos sobre lo que aportas, para que el proyecto pueda seguir siendo software libre y, a la vez, sostenerse con una posible edición comercial. **Conservas los derechos de autor de tu contribución**: no nos la cedes, nos das una licencia amplia para usarla.
 
