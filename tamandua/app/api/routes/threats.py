@@ -14,6 +14,7 @@ from tamandua.modules.sources.repositories import SourceError, find_source
 from tamandua.modules.sources.assets import asset_key
 from tamandua.modules.runs.store import list_runs, load_run
 from tamandua.app.api.routing import Request, route
+from tamandua.shared.i18n import msg
 from tamandua.version import VERSION
 
 
@@ -61,7 +62,7 @@ def _assets(request: Request, keys: list[str] = ()) -> dict[str, dict]:
 
 def _view(request: Request, model: dict) -> dict:
     linked = {item["asset"] for item in model.get("components", []) if item.get("asset")}
-    rows = tm.threats(model, tm.evidence_index(request.data_dir, linked))
+    rows = tm.threats(model, tm.evidence_index(request.data_dir, linked), locale=request.locale)
     keys = _model_keys(model)
     assets = _assets(request, keys)
     return {"model": model, "threats": rows, "summary": tm.summary(rows),
@@ -81,33 +82,34 @@ def model_detail(request: Request):
     try:
         view = _view(request, tm.load(request.data_dir, model_id))
     except tm.ModelError as exc:
-        return request.json(404, {"error": str(exc)})
+        return request.json(404, {"error": exc.message})
     if not artifact:
         return request.json(200, view)
+    locale = request.locale
     if artifact == "threat-dragon.json":
-        return request.send(200, json.dumps(tm.to_threat_dragon(view["model"], view["threats"]), ensure_ascii=False, indent=2).encode("utf-8"),
-                            "application/json; charset=utf-8")
+        document = tm.to_threat_dragon(view["model"], view["threats"], locale=locale)
+        return request.send(200, json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8"), "application/json; charset=utf-8")
     if artifact == "tm.py":
-        return request.send(200, tm.to_pytm(view["model"]).encode("utf-8"), "text/x-python; charset=utf-8")
+        return request.send(200, tm.to_pytm(view["model"], locale=locale).encode("utf-8"), "text/x-python; charset=utf-8")
     if artifact == "report.md":
-        return request.send(200, tm.to_markdown(view["model"], view["threats"]).encode("utf-8"), "text/markdown; charset=utf-8")
+        return request.send(200, tm.to_markdown(view["model"], view["threats"], locale=locale).encode("utf-8"), "text/markdown; charset=utf-8")
     if artifact == "report.pdf":
-        return request.send(200, threat_report.render_pdf({**view["model"], "id": model_id}, view["threats"], version=VERSION),
+        return request.send(200, threat_report.render_pdf({**view["model"], "id": model_id}, view["threats"], version=VERSION, locale=locale),
                             "application/pdf")
     if artifact == "diagram.svg":
-        return request.send(200, tm.to_svg(view["model"]).encode("utf-8"), "image/svg+xml; charset=utf-8")
+        return request.send(200, tm.to_svg(view["model"], locale=locale).encode("utf-8"), "image/svg+xml; charset=utf-8")
     if artifact == "model.json":
         document = tm.to_portable(view["model"], _assets(request, _model_keys(view["model"])))
         return request.send(200, json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8"),
                             "application/json; charset=utf-8")
-    return request.json(404, {"error": "Ruta no encontrada"})
+    return request.json(404, {"error": msg("api.not_found")})
 
 
 @route("POST", "/api/threat-models", action="save-threat-model", body=600_000)
 def save_model(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or not set(payload) <= {"id", "model", "suggest", "name", "methodology", "custom_modules"}:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     suggested = payload.get("suggest") if isinstance(payload.get("suggest"), list) else []
     assets = _assets(request, list(dict.fromkeys([*_model_keys(payload.get("model")),
                                                   *(item for item in suggested[:10] if isinstance(item, str))])))
@@ -116,9 +118,9 @@ def save_model(request: Request):
             # Modelo nuevo propuesto desde el inventario del último escaneo de cada repositorio elegido.
             chosen = payload["suggest"]
             repositories = _read_repositories(request, assets, chosen)
-            if isinstance(repositories, str):
+            if not isinstance(repositories, list):
                 return request.json(400, {"error": repositories})
-            draft = tm.suggest(tm._text(payload.get("name"), 80, "El nombre", required=True), repositories)
+            draft = tm.suggest(tm._text(payload.get("name"), 80, msg("threats.fields.name"), required=True), repositories, locale=request.locale)
             draft["methodology"] = payload.get("methodology") or "stride"
             draft["custom_modules"] = payload.get("custom_modules", ["manual", "elements"])
             draft["repositories"] = chosen
@@ -129,9 +131,9 @@ def save_model(request: Request):
         stored = tm.save(request.data_dir, model, by=request.user["username"], model_id=model_id if isinstance(model_id, str) else None)
         return request.json(200, _view(request, stored))
     except tm.ModelError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": exc.message})
     except (OSError, ValueError):
-        return request.json(400, {"error": "No se pudo guardar el modelo"})
+        return request.json(400, {"error": msg("threats.errors.save_failed")})
 
 
 @route("POST", "/api/threat-models/import", action="import-threat-model", body=600_000)
@@ -141,9 +143,9 @@ def import_model(request: Request):
         model.pop("relayout", None)
         return request.json(200, _view(request, tm.save(request.data_dir, model, by=request.user["username"])))
     except tm.ModelError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": exc.message})
     except (OSError, ValueError):
-        return request.json(400, {"error": "No se pudo importar el modelo"})
+        return request.json(400, {"error": msg("threats.errors.import_failed")})
 
 
 @route("POST", "/api/threat-models/validate", action="validate-threat-model", body=600_000)
@@ -152,7 +154,7 @@ def validate_import(request: Request):
     try:
         model = tm.from_portable(request.payload)
     except tm.ModelError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": exc.message})
     return request.json(200, {
         "name": model["name"], "methodology": model["methodology"],
         "components": len(model["components"]), "flows": len(model["flows"]),
@@ -166,11 +168,11 @@ def validate_import(request: Request):
     })
 
 
-def _read_repositories(request: Request, assets: dict, chosen) -> list[dict] | str:
-    """Manifiestos de los repositorios elegidos, leídos en el momento. Devuelve el error como texto."""
+def _read_repositories(request: Request, assets: dict, chosen) -> list[dict] | dict:
+    """Manifests of the chosen repositories, read live. Returns the error as a message."""
     if (not isinstance(chosen, list) or not 1 <= len(chosen) <= 10
             or any(not isinstance(item, str) or assets.get(item, {}).get("kind") != "repository" for item in chosen)):
-        return "Elige entre 1 y 10 repositorios"
+        return msg("threats.errors.choose_repositories")
     repositories = []
     for item in chosen:
         # El inventario se lee en el momento: no depende de si hay escaneo ni de lo antiguo que sea.
@@ -178,7 +180,7 @@ def _read_repositories(request: Request, assets: dict, chosen) -> list[dict] | s
             inventory = live_inventory(assets[item].get("source_id") or item,
                                        installation_id=assets[item].get("installation_id"))
         except (GitHubAppError, SourceError, OSError) as exc:
-            return f"No se pudieron leer los manifiestos de {assets[item]['name']}: {exc}"
+            return msg("threats.errors.manifests_failed", name=assets[item]["name"], detail=getattr(exc, "message", None) or str(exc))
         record = load_run(request.data_dir, assets[item]["last_run"]) if assets[item]["last_run"] else {}
         repositories.append({"id": item, "name": assets[item]["name"],
                              "inventory": inventory or record.get("inventory"), "findings": record.get("findings", [])})
@@ -190,20 +192,20 @@ def propose(request: Request):
     """Componentes propuestos desde repositorios, fusionados en el borrador que se está editando. No guarda nada."""
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"model", "repositories"}:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     chosen = payload["repositories"] if isinstance(payload["repositories"], list) else []
     assets = _assets(request, list(dict.fromkeys([*_model_keys(payload["model"]),
                                                   *(item for item in chosen[:10] if isinstance(item, str))])))
     try:
         current = tm.validate(payload["model"], known_assets=set(assets))
         repositories = _read_repositories(request, assets, payload["repositories"])
-        if isinstance(repositories, str):
+        if not isinstance(repositories, list):
             return request.json(400, {"error": repositories})
-        proposal = tm.validate(tm.suggest(current["name"], repositories), known_assets=set(assets))
+        proposal = tm.validate(tm.suggest(current["name"], repositories, locale=request.locale), known_assets=set(assets))
         merged, added = tm.merge_proposal(current, proposal)
         merged = tm.validate({**merged, "repositories": [*current.get("repositories", []), *payload["repositories"]]}, known_assets=set(assets))
     except tm.ModelError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": exc.message})
     return request.json(200, {"model": merged, "added": added})
 
 
@@ -211,12 +213,12 @@ def propose(request: Request):
 def decide(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or not {"id", "threat", "status"} <= set(payload) or not set(payload) <= {"id", "threat", "status", "reason"}:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     try:
         model = tm.decide(request.data_dir, payload["id"], payload["threat"], payload["status"], payload.get("reason"),
                           by=request.user["username"])
     except tm.ModelError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": exc.message})
     return request.json(200, _view(request, model))
 
 
@@ -224,10 +226,10 @@ def decide(request: Request):
 def remove(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"id"}:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     try:
         tm.delete(request.data_dir, payload["id"])
     except tm.ModelError as exc:
-        return request.json(404, {"error": str(exc)})
+        return request.json(404, {"error": exc.message})
     request.log.info("threat_model_deleted", extra={"user": request.user["username"], "reason": payload["id"]})
     return request.json(200, {"deleted": True})

@@ -1,0 +1,70 @@
+{
+  "severity": {
+    "critical": "crítica",
+    "high": "alta",
+    "medium": "media",
+    "low": "baja",
+    "info": "informativa"
+  },
+  "priority": {
+    "kev": "En el catálogo CISA KEV: explotación activa conocida",
+    "kev_ransomware": "En el catálogo CISA KEV: explotación activa conocida y usada por ransomware",
+    "epss": "EPSS {{probability}} (percentil {{percentile}}) de explotación en 30 días",
+    "cvss": "CVSS {{score}} ({{severity}})",
+    "fixed": "Corrección publicada: {{version}}",
+    "no_fix": "Sin versión corregida publicada",
+    "malicious": "Paquete malicioso conocido (OpenSSF Malicious Packages): código hostil, no un fallo"
+  },
+  "malicious": {
+    "title": "Paquete malicioso: {{package}} {{version}}",
+    "reason": "{{id}} marca {{package}} {{version}} como malicioso.",
+    "remediation": "Elimina {{package}} {{version}} de {{path}}, borra la caché del gestor y vuelve a generar el lockfile sin él. Trata como comprometidas las máquinas y pipelines de CI que lo instalaron: rota sus tokens y claves (registro de paquetes, GitHub, nube) y revisa si publicaron algo en tu nombre."
+  },
+  "dependency": {
+    "update": "Actualiza {{package}} de {{installed}} a {{version}} o superior en {{path}} y vuelve a generar el lockfile.",
+    "no_fix": "No hay versión corregida publicada para {{package}}. Evalúa si el código vulnerable es alcanzable, aplica mitigación o sustituye la dependencia.",
+    "reason": "OSV asocia {{id}} a {{package}} {{version}}."
+  },
+  "cve": {
+    "not_in_local_copy": "Aún no está en la copia local de NVD."
+  },
+  "sources": {
+    "licenses": {
+      "ruby_advisory_db": "Dominio público (parte bajo licencia OSVDB, no comercial)",
+      "per_advisory": "Según la fuente de cada aviso",
+      "public_domain": "Dominio público",
+      "euvd": "Reutilización citando la fuente (aviso legal de ENISA); condiciones de la API por confirmar",
+      "ubuntu": "CC BY-SA 4.0 (avisos); CVE Tracker sin licencia declarada",
+      "undeclared": "Sin licencia declarada",
+      "undeclared_copyright": "Sin licencia declarada (solo copyright)",
+      "undeclared_restrictive": "Sin licencia declarada (términos del sitio restrictivos)",
+      "amazon": "Términos del sitio de AWS (excluyen uso comercial)",
+      "alma": "MIT (OSV); errata sin licencia declarada",
+      "unreviewed": "Sin revisar"
+    },
+    "terms": {
+      "open": "uso libre",
+      "attribution": "requiere atribución",
+      "share_alike": "atribución y compartir igual",
+      "non_commercial": "no comercial",
+      "unclear": "sin licencia clara"
+    },
+    "line_one": "{{name}}: {{license}} · {{count}} aviso",
+    "line_other": "{{name}}: {{license}} · {{count}} avisos",
+    "line_terms_one": "{{name}}: {{license}} ({{terms}}) · {{count}} aviso",
+    "line_terms_other": "{{name}}: {{license}} ({{terms}}) · {{count}} avisos",
+    "missing_one": "{{count}} aviso sin fuente registrada (análisis anterior a la atribución: vuelve a analizar para registrarla).",
+    "missing_other": "{{count}} avisos sin fuente registrada (análisis anterior a la atribución: vuelve a analizar para registrarla).",
+    "kev": "Explotación activa: catálogo KEV de CISA (CC0 1.0).",
+    "epss": "Probabilidad de explotación: EPSS de FIRST.org."
+  },
+  "watch": {
+    "step": "Avisos nuevos (OSV-Scanner sin conexión)",
+    "detail_one": "{{packages}} paquetes del análisis del {{date}} contrastados con la base OSV actualizada: {{count}} aviso que no estaba.",
+    "detail_other": "{{packages}} paquetes del análisis del {{date}} contrastados con la base OSV actualizada: {{count}} avisos que no estaban.",
+    "limitations": {
+      "os_packages": "Solo dependencias de aplicación; los paquetes del sistema operativo de una imagen se revisan al reanalizarla.",
+      "not_full": "No es un análisis completo: añade avisos y no da nada por corregido."
+    }
+  }
+}

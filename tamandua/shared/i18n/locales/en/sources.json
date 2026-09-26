@@ -1,0 +1,52 @@
+{
+  "errors": {
+    "joined": "{{first}} · {{second}}",
+    "redirect_not_allowed": "Archive redirect not allowed",
+    "over_download_limit": "The repository exceeds the download limit",
+    "provider_unreachable": "Couldn't reach the code provider",
+    "archive_too_big": "The repository archive is over 1 GB compressed",
+    "download_timeout": "The download took over {{minutes}} min ({{mb}} MB received); check the connection to {{provider}}",
+    "download_failed": "Couldn't download the repository",
+    "invalid_provider": "Invalid code provider",
+    "invalid_data": "The provider returned invalid data",
+    "invalid_list": "Invalid repository list",
+    "list_failed": "Couldn't list repositories; check the token and its permissions",
+    "installation": "Installation {{id}}: {{detail}}",
+    "decompression_bomb": "The archive expands out of all proportion; it was discarded as a possible decompression bomb",
+    "invalid_archive_file": "Invalid repository file",
+    "invalid_archive": "Invalid compressed archive",
+    "invalid_commit": "Invalid commit",
+    "invalid_repository": "Invalid repository",
+    "not_available": "Repository not available with the configured credential",
+    "connect_first": "Connect the code provider before analyzing"
+  },
+  "progress": {
+    "downloading": "Downloading… {{mb}} MB received",
+    "downloaded": "Download complete ({{mb}} MB). Extracting the files that can be analyzed…"
+  },
+  "domains": {
+    "invalid_registry": "Invalid domain registry",
+    "invalid_url": "Invalid URL",
+    "invalid_url_port": "Invalid URL or port",
+    "https_only": "Use an HTTPS URL on a public domain, with no user, port, query or fragment",
+    "invalid_domain": "Invalid public domain",
+    "context_length": "Context takes up to {{max}} characters",
+    "context_control": "The context contains control characters",
+    "invalid_kind": "Invalid target type",
+    "already_registered": "This domain is already registered",
+    "limit": "You've reached the maximum number of registered domains",
+    "invalid_id": "Invalid domain ID",
+    "not_found": "Domain not found",
+    "dns_unavailable": "Couldn't query DNS",
+    "dns_failed": "The DNS query failed",
+    "txt_missing": "The verification TXT record wasn't found; check the name, the value and propagation",
+    "check": {
+      "dns_error": "The domain doesn't resolve in DNS.",
+      "private_address": "The domain resolves to a private or reserved address; it isn't probed.",
+      "tls_error": "The TLS certificate isn't valid for this host.",
+      "unreachable": "No HTTPS response on port 443.",
+      "reachable": "HTTPS response {{code}} from {{address}}."
+    },
+    "invalid_request": "Invalid domain request"
+  }
+}

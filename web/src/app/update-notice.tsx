@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/shared/ui/button'
 
 // Una pestaña abierta sigue ejecutando el panel que cargó aunque el servidor se haya actualizado.
@@ -7,6 +8,7 @@ import { Button } from '@/shared/ui/button'
 const bundle = (html: string) => html.match(/\/assets\/index-[A-Za-z0-9_-]+\.js/)?.[0] ?? null
 
 export function UpdateNotice() {
+  const { t } = useTranslation('nav')
   const [stale, setStale] = useState(false)
   useEffect(() => {
     const running = bundle(document.documentElement.outerHTML)
@@ -25,7 +27,7 @@ export function UpdateNotice() {
   }, [])
   if (!stale) return null
   return <div role="status" className="fixed right-4 bottom-4 z-50 flex max-w-sm items-center gap-3 rounded-xl border border-brand/40 bg-panel px-4 py-3 text-sm shadow-lg">
-    <span className="text-app-secondary">Hay una versión nueva del panel. Recarga para usarla; guarda antes lo que tengas sin guardar.</span>
-    <Button size="sm" onClick={() => window.location.reload()} className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"><RefreshCw />Recargar</Button>
+    <span className="text-app-secondary">{t('update.message')}</span>
+    <Button size="sm" onClick={() => window.location.reload()} className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"><RefreshCw />{t('update.reload')}</Button>
   </div>
 }

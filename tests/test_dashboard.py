@@ -10,6 +10,7 @@ from unittest.mock import patch
 from tamandua.modules.reporting import dashboard
 from tamandua.modules.intel.advisories import _parse_nvd
 from tamandua.modules.scanning.coverage import owasp_coverage, rules_by_category
+from tamandua.shared.i18n import localize
 from tamandua.modules.runs.store import list_runs, page_runs, save_repository_scan
 
 
@@ -83,8 +84,8 @@ class CoverageTests(unittest.TestCase):
 
     def test_coverage_reflects_what_ran_with_numbers_and_reasons(self):
         findings = [_finding("a", severity="high"), {**_finding("b"), "owasp": ["A05:2025"], "scanner": "sast"}]
-        rows = {item["id"]: item for item in owasp_coverage(findings, sast_ran=True, sca_status="partial", iac_ran=True,
-                                                           iac_files=0, secrets_ran=True, engines=True)}
+        rows = {item["id"]: item for item in localize(owasp_coverage(findings, sast_ran=True, sca_status="partial", iac_ran=True,
+                                                                    iac_files=0, secrets_ran=True, engines=True))}
         self.assertEqual(rows["A03"]["status"], "partial")
         self.assertIn("Trivy", rows["A03"]["reason"])
         self.assertIn("1 hallazgo", rows["A03"]["reason"])
@@ -96,8 +97,8 @@ class CoverageTests(unittest.TestCase):
         # Lo que un análisis estático no cubre se declara con su motivo concreto.
         self.assertEqual(rows["A06"]["status"], "not_tested")
         self.assertIn("modelado de amenazas", rows["A06"]["reason"])
-        without = {item["id"]: item for item in owasp_coverage([], sast_ran=False, sca_status="not_tested", iac_ran=False,
-                                                              iac_files=0, secrets_ran=True, engines=False)}
+        without = {item["id"]: item for item in localize(owasp_coverage([], sast_ran=False, sca_status="not_tested", iac_ran=False,
+                                                                       iac_files=0, secrets_ran=True, engines=False))}
         self.assertEqual(without["A03"]["status"], "not_tested")
         self.assertIn("reglas AST internas", without["A05"]["reason"])
 
@@ -128,7 +129,7 @@ class DashboardTests(unittest.TestCase):
         # riesgo = 8·1 crítico + 3·1 alto + 15·1 KEV + 5·1 EPSS alto = 31 → 100·e^(−31/150)
         self.assertEqual(kpis["security_score"]["value"], 81.3)
         self.assertEqual(kpis["security_score"]["risk"], 31.0)
-        self.assertIn("e^", kpis["security_score"]["formula"])
+        self.assertIn("e^", localize(kpis["security_score"]["formula"]))
         self.assertEqual(result["cve_news"]["published_7d"], 3)
         self.assertEqual(result["top_assets"][0]["name"], "org/app")
         self.assertEqual(result["top_assets"][0]["trend"], -1)

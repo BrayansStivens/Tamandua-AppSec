@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react'
 import { Hammer } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 // Una función que se verá pronto pero que hoy no da resultados: siempre con la misma marca y en gris.
 export function SoonBadge({ className = '' }: { className?: string }) {
+  const { t } = useTranslation('ui')
   return <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-app-faint/60 px-2 py-0.5 text-[11px] font-medium tracking-wide text-app-subtle uppercase ${className}`}>
-    <Hammer className="size-3" />En desarrollo
+    <Hammer className="size-3" />{t('soon.badge')}
   </span>
 }
 
@@ -21,9 +23,10 @@ export function ComingSoonCard({ title, icon, description, plan, children }: { t
 }
 
 export function ComingSoonPage({ title, description, plan }: { title: string; description: string; plan: string[] }) {
+  const { t } = useTranslation('ui')
   return <div className="mx-auto max-w-2xl py-6">
     <ComingSoonCard title={title} description={description} plan={plan} icon={<Hammer className="size-5" />}>
-      <p className="mt-4 text-xs opacity-70">Aún no da resultados reales, por eso está desactivado. Cuando esté listo aparecerá aquí sin que tengas que hacer nada.</p>
+      <p className="mt-4 text-xs opacity-70">{t('soon.page_note')}</p>
     </ComingSoonCard>
   </div>
 }

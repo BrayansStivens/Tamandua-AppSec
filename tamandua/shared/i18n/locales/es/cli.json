@@ -1,0 +1,42 @@
+{
+  "error": "Error: {{detail}}",
+  "server": {
+    "insecure_http": "TAMANDUA_PUBLIC_URL={{url}} expone el panel por HTTP en claro. Usa HTTPS (TAMANDUA_TLS_CERT/TAMANDUA_TLS_KEY o un proxy como Caddy delante) o, solo en una red de confianza y bajo tu responsabilidad, TAMANDUA_ALLOW_INSECURE_HTTP=1.",
+    "port_out_of_range": "Puerto fuera de rango",
+    "listening": "Panel: {{url}} (escuchando en {{address}})",
+    "listening_tls": "Panel: {{url}} (escuchando en {{address}}, TLS)",
+    "setup_code": "Primer arranque: crea el administrador en el panel con este código",
+    "setup_code_hint": "(solo sirve una vez y solo mientras no haya usuarios)",
+    "stopped": "Panel detenido."
+  },
+  "worker": {
+    "started": "Worker en marcha: ejecuta los análisis de la cola.",
+    "stopped": "Worker detenido."
+  },
+  "migrations": {
+    "data_too_new": "Los datos de {{path}} son de una versión más nueva de Tamandua (formato {{version}}; esta entiende hasta el {{latest}}). Actualiza Tamandua o restaura una copia de seguridad anterior."
+  },
+  "demo": {
+    "no_fixtures": "No encuentro los ejemplos en {{path}}",
+    "analyzing_one": "Analizando 1 archivo de ejemplo con los motores de Tamandua…",
+    "analyzing_other": "Analizando {{count}} archivos de ejemplo con los motores de Tamandua…",
+    "code_done_one": "Código: 1 hallazgo ({{status}}).",
+    "code_done_other": "Código: {{count}} hallazgos ({{status}}).",
+    "model_exists": "Modelo de amenazas de ejemplo: ya estaba importado.",
+    "model_imported": "Modelo de amenazas de ejemplo importado: «{{name}}».",
+    "analyzing_image": "Analizando la imagen {{reference}} (se lee del registro; puede tardar un par de minutos)…",
+    "image_done_one": "Imagen: 1 hallazgo ({{status}}).",
+    "image_done_other": "Imagen: {{count}} hallazgos ({{status}}).",
+    "ready": "Listo: abre el panel y mira Resumen, Hallazgos y Amenazas."
+  },
+  "engines": {
+    "ready": "listo",
+    "missing": "falta"
+  },
+  "users": {
+    "password_prompt": "Contraseña (mínimo {{min}} caracteres): ",
+    "password_repeat": "Repite la contraseña: ",
+    "next_steps": "Inicia sesión en el panel y activa el TOTP desde Cuenta.",
+    "sessions_closed": "Sesiones cerradas: {{count}}"
+  }
+}

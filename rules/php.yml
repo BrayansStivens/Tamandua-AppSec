@@ -2,8 +2,11 @@ rules:
   - id: appsec.php.sql-injection
     languages: [php]
     severity: ERROR
-    message: "Entrada del usuario llega a una consulta SQL. Usa sentencias preparadas (PDO/mysqli) con parámetros vinculados."
-    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "User input reaches a SQL query. Use prepared statements (PDO or mysqli) with bound parameters."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "SQL injection from user input", es: "Inyección SQL desde datos del usuario"},
+      fix: {en: "User input reaches a SQL query. Use prepared statements (PDO or mysqli) with bound parameters.",
+            es: "Entrada del usuario llega a una consulta SQL. Usa sentencias preparadas (PDO/mysqli) con parámetros vinculados."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -23,8 +26,11 @@ rules:
   - id: appsec.php.command-injection
     languages: [php]
     severity: ERROR
-    message: "Entrada del usuario llega a la ejecución de un comando del sistema. Usa escapeshellarg sobre cada argumento y valida contra una lista permitida."
-    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL}
+    message: "User input reaches a system command. Escape every argument with escapeshellarg and validate it against an allowlist."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL,
+      title: {en: "Command injection from user input", es: "Inyección de comandos desde datos del usuario"},
+      fix: {en: "User input reaches a system command. Escape every argument with escapeshellarg and validate it against an allowlist.",
+            es: "Entrada del usuario llega a la ejecución de un comando del sistema. Usa escapeshellarg sobre cada argumento y valida contra una lista permitida."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -47,16 +53,22 @@ rules:
   - id: appsec.php.eval-non-literal
     languages: [php]
     severity: ERROR
-    message: "eval() sobre una expresión no literal ejecuta código arbitrario."
-    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL}
+    message: "eval() on a non-literal expression runs arbitrary code. Remove eval and use json_decode or a lookup table of allowed operations."
+    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL,
+      title: {en: "Code evaluated from a dynamic expression", es: "Código evaluado desde una expresión dinámica"},
+      fix: {en: "eval() on a non-literal expression runs arbitrary code. Remove eval and use json_decode or a lookup table of allowed operations.",
+            es: "eval() sobre una expresión no literal ejecuta código arbitrario. Elimina eval y usa json_decode o una tabla de operaciones permitidas."}}
     patterns:
       - pattern: eval($X)
       - pattern-not: eval("...")
   - id: appsec.php.unserialize-from-request
     languages: [php]
     severity: ERROR
-    message: "unserialize sobre entrada del usuario: inyección de objetos y ejecución de código. Usa json_decode o allowed_classes => false."
-    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH}
+    message: "unserialize on user input allows object injection and code execution. Use json_decode, or pass allowed_classes => false."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH,
+      title: {en: "unserialize on user input", es: "unserialize sobre datos del usuario"},
+      fix: {en: "unserialize on user input allows object injection and code execution. Use json_decode, or pass allowed_classes => false.",
+            es: "unserialize sobre entrada del usuario: inyección de objetos y ejecución de código. Usa json_decode o allowed_classes => false."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -71,8 +83,11 @@ rules:
   - id: appsec.php.file-inclusion-from-request
     languages: [php]
     severity: ERROR
-    message: "include/require con ruta tomada de la petición: inclusión de archivos locales o remotos con ejecución de código. Usa una lista fija de archivos permitidos."
-    metadata: {cwe: [98], owasp: "A01:2025", category: injection, confidence: HIGH, severity: CRITICAL}
+    message: "include/require takes its path from the request: local or remote file inclusion with code execution. Include only files from a fixed allowlist."
+    metadata: {cwe: [98], owasp: "A01:2025", category: injection, confidence: HIGH, severity: CRITICAL,
+      title: {en: "File inclusion from request input", es: "Inclusión de archivos desde la petición"},
+      fix: {en: "include/require takes its path from the request: local or remote file inclusion with code execution. Include only files from a fixed allowlist.",
+            es: "include/require con ruta tomada de la petición: inclusión de archivos locales o remotos con ejecución de código. Usa una lista fija de archivos permitidos."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -90,8 +105,11 @@ rules:
   - id: appsec.php.reflected-xss
     languages: [php]
     severity: WARNING
-    message: "Entrada del usuario impresa sin escapar: XSS reflejado. Escapa con htmlspecialchars($x, ENT_QUOTES, 'UTF-8')."
-    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: HIGH}
+    message: "User input is printed without escaping (reflected XSS). Escape it with htmlspecialchars($x, ENT_QUOTES, 'UTF-8')."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: HIGH,
+      title: {en: "Reflected XSS from user input", es: "XSS reflejado desde datos del usuario"},
+      fix: {en: "User input is printed without escaping (reflected XSS). Escape it with htmlspecialchars($x, ENT_QUOTES, 'UTF-8').",
+            es: "Entrada del usuario impresa sin escapar: XSS reflejado. Escapa con htmlspecialchars($x, ENT_QUOTES, 'UTF-8')."}}
     mode: taint
     pattern-sources:
       - pattern-either:

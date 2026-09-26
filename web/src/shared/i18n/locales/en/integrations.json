@@ -1,0 +1,102 @@
+{
+  "page": {
+    "read_only": "Connecting providers and saving keys is up to an administrator; here you can see their status.",
+    "issues_title": "Issue tracking",
+    "issues_description": "Turn open findings into issues for your team, with no duplicates across scans.",
+    "ai": {
+      "title": "AI assistance",
+      "description": "An explanation of each finding and a proposed patch, using your own OpenAI or Anthropic key. Today AI takes no part in any scan, so there's no need to save a key.",
+      "plan": {
+        "consent": "Consent on every run before anything is sent to the provider",
+        "budget": "A per-run budget and secret redaction",
+        "no_code": "Source code is never sent without that consent"
+      },
+      "saved_key": "You have a saved {{provider}} key (····{{last4}}). It isn't used until this feature is ready.",
+      "remove_key": "Remove key"
+    }
+  },
+  "jira": {
+    "tagline": "Create issues from findings",
+    "site_project": "{{site}} · project {{project}}",
+    "site_project_named": "{{site}} · project {{project}} ({{name}})",
+    "status": {
+      "connected": "Connected",
+      "not_configured": "Not set up"
+    },
+    "loading": "Loading the Jira connection",
+    "account": "Account {{email}} · token ····{{last4}} · type \"{{type}}\"",
+    "configured_by": "set up by {{name}}",
+    "configured_on": "set up on {{date}}",
+    "configured_by_on": "set up by {{name}} on {{date}}",
+    "label_note": "Each issue carries the label <code>appsec-&lt;fingerprint&gt;</code>: exporting the same finding again links the existing issue instead of creating a duplicate.",
+    "remove": "Disconnect",
+    "site": "Site",
+    "site_placeholder": "https://your-site.atlassian.net",
+    "email": "Account email",
+    "token": "API token",
+    "project": "Project",
+    "issue_type": "Issue type",
+    "submit": "Save and validate",
+    "create_token": "Create an API token",
+    "validate_note": "The account, project and issue type are checked before saving. The token stays on the server and never comes back to the browser.",
+    "admin_only": "An administrator can connect it.",
+    "export": {
+      "title_one": "Create in Jira · {{count}} finding",
+      "title_other": "Create in Jira · {{count}} findings",
+      "intro": "One issue per piece of work: advisories for the same package go together, with the version that fixes them all; code and secrets go one by one. Anything that already has an issue gets linked, not duplicated.",
+      "created_one": "{{count}} issue created",
+      "created_other": "{{count}} issues created",
+      "existing_one": "{{count}} already existed",
+      "existing_other": "{{count}} already existed",
+      "failed_one": "{{count}} finding failed",
+      "failed_other": "{{count}} findings failed",
+      "linked_one": "{{count}} finding linked.",
+      "linked_other": "{{count}} findings linked.",
+      "state": {
+        "created": "Created",
+        "existing": "Already existed"
+      },
+      "done": "Done",
+      "submit": "Create issues"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "description": "A message in Slack, Teams or a webhook when a scan (manual, batch or automatic) finds something new that matters, or when a batch finishes. Pull request reviews already notify on the pull request itself.",
+    "threshold": {
+      "critical": "Critical only",
+      "high": "High and above",
+      "medium": "Medium and above"
+    },
+    "hint": {
+      "slack": "In Slack: Apps → Incoming Webhooks → Add to Slack, pick the channel and copy the URL (https://hooks.slack.com/…).",
+      "teams": "In Teams: on the channel, … → Workflows → \"Post to a channel when a webhook request is received\", then copy the URL.",
+      "webhook": "Any service that accepts a JSON POST. Every notification carries the X-Tamandua-Signature header (HMAC-SHA256 of the body)."
+    },
+    "saved": "Channel \"{{name}}\" saved. Send a test to check it.",
+    "confirm_remove": "Remove \"{{name}}\"? To add it back you'll need the webhook URL again.",
+    "test_ok": "Test delivered to \"{{name}}\" ({{detail}}).",
+    "test_failed": "The test to \"{{name}}\" failed: {{detail}}. Check the URL or create the webhook again.",
+    "loading": "Loading channels",
+    "signed": "signed",
+    "last_ok": "Last sent {{date}}: delivered",
+    "last_failed": "Last sent {{date}}: failed ({{detail}})",
+    "test": "Test",
+    "test_label": "Test {{name}}",
+    "remove_label": "Remove {{name}}",
+    "secret_title": "This webhook's signing secret: save it now, it won't be shown again.",
+    "secret_label": "signing secret",
+    "secret_help": "The receiver computes an HMAC-SHA256 of the body with this secret and compares it with the X-Tamandua-Signature header.",
+    "secret_saved": "I've saved it",
+    "add": "Add channel",
+    "where": "Where",
+    "name": "Name",
+    "name_placeholder": "e.g. #security",
+    "url": "Webhook URL",
+    "events": "Notify about",
+    "threshold_label": "Findings from",
+    "save": "Save channel",
+    "url_note": "The URL is stored encrypted and never comes back to the browser.",
+    "links_note": "To have messages link to the finding, set TAMANDUA_PUBLIC_URL to the panel's address."
+  }
+}

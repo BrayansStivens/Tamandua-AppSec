@@ -1,0 +1,39 @@
+{
+  "title": "Getting started",
+  "progress": "{{done}} of {{total}} done. Steps check themselves off as you complete them.",
+  "hide": "Hide getting started",
+  "done": "(done)",
+  "pending": "(pending)",
+  "steps": {
+    "mfa": {
+      "title": "Protect your account with two-factor authentication",
+      "hint": "An authenticator app (TOTP) on top of your password.",
+      "action": "Turn on"
+    },
+    "github": {
+      "title": "Connect GitHub",
+      "hint_admin": "Create this server's GitHub App; the panel walks you through it.",
+      "hint_member": "An administrator sets it up in Integrations.",
+      "action": "Connect"
+    },
+    "analyzed": {
+      "title": "Run your first scan",
+      "hint_demo": "You already have the demo data: now scan one of your own repositories.",
+      "hint_admin": "No repositories yet? Run “make demo” on the server to see the examples scanned.",
+      "hint_member": "Pick a repository or an image and scan it.",
+      "action": "New scan"
+    },
+    "watching": {
+      "title": "Watch your pull requests and main branch",
+      "hint_admin": "Every PR gets reviewed automatically, and the branch is rescanned when it changes.",
+      "hint_member": "An administrator turns it on in Pull requests.",
+      "action": "Watch"
+    },
+    "alerts": {
+      "title": "Get alerts in Slack or Teams",
+      "hint_admin": "A message when something new that matters shows up, without opening the panel.",
+      "hint_member": "An administrator sets it up in Integrations → Alerts.",
+      "action": "Set up"
+    }
+  }
+}

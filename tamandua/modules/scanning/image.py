@@ -31,6 +31,7 @@ from pathlib import Path
 
 from tamandua.modules.intel import data_sources
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import default_locale, msg, text
 from tamandua.modules.intel.advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
 from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_image, run_checkov_image
@@ -58,7 +59,14 @@ GRYPE_SEVERITY = {"critical": "critical", "high": "high", "medium": "medium", "l
 
 
 class ImageError(ValueError):
-    pass
+    """Carries a message; `str()` renders it in the default locale, `.message` keeps it for the reader's."""
+
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self) -> str:
+        return text(self.message, default_locale())
 
 
 # --- referencias --------------------------------------------------------------------------
@@ -68,7 +76,7 @@ def parse_reference(text: str) -> dict:
     raw = str(text or "").strip()
     match = REFERENCE.fullmatch(raw) if 3 <= len(raw) <= 300 else None
     if not match:
-        raise ImageError("Referencia de imagen inválida: usa registro/repositorio:etiqueta, p. ej. ghcr.io/acme/api:1.4")
+        raise ImageError(msg("scanning.image.errors.invalid_reference"))
     registry = (match["registry"] or DOCKER_HUB).lower()
     repository = match["repository"]
     if registry in ("index.docker.io", "registry-1.docker.io"):
@@ -98,10 +106,9 @@ def check_registry_address(registry: str) -> None:
     try:
         addresses = {info[4][0] for info in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
     except OSError as exc:
-        raise ImageError(f"No se pudo resolver el registro {registry}") from exc
+        raise ImageError(msg("scanning.image.errors.unresolvable", registry=registry)) from exc
     if not addresses or not all(ipaddress.ip_address(address.split("%")[0]).is_global for address in addresses):
-        raise ImageError(f"El registro {registry} resuelve a una dirección privada. Si es un registro propio de tu red, "
-                         "arranca el servidor con TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.")
+        raise ImageError(msg("scanning.image.errors.private_address", registry=registry))
 
 
 # --- credenciales de registros ------------------------------------------------------------
@@ -128,11 +135,11 @@ def save_registry(registry: str, username: str, token: str, *, by: str) -> list[
     if host in ("index.docker.io", "registry-1.docker.io", "hub.docker.com"):
         host = DOCKER_HUB
     if not HOST.fullmatch(host) or len(host) > 200:
-        raise ImageError("Registro inválido: solo el host, p. ej. ghcr.io o 123456789.dkr.ecr.us-east-1.amazonaws.com")
+        raise ImageError(msg("scanning.image.errors.invalid_registry"))
     if not isinstance(username, str) or not 1 <= len(username.strip()) <= 200 or any(ord(char) < 33 for char in username.strip()):
-        raise ImageError("Usuario inválido")
+        raise ImageError(msg("scanning.image.errors.invalid_username"))
     if not isinstance(token, str) or not 8 <= len(token) <= 4096 or any(ord(char) < 33 or ord(char) > 126 for char in token):
-        raise ImageError("Token inválido: pega el token de acceso de solo lectura del registro")
+        raise ImageError(msg("scanning.image.errors.invalid_token"))
     data = _stored()
     data[host] = {"username": username.strip(), "token": token,
                   "saved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "saved_by": by}
@@ -169,7 +176,7 @@ def _family(ecosystem: str) -> str:
 def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None) -> tuple[dict, dict]:
     started = time.time()
     if not docker_available():
-        return _result("trivy", "not_tested", "Docker no disponible: la imagen no se analizó con Trivy."), {}
+        return _result("trivy", "not_tested", msg("scanning.image.no_docker", engine="Trivy")), {}
     cache_dir = writable_cache(cache_dir)
     secrets = {"TRIVY_USERNAME": credentials["username"], "TRIVY_PASSWORD": credentials["token"]} if credentials else None
     try:
@@ -181,14 +188,13 @@ def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
             return _result("trivy", "inconclusive", _registry_error(completed.stderr, credentials), started=started), {}
         payload = json.loads(completed.stdout or "{}")
     except subprocess.TimeoutExpired:
-        return _result("trivy", "inconclusive", "Trivy superó el tiempo máximo con esta imagen.", started=started), {}
+        return _result("trivy", "inconclusive", msg("scanning.image.timeout", engine="Trivy"), started=started), {}
     except (OSError, ValueError):
-        return _result("trivy", "inconclusive", "Trivy no devolvió una salida legible.", started=started), {}
+        return _result("trivy", "inconclusive", msg("scanning.engines.unreadable", engine="Trivy"), started=started), {}
     findings = parse_trivy(payload, feeds)
     metadata = payload.get("Metadata") or {}
     counts = {kind: sum(1 for item in findings if item["scanner"] == kind) for kind in ("sca", "iac", "secrets")}
-    detail = (f"{counts['sca']} avisos en paquetes, {counts['iac']} problemas de configuración de la imagen y "
-              f"{counts['secrets']} secretos en capas, variables de entorno o historial.")
+    detail = msg("scanning.image.trivy_detail", **counts)
     return {**_result("trivy", "completed", detail, findings, started), "packages": trivy_packages(payload),
             "system_packages": trivy_packages(payload, system=True)}, metadata
 
@@ -233,7 +239,7 @@ def _grype_finding(match: dict, feeds: dict) -> dict:
 def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None, registry: str) -> dict:
     started = time.time()
     if not docker_available():
-        return _result("grype", "not_tested", "Docker no disponible: la imagen no se analizó con Grype.")
+        return _result("grype", "not_tested", msg("scanning.image.no_docker", engine="Grype"))
     cache_dir = writable_cache(cache_dir)
     (cache_dir / "tmp").mkdir(exist_ok=True)
     secrets = ({"GRYPE_REGISTRY_AUTH_AUTHORITY": _host_only(registry) if registry != DOCKER_HUB else "index.docker.io",
@@ -249,11 +255,11 @@ def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
             return _result("grype", "inconclusive", _registry_error(completed.stderr, credentials), started=started)
         payload = json.loads(completed.stdout or "{}")
     except subprocess.TimeoutExpired:
-        return _result("grype", "inconclusive", "Grype superó el tiempo máximo con esta imagen.", started=started)
+        return _result("grype", "inconclusive", msg("scanning.image.timeout", engine="Grype"), started=started)
     except (OSError, ValueError):
-        return _result("grype", "inconclusive", "Grype no devolvió una salida legible.", started=started)
+        return _result("grype", "inconclusive", msg("scanning.engines.unreadable", engine="Grype"), started=started)
     findings = [_grype_finding(match, feeds) for match in payload.get("matches") or []]
-    return _result("grype", "completed", f"{len(findings)} avisos en paquetes.", findings, started)
+    return _result("grype", "completed", msg("scanning.image.grype_detail", advisories=len(findings)), findings, started)
 
 
 def _host(path: Path) -> str:
@@ -261,15 +267,13 @@ def _host(path: Path) -> str:
     return host_path(path)
 
 
-def _registry_error(stderr: str, credentials: dict | None) -> str:
-    text = (stderr or "").lower()
-    if any(marker in text for marker in ("unauthorized", "denied", "401", "403", "authentication required")):
-        return ("El registro rechazó el acceso: revisa que la imagen exista y que las credenciales guardadas para ese registro "
-                "tengan permiso de lectura." if credentials else
-                "El registro pide credenciales: guárdalas en Integraciones → Registros de contenedores.")
-    if "manifest unknown" in text or "not found" in text or "name unknown" in text:
-        return "El registro no tiene esa imagen o esa etiqueta."
-    return "No se pudo leer la imagen del registro."
+def _registry_error(stderr: str, credentials: dict | None) -> dict:
+    output = (stderr or "").lower()
+    if any(marker in output for marker in ("unauthorized", "denied", "401", "403", "authentication required")):
+        return msg("scanning.image.registry.denied") if credentials else msg("scanning.image.registry.credentials_needed")
+    if "manifest unknown" in output or "not found" in output or "name unknown" in output:
+        return msg("scanning.image.registry.not_found")
+    return msg("scanning.image.registry.unreadable")
 
 
 # --- configuración de la imagen -------------------------------------------------------------
@@ -281,7 +285,7 @@ URL_CREDENTIALS = re.compile(r"(?i)\b[a-z][a-z0-9+.-]*://([^/\s:@]+):([^/\s@]{3,
 AUTH_HEADER = re.compile(r"(?i)authorization:\s*(bearer|basic|token)\s+(?!\$)[A-Za-z0-9._~+/=-]{8,}")
 
 
-def _config_finding(rule: str, title: str, severity: str, reason: str, remediation: str, cwe: int, asset: str, key: str,
+def _config_finding(rule: str, title, severity: str, reason, remediation, cwe: int, asset: str, key: str,
                     path: str = "configuración de la imagen") -> dict:
     from tamandua.modules.scanning.engines import _base, _stable
     finding = _base("iac" if cwe != 798 else "secrets", rule, title, path, 1, severity, tool="tamandua",
@@ -299,53 +303,47 @@ def config_findings(metadata: dict, image: dict) -> list[dict]:
     findings = []
     user = str(config.get("User") or "").strip()
     if user in ("", "root", "0", "0:0", "root:root"):
-        findings.append(_config_finding("IMG-ROOT", "La imagen se ejecuta como root", "medium",
-            "No declara USER (o declara root): un fallo en la aplicación da control de root dentro del contenedor y facilita escapar de él.",
-            "Añade un usuario sin privilegios en el Dockerfile (RUN adduser … && USER app) o ejecútala con --user.", 250, asset, "user"))
+        findings.append(_config_finding("IMG-ROOT", msg("scanning.image.rules.root.title"), "medium",
+            msg("scanning.image.rules.root.reason"), msg("scanning.image.rules.root.remediation"), 250, asset, "user"))
     for entry in config.get("Env") or []:
         name, _, value = str(entry).partition("=")
         if value.strip() and not value.startswith("$") and SECRET_NAME.search(name):
-            findings.append(_config_finding("IMG-ENV-SECRET", f"Posible credencial en la variable de entorno {name}", "high",
-                f"La imagen define {name} con un valor fijo (redactado): cualquiera que pueda descargar la imagen puede leerlo con docker inspect.",
-                "Rota la credencial. No la pongas en ENV: pásala en tiempo de ejecución (secreto de Docker/Kubernetes o variable del orquestador) "
-                "o, si solo hace falta al construir, con RUN --mount=type=secret de BuildKit.", 798, asset, f"env:{name}", path=f"ENV {name}"))
+            findings.append(_config_finding("IMG-ENV-SECRET", msg("scanning.image.rules.env_secret.title", name=name), "high",
+                msg("scanning.image.rules.env_secret.reason", name=name), msg("scanning.image.rules.env_secret.remediation"),
+                798, asset, f"env:{name}", path=f"ENV {name}"))
     for index, step in enumerate(history):
         for match in HISTORY_SECRET.finditer(step):
-            findings.append(_config_finding("IMG-BUILD-SECRET", f"Credencial en el historial de construcción ({match.group(1)})", "critical",
-                f"El paso {index + 1} del historial contiene {match.group(1)} con un valor (redactado). Los ARG y las variables de un RUN quedan "
-                "guardados en la imagen y se leen con docker history.",
-                "Rota la credencial ya. Reconstruye usando secretos de BuildKit (RUN --mount=type=secret,id=npm …) en lugar de ARG o ENV, "
-                "y borra las etiquetas publicadas con la credencial.", 798, asset, f"history:{index}:{match.group(1)}", path=f"historial, paso {index + 1}"))
+            findings.append(_config_finding("IMG-BUILD-SECRET", msg("scanning.image.rules.build_secret.title", name=match.group(1)), "critical",
+                msg("scanning.image.rules.build_secret.reason", step=index + 1, name=match.group(1)),
+                msg("scanning.image.rules.build_secret.remediation"), 798, asset, f"history:{index}:{match.group(1)}",
+                path=f"historial, paso {index + 1}"))
         if URL_CREDENTIALS.search(step) or AUTH_HEADER.search(step):
-            findings.append(_config_finding("IMG-BUILD-URL-CREDENTIAL", "Credencial en una URL o cabecera del historial de construcción", "critical",
-                f"El paso {index + 1} del historial usa una URL con usuario y contraseña o una cabecera Authorization con valor fijo (redactado).",
-                "Rota la credencial y usa secretos de BuildKit o un fichero .netrc montado como secreto durante la construcción.",
+            findings.append(_config_finding("IMG-BUILD-URL-CREDENTIAL", msg("scanning.image.rules.build_url_credential.title"), "critical",
+                msg("scanning.image.rules.build_url_credential.reason", step=index + 1),
+                msg("scanning.image.rules.build_url_credential.remediation"),
                 798, asset, f"history-url:{index}", path=f"historial, paso {index + 1}"))
         if re.match(r"(?i)\s*ADD\s+(file:)?\s*https?://", step) or re.search(r"(?i)/bin/sh -c #\(nop\) ADD https?://", step):
-            findings.append(_config_finding("IMG-ADD-URL", "ADD descarga ficheros desde una URL", "medium",
-                f"El paso {index + 1} usa ADD con una URL: el contenido no se verifica y puede cambiar entre construcciones.",
-                "Descarga con curl y comprueba el SHA-256 (o usa ADD --checksum=sha256:… con BuildKit).", 494, asset, f"add:{index}"))
+            findings.append(_config_finding("IMG-ADD-URL", msg("scanning.image.rules.add_url.title"), "medium",
+                msg("scanning.image.rules.add_url.reason", step=index + 1), msg("scanning.image.rules.add_url.remediation"),
+                494, asset, f"add:{index}"))
     if "22/tcp" in (config.get("ExposedPorts") or {}):
-        findings.append(_config_finding("IMG-SSH", "La imagen expone SSH (22/tcp)", "medium",
-            "Un servidor SSH en un contenedor amplía la superficie de ataque y suele indicar credenciales dentro de la imagen.",
-            "Quita el servidor SSH; para depurar usa docker exec o kubectl exec.", 1188, asset, "ssh"))
+        findings.append(_config_finding("IMG-SSH", msg("scanning.image.rules.ssh.title"), "medium",
+            msg("scanning.image.rules.ssh.reason"), msg("scanning.image.rules.ssh.remediation"), 1188, asset, "ssh"))
     if not config.get("Healthcheck"):
-        findings.append(_config_finding("IMG-NO-HEALTHCHECK", "La imagen no define HEALTHCHECK", "low",
-            "Sin HEALTHCHECK, el orquestador no detecta un proceso colgado o degradado.",
-            "Añade HEALTHCHECK en el Dockerfile o define la sonda en el orquestador.", 1188, asset, "healthcheck"))
+        findings.append(_config_finding("IMG-NO-HEALTHCHECK", msg("scanning.image.rules.no_healthcheck.title"), "low",
+            msg("scanning.image.rules.no_healthcheck.reason"), msg("scanning.image.rules.no_healthcheck.remediation"),
+            1188, asset, "healthcheck"))
     if image.get("tag") == "latest" and not image.get("digest"):
-        findings.append(_config_finding("IMG-LATEST", "Se analiza la etiqueta latest", "info",
-            "latest cambia sin aviso: lo que se analiza hoy puede no ser lo que se despliega mañana.",
-            "Despliega y analiza etiquetas inmutables (versión o @sha256:…).", 1357, asset, "latest"))
+        findings.append(_config_finding("IMG-LATEST", msg("scanning.image.rules.latest.title"), "info",
+            msg("scanning.image.rules.latest.reason"), msg("scanning.image.rules.latest.remediation"), 1357, asset, "latest"))
     created = str(config_block.get("created") or "")
     try:
         age = (datetime.now(timezone.utc) - datetime.fromisoformat(created.replace("Z", "+00:00"))).days if created else None
     except ValueError:
         age = None
     if age is not None and age > 365:
-        findings.append(_config_finding("IMG-STALE", f"La imagen se construyó hace {age // 30} meses", "low",
-            "Una imagen antigua acumula parches de seguridad sin aplicar en su base.",
-            "Reconstruye la imagen periódicamente (p. ej. cada semana) para recoger los parches de la base.", 1104, asset, "stale"))
+        findings.append(_config_finding("IMG-STALE", msg("scanning.image.rules.stale.title", months=age // 30), "low",
+            msg("scanning.image.rules.stale.reason"), msg("scanning.image.rules.stale.remediation"), 1104, asset, "stale"))
     return findings
 
 
@@ -384,14 +382,13 @@ def _finish_package(finding: dict) -> dict:
     family = _family(package.get("ecosystem", ""))
     digest = sca_fingerprint("sca", _canonical_id(aliases, finding["rule_id"]), family, package.get("name", ""), package.get("version", ""))
     fixed = package.get("fixed_version")
+    name = package.get("name")
     if family == "os":
-        remediation = (f"Reconstruye la imagen sobre una base actualizada o actualiza {package.get('name')} a {fixed} en el Dockerfile "
-                       "(apt/apk/dnf upgrade)." if fixed else
-                       f"La distribución no publica aún una versión corregida de {package.get('name')}. Valora otra imagen base "
-                       "(slim, distroless) o si el paquete se usa de verdad.")
+        remediation = (msg("scanning.image.remediation.os_upgrade", package=name, fixed=fixed) if fixed
+                       else msg("scanning.image.remediation.os_no_fix", package=name))
     else:
-        remediation = (f"Actualiza {package.get('name')} a {fixed} en la aplicación empaquetada y reconstruye la imagen."
-                       if fixed else f"No hay versión corregida de {package.get('name')}: evalúa sustituirla o mitigar.")
+        remediation = (msg("scanning.image.remediation.app_upgrade", package=name, fixed=fixed) if fixed
+                       else msg("scanning.image.remediation.app_no_fix", package=name))
     return {**finding, "fingerprint": digest, "finding_id": digest[:16], "remediation": remediation}
 
 
@@ -400,30 +397,30 @@ def _finish_package(finding: dict) -> dict:
 def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None) -> dict:
     from tamandua.modules.intel.advisories import load_feeds
 
-    def report(level: str, message: str) -> None:
+    def report(level: str, message) -> None:
         if progress:
             progress(level, message)
 
     feeds = load_feeds(data_dir)
     credentials = credentials_for(image["registry"])
-    report("info", f"Leyendo {image['reference']} desde el registro"
-                   + (" con las credenciales guardadas" if credentials else " sin credenciales (imagen pública)") + "…")
+    report("info", msg("scanning.image.progress.reading_credentials" if credentials else "scanning.image.progress.reading_public",
+                       reference=image["reference"]))
     trivy, metadata = run_trivy_image(image["reference"], data_dir / "trivy-cache", feeds, credentials)
-    report("ok" if trivy["status"] == "completed" else "warn", f"Trivy: {trivy['detail']}")
-    report("info", "Segunda opinión sobre los paquetes con Grype…")
+    report("ok" if trivy["status"] == "completed" else "warn", msg("scanning.progress.engine", engine="Trivy", detail=trivy["detail"]))
+    report("info", msg("scanning.image.progress.grype"))
     grype = run_grype_image(image["reference"], data_dir / "grype-cache", feeds, credentials, image["registry"])
-    report("ok" if grype["status"] == "completed" else "warn", f"Grype: {grype['detail']}")
+    report("ok" if grype["status"] == "completed" else "warn", msg("scanning.progress.engine", engine="Grype", detail=grype["detail"]))
 
     if metadata:
-        report("info", "Checkov sobre el Dockerfile reconstruido del historial de la imagen…")
+        report("info", msg("scanning.image.progress.checkov"))
         checkov = run_checkov_image(metadata, image, data_dir / "tmp")
     else:
-        checkov = _result("checkov", "not_tested", "Sin la configuración de la imagen (Trivy no pudo leerla), Checkov no tiene qué revisar.")
-    report("ok" if checkov["status"] == "completed" else "warn", f"Checkov: {checkov['detail']}")
+        checkov = _result("checkov", "not_tested", msg("scanning.image.checkov_without_config"))
+    report("ok" if checkov["status"] == "completed" else "warn", msg("scanning.progress.engine", engine="Checkov", detail=checkov["detail"]))
 
     packages, agreement = merge_packages([item for item in trivy["findings"] if item["scanner"] == "sca"], grype["findings"])
     # Configuración: las reglas propias mandan; Trivy y Checkov solo suman lo que ellas no cubren.
-    configuration, joined = merge_image(config_findings(metadata, image) if metadata else [],
+    configuration, joined_rules = merge_image(config_findings(metadata, image) if metadata else [],
                                         [item for item in trivy["findings"] if item["scanner"] == "iac"], checkov["findings"])
     findings = ([_finish_package(item) for item in packages] + [item for item in trivy["findings"] if item["scanner"] == "secrets"]
                 + configuration)
@@ -444,24 +441,24 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
     sca_count = sum(1 for item in findings if item["scanner"] == "sca")
     iac_count = sum(1 for item in findings if item["scanner"] == "iac")
     secret_count = sum(1 for item in findings if item["scanner"] == "secrets")
+    where = " · ".join([image["reference"], *([f"{resolved[:19]}…"] if resolved else []), *([image_meta["os"]] if image_meta["os"] else [])])
     steps = [
-        {"id": "image", "name": "Imagen", "status": "completed" if trivy["status"] == "completed" else trivy["status"],
-         "detail": f"{image['reference']}" + (f" · {resolved[:19]}…" if resolved else "") + (f" · {image_meta['os']}" if image_meta["os"] else "")
-                   + f" · usuario {image_meta['user']}. Leída del registro, sin ejecutarla."},
-        {"id": "sca", "name": "Paquetes · Trivy + Grype",
+        {"id": "image", "name": msg("scanning.image.steps.image.name"), "status": "completed" if trivy["status"] == "completed" else trivy["status"],
+         "detail": msg("scanning.image.steps.image.detail", where=where, user=image_meta["user"])},
+        {"id": "sca", "name": msg("scanning.image.steps.sca.name"),
          "status": "partial" if len(engines_ok) == 2 else ("inconclusive" if not engines_ok else "partial"),
-         "detail": (f"{sca_count} avisos: {agreement['both']} los ven ambos motores, {agreement['only_trivy']} solo Trivy y "
-                    f"{agreement['only_grype']} solo Grype. Prioridad con CVSS, KEV y EPSS.")
-                   if len(engines_ok) == 2 else f"{sca_count} avisos con un solo motor: " + " · ".join(f"{tool['name']}: {tool['detail']}" for tool in (trivy, grype))},
-        {"id": "config", "name": "Configuración de la imagen · reglas propias + Checkov",
+         "detail": msg("scanning.image.steps.sca.detail", advisories=sca_count, both=agreement["both"], only_trivy=agreement["only_trivy"],
+                       only_grype=agreement["only_grype"])
+                   if len(engines_ok) == 2 else msg("scanning.image.steps.sca.single_engine", advisories=sca_count,
+                                                    trivy=trivy["detail"], grype=grype["detail"])},
+        {"id": "config", "name": msg("scanning.image.steps.config.name"),
          "status": "completed" if trivy["status"] == "completed" else "not_tested",
-         "detail": f"{iac_count} problemas (usuario root, HEALTHCHECK, instrucciones inseguras) en la configuración y el historial."
-                   + (f" Checkov revisó el Dockerfile reconstruido: {len(checkov['findings'])} fallos, {joined} ya cubiertos por otra regla."
-                      if checkov["status"] == "completed" else f" {checkov['detail']}"),
+         "detail": msg("scanning.image.steps.config.detail_checkov", problems=iac_count, failures=len(checkov["findings"]), joined=joined_rules)
+                   if checkov["status"] == "completed" else msg("scanning.image.steps.config.detail", problems=iac_count, checkov=checkov["detail"]),
          "tool": {"name": "checkov", "version": checkov["version"], "image": checkov["image"], "duration_s": checkov["duration_s"]}},
-        {"id": "secrets", "name": "Secretos en capas, ENV e historial", "status": "completed" if trivy["status"] == "completed" else "not_tested",
-         "detail": f"{secret_count} secretos; valores redactados. Incluye variables de entorno y argumentos de construcción que quedaron en la imagen."},
-        {"id": "review", "name": "Triage humano", "status": "pending", "detail": "Confirma que los paquetes se usan y prioriza por exposición de la imagen."},
+        {"id": "secrets", "name": msg("scanning.image.steps.secrets.name"), "status": "completed" if trivy["status"] == "completed" else "not_tested",
+         "detail": msg("scanning.image.steps.secrets.detail", secrets=secret_count)},
+        {"id": "review", "name": msg("scanning.steps.review"), "status": "pending", "detail": msg("scanning.image.steps.review.detail")},
     ]
     sca_status = "partial" if engines_ok else "inconclusive"
     coverage = owasp_coverage(findings, sast_ran=False, sca_status=sca_status, iac_ran=trivy["status"] == "completed",
@@ -482,8 +479,6 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
                         "agreement": agreement,
                         "tools": [{"name": tool["tool"], "version": tool["version"], "status": tool["status"]} for tool in tools],
                         "planned": 3, "executed": sum(1 for step in steps[1:4] if step["status"] in ("completed", "partial")), "confirmed": 0},
-            "limitations": ["La imagen se leyó del registro: no se ejecutó ni se construyó",
-                            "No se analizó el código fuente que generó la imagen (para eso, analiza su repositorio)",
-                            "Los motores pueden discrepar en paquetes con parches retroportados por la distribución",
-                            "Un aviso en un paquete del sistema no prueba que la aplicación lo use"],
+            "limitations": [msg("scanning.image.limitations.read_only"), msg("scanning.image.limitations.no_source"),
+                            msg("scanning.image.limitations.backports"), msg("scanning.image.limitations.system_package")],
             "scanned_at": datetime.now(timezone.utc).isoformat()}

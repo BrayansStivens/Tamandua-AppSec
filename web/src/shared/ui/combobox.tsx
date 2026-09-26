@@ -1,14 +1,16 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Check, ChevronsUpDown, LoaderCircle, Search } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export type ComboOption = { id: string; label: string; hint?: string; badge?: ReactNode }
 
 // Buscador con autocompletado. Busca en el servidor mientras se escribe (con pausa de 200 ms),
 // así escala a miles de repositorios o ejecuciones sin cargarlos todos en el navegador.
-export function Combobox({ value, placeholder, search, onSelect, label, emptyText = 'Nada coincide', className = '' }: {
+export function Combobox({ value, placeholder, search, onSelect, label, emptyText, className = '' }: {
   value: ComboOption | null; placeholder: string; label: string; emptyText?: string; className?: string
   search: (query: string) => Promise<{ options: ComboOption[]; total: number }>; onSelect: (option: ComboOption) => void
 }) {
+  const { t } = useTranslation('ui')
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<ComboOption[]>([])
@@ -53,7 +55,7 @@ export function Combobox({ value, placeholder, search, onSelect, label, emptyTex
     </button>
       : <div className="flex h-9 items-center gap-2 rounded-lg border border-brand/50 bg-app-soft px-3"><Search className="size-3.5 text-app-subtle" />
         <input ref={input} role="combobox" aria-label={label} aria-expanded aria-controls={listId} aria-autocomplete="list" aria-activedescendant={options[active] ? `${listId}-${active}` : undefined} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={keys}
-          placeholder="Escribe para buscar…" className="min-w-0 flex-1 bg-transparent text-sm outline-none" />{loading && <LoaderCircle className="size-3.5 animate-spin text-app-subtle" />}</div>}
+          placeholder={t('combobox.placeholder')} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />{loading && <LoaderCircle className="size-3.5 animate-spin text-app-subtle" />}</div>}
     {open && <ul id={listId} role="listbox" className="absolute z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-app-line bg-panel p-1 shadow-xl">
       {options.map((option, index) => <li key={option.id} id={`${listId}-${index}`} role="option" aria-selected={value?.id === option.id} onMouseEnter={() => setActive(index)} onMouseDown={event => { event.preventDefault(); choose(option) }}
         className={`flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-sm ${index === active ? 'bg-app-soft' : ''}`}>
@@ -61,8 +63,8 @@ export function Combobox({ value, placeholder, search, onSelect, label, emptyTex
         <span className="min-w-0 flex-1"><span className="block truncate">{option.label}</span>{option.hint && <span className="block truncate text-xs text-app-subtle">{option.hint}</span>}</span>
         {option.badge}
       </li>)}
-      {!loading && options.length === 0 && <li className="px-3 py-3 text-sm text-app-subtle">{emptyText}</li>}
-      {total > options.length && <li className="px-3 py-2 text-xs text-app-subtle">{total - options.length} más: sigue escribiendo para acotar</li>}
+      {!loading && options.length === 0 && <li className="px-3 py-3 text-sm text-app-subtle">{emptyText ?? t('combobox.empty')}</li>}
+      {total > options.length && <li className="px-3 py-2 text-xs text-app-subtle">{t('combobox.more', { remaining: total - options.length })}</li>}
     </ul>}
   </div>
 }

@@ -1,11 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BrandMark } from '@/shared/ui/brand-mark'
 import { BRAND } from '@/shared/lib/brand'
 import { LOADING_EVENT } from '@/shared/api/http'
 
 // Pantalla de arranque: la marca en el centro, con un pulso suave mientras se comprueba la sesión.
 export function Splash() {
-  return <div className="grid min-h-screen place-items-center bg-app" role="status" aria-label={`Cargando ${BRAND.name}`}>
+  const { t } = useTranslation('ui')
+  return <div className="grid min-h-screen place-items-center bg-app" role="status" aria-label={t('splash', { name: BRAND.name })}>
     <div className="flex animate-[tamandua-breathe_1.8s_ease-in-out_infinite] items-center gap-3 opacity-80">
       <BrandMark size={40} /><span className="text-2xl font-semibold tracking-tight text-app-fg">{BRAND.name}</span>
     </div>
@@ -40,16 +42,17 @@ export function Bone({ className = '' }: { className?: string }) {
   return <span aria-hidden className={`block rounded-md bg-skeleton motion-safe:animate-pulse ${className}`} />
 }
 
-function Region({ label, className = '', children }: { label: string; className?: string; children: ReactNode }) {
+function Region({ label, className = '', children }: { label?: string; className?: string; children: ReactNode }) {
+  const { t } = useTranslation('ui')
   // El diseño (grid, divide…) va en el contenedor de las formas, que es el que tiene los hijos.
   return <div role="status" aria-live="polite" aria-busy="true">
-    <span className="sr-only">{label}</span>
+    <span className="sr-only">{label ?? t('loading')}</span>
     <div aria-hidden className={className}>{children}</div>
   </div>
 }
 
 // Lista: icono, título, línea secundaria y, si se pide, una acción al final (filas de repositorios, PRs, análisis).
-export function SkeletonList({ rows = 5, label = 'Cargando', action = false, dense = false }: { rows?: number; label?: string; action?: boolean; dense?: boolean }) {
+export function SkeletonList({ rows = 5, label, action = false, dense = false }: { rows?: number; label?: string; action?: boolean; dense?: boolean }) {
   return <Region label={label} className="divide-y divide-app-line">
     {Array.from({ length: rows }, (_, index) => <div key={index} className={`flex items-center gap-3 ${dense ? 'px-3 py-2' : 'px-4 py-3'}`}>
       <Bone className="size-4 shrink-0 rounded" />
@@ -60,7 +63,7 @@ export function SkeletonList({ rows = 5, label = 'Cargando', action = false, den
 }
 
 // Tabla: cabecera y filas con tantas columnas como la tabla real.
-export function SkeletonTable({ rows = 6, columns = 4, label = 'Cargando' }: { rows?: number; columns?: number; label?: string }) {
+export function SkeletonTable({ rows = 6, columns = 4, label }: { rows?: number; columns?: number; label?: string }) {
   const widths = ['w-3/4', 'w-1/2', 'w-2/3', 'w-1/3', 'w-5/6']
   return <Region label={label} className="overflow-hidden rounded-xl border border-app-line">
     <div className="grid gap-3 border-b border-app-line px-4 py-3" style={{ gridTemplateColumns: `2fr repeat(${columns - 1}, minmax(0, 1fr))` }}>
@@ -73,14 +76,14 @@ export function SkeletonTable({ rows = 6, columns = 4, label = 'Cargando' }: { r
 }
 
 // Métricas: tarjetas con número y etiqueta (resumen, hallazgos).
-export function SkeletonTiles({ count = 4, label = 'Cargando' }: { count?: number; label?: string }) {
+export function SkeletonTiles({ count = 4, label }: { count?: number; label?: string }) {
   return <Region label={label} className={`grid gap-3 ${count > 4 ? 'sm:grid-cols-3 xl:grid-cols-6' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
     {Array.from({ length: count }, (_, index) => <div key={index} className="space-y-3 rounded-xl border border-app-line bg-panel p-4"><Bone className="h-7 w-12" /><Bone className="h-3 w-24" /></div>)}
   </Region>
 }
 
 // Tarjeta con título, descripción y cuerpo de líneas (paneles de detalle, formularios de solo lectura).
-export function SkeletonCard({ lines = 3, label = 'Cargando' }: { lines?: number; label?: string }) {
+export function SkeletonCard({ lines = 3, label }: { lines?: number; label?: string }) {
   return <Region label={label} className="space-y-4 rounded-xl border border-app-line bg-panel p-5">
     <div className="space-y-2"><Bone className="h-5 w-1/3" /><Bone className="h-3.5 w-2/3" /></div>
     <div className="space-y-2">{Array.from({ length: lines }, (_, index) => <Bone key={index} className={`h-3.5 ${index === lines - 1 ? 'w-1/2' : 'w-full'}`} />)}</div>
@@ -88,7 +91,7 @@ export function SkeletonCard({ lines = 3, label = 'Cargando' }: { lines?: number
 }
 
 // Bloques genéricos (y métricas encima si se piden).
-export function Skeleton({ rows = 3, tiles = 0, label = 'Cargando' }: { rows?: number; tiles?: number; label?: string }) {
+export function Skeleton({ rows = 3, tiles = 0, label }: { rows?: number; tiles?: number; label?: string }) {
   return <Region label={label} className="space-y-4">
     {tiles > 0 && <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">{Array.from({ length: tiles }, (_, index) => <Bone key={index} className="h-20 rounded-xl" />)}</div>}
     {Array.from({ length: rows }, (_, index) => <Bone key={index} className="h-14 rounded-xl" />)}

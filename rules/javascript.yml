@@ -2,8 +2,11 @@ rules:
   - id: appsec.js.eval-non-literal
     languages: [javascript, typescript]
     severity: ERROR
-    message: "eval() sobre una expresión no literal ejecuta código arbitrario. Sustituye por JSON.parse o una tabla de funciones permitidas."
-    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL}
+    message: "eval() on a non-literal expression runs arbitrary code. Use JSON.parse, or a lookup table of allowed functions."
+    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL,
+      title: {en: "Code evaluated from a dynamic expression", es: "Código evaluado desde una expresión dinámica"},
+      fix: {en: "eval() on a non-literal expression runs arbitrary code. Use JSON.parse, or a lookup table of allowed functions.",
+            es: "eval() sobre una expresión no literal ejecuta código arbitrario. Sustituye por JSON.parse o una tabla de funciones permitidas."}}
     patterns:
       - pattern-either:
           - pattern: eval($X)
@@ -13,8 +16,11 @@ rules:
   - id: appsec.js.command-injection
     languages: [javascript, typescript]
     severity: ERROR
-    message: "Entrada de la petición llega a la ejecución de un comando del sistema. Usa execFile/spawn sin shell con argumentos separados y valida contra una lista permitida."
-    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL}
+    message: "Request input reaches a system command. Use execFile or spawn without a shell, pass arguments separately and validate them against an allowlist."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL,
+      title: {en: "Command injection from request input", es: "Inyección de comandos desde la petición"},
+      fix: {en: "Request input reaches a system command. Use execFile or spawn without a shell, pass arguments separately and validate them against an allowlist.",
+            es: "Entrada de la petición llega a la ejecución de un comando del sistema. Usa execFile/spawn sin shell con argumentos separados y valida contra una lista permitida."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -34,8 +40,11 @@ rules:
   - id: appsec.js.sql-injection
     languages: [javascript, typescript]
     severity: ERROR
-    message: "Entrada de la petición llega a una consulta SQL. Usa consultas parametrizadas ($1 / ?) y nunca concatenes ni interpoles la entrada en el SQL."
-    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "Request input reaches a SQL query. Use parameterized queries ($1 / ?) and never concatenate or interpolate input into the SQL text."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "SQL injection from request input", es: "Inyección SQL desde la petición"},
+      fix: {en: "Request input reaches a SQL query. Use parameterized queries ($1 / ?) and never concatenate or interpolate input into the SQL text.",
+            es: "Entrada de la petición llega a una consulta SQL. Usa consultas parametrizadas ($1 / ?) y nunca concatenes ni interpoles la entrada en el SQL."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -53,8 +62,11 @@ rules:
   - id: appsec.js.dom-xss-sink
     languages: [javascript, typescript]
     severity: WARNING
-    message: "Escritura de HTML sin escapar en el DOM desde una variable. Usa textContent, o sanitiza con DOMPurify si necesitas HTML."
-    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    message: "A variable is written to the DOM as HTML without escaping. Use textContent, or sanitize with DOMPurify if you need HTML."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM,
+      title: {en: "Unescaped HTML written to the DOM", es: "HTML sin escapar escrito en el DOM"},
+      fix: {en: "A variable is written to the DOM as HTML without escaping. Use textContent, or sanitize with DOMPurify if you need HTML.",
+            es: "Escritura de HTML sin escapar en el DOM desde una variable. Usa textContent, o sanitiza con DOMPurify si necesitas HTML."}}
     patterns:
       - pattern-either:
           - pattern: $EL.innerHTML = $X
@@ -68,15 +80,21 @@ rules:
   - id: appsec.js.react-dangerously-set-inner-html
     languages: [javascript, typescript]
     severity: WARNING
-    message: "dangerouslySetInnerHTML con contenido no literal: XSS si el valor viene de datos externos. Sanitiza con DOMPurify o renderiza texto."
-    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    message: "dangerouslySetInnerHTML with non-literal content allows XSS if the value comes from external data. Render it as text, or sanitize it with DOMPurify."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM,
+      title: {en: "Dynamic content in dangerouslySetInnerHTML", es: "Contenido dinámico en dangerouslySetInnerHTML"},
+      fix: {en: "dangerouslySetInnerHTML with non-literal content allows XSS if the value comes from external data. Render it as text, or sanitize it with DOMPurify.",
+            es: "dangerouslySetInnerHTML con contenido no literal: XSS si el valor viene de datos externos. Sanitiza con DOMPurify o renderiza texto."}}
     # JSX no se parsea como patrón estructural; se detecta por regex y se excluye el literal.
     pattern-regex: 'dangerouslySetInnerHTML=\{\{\s*__html:\s*(?!["\x27`])[^}]+\}\}'
   - id: appsec.js.path-traversal
     languages: [javascript, typescript]
     severity: ERROR
-    message: "Ruta de archivo construida con entrada de la petición. Normaliza con path.resolve y comprueba que quede dentro del directorio permitido, o usa path.basename."
-    metadata: {cwe: [22], owasp: "A01:2025", category: path-traversal, confidence: HIGH}
+    message: "A file path is built from request input. Resolve it with path.resolve and check it stays inside the allowed directory, or keep only path.basename."
+    metadata: {cwe: [22], owasp: "A01:2025", category: path-traversal, confidence: HIGH,
+      title: {en: "File path built from request input", es: "Ruta de archivo construida con datos de la petición"},
+      fix: {en: "A file path is built from request input. Resolve it with path.resolve and check it stays inside the allowed directory, or keep only path.basename.",
+            es: "Ruta de archivo construida con entrada de la petición. Normaliza con path.resolve y comprueba que quede dentro del directorio permitido, o usa path.basename."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -98,8 +116,11 @@ rules:
   - id: appsec.js.open-redirect
     languages: [javascript, typescript]
     severity: WARNING
-    message: "Redirección con destino tomado de la petición. Valida contra una lista de rutas permitidas o usa rutas relativas."
-    metadata: {cwe: [601], owasp: "A01:2025", category: redirect, confidence: HIGH}
+    message: "The redirect target comes from the request. Check it against an allowlist of paths, or redirect only to relative paths."
+    metadata: {cwe: [601], owasp: "A01:2025", category: redirect, confidence: HIGH,
+      title: {en: "Open redirect from request input", es: "Redirección abierta desde la petición"},
+      fix: {en: "The redirect target comes from the request. Check it against an allowlist of paths, or redirect only to relative paths.",
+            es: "Redirección con destino tomado de la petición. Valida contra una lista de rutas permitidas o usa rutas relativas."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -112,8 +133,11 @@ rules:
   - id: appsec.js.jwt-none-algorithm
     languages: [javascript, typescript]
     severity: ERROR
-    message: "Verificación JWT que admite el algoritmo 'none': cualquier token sin firma será aceptado. Fija una lista explícita de algoritmos seguros."
-    metadata: {cwe: [347], owasp: "A07:2025", category: auth, confidence: HIGH}
+    message: "JWT verification allows the 'none' algorithm, so unsigned tokens are accepted. Pin an explicit list of secure algorithms."
+    metadata: {cwe: [347], owasp: "A07:2025", category: auth, confidence: HIGH,
+      title: {en: "JWT verification accepts the 'none' algorithm", es: "Verificación JWT que acepta el algoritmo 'none'"},
+      fix: {en: "JWT verification allows the 'none' algorithm, so unsigned tokens are accepted. Pin an explicit list of secure algorithms.",
+            es: "Verificación JWT que admite el algoritmo 'none': cualquier token sin firma será aceptado. Fija una lista explícita de algoritmos seguros."}}
     pattern-either:
       - pattern: |
           jwt.verify($T, $S, {..., algorithms: [..., "none", ...], ...}, ...)
@@ -122,16 +146,22 @@ rules:
   - id: appsec.js.jwt-hardcoded-secret
     languages: [javascript, typescript]
     severity: WARNING
-    message: "Secreto JWT escrito en el código. Muévelo a configuración/secretos y rótalo: ya está expuesto en el repositorio."
-    metadata: {cwe: [798], owasp: "A04:2025", category: secrets, confidence: HIGH}
+    message: "The JWT secret is written in the code. Move it to configuration or a secrets manager and rotate it: it's already exposed in the repository."
+    metadata: {cwe: [798], owasp: "A04:2025", category: secrets, confidence: HIGH,
+      title: {en: "Hard-coded JWT secret", es: "Secreto JWT en el código"},
+      fix: {en: "The JWT secret is written in the code. Move it to configuration or a secrets manager and rotate it: it's already exposed in the repository.",
+            es: "Secreto JWT escrito en el código. Muévelo a configuración/secretos y rótalo: ya está expuesto en el repositorio."}}
     pattern-either:
       - pattern: jwt.sign($P, "...", ...)
       - pattern: jwt.verify($T, "...", ...)
   - id: appsec.js.tls-reject-unauthorized-false
     languages: [javascript, typescript]
     severity: ERROR
-    message: "Validación de certificados TLS desactivada: permite interceptar el tráfico. Usa una CA propia en lugar de deshabilitar la verificación."
-    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    message: "TLS certificate validation is turned off, so traffic can be intercepted. Trust your own CA instead of disabling verification."
+    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH,
+      title: {en: "TLS certificate validation disabled", es: "Validación de certificados TLS desactivada"},
+      fix: {en: "TLS certificate validation is turned off, so traffic can be intercepted. Trust your own CA instead of disabling verification.",
+            es: "Validación de certificados TLS desactivada: permite interceptar el tráfico. Usa una CA propia en lugar de deshabilitar la verificación."}}
     pattern-either:
       - pattern: |
           {..., rejectUnauthorized: false, ...}
@@ -140,8 +170,11 @@ rules:
   - id: appsec.js.weak-hash
     languages: [javascript, typescript]
     severity: INFO
-    message: "MD5/SHA-1 no sirven para contraseñas ni firmas. Para contraseñas usa bcrypt/scrypt/argon2; para integridad, SHA-256."
-    metadata: {cwe: [328], owasp: "A04:2025", category: crypto, confidence: LOW}
+    message: "MD5 and SHA-1 are unsafe for passwords and signatures. Use bcrypt, scrypt or argon2 for passwords and SHA-256 for integrity."
+    metadata: {cwe: [328], owasp: "A04:2025", category: crypto, confidence: LOW,
+      title: {en: "Weak hash algorithm (MD5/SHA-1)", es: "Algoritmo de hash débil (MD5/SHA-1)"},
+      fix: {en: "MD5 and SHA-1 are unsafe for passwords and signatures. Use bcrypt, scrypt or argon2 for passwords and SHA-256 for integrity.",
+            es: "MD5/SHA-1 no sirven para contraseñas ni firmas. Para contraseñas usa bcrypt/scrypt/argon2; para integridad, SHA-256."}}
     pattern-either:
       - pattern: crypto.createHash("md5")
       - pattern: crypto.createHash("sha1")

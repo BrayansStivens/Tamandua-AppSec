@@ -1,10 +1,16 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/shared/i18n'
+import { formatDay } from '@/shared/i18n/format'
 
 // Gráficas SVG sin dependencias. Marcas finas, huecos de 2 px entre segmentos, rejilla recesiva,
 // leyenda siempre que haya ≥ 2 series, etiquetas directas selectivas y capa de hover con tooltip.
 const SEV = ['low', 'medium', 'high', 'critical'] as const
 export const sevColor: Record<string, string> = { low: 'var(--sev-low)', medium: 'var(--sev-medium)', high: 'var(--sev-high)', critical: 'var(--sev-critical)' }
-export const sevName: Record<string, string> = { low: 'Baja', medium: 'Media', high: 'Alta', critical: 'Crítica' }
+export const sevName: Record<string, string> = {
+  get low() { return i18n.t('common:severity.low') }, get medium() { return i18n.t('common:severity.medium') },
+  get high() { return i18n.t('common:severity.high') }, get critical() { return i18n.t('common:severity.critical') },
+}
 const shortDay = (day: string) => day.slice(5).replace('-', '/')
 
 // Ancho real del contenedor: los gráficos se dibujan a su tamaño en píxeles en vez de escalar un viewBox
@@ -44,6 +50,7 @@ export function Legend({ items }: { items: { label: string; color: string }[] })
 
 /** Barras apiladas por día: hallazgos nuevos por severidad. */
 export function StackedSeverityBars({ data, height = 180 }: { data: { day: string; critical: number; high: number; medium: number; low: number }[]; height?: number }) {
+  const { t } = useTranslation('charts')
   const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null)
   const [ref, width] = useWidth(640)
   const padLeft = 28, padBottom = 22, padTop = 8
@@ -54,7 +61,7 @@ export function StackedSeverityBars({ data, height = 180 }: { data: { day: strin
   const total = data.reduce((sum, item) => sum + item.critical + item.high + item.medium + item.low, 0)
   const ticksAt = dayTicks(data.length, innerW)
   return <div ref={ref} className="relative">
-    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block max-w-full" role="img" aria-label={`Hallazgos nuevos por día: ${total} en total`}>
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block max-w-full" role="img" aria-label={t('new_per_day', { total })}>
       {ticks.map(tick => { const y = padTop + innerH - (tick / max) * innerH; return <g key={tick}><line x1={padLeft} x2={width - 8} y1={y} y2={y} stroke="var(--grid-line)" strokeWidth={1} /><text x={padLeft - 6} y={y + 3} textAnchor="end" className="fill-app-subtle" fontSize={11}>{tick}</text></g> })}
       {data.map((item, index) => { const x = padLeft + index * slot + (slot - bar) / 2; let y = padTop + innerH
         return <g key={item.day} onMouseEnter={event => setHover({ index, x: (event.nativeEvent as MouseEvent).offsetX, y: (event.nativeEvent as MouseEvent).offsetY })} onMouseLeave={() => setHover(null)}>
@@ -72,9 +79,10 @@ export function StackedSeverityBars({ data, height = 180 }: { data: { day: strin
 
 /** Parte-todo horizontal: abiertos por severidad, con etiquetas directas. */
 export function SeverityBar({ counts }: { counts: Record<string, number> }) {
+  const { t } = useTranslation('charts')
   const total = SEV.reduce((sum, level) => sum + (counts[level] ?? 0), 0)
   return <div className="space-y-3">
-    <div className="flex h-4 w-full overflow-hidden rounded-md bg-app-soft" role="img" aria-label={`Abiertos por severidad, ${total} en total`}>
+    <div className="flex h-4 w-full overflow-hidden rounded-md bg-app-soft" role="img" aria-label={t('open_by_severity', { total })}>
       {total ? SEV.slice().reverse().map(level => (counts[level] ?? 0) > 0 ? <div key={level} title={`${sevName[level]}: ${counts[level]}`} style={{ width: `${(100 * (counts[level] ?? 0)) / total}%`, background: sevColor[level] }} className="border-r-2 border-panel last:border-r-0" /> : null) : null}
     </div>
     <div className="grid grid-cols-4 gap-2 text-xs">{SEV.slice().reverse().map(level => <div key={level} className="flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-sm" style={{ background: sevColor[level] }} /><span className="text-app-muted">{sevName[level]}</span><span className="ml-auto font-medium tabular-nums text-app-fg">{counts[level] ?? 0}</span></div>)}</div>
@@ -83,6 +91,7 @@ export function SeverityBar({ counts }: { counts: Record<string, number> }) {
 
 /** Dos líneas: acumulado de hallados y de corregidos. */
 export function FoundVsFixed({ data, height = 200 }: { data: { day: string; found: number; fixed: number }[]; height?: number }) {
+  const { t } = useTranslation('charts')
   const [hover, setHover] = useState<{ index: number; x: number; y: number } | null>(null)
   const [ref, width] = useWidth(640)
   const padLeft = 28, padBottom = 22, padTop = 14
@@ -94,18 +103,18 @@ export function FoundVsFixed({ data, height = 200 }: { data: { day: string; foun
   const last = data[data.length - 1]
   const ticksAt = dayTicks(data.length, innerW)
   return <div ref={ref} className="relative">
-    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block max-w-full" role="img" aria-label="Hallados frente a corregidos, acumulado">
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block max-w-full" role="img" aria-label={t('found_vs_fixed')}>
       {[0, Math.ceil(max / 2), max].map(tick => <g key={tick}><line x1={padLeft} x2={width - 8} y1={y(tick)} y2={y(tick)} stroke="var(--grid-line)" strokeWidth={1} /><text x={padLeft - 6} y={y(tick) + 3} textAnchor="end" className="fill-app-subtle" fontSize={11}>{tick}</text></g>)}
       <path d={path('found')} fill="none" stroke="var(--series-found)" strokeWidth={2} strokeLinejoin="round" />
       <path d={path('fixed')} fill="none" stroke="var(--series-fixed)" strokeWidth={2} strokeLinejoin="round" />
-      {last && <><text x={width - 10} y={y(last.found) - 4} textAnchor="end" className="fill-app-secondary" fontSize={11}>{last.found} hallados</text><text x={width - 10} y={y(last.fixed) + (Math.abs(y(last.fixed) - y(last.found)) < 12 ? 12 : -4)} textAnchor="end" className="fill-app-secondary" fontSize={11}>{last.fixed} corregidos</text></>}
+      {last && <><text x={width - 10} y={y(last.found) - 4} textAnchor="end" className="fill-app-secondary" fontSize={11}>{t('found_count', { count: last.found })}</text><text x={width - 10} y={y(last.fixed) + (Math.abs(y(last.fixed) - y(last.found)) < 12 ? 12 : -4)} textAnchor="end" className="fill-app-secondary" fontSize={11}>{t('fixed_count', { count: last.fixed })}</text></>}
       {hover && <><line x1={x(hover.index)} x2={x(hover.index)} y1={padTop} y2={padTop + innerH} stroke="var(--axis-line)" strokeDasharray="3 3" /><circle cx={x(hover.index)} cy={y(data[hover.index].found)} r={4} fill="var(--series-found)" stroke="var(--app-panel)" strokeWidth={2} /><circle cx={x(hover.index)} cy={y(data[hover.index].fixed)} r={4} fill="var(--series-fixed)" stroke="var(--app-panel)" strokeWidth={2} /></>}
       <rect x={padLeft} y={padTop} width={innerW} height={innerH} fill="transparent" onMouseMove={event => { const rect = (event.currentTarget as SVGRectElement).getBoundingClientRect(); const ratio = (event.clientX - rect.left) / rect.width; setHover({ index: Math.round(ratio * (data.length - 1)), x: (event.nativeEvent as MouseEvent).offsetX, y: (event.nativeEvent as MouseEvent).offsetY }) }} onMouseLeave={() => setHover(null)} />
       {data.map((item, index) => ticksAt.has(index) && <text key={item.day} x={x(index)} y={height - 6} textAnchor={index === data.length - 1 ? 'end' : index === 0 ? 'start' : 'middle'} className="fill-app-subtle" fontSize={11}>{shortDay(item.day)}</text>)}
       <line x1={padLeft} x2={width - 8} y1={padTop + innerH} y2={padTop + innerH} stroke="var(--axis-line)" strokeWidth={1} />
     </svg>
-    {hover && <Tooltip x={hover.x} y={hover.y}><div className="font-medium">{data[hover.index].day}</div><div className="flex justify-between gap-3"><span>Hallados</span><span className="tabular-nums">{data[hover.index].found}</span></div><div className="flex justify-between gap-3"><span>Corregidos</span><span className="tabular-nums">{data[hover.index].fixed}</span></div></Tooltip>}
-    <Legend items={[{ label: 'Hallados (acumulado)', color: 'var(--series-found)' }, { label: 'Corregidos (acumulado)', color: 'var(--series-fixed)' }]} />
+    {hover && <Tooltip x={hover.x} y={hover.y}><div className="font-medium">{data[hover.index].day}</div><div className="flex justify-between gap-3"><span>{t('found')}</span><span className="tabular-nums">{data[hover.index].found}</span></div><div className="flex justify-between gap-3"><span>{t('fixed')}</span><span className="tabular-nums">{data[hover.index].fixed}</span></div></Tooltip>}
+    <Legend items={[{ label: t('found_cumulative'), color: 'var(--series-found)' }, { label: t('fixed_cumulative'), color: 'var(--series-fixed)' }]} />
   </div>
 }
 
@@ -123,6 +132,7 @@ export function HBars({ rows, colorFor }: { rows: { label: string; value: number
 /** Actividad diaria en semanas (columnas) × días (filas). Termina siempre en hoy y muestra tantas semanas como
  *  quepan en el ancho disponible: sin scroll horizontal y con el día actual a la vista. */
 export function ActivityHeatmap({ days }: { days: { day: string; runs: number }[] }) {
+  const { t } = useTranslation('charts')
   const [hover, setHover] = useState<{ day: string; runs: number; x: number; y: number } | null>(null)
   const [ref, available] = useWidth(720)
   const gap = 3, left = 22, top = 16
@@ -140,24 +150,24 @@ export function ActivityHeatmap({ days }: { days: { day: string; runs: number }[
   const x = (col: number) => left + col * (cell + gap)
   // Un mes se rotula en la columna donde empieza; la primera columna solo si el siguiente rótulo no la pisa.
   const monthOf = (col: number) => visible[Math.max(0, col * 7 - startRow)]?.day.slice(0, 7) ?? ''
-  const monthName = (month: string) => new Date(`${month}-01T00:00:00Z`).toLocaleDateString('es-CO', { month: 'short', timeZone: 'UTC' }).replace('.', '')
+  const monthName = (month: string) => formatDay(`${month}-01T00:00:00Z`, { month: 'short', timeZone: 'UTC' }).replace('.', '')
   const starts = Array.from({ length: cols }, (_, col) => col).filter(col => col > 0 && monthOf(col) && monthOf(col) !== monthOf(col - 1))
   const months = [...(starts[0] === undefined || starts[0] >= 3 ? [0] : []), ...starts].map(col => ({ x: x(col), label: monthName(monthOf(col)) }))
   const total = visible.reduce((sum, item) => sum + item.runs, 0)
   const weeks = Math.ceil((visible.length + startRow) / 7)
   return <div ref={ref} className="relative">
-    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block max-w-full" role="img" aria-label={`Ejecuciones por día en las últimas ${weeks} semanas: ${total} en total`}>
-      {['L', '', 'X', '', 'V', '', 'D'].map((label, row) => label && <text key={row} x={0} y={top + row * (cell + gap) + cell - 2} className="fill-app-subtle" fontSize={11}>{label}</text>)}
+    <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block max-w-full" role="img" aria-label={t('activity_label', { weeks, total })}>
+      {[t('weekday.mon'), '', t('weekday.wed'), '', t('weekday.fri'), '', t('weekday.sun')].map((label, row) => label && <text key={row} x={0} y={top + row * (cell + gap) + cell - 2} className="fill-app-subtle" fontSize={11}>{label}</text>)}
       {months.map(month => <text key={`${month.x}-${month.label}`} x={month.x} y={10} className="fill-app-subtle" fontSize={11}>{month.label}</text>)}
       {visible.map((item, index) => { const position = index + startRow; const col = Math.floor(position / 7), row = position % 7
         const today = index === visible.length - 1
         return <rect key={item.day} x={x(col)} y={top + row * (cell + gap)} width={cell} height={cell} rx={2} fill={level(item.runs)} stroke={today ? 'var(--app-fg)' : undefined} strokeWidth={today ? 1.5 : undefined}
           onMouseEnter={event => setHover({ ...item, x: (event.nativeEvent as MouseEvent).offsetX, y: (event.nativeEvent as MouseEvent).offsetY })} onMouseLeave={() => setHover(null)} /> })}
     </svg>
-    {hover && <Tooltip x={hover.x} y={hover.y}><div className="font-medium">{hover.day === lastDay ? `Hoy · ${hover.day}` : hover.day}</div><div>{hover.runs} {hover.runs === 1 ? 'ejecución' : 'ejecuciones'}</div></Tooltip>}
+    {hover && <Tooltip x={hover.x} y={hover.y}><div className="font-medium">{hover.day === lastDay ? t('today_day', { day: hover.day }) : hover.day}</div><div>{t('runs', { count: hover.runs })}</div></Tooltip>}
     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-app-subtle" style={{ maxWidth: width }}>
-      <span>{total} {total === 1 ? 'ejecución' : 'ejecuciones'} en {weeks} semanas · recuadro = hoy</span>
-      <span className="flex items-center gap-1">Menos {[1, 2, 3, 4, 5].map(step => <span key={step} className="inline-block size-2.5 rounded-sm" style={{ background: `var(--seq-${step})` }} />)} Más</span>
+      <span>{t('activity_summary', { count: total, weeks })}</span>
+      <span className="flex items-center gap-1">{t('less')} {[1, 2, 3, 4, 5].map(step => <span key={step} className="inline-block size-2.5 rounded-sm" style={{ background: `var(--seq-${step})` }} />)} {t('more')}</span>
     </div>
   </div>
 }

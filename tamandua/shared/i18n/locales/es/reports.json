@@ -1,0 +1,664 @@
+{
+  "common": {
+    "severity": {
+      "critical": "Crítica",
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "info": "Info"
+    },
+    "action": {
+      "act": "Actuar ya",
+      "attend": "Atender",
+      "track": "Seguimiento"
+    },
+    "step_status": {
+      "completed": "completado",
+      "partial": "parcial",
+      "not_tested": "no ejecutado",
+      "inconclusive": "no concluyente",
+      "failed": "falló",
+      "pending": "pendiente",
+      "skipped": "omitido"
+    },
+    "yes": "sí",
+    "none": "ninguno",
+    "unknown": "desconocido",
+    "no_date": "sin fecha",
+    "sources": "Fuentes de los avisos",
+    "limitations": "Límites",
+    "summary": "Resumen",
+    "scope": "Alcance",
+    "findings": "Hallazgos",
+    "findings_count": "Hallazgos ({{count}})",
+    "what_first": "Qué hacer primero",
+    "code_heading": "Código, secretos e infraestructura ({{count}})",
+    "medium_low": "Medios y bajos ({{count}})",
+    "annex": "Anexo · Índice de vulnerabilidades ({{count}})",
+    "method_coverage": "Método y cobertura",
+    "references": "Referencias: {{list}}",
+    "kev_mark": "Explotación activa conocida (CISA KEV)",
+    "malicious_mark": "Paquete malicioso conocido (OpenSSF)",
+    "risk_label": "Riesgo:",
+    "fix_label": "Corrección:"
+  },
+  "columns": {
+    "severity": "Severidad",
+    "what": "Qué",
+    "where": "Dónde",
+    "action": "Acción",
+    "priority": "Prioridad",
+    "count": "Cantidad",
+    "package": "Paquete",
+    "manifest": "Manifiesto",
+    "advisories": "Avisos",
+    "update_to": "Actualizar a",
+    "command": "Comando",
+    "finding": "Hallazgo",
+    "location": "Ubicación",
+    "fix": "Corrección",
+    "identifier": "Identificador",
+    "cvss": "CVSS",
+    "epss": "EPSS",
+    "kev": "KEV",
+    "fixed_in": "Corregida en",
+    "source": "Fuente",
+    "decision": "Decisión",
+    "reason": "Motivo",
+    "by": "Por",
+    "expires": "Vence",
+    "aspect": "Aspecto",
+    "evidence_here": "Evidencia técnica en este dossier",
+    "still_needed": "Documentación aún necesaria",
+    "control": "Control",
+    "contributes": "Qué aporta esta evidencia",
+    "detected": "Detectado",
+    "was_due": "Vencía",
+    "overdue_by": "Retraso",
+    "status": "Estado",
+    "recommended_action": "Acción recomendada",
+    "decided_by": "Decidido por",
+    "date": "Fecha",
+    "repository": "Repositorio",
+    "critical_short": "Crít.",
+    "high_plural": "Altas",
+    "medium_plural": "Medias",
+    "low_plural": "Bajas",
+    "open_plural": "Abiertos",
+    "fixed_short": "Remed.",
+    "exceptions_short": "Excep.",
+    "last_complete": "Último completo",
+    "vulnerabilities": "Vulnerabilidades",
+    "role": "Rol",
+    "name": "Nombre",
+    "signature": "Firma"
+  },
+  "count": {
+    "findings_one": "{{count}} hallazgo",
+    "findings_other": "{{count}} hallazgos",
+    "pending_findings_one": "{{count}} hallazgo pendiente",
+    "pending_findings_other": "{{count}} hallazgos pendientes",
+    "fixed_findings_one": "{{count}} hallazgo remediado",
+    "fixed_findings_other": "{{count}} hallazgos remediados",
+    "advisories_one": "{{count}} aviso",
+    "advisories_other": "{{count}} avisos",
+    "actions_one": "{{count}} acción",
+    "actions_other": "{{count}} acciones",
+    "days_one": "{{count}} día",
+    "days_other": "{{count}} días",
+    "vulnerabilities_one": "{{count}} vulnerabilidad",
+    "vulnerabilities_other": "{{count}} vulnerabilidades",
+    "packages_one": "{{count}} paquete",
+    "packages_other": "{{count}} paquetes",
+    "packages_to_update_one": "{{count}} dependencia que actualizar o sustituir",
+    "packages_to_update_other": "{{count}} dependencias que actualizar o sustituir",
+    "repositories_one": "{{count}} repositorio",
+    "repositories_other": "{{count}} repositorios",
+    "approved_exceptions_one": "{{count}} excepción aprobada",
+    "approved_exceptions_other": "{{count}} excepciones aprobadas",
+    "critical_one": "{{count}} crítico",
+    "critical_other": "{{count}} críticos",
+    "high_one": "{{count}} alto",
+    "high_other": "{{count}} altos",
+    "medium_one": "{{count}} medio",
+    "medium_other": "{{count}} medios",
+    "low_info_one": "{{count}} bajo o informativo",
+    "low_info_other": "{{count}} bajos o informativos",
+    "are_critical_one": "{{count}} es crítico",
+    "are_critical_other": "{{count}} son críticos"
+  },
+  "design": {
+    "listing_last": "{{items}} y {{last}}",
+    "listing_more": "{{items}} y {{count}} más",
+    "signoff": "Revisión y aprobación",
+    "prepared_by": "Preparado por",
+    "reviewed_by": "Revisado por",
+    "approved_by": "Aprobado por",
+    "page_footer": "Tamandua {{version}}  ·  página {{page}}",
+    "disclaimer": "Evidencia técnica generada con herramientas automatizadas y revisada por el equipo. No constituye una opinión de auditoría, una certificación ni una declaración de cumplimiento."
+  },
+  "markdown": {
+    "identifiers": "Identificadores: {{list}}",
+    "package": "Paquete: `{{name}}` {{version}} ({{ecosystem}}) · {{fix}} · declarado en `{{path}}`",
+    "fixed_in": "**corregido en {{version}}**",
+    "no_fixed_version": "**sin versión corregida**",
+    "location": "Ubicación: `{{where}}`",
+    "advisory_source": "Fuente del aviso: {{source}} · {{license}}",
+    "license_unreviewed": "licencia sin revisar",
+    "kev": "**CISA KEV** desde {{date}}",
+    "kev_ransomware": "**CISA KEV** desde {{date}} · usado por ransomware",
+    "epss": "EPSS {{score}} (percentil {{percentile}})",
+    "triage": "Triage: **{{status}}**",
+    "triage_by": "Triage: **{{status}}** por {{by}} ({{date}})",
+    "triage_expires": "caduca {{date}}",
+    "triage_expired": "la aceptación anterior caducó",
+    "triage_reason": "motivo: {{reason}}",
+    "why_priority": "**Por qué esta prioridad:** {{factors}}",
+    "remediation": "**Remediación:** {{text}}",
+    "how_to_fix": "**Cómo corregirlo:**",
+    "before": "Antes:",
+    "after": "Después:",
+    "title_code": "Análisis de código · {{name}}",
+    "title_image": "Análisis de imagen · {{name}}",
+    "identity_image": "imagen `{{reference}}`",
+    "identity_image_digest": "imagen `{{reference}}` · digest `{{digest}}`",
+    "identity_snapshot": "snapshot SHA-256 `{{sha}}`",
+    "run_line": "Run `{{id}}` · {{date}} · fuente `{{provider}}` · {{identity}}",
+    "status_line": "Estado: **{{status}}** · {{files}} archivos · {{dependencies}} dependencias examinadas.",
+    "executive_summary": "Resumen ejecutivo",
+    "kev_total_one": "{{count}} hallazgo en el catálogo CISA KEV (explotación activa conocida).",
+    "kev_total_other": "{{count}} hallazgos en el catálogo CISA KEV (explotación activa conocida).",
+    "fixable_total_one": "{{count}} dependencia con versión corregida publicada.",
+    "fixable_total_other": "{{count}} dependencias con versión corregida publicada.",
+    "findings_total_one": "{{count}} hallazgo en total; cada uno lleva una huella estable para no duplicar tickets entre ejecuciones.",
+    "findings_total_other": "{{count}} hallazgos en total; cada uno lleva una huella estable para no duplicar tickets entre ejecuciones.",
+    "declared_context": "Contexto declarado",
+    "context_note": "Descripción aportada por el equipo, no una verificación del sistema.",
+    "dismissed": "Descartados en triage",
+    "dismissed_intro_one": "{{count}} hallazgo marcado como falso positivo o riesgo aceptado, con quién lo decidió y por qué.",
+    "dismissed_intro_other": "{{count}} hallazgos marcados como falso positivo o riesgo aceptado, con quién lo decidió y por qué.",
+    "coverage": "Cobertura de esta ejecución",
+    "no_findings": "No se generaron hallazgos con las reglas y dependencias examinadas. La cobertura se detalla más abajo.",
+    "pending_intro": "{{pending}} que se cierran con {{actions}}.",
+    "dependencies": "Dependencias ({{packages}} · {{advisories}})",
+    "no_fix": "sin corrección",
+    "detail_truncated": "Se detallan {{shown}} de {{total}} críticos y altos; el resto está en el panel, el JSON y el SARIF.",
+    "more_in_panel": "… y {{count}} más en el panel",
+    "annex_more": "… y {{count}} más en el JSON y el SARIF"
+  },
+  "asset": {
+    "title": "Estado actual de hallazgos · {{name}}",
+    "asset_line": "Activo: `{{id}}` · corte UTC: `{{date}}`",
+    "scope_text": "Vista acumulada del registro de hallazgos de este activo. Combina escaneos completos y revisiones de PR; no representa una prueba independiente ni demuestra cobertura continua.",
+    "included_one": "{{count}} hallazgo incluido en esta vista.",
+    "included_other": "{{count}} hallazgos incluidos en esta vista.",
+    "lifecycle_counts": "{{open}} abiertos; {{fixed}} remediados; {{suppressed}} descartados en triage; {{excluded}} excluidos.",
+    "empty": "La vista seleccionada no contiene hallazgos.",
+    "lifecycle_line": "Ciclo de vida: **{{status}}** · primera observación `{{first}}` · última observación `{{last}}`.",
+    "limit_tools": "El registro refleja solo las herramientas, rutas y repositorios analizados.",
+    "limit_runs": "Consulta cada ejecución original para sus pasos, versiones y cobertura específica."
+  },
+  "profile": {
+    "label": {
+      "soc2": "SOC 2 Tipo II",
+      "iso27001": "ISO/IEC 27001:2022",
+      "custom": "Personalizado"
+    },
+    "heading": "Evidencia técnica para {{framework}}",
+    "pdf_kind": "Dossier para revisión",
+    "scope_state": "`{{name}}`, registro acumulado de hallazgos; consultar ejecuciones originales para cobertura.",
+    "scope_image": "`{{name}}`, imagen `{{reference}}` leída del registro; análisis estático puntual.",
+    "scope_snapshot": "`{{name}}`, snapshot SHA-256 `{{sha}}`; análisis estático puntual.",
+    "profile_line": "Perfil: **{{profile}}** · {{kind}}: `{{id}}` · UTC: `{{date}}`",
+    "kind_state": "Registro",
+    "kind_run": "Run",
+    "disclaimer": "Documento de apoyo para el equipo de seguridad. No es una auditoría SOC 2, una certificación ISO 27001 ni una opinión de cumplimiento.",
+    "review_context": "Contexto para revisión",
+    "owner": "Organización y propietario del control: completar por el equipo responsable.",
+    "system_scope": "Sistema y alcance: {{scope}}",
+    "evidence_state": "Evidencia: estado acumulado, huellas de hallazgos y decisiones de triage; consultar cada ejecución para hash y pasos de prueba.",
+    "evidence_run": "Evidencia: identificador de run, hash del código, pasos de prueba, observaciones y estado de cobertura.",
+    "frequency_state": "Frecuencia y periodo de observación: registro acumulado; sus entradas no demuestran por sí solas operación continua del control.",
+    "frequency_run": "Frecuencia y periodo de observación: una ejecución puntual; no demuestra operación continua del control.",
+    "applicability": "Evaluación de aplicabilidad y controles: requiere revisión humana y documentación adicional.",
+    "matrix": "Matriz de preparación de evidencia",
+    "matrix_note": "La matriz es una guía de preparación; no evalúa la eficacia de controles ni sustituye el criterio del auditor.",
+    "attached": "Registro técnico adjunto",
+    "rows": {
+      "soc2": {
+        "design": {
+          "aspect": "Diseño del control",
+          "available": "Objetivo, responsables y frecuencia",
+          "missing": "Descripción aprobada del control y dueño"
+        },
+        "operation": {
+          "aspect": "Operación",
+          "available": "Fecha, fuente, pasos y hallazgos de esta ejecución",
+          "missing": "Muestras distribuidas a lo largo del periodo de evaluación"
+        },
+        "exceptions": {
+          "aspect": "Excepciones",
+          "available": "Hallazgos y decisiones de triage",
+          "missing": "Tickets, aprobaciones y prueba de remediación"
+        }
+      },
+      "iso27001": {
+        "scope": {
+          "aspect": "Alcance del SGSI",
+          "available": "Activo y fuente analizada",
+          "missing": "Alcance aprobado y relación con el inventario de activos"
+        },
+        "risk": {
+          "aspect": "Tratamiento de riesgos",
+          "available": "Hallazgos, severidad y triage",
+          "missing": "Evaluación de riesgos y plan de tratamiento aprobados"
+        },
+        "improvement": {
+          "aspect": "Mejora y seguimiento",
+          "available": "Pasos y límites del análisis puntual",
+          "missing": "Declaración de aplicabilidad y evidencias de seguimiento"
+        }
+      },
+      "custom": {
+        "scope": {
+          "aspect": "Alcance",
+          "available": "Activo, fecha y cobertura técnica",
+          "missing": "Definir criterio y periodo de revisión"
+        },
+        "result": {
+          "aspect": "Resultado",
+          "available": "Hallazgos y decisiones de triage",
+          "missing": "Agregar validación y aprobación del responsable"
+        }
+      }
+    }
+  },
+  "audit": {
+    "status": {
+      "open": "Abierto",
+      "in_progress": "En curso",
+      "fixed": "Remediado",
+      "false_positive": "Falso positivo",
+      "accepted": "Riesgo aceptado",
+      "excluded": "Fuera de alcance"
+    },
+    "status_count": {
+      "open_one": "{{count}} abierto",
+      "open_other": "{{count}} abiertos",
+      "in_progress_one": "{{count}} en curso",
+      "in_progress_other": "{{count}} en curso",
+      "fixed_one": "{{count}} remediado",
+      "fixed_other": "{{count}} remediados",
+      "false_positive_one": "{{count}} falso positivo",
+      "false_positive_other": "{{count}} falsos positivos",
+      "accepted_one": "{{count}} aceptado",
+      "accepted_other": "{{count}} aceptados",
+      "excluded_one": "{{count}} fuera de alcance",
+      "excluded_other": "{{count}} fuera de alcance"
+    },
+    "package_group": "{{vulnerabilities}} ({{counts}})",
+    "sla_level": {
+      "critical": "crítica",
+      "high": "alta",
+      "medium": "media",
+      "low": "baja"
+    },
+    "sla_policy_item": "{{level}} {{days}}",
+    "sla_policy_none": "{{level}} sin plazo",
+    "deadlines_heading": "Plazos de corrección ({{advisories}} fuera de plazo)",
+    "deadlines_body": "Política del espacio de trabajo: {{policy}}, contados desde la primera detección. Se aplican a lo abierto o en curso; lo remediado y las excepciones aprobadas no vencen. Con plazo corriendo: {{running}}; fuera de plazo: {{overdue}} en {{actions}}; vencen en los próximos 7 días: {{soon}}.",
+    "none_overdue": "Ningún hallazgo pendiente está fuera de plazo.",
+    "deadlines_truncated": "Se listan las {{limit}} acciones con más retraso de {{total}}; todas figuran en la tabla de hallazgos.",
+    "deadlines_included": "Los plazos de corrección están en la sección «Plazos de corrección» de este informe.",
+    "deadlines_missing": "Este informe no incluye los plazos de corrección: genéralo desde el estado actual del repositorio (Hallazgos → Estado actual) para que los traiga.",
+    "controls_heading": "Controles relacionados · {{framework}}",
+    "controls_note": "La relación con cada control es orientativa: la eficacia del control la evalúa el auditor con el resto de la documentación del equipo (política, responsables, frecuencia y muestras del periodo).",
+    "more_advisories": "{{risks}}; y {{count}} avisos más",
+    "evidence": "Evidencia de gestión de vulnerabilidades",
+    "evidence_consolidated": "Evidencia de gestión de vulnerabilidades · consolidado",
+    "title_with_system": "Evidencia de gestión de vulnerabilidades · {{system}}",
+    "period_range": "{{start}} a {{end}}",
+    "period_scan": "Análisis del {{date}}",
+    "period_state": "Estado al {{date}}",
+    "issued_value": "{{date}} · ref. {{ref}}",
+    "meta": {
+      "organization": "Organización",
+      "system": "Sistema / alcance",
+      "period": "Periodo",
+      "prepared_by": "Preparado por",
+      "prepared_for": "Preparado para",
+      "issued": "Emitido"
+    },
+    "kpi": {
+      "in_scope": "en el alcance",
+      "critical": "críticas",
+      "high": "altas",
+      "open": "abiertas o en curso",
+      "fixed": "remediadas",
+      "excepted": "excepciones aprobadas",
+      "analysed": "repositorios con análisis completo",
+      "open_critical": "críticas abiertas",
+      "open_high": "altas abiertas"
+    },
+    "of_total": "{{done}} de {{total}}",
+    "summary": "{{findings}} en el alcance de este informe: {{critical}}, {{high}}, {{medium}} y {{low}}. Abiertos o en curso: {{active}}; remediados: {{fixed}}; con excepción aprobada: {{excepted}}.",
+    "summary_kev_one": "{{count}} corresponde a vulnerabilidades con explotación activa conocida (CISA KEV).",
+    "summary_kev_other": "{{count}} corresponden a vulnerabilidades con explotación activa conocida (CISA KEV).",
+    "summary_grouped": "Se agrupan en {{actions}}: los avisos de una misma dependencia se cierran con una sola actualización.",
+    "method_static": "Análisis estático del {{date}}, sin ejecutar el código ni enviarlo a servicios externos.",
+    "method_engines": "Motores: {{list}}.",
+    "method_snapshot": "Instantánea analizada: SHA-256 {{sha}}…",
+    "method_state": "Estado acumulado del repositorio a {{date}}: reúne los análisis completos y las revisiones de pull requests, con la fecha en que cada hallazgo se detectó y, si aplica, se remedió.",
+    "method_gaps": "No se completó del todo: {{gaps}}. Esas áreas no equivalen a «sin hallazgos».",
+    "method_complete": "Todos los motores del análisis se completaron.",
+    "no_findings": "Ningún hallazgo en el alcance elegido.",
+    "exceptions_heading": "Excepciones y decisiones ({{count}})",
+    "no_exceptions_scope": "No hay riesgos aceptados ni falsos positivos declarados en el alcance.",
+    "no_exceptions": "No hay riesgos aceptados ni falsos positivos declarados.",
+    "detail": "Detalle",
+    "detail_high": "Detalle de críticos y altos",
+    "detail_truncated": "Se detallan las {{limit}} primeras de {{total}} acciones (explotación activa y severidad primero); todas están en la tabla de hallazgos y el detalle completo en el informe técnico.",
+    "portfolio_summary": "{{repositories}} en el informe; {{pending}}, de los que {{critical}} y {{high}} altos. {{fixed}} y {{exceptions}}.",
+    "coverage": "Cobertura",
+    "coverage_known": "{{analysed}} de {{total}} repositorios de la organización tienen al menos un análisis completo ({{percent}} %).",
+    "coverage_report": "{{analysed}} de {{total}} repositorios del informe tienen al menos un análisis completo.",
+    "coverage_incomplete": "Con análisis, pero ninguno completo (un motor no se ejecutó): {{list}}.",
+    "coverage_missing": "Sin ningún análisis ({{count}}): {{list}}.",
+    "method": "Método",
+    "portfolio_method_static": "Análisis estático de cada repositorio (código, dependencias, secretos, infraestructura y pipelines), sin ejecutar el código ni enviarlo a servicios externos.",
+    "portfolio_method_state": "El estado de cada repositorio reúne sus análisis completos y las revisiones de pull requests: un hallazgo queda remediado cuando deja de aparecer en un análisis completo, nunca por uno incompleto.",
+    "by_repository": "Por repositorio ({{count}})",
+    "no_full_scan": "Sin análisis completo",
+    "open_heading": "Críticos y altos abiertos ({{count}})",
+    "open_truncated": "Se muestran {{shown}} de {{total}} acciones; el detalle completo está en el informe de cada repositorio.",
+    "no_open": "No hay hallazgos críticos ni altos abiertos."
+  },
+  "frameworks": {
+    "soc2": {
+      "label": "SOC 2 Tipo II",
+      "controls": {
+        "cc3_2": {
+          "code": "CC3.2",
+          "name": "Identificación y análisis de riesgos",
+          "text": "Hallazgos priorizados por severidad, explotación activa (CISA KEV) y probabilidad (EPSS)."
+        },
+        "cc7_1": {
+          "code": "CC7.1",
+          "name": "Detección de vulnerabilidades y configuraciones",
+          "text": "Análisis del código, dependencias, secretos e infraestructura, con sus motores y cobertura."
+        },
+        "cc8_1": {
+          "code": "CC8.1",
+          "name": "Gestión de cambios",
+          "text": "Revisión de lo que introduce cada cambio antes de integrarlo, cuando se usa en pull requests o CI."
+        }
+      }
+    },
+    "iso27001": {
+      "label": "ISO/IEC 27001:2022",
+      "controls": {
+        "a8_8": {
+          "code": "A.8.8",
+          "name": "Gestión de vulnerabilidades técnicas",
+          "text": "Vulnerabilidades identificadas, evaluadas y en tratamiento, con su estado y responsable."
+        },
+        "a8_9": {
+          "code": "A.8.9",
+          "name": "Gestión de la configuración",
+          "text": "Revisión de infraestructura como código, contenedores y pipelines."
+        },
+        "a8_28": {
+          "code": "A.8.28",
+          "name": "Codificación segura",
+          "text": "Análisis estático del código propio y búsqueda de secretos."
+        },
+        "a8_29": {
+          "code": "A.8.29",
+          "name": "Pruebas de seguridad en desarrollo",
+          "text": "Pruebas automatizadas de seguridad integradas en el ciclo de desarrollo."
+        }
+      }
+    },
+    "pci": {
+      "label": "PCI DSS 4.0.1",
+      "controls": {
+        "r6_2_4": {
+          "code": "6.2.4",
+          "name": "Prevenir ataques comunes en el software",
+          "text": "Análisis estático del código propio contra inyección, XSS, deserialización y demás fallos comunes."
+        },
+        "r6_3_1": {
+          "code": "6.3.1",
+          "name": "Identificar vulnerabilidades y clasificar su riesgo",
+          "text": "Hallazgos con severidad, explotación activa (CISA KEV) y probabilidad (EPSS)."
+        },
+        "r6_3_2": {
+          "code": "6.3.2",
+          "name": "Inventario del software y sus componentes",
+          "text": "Inventario de dependencias exportable como SBOM (CycloneDX) desde cada análisis."
+        },
+        "r6_3_3": {
+          "code": "6.3.3",
+          "name": "Parches críticos en el plazo de un mes",
+          "text": "Plazos de corrección por severidad y hallazgos fuera de plazo."
+        }
+      }
+    },
+    "cra": {
+      "label": "Reglamento de Ciberresiliencia (UE) 2024/2847",
+      "controls": {
+        "annex_i_ii_1": {
+          "code": "Anexo I, II.1",
+          "name": "Identificar y documentar vulnerabilidades y componentes",
+          "text": "Hallazgos por análisis e inventario de componentes exportable como SBOM CycloneDX."
+        },
+        "annex_i_ii_2": {
+          "code": "Anexo I, II.2",
+          "name": "Abordar y remediar las vulnerabilidades sin demora",
+          "text": "Estado de cada vulnerabilidad, acción recomendada y plazos de corrección."
+        },
+        "annex_i_ii_3": {
+          "code": "Anexo I, II.3",
+          "name": "Pruebas y revisiones de seguridad periódicas",
+          "text": "Análisis automatizados en cada cambio y en la rama principal, con su cobertura."
+        },
+        "art_14": {
+          "code": "Art. 14",
+          "name": "Notificar vulnerabilidades explotadas activamente",
+          "text": "Insumo: vulnerabilidades del catálogo CISA KEV señaladas como explotación activa. El registro de las notificaciones está en la vista Cumplimiento de Tamandua."
+        }
+      }
+    },
+    "br_cmn": {
+      "label": "Brasil · Res. CMN 4.893 (con los cambios de la 5.274/2025)",
+      "controls": {
+        "vulnerabilities": {
+          "code": "Vulnerabilidades",
+          "name": "Prevención y tratamiento continuo de vulnerabilidades",
+          "text": "Hallazgos identificados, priorizados y con su estado y plazo de corrección."
+        },
+        "testing": {
+          "code": "Pruebas",
+          "name": "Pruebas de seguridad y plan de acción",
+          "text": "Análisis automatizados con su cobertura; acciones recomendadas por hallazgo."
+        },
+        "traceability": {
+          "code": "Trazabilidad",
+          "name": "Trazabilidad de decisiones",
+          "text": "Excepciones y decisiones con motivo, responsable, fecha y caducidad."
+        }
+      }
+    },
+    "cl_21663": {
+      "label": "Chile · Ley Marco de Ciberseguridad 21.663",
+      "controls": {
+        "risk": {
+          "code": "Gestión de riesgos",
+          "name": "Medidas para prevenir incidentes",
+          "text": "Vulnerabilidades del software identificadas y priorizadas por riesgo y explotación activa."
+        },
+        "improvement": {
+          "code": "Mejora continua",
+          "name": "Revisión periódica de la seguridad",
+          "text": "Análisis en cada cambio y de la rama principal, con su cobertura y los plazos de corrección."
+        },
+        "evidence": {
+          "code": "Evidencia",
+          "name": "Registro de medidas y decisiones",
+          "text": "Decisiones de triage con motivo, responsable y fecha, conservadas como historial."
+        }
+      }
+    },
+    "co_sfc": {
+      "label": "Colombia · SFC, riesgo de ciberseguridad (CE 007 de 2018)",
+      "controls": {
+        "vulnerabilities": {
+          "code": "Vulnerabilidades",
+          "name": "Gestión de vulnerabilidades técnicas",
+          "text": "Vulnerabilidades del código, dependencias e imágenes con severidad, estado y plazo."
+        },
+        "secure_development": {
+          "code": "Desarrollo seguro",
+          "name": "Seguridad en el ciclo de desarrollo",
+          "text": "Revisión de lo que introduce cada cambio antes de integrarlo y análisis de la rama principal."
+        },
+        "evidence": {
+          "code": "Evidencia",
+          "name": "Registro para supervisión",
+          "text": "Informe con alcance, método, cobertura y decisiones, listo para revisión."
+        }
+      }
+    },
+    "general": {
+      "label": "Gestión de vulnerabilidades"
+    }
+  },
+  "technical": {
+    "kind": {
+      "repository_scan": "Análisis completo",
+      "image_scan": "Análisis de imagen",
+      "pr_review": "Revisión de pull request",
+      "asset_state": "Estado acumulado",
+      "default": "Análisis"
+    },
+    "eyebrow": "Informe técnico de hallazgos · {{kind}}",
+    "subtitle_state": "Estado acumulado al {{date}}",
+    "subtitle_scan": "Análisis del {{date}}",
+    "meta": {
+      "asset": "Activo",
+      "type": "Tipo",
+      "date": "Fecha",
+      "revision": "Rama / revisión",
+      "engines": "Motores",
+      "reference": "Referencia"
+    },
+    "kpi": {
+      "pending": "pendientes",
+      "kev": "con explotación activa (KEV)",
+      "actions": "acciones para cerrarlas"
+    },
+    "summary": "{{pending}} ({{counts}}) que se cierran con {{actions}}: {{packages}} ({{fixable}} con versión corregida) y {{code}} de código, secretos o infraestructura.",
+    "decided_one": "{{count}} decisión del equipo (riesgo aceptado o falso positivo) fuera de la cuenta.",
+    "decided_other": "{{count}} decisiones del equipo (riesgo aceptado o falso positivo) fuera de la cuenta.",
+    "incomplete": "Cobertura incompleta: {{gaps}}. Lo que no se analizó no equivale a «sin hallazgos».",
+    "first_truncated": "Las 15 primeras de {{total}} acciones, por explotación activa, severidad y alcance. El resto, en las secciones siguientes.",
+    "dependencies": "Dependencias ({{packages}} · {{vulnerabilities}})",
+    "partial_fix": "algún aviso sin corrección",
+    "no_fixed_version": "sin versión corregida",
+    "update_note": "«Actualizar a» es la versión más alta entre las que corrigen cada aviso: la que los cierra todos. Después regenera el lockfile y vuelve a analizar.",
+    "what_label": "Qué:",
+    "fallback_fix": "Revisar según la guía del hallazgo",
+    "detail_truncated": "Se detallan {{shown}} de {{total}} críticos y altos; el resto está en el JSON, el SARIF y el panel.",
+    "table_truncated": "Se muestran {{shown}} de {{total}}; el resto está en el JSON, el SARIF y el panel.",
+    "decisions": "Decisiones del equipo ({{count}})",
+    "decisions_truncated": "Se muestran {{shown}} de {{total}} decisiones; todas están en el panel.",
+    "state_note": "Estado acumulado: reúne los análisis completos y las revisiones de pull requests; un hallazgo queda remediado cuando deja de aparecer en un análisis completo, nunca por uno incompleto.",
+    "no_engines": "Sin detalle de motores en este registro.",
+    "annex_truncated": "Se muestran {{shown}} de {{total}}; el resto está en el JSON y el SARIF del análisis.",
+    "closing": "Evidencia técnica generada con herramientas automatizadas: revísala antes de actuar. Los avisos de dependencias no prueban explotación en esta aplicación.",
+    "title": "Informe técnico · {{name}}",
+    "footer": "Informe técnico · {{name}} · emitido {{date}}"
+  },
+  "pdf": {
+    "footer": "Tamandua  ·  Evidencia técnica; revisión humana requerida"
+  },
+  "dashboard": {
+    "score_formula": "100·e^(−riesgo/150); riesgo = 8·críticos + 3·altos + 0,8·medios + 0,1·bajos + 15·en KEV + 5·EPSS ≥ 10 %",
+    "cwe": {
+      "79": "Cross-site scripting",
+      "89": "Inyección SQL",
+      "78": "Inyección de comandos",
+      "22": "Path traversal",
+      "502": "Deserialización insegura",
+      "798": "Credenciales embebidas",
+      "295": "Validación de certificado",
+      "918": "SSRF",
+      "601": "Redirección abierta",
+      "347": "Verificación de firma",
+      "327": "Criptografía débil",
+      "328": "Hash débil",
+      "916": "Hash de contraseña débil",
+      "95": "Eval de código",
+      "1333": "ReDoS",
+      "1321": "Prototype pollution",
+      "400": "Consumo de recursos sin límite",
+      "770": "Asignación sin límites",
+      "20": "Validación de entrada",
+      "200": "Exposición de información",
+      "287": "Autenticación incorrecta",
+      "352": "CSRF",
+      "611": "XXE",
+      "94": "Inyección de código",
+      "1104": "Componente vulnerable",
+      "285": "Autorización incorrecta",
+      "306": "Sin autenticación",
+      "74": "Inyección",
+      "1336": "Inyección de plantilla",
+      "915": "Asignación masiva",
+      "125": "Lectura fuera de límites",
+      "787": "Escritura fuera de límites",
+      "119": "Desbordamiento de búfer",
+      "120": "Copia de búfer sin comprobar",
+      "416": "Uso tras liberar",
+      "415": "Doble liberación",
+      "476": "Desreferencia de puntero nulo",
+      "190": "Desbordamiento de entero",
+      "191": "Subdesbordamiento de entero",
+      "401": "Fuga de memoria",
+      "404": "Liberación de recursos incorrecta",
+      "674": "Recursión sin control",
+      "835": "Bucle infinito",
+      "362": "Condición de carrera",
+      "367": "TOCTOU",
+      "369": "División por cero",
+      "908": "Memoria sin inicializar",
+      "459": "Limpieza incompleta",
+      "59": "Seguimiento de enlaces",
+      "732": "Permisos incorrectos",
+      "269": "Gestión de privilegios",
+      "522": "Credenciales poco protegidas",
+      "319": "Transmisión en claro",
+      "297": "Validación de nombre de host",
+      "330": "Aleatoriedad insuficiente",
+      "203": "Canal lateral por diferencias",
+      "444": "HTTP request smuggling",
+      "113": "Inyección CRLF",
+      "117": "Inyección en logs",
+      "23": "Path traversal relativo",
+      "434": "Subida de archivos sin restricción",
+      "639": "Autorización por clave de usuario (IDOR)",
+      "862": "Sin autorización",
+      "863": "Autorización incorrecta",
+      "1395": "Componente de terceros vulnerable"
+    }
+  },
+  "errors": {
+    "invalid_options": "Opciones del informe inválidas",
+    "invalid_field": "Campo «{{field}}» inválido (hasta {{limit}} caracteres, sin saltos de línea)",
+    "invalid_period_date": "Fecha del periodo inválida (AAAA-MM-DD)",
+    "period_reversed": "El periodo termina antes de empezar",
+    "too_many_findings": "Demasiados hallazgos para un informe: filtra o elige menos (hasta 5000)",
+    "unsupported_profile": "Perfil o ejecución no compatible",
+    "invalid_title": "Título inválido"
+  }
+}

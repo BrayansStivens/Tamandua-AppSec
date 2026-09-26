@@ -1,3 +1,5 @@
+import i18n from '@/shared/i18n'
+
 export type Point = { x: number; y: number }
 export type Box = Point & { width: number; height: number }
 // Tipos del modelo de amenazas compartidos por la vista y el editor de diagramas.
@@ -38,5 +40,5 @@ export function assetGroups(catalog: Catalog, model: Model): { label: string; it
   const linked = new Set(model.repositories ?? [])
   const project = catalog.assets.filter(item => linked.has(item.id))
   const others = catalog.assets.filter(item => !linked.has(item.id))
-  return [{ label: 'Del proyecto', items: project }, { label: project.length ? 'Otros' : 'Repositorios y dominios', items: others }].filter(group => group.items.length)
+  return [{ label: i18n.t('threats:assets.project'), items: project }, { label: i18n.t(project.length ? 'threats:assets.others' : 'threats:assets.all'), items: others }].filter(group => group.items.length)
 }

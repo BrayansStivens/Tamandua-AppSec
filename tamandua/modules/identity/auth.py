@@ -42,10 +42,15 @@ from tamandua.shared.db import TENANT
 from urllib.parse import quote
 
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import msg, text
 
 
 class AuthError(ValueError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message, code: str | None = None):
+        super().__init__(text(message, "en"))
+        self.message, self.code = message, code  # `code`: stable id the panel can match on
 
 
 ROLES = ("admin", "member")
@@ -93,13 +98,13 @@ def verify_password(record: dict | None, password: str) -> bool:
 
 def validate_password(password: str, username: str = "") -> None:
     if not isinstance(password, str) or not PASSWORD_MIN <= len(password) <= PASSWORD_MAX:
-        raise AuthError(f"La contraseña debe tener entre {PASSWORD_MIN} y {PASSWORD_MAX} caracteres")
+        raise AuthError(msg("auth.errors.password_length", min=PASSWORD_MIN, max=PASSWORD_MAX))
     if any(unicodedata.category(character) == "Cc" for character in password):
-        raise AuthError("La contraseña contiene caracteres de control")
+        raise AuthError(msg("auth.errors.password_control"))
     if len(set(password.lower())) < 5:
-        raise AuthError("La contraseña es demasiado repetitiva")
+        raise AuthError(msg("auth.errors.password_repetitive"))
     if username and username.lower() in password.lower():
-        raise AuthError("La contraseña no puede contener el nombre de usuario")
+        raise AuthError(msg("auth.errors.password_has_username"))
 
 
 _DUMMY = {"salt": base64.b64encode(b"\0" * 16).decode("ascii"), "hash": base64.b64encode(b"\0" * 32).decode("ascii"),
@@ -195,23 +200,23 @@ class Users:
         """Como `create`, pero solo si no hay nadie: dos altas simultáneas no crean dos administradores."""
         with self._locked():
             if self.any():
-                raise AuthError("Este workspace ya tiene administrador")
+                raise AuthError(msg("auth.errors.workspace_has_admin"))
             return self.create(username, password, role="admin", display_name=display_name)
 
     def create(self, username: str, password: str | None, *, role: str = "member", display_name: str = "") -> dict:
         """Con contraseña (CLI) o sin ella (invitación: la pone el invitado con su enlace)."""
         key = normalize_username(username)
         if role not in ROLES:
-            raise AuthError("Rol inválido")
+            raise AuthError(msg("auth.errors.invalid_role"))
         if password is not None:
             validate_password(password, key)
         display_name = " ".join(str(display_name or "").split())
         if any(unicodedata.category(character) == "Cc" for character in display_name):
-            raise AuthError("El nombre contiene caracteres de control")
+            raise AuthError(msg("auth.errors.name_control"))
         with self._locked():
             rows = self._load()
             if any(user["username"] == key for user in rows):
-                raise AuthError("El usuario ya existe")
+                raise AuthError(msg("auth.errors.user_exists"))
             user = {"id": secrets.token_hex(12), "username": key, "display_name": (display_name or key)[:80],
                     "role": role, "password": hash_password(password) if password is not None else None, "totp": {"enabled": False},
                     "identities": [{"provider": "local", "subject": key}],
@@ -226,7 +231,7 @@ class Users:
             rows = self._load()
             user = next((row for row in rows if row["id"] == user_id), None)
             if user is None:
-                raise AuthError("Usuario no encontrado")
+                raise AuthError(msg("auth.errors.user_not_found"))
             if guard is not None:
                 guard(rows, user)
             mutate(user)
@@ -243,7 +248,7 @@ class Users:
 
     def set_role(self, user_id: str, role: str, *, actor_id: str | None = None) -> None:
         if role not in ROLES:
-            raise AuthError("Rol inválido")
+            raise AuthError(msg("auth.errors.invalid_role"))
         user = self._update(user_id, lambda user: user.update(role=role),
                             guard=lambda rows, target: _admin_guard(rows, target, actor_id, role=role))
         _log.info("role_changed", extra={"user": user["username"], "role": role})
@@ -251,11 +256,11 @@ class Users:
     # -- Enlaces de un solo uso para invitar o restablecer la contraseña: solo se guarda su hash.
     def issue_link(self, user_id: str, purpose: str) -> str:
         if purpose not in ("invite", "reset"):
-            raise AuthError("Enlace inválido")
+            raise AuthError(msg("auth.errors.invalid_link"))
         token = secrets.token_urlsafe(32)
         def mutate(user):
             if user.get("disabled"):
-                raise AuthError("El usuario está desactivado")
+                raise AuthError(msg("auth.errors.user_disabled"))
             user["link"] = {"hash": hashlib.sha256(token.encode("ascii")).hexdigest(), "purpose": purpose,
                             "expires_at": time.time() + LINK_TTL}
         user = self._update(user_id, mutate)
@@ -281,11 +286,11 @@ class Users:
     def redeem_link(self, token, password) -> dict:
         user = self._by_link(token)
         if user is None:
-            raise AuthError("El enlace no es válido o ya caducó; pide otro a un administrador")
+            raise AuthError(msg("auth.errors.link_expired"))
         purpose, digest = user["link"]["purpose"], user["link"]["hash"]
         def mutate(row):
             if (row.get("link") or {}).get("hash") != digest or row.get("disabled"):
-                raise AuthError("El enlace no es válido o ya caducó; pide otro a un administrador")
+                raise AuthError(msg("auth.errors.link_expired"))
             validate_password(password, row["username"])
             row["password"] = hash_password(password)
             row["password_changed_at"] = _now()
@@ -316,11 +321,11 @@ class Users:
         def mutate(user):
             pending = user.get("totp", {}).get("pending")
             if not pending:
-                raise AuthError("No hay una activación de TOTP en curso")
+                raise AuthError(msg("auth.errors.no_totp_setup"))
             secret = base64.b32decode(pending)
             step = totp_matches(secret, code, moment or int(time.time()), None)
             if step is None:
-                raise AuthError("El código no coincide; comprueba la hora del dispositivo e inténtalo de nuevo")
+                raise AuthError(msg("auth.errors.totp_mismatch"))
             user["totp"] = {"enabled": True, "secret": pending, "last_step": step, "enabled_at": _now(),
                             "backup_codes": [_hash_backup(item) for item in codes]}
         user = self._update(user_id, mutate)
@@ -360,19 +365,19 @@ def _admin_guard(rows: list[dict], target: dict, actor_id: str | None, *, role: 
     """Nadie se quita a sí mismo el acceso de administrador y nunca se queda el sistema sin uno activo."""
     demotes = disable or (role is not None and role != "admin")
     if actor_id is not None and target["id"] == actor_id and demotes:
-        raise AuthError("No puedes desactivarte ni quitarte el rol de administrador a ti mismo")
+        raise AuthError(msg("auth.errors.self_demote"))
     if demotes and target["role"] == "admin" and not target.get("disabled"):
         if sum(1 for user in rows if user["role"] == "admin" and not user.get("disabled")) <= 1:
-            raise AuthError("Debe quedar al menos un administrador activo")
+            raise AuthError(msg("auth.errors.last_admin"))
 
 
 def normalize_username(value, *, strict: bool = True) -> str:
     if not isinstance(value, str):
-        raise AuthError("Nombre de usuario inválido")
+        raise AuthError(msg("auth.errors.invalid_username"))
     key = "".join(character for character in unicodedata.normalize("NFKC", value) if unicodedata.category(character)[0] != "C")
     key = key.strip().lower()
     if strict and not USERNAME_PATTERN.fullmatch(key):
-        raise AuthError("El usuario admite 3-40 caracteres: letras, números, punto, guion y guion bajo")
+        raise AuthError(msg("auth.errors.username_format"))
     return key[:40]
 
 
@@ -451,7 +456,7 @@ class Sessions:
         with db.transaction(self.data_dir) as connection:
             connection.execute(delete(auth_challenges).where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.created_at + CHALLENGE_TTL < now))
             if connection.execute(select(func.count()).select_from(auth_challenges).where(auth_challenges.c.tenant_id == TENANT)).scalar_one() >= 200:
-                raise AuthError("Demasiados inicios de sesión en curso; inténtalo en unos minutos")
+                raise AuthError(msg("auth.errors.too_many_logins"))
             connection.execute(insert(auth_challenges).values(tenant_id=TENANT, id=_token_hash(token), user_id=user_id, client=client, created_at=now))
         return token
 
@@ -555,10 +560,10 @@ class Authenticator:
             raise Locked(wait)
         expected = getattr(self, "_setup", None)
         if not self.setup_required() or expected is None:
-            raise AuthError("Este workspace ya tiene administrador")
+            raise AuthError(msg("auth.errors.workspace_has_admin"))
         given = str(code or "").strip().upper().replace(" ", "")
         if not hmac.compare_digest(given.encode(), expected.encode()):
-            raise AuthError("Código de configuración incorrecto: está en la consola del servidor")
+            raise AuthError(msg("auth.errors.wrong_setup_code"))
         user = self.users.create_first_admin(username, password, display_name)
         self._setup = None
         self.throttle.succeeded("setup")
@@ -586,7 +591,7 @@ class Authenticator:
         """Primer paso. Devuelve {"session": cookie} o {"challenge": token} si falta TOTP."""
         key = normalize_username(username, strict=False) if isinstance(username, str) else ""
         if not key or not isinstance(password, str) or len(password) > PASSWORD_MAX:
-            raise AuthError("Usuario o contraseña incorrectos")
+            raise AuthError(msg("auth.errors.bad_credentials"))
         for scope in (f"user:{key}", f"client:{client}"):
             wait = self.throttle.reserve(scope)
             if wait:
@@ -599,7 +604,7 @@ class Authenticator:
         if not ok:
             _log.warning("login_failed", extra={"user": key, "client": client,
                                                 "reason": "disabled" if user and user.get("disabled") else "credentials"})
-            raise AuthError("Usuario o contraseña incorrectos")
+            raise AuthError(msg("auth.errors.bad_credentials"))
         if user["totp"].get("enabled"):
             _log.info("login_password_ok", extra={"user": key, "client": client, "next": "totp"})
             return {"challenge": self.sessions.open_challenge(user["id"], client)}
@@ -608,18 +613,18 @@ class Authenticator:
     def second_factor(self, token, code, client: str) -> dict:
         user_id = self.sessions.peek_challenge(token, client)
         if user_id is None:
-            raise AuthError("El inicio de sesión caducó; vuelve a introducir la contraseña")
+            raise AuthError(msg("auth.errors.login_expired"), code="challenge_expired")
         user = self.users.by_id(user_id)
         if user is None or user.get("disabled"):
             self.sessions.close_challenge(token)
-            raise AuthError("El inicio de sesión caducó; vuelve a introducir la contraseña")
+            raise AuthError(msg("auth.errors.login_expired"), code="challenge_expired")
         wait = self.throttle.reserve(f"totp:{user_id}")
         if wait:
             raise Locked(wait)
         if not self.users.verify_totp(user_id, code):
             self.sessions.fail_challenge(token)
             _log.warning("totp_failed", extra={"user": user["username"], "client": client})
-            raise AuthError("Código incorrecto")
+            raise AuthError(msg("auth.errors.wrong_code"))
         self.throttle.succeeded(f"totp:{user_id}")
         self.sessions.close_challenge(token)
         return self._complete(user, client, mfa=True)
@@ -646,7 +651,7 @@ class Authenticator:
     def change_password(self, user: dict, current: str, new: str, cookie_header: str | None) -> str:
         """Cambia la contraseña, cierra las demás sesiones y devuelve una cookie nueva para esta."""
         if not verify_password(user["password"], current if isinstance(current, str) else ""):
-            raise AuthError("La contraseña actual no coincide")
+            raise AuthError(msg("auth.errors.current_password_mismatch"))
         mfa = bool((self.current(cookie_header)[1] or {}).get("mfa"))
         self.users.set_password(user["id"], new)
         self.sessions.revoke_user(user["id"])
@@ -655,5 +660,5 @@ class Authenticator:
 
 class Locked(AuthError):
     def __init__(self, retry_in: int):
-        super().__init__(f"Demasiados intentos; espera {retry_in} segundos")
+        super().__init__(msg("auth.errors.locked", seconds=retry_in))
         self.retry_in = retry_in

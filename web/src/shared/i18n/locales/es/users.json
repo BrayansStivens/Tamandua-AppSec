@@ -1,0 +1,63 @@
+{
+  "title": "Personas con acceso",
+  "description": "Invita con un enlace de un solo uso: cada persona elige su contraseña y tú nunca la ves.",
+  "policy": {
+    "admins": "TOTP obligatorio para administradores",
+    "all": "TOTP obligatorio para todos",
+    "none": "TOTP opcional"
+  },
+  "role": {
+    "admin": "Administrador",
+    "member": "Miembro"
+  },
+  "role_hint": {
+    "admin": "Conecta proveedores, gestiona usuarios y acepta riesgos",
+    "member": "Lanza análisis, triagea y consulta resultados"
+  },
+  "invite": "Invitar",
+  "loading": "Cargando usuarios",
+  "columns": {
+    "user": "Usuario",
+    "role": "Rol",
+    "second_factor": "Segundo factor",
+    "last_login": "Último acceso",
+    "actions": "Acciones"
+  },
+  "you": "(tú)",
+  "flags": {
+    "disabled": "desactivado",
+    "invite_pending": "invitación pendiente",
+    "reset_pending": "restablecimiento pendiente",
+    "no_password": "sin contraseña"
+  },
+  "role_of": "Rol de {{username}}",
+  "totp_on": "Activo",
+  "totp_off": "Sin activar",
+  "never": "Nunca",
+  "actions_for": "Acciones para @{{username}}",
+  "send_reset": "Enviar enlace de contraseña",
+  "resend_invite": "Reenviar invitación",
+  "remove_totp": "Quitar segundo factor",
+  "enable": "Reactivar cuenta",
+  "disable": "Desactivar cuenta",
+  "footnote": "Desactivar o quitar el TOTP cierra al momento las sesiones abiertas de esa persona. Siempre queda al menos un administrador activo.",
+  "invite_dialog": {
+    "title": "Invitar a alguien",
+    "description": "Se crea la cuenta sin contraseña y un enlace de un solo uso válido 72 horas. Envíaselo por un canal de confianza.",
+    "username": "Usuario",
+    "username_placeholder": "ana.lopez",
+    "username_hint": "3-40 caracteres: letras, números, punto, guion o guion bajo.",
+    "display_name": "Nombre visible (opcional)",
+    "display_name_placeholder": "Ana López",
+    "role": "Rol",
+    "submit": "Crear invitación"
+  },
+  "link_dialog": {
+    "title": "Enlace para @{{username}}",
+    "description_one": "Sirve una sola vez y caduca en {{count}} hora. No se volverá a mostrar: si se pierde, genera otro (el anterior deja de valer).",
+    "description_other": "Sirve una sola vez y caduca en {{count}} horas. No se volverá a mostrar: si se pierde, genera otro (el anterior deja de valer).",
+    "copy": "Copiar enlace",
+    "copied_to_clipboard": "Copiado al portapapeles",
+    "done": "Hecho"
+  }
+}

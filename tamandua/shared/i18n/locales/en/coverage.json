@@ -1,0 +1,39 @@
+{
+  "join": "{{first}}; {{second}}",
+  "untestable": {
+    "a06": "Insecure design: needs threat modeling and an architecture review; static analysis doesn't detect it.",
+    "a09": "Logging and alerting: no static rules yet; assessed in design review and dynamic testing.",
+    "a10": "Mishandling of exceptional conditions: no static rules yet; needs dynamic testing or manual review."
+  },
+  "sca": {
+    "engines": "dependencies resolved by Trivy with fixed version, CVSS, CISA KEV and EPSS",
+    "osv": "dependencies looked up in OSV",
+    "inconclusive": "the dependency lookup didn't finish",
+    "none": "no analyzable dependency manifests, or no authorization to look them up"
+  },
+  "cicd_one": "CI/CD pipelines reviewed by {{tools}} in {{count}} file",
+  "cicd_other": "CI/CD pipelines reviewed by {{tools}} in {{count}} files",
+  "iac": {
+    "reviewed_one": "infrastructure configuration reviewed by {{tools}} in {{count}} file",
+    "reviewed_other": "infrastructure configuration reviewed by {{tools}} in {{count}} files",
+    "none_many": "{{tools}} found no infrastructure files (Dockerfile, Kubernetes, Terraform, CloudFormation) in the snapshot",
+    "none_one": "{{tools}} found no infrastructure files (Dockerfile, Kubernetes, Terraform) in the snapshot"
+  },
+  "rules": {
+    "configuration_one": "{{count}} Tamandua configuration rule",
+    "configuration_other": "{{count}} Tamandua configuration rules",
+    "crypto_one": "{{count}} Tamandua cryptography and secrets rule",
+    "crypto_other": "{{count}} Tamandua cryptography and secrets rules",
+    "opengrep_one": "{{count}} Tamandua rule in Opengrep",
+    "opengrep_other": "{{count}} Tamandua rules in Opengrep"
+  },
+  "secrets": {
+    "engines": "secrets with Gitleaks and Trivy",
+    "internal": "secrets with internal patterns"
+  },
+  "internal_ast": "internal Python AST rules (dynamic SQL, shell, eval)",
+  "no_engine": "no engine that ran covers this category in this repository",
+  "with_findings_one": "{{reason}}. {{count}} finding.",
+  "with_findings_other": "{{reason}}. {{count}} findings.",
+  "without_findings": "{{reason}}. No findings."
+}

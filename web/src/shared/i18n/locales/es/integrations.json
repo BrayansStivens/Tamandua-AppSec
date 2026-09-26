@@ -1,0 +1,102 @@
+{
+  "page": {
+    "read_only": "Conectar proveedores y guardar claves es cosa de un administrador; aquí ves su estado.",
+    "issues_title": "Gestión de incidencias",
+    "issues_description": "Convierte hallazgos pendientes en incidencias de tu equipo, sin duplicados entre escaneos.",
+    "ai": {
+      "title": "Asistencia con IA",
+      "description": "Explicación de cada hallazgo y propuesta de parche con tu propia clave de OpenAI o Anthropic. Hoy la IA no participa en ningún análisis, así que no hace falta guardar ninguna clave.",
+      "plan": {
+        "consent": "Consentimiento en cada ejecución antes de enviar nada al proveedor",
+        "budget": "Presupuesto por ejecución y redacción de secretos",
+        "no_code": "Nunca se envía código fuente sin ese consentimiento"
+      },
+      "saved_key": "Tienes guardada una clave de {{provider}} (····{{last4}}). No se usa hasta que esta función esté lista.",
+      "remove_key": "Retirar clave"
+    }
+  },
+  "jira": {
+    "tagline": "Crea incidencias desde los hallazgos",
+    "site_project": "{{site}} · proyecto {{project}}",
+    "site_project_named": "{{site}} · proyecto {{project}} ({{name}})",
+    "status": {
+      "connected": "Conectado",
+      "not_configured": "Sin configurar"
+    },
+    "loading": "Cargando la conexión con Jira",
+    "account": "Cuenta {{email}} · token ····{{last4}} · tipo «{{type}}»",
+    "configured_by": "configurado por {{name}}",
+    "configured_on": "configurado el {{date}}",
+    "configured_by_on": "configurado por {{name}} el {{date}}",
+    "label_note": "Cada incidencia lleva la etiqueta <code>appsec-&lt;huella&gt;</code>: volver a exportar el mismo hallazgo enlaza la existente en lugar de duplicarla.",
+    "remove": "Retirar conexión",
+    "site": "Sitio",
+    "site_placeholder": "https://tu-sitio.atlassian.net",
+    "email": "Email de la cuenta",
+    "token": "API token",
+    "project": "Proyecto",
+    "issue_type": "Tipo",
+    "submit": "Guardar y validar",
+    "create_token": "Crear un API token",
+    "validate_note": "Se comprueba la cuenta, el proyecto y el tipo de incidencia antes de guardar. El token se queda en el servidor y nunca vuelve al navegador.",
+    "admin_only": "Un administrador puede conectarlo.",
+    "export": {
+      "title_one": "Crear en Jira · {{count}} hallazgo",
+      "title_other": "Crear en Jira · {{count}} hallazgos",
+      "intro": "Una incidencia por trabajo: los avisos de un mismo paquete van juntos con la versión que los cierra todos; el código y los secretos, uno a uno. Lo que ya tenga incidencia se enlaza, no se duplica.",
+      "created_one": "{{count}} incidencia creada",
+      "created_other": "{{count}} incidencias creadas",
+      "existing_one": "{{count}} ya existía",
+      "existing_other": "{{count}} ya existían",
+      "failed_one": "{{count}} hallazgo con error",
+      "failed_other": "{{count}} hallazgos con error",
+      "linked_one": "{{count}} hallazgo enlazado.",
+      "linked_other": "{{count}} hallazgos enlazados.",
+      "state": {
+        "created": "Creada",
+        "existing": "Ya existía"
+      },
+      "done": "Hecho",
+      "submit": "Crear incidencias"
+    }
+  },
+  "notifications": {
+    "title": "Avisos",
+    "description": "Un mensaje en Slack, Teams o un webhook cuando un análisis (manual, en lote o automático) encuentra algo nuevo que importa, o cuando termina un lote. Las revisiones de PR ya avisan en el propio PR.",
+    "threshold": {
+      "critical": "Solo críticos",
+      "high": "Altos o superior",
+      "medium": "Medios o superior"
+    },
+    "hint": {
+      "slack": "En Slack: Apps → Incoming Webhooks → Add to Slack, elige el canal y copia la URL (https://hooks.slack.com/…).",
+      "teams": "En Teams: en el canal, … → Workflows → «Publicar en un canal cuando se reciba una solicitud de webhook» y copia la URL.",
+      "webhook": "Cualquier servicio que acepte un POST con JSON. Cada aviso lleva la cabecera X-Tamandua-Signature (HMAC-SHA256 del cuerpo)."
+    },
+    "saved": "Canal «{{name}}» guardado. Envía una prueba para comprobarlo.",
+    "confirm_remove": "¿Quitar «{{name}}»? Para volver a añadirlo necesitarás la URL del webhook otra vez.",
+    "test_ok": "Prueba entregada a «{{name}}» ({{detail}}).",
+    "test_failed": "La prueba a «{{name}}» falló: {{detail}}. Revisa la URL o crea el webhook de nuevo.",
+    "loading": "Cargando canales",
+    "signed": "firmado",
+    "last_ok": "Último envío {{date}}: entregado",
+    "last_failed": "Último envío {{date}}: falló ({{detail}})",
+    "test": "Probar",
+    "test_label": "Probar {{name}}",
+    "remove_label": "Quitar {{name}}",
+    "secret_title": "Secreto de firma de este webhook: guárdalo ahora, no se vuelve a mostrar.",
+    "secret_label": "secreto de firma",
+    "secret_help": "El receptor calcula HMAC-SHA256 del cuerpo con este secreto y lo compara con la cabecera X-Tamandua-Signature.",
+    "secret_saved": "Ya lo guardé",
+    "add": "Añadir canal",
+    "where": "Dónde",
+    "name": "Nombre",
+    "name_placeholder": "p. ej. #seguridad",
+    "url": "URL del webhook",
+    "events": "Avisar de",
+    "threshold_label": "Hallazgos desde",
+    "save": "Guardar canal",
+    "url_note": "La URL se guarda cifrada y nunca vuelve al navegador.",
+    "links_note": "Para que los mensajes enlacen al hallazgo, define TAMANDUA_PUBLIC_URL con la dirección del panel."
+  }
+}

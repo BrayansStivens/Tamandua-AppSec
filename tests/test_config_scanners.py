@@ -6,6 +6,7 @@ from unittest.mock import patch
 from tamandua.modules.scanning import config_engines as cs
 from tamandua.modules.scanning.image import config_findings, parse_reference
 from tamandua.modules.scanning.engines import IMAGES, parse_trivy
+from tamandua.shared.i18n import text
 
 DATA = Path(__file__).parent / "engine-outputs"
 
@@ -98,7 +99,7 @@ class ZizmorTests(unittest.TestCase):
         self.assertEqual(unpinned["scanner"], "cicd")
         self.assertTrue(unpinned["path"].startswith(".github/workflows/"))
         self.assertGreater(unpinned["line"], 1)
-        self.assertIn("SHA", unpinned["title"])
+        self.assertIn("SHA", text(unpinned["title"]))
         self.assertEqual(len({item["fingerprint"] for item in findings}), len(findings))
 
     def test_repository_without_workflows_is_not_run(self):

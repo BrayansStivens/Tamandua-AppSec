@@ -19,6 +19,7 @@ from tamandua.app import data_migrations
 from tamandua.modules.runs.jobs import ScanJobs
 from tamandua.shared import db
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import t
 
 LEADER_KEY = int.from_bytes(hashlib.sha256(b"tamandua:worker-leader").digest()[:8], "big", signed=True)
 
@@ -94,9 +95,9 @@ def run(data_dir: Path) -> None:
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
     threading.Thread(target=_lead, args=(data_dir, jobs, stop), name="tamandua-leader", daemon=True).start()
-    print("Worker en marcha: ejecuta los análisis de la cola.", flush=True)
+    print(t("cli.worker.started"), flush=True)
     jobs.run_worker()
-    print("Worker detenido.", flush=True)
+    print(t("cli.worker.stopped"), flush=True)
 
 
 def healthy(data_dir: Path) -> bool:

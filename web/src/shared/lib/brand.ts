@@ -1,6 +1,5 @@
-// Marca en un solo sitio: nombre, lema y enlaces que ve el usuario.
+// Brand in one place: name and links. The tagline lives in the `nav` catalog (`nav:tagline`).
 export const BRAND = {
   name: 'Tamandua',
-  tagline: 'Se come tus bugs',
   repo: 'https://github.com/BrayansStivens/appsec-agent',
 } as const

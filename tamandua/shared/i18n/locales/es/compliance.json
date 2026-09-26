@@ -1,0 +1,35 @@
+{
+  "cra": {
+    "stages": {
+      "early_warning": "Alerta temprana",
+      "notification": "Notificación",
+      "final_report": "Informe final"
+    },
+    "errors": {
+      "product_name": "Pon el nombre comercial del producto (hasta {{max}} caracteres).",
+      "support_date": "La fecha de fin del soporte debe ser AAAA-MM-DD.",
+      "invalid_stage": "Evento o etapa no válidos."
+    },
+    "draft": {
+      "body": "Producto: {{product}}{{support}}\nVulnerabilidad: {{cve}}{{kev_name}}\nComponente afectado: {{packages}}\nExplotación activa: en el catálogo CISA KEV desde {{kev_date}}{{ransomware}}\nConocimiento por el fabricante: {{aware}} UTC\nNaturaleza general del exploit: [resume cómo se explota, sin detalles que faciliten el ataque]\nMedida correctora disponible: {{fixed}}\nMedidas que pueden tomar los usuarios: [p. ej. actualizar a la versión X, desactivar la función Y]\nEstados miembros donde se comercializa el producto: [lista]\nSensibilidad de la información: [indica si algo no debe compartirse]\n\nAntes de enviar: confirma que la vulnerabilidad afecta de verdad al producto (el hallazgo es un candidato del escáner).",
+      "support": " (soporte hasta {{date}})",
+      "no_component": "[componente afectado]",
+      "ransomware": " · usada en campañas de ransomware",
+      "fixed_since": "Sí, desde {{date}}",
+      "not_fixed": "[aún no: describe la mitigación temporal]"
+    }
+  },
+  "vex": {
+    "false_positive": "Descartado en el triage como falso positivo.",
+    "accepted": "Riesgo aceptado: {{reason}}",
+    "accepted_until": "Riesgo aceptado (hasta {{date}}): {{reason}}",
+    "in_progress": "Corrección en curso.",
+    "role": "Documento generado a partir del triage"
+  },
+  "sbom": {
+    "needs_full_scan": "El SBOM sale de un análisis completo que haya terminado: este no lo es.",
+    "os_package": "sistema operativo",
+    "origin": "Inventario de Trivy sobre los manifiestos y lockfiles analizados. Sin proveedor ni hash por componente: no se infieren.",
+    "origin_image": "Inventario de Trivy sobre los manifiestos y lockfiles analizados y los paquetes del sistema de la imagen. Sin proveedor ni hash por componente: no se infieren."
+  }
+}

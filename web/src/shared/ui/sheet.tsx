@@ -4,6 +4,7 @@ import { cn } from "cn"
 
 import { Button } from "@/shared/ui/button"
 import { XIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
@@ -44,6 +45,7 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -70,7 +72,7 @@ function SheetContent({
           >
             <XIcon
             />
-            <span className="sr-only">Cerrar</span>
+            <span className="sr-only">{t('common:actions.close')}</span>
           </SheetPrimitive.Close>
         )}
       </SheetPrimitive.Popup>

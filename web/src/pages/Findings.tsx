@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { TriangleAlert } from 'lucide-react'
 import type { SessionUser } from '@/features/auth/session'
 import { RepositoryResult, type RepositoryRun } from '@/features/findings/repository-result'
@@ -11,14 +12,19 @@ import { SlaPolicyCard } from '@/features/findings/sla-policy'
 import { Skeleton } from '@/shared/ui/loading'
 import { api, query } from '@/shared/api/http'
 import { readRoute, setRouteParam } from '@/shared/lib/route'
-import { formatDate, plural, statusLabel, type Page, type RunRow } from '@/shared/lib/types'
+import { formatDate, type Page, type RunRow } from '@/shared/lib/types'
+import i18n from '@/shared/i18n'
 
 type Detail = RepositoryRun & { type: string }
 const CURRENT = '__current__'
-
+const RUN_STATUS: Record<string, string> = {
+  completed: 'common:run_status.completed', incomplete: 'common:run_status.incomplete', failed: 'common:run_status.failed',
+  queued: 'common:run_status.queued', running: 'common:run_status.running',
+}
 
 // Hallazgos por repositorio: el estado actual es el último escaneo completo; se puede filtrar por ejecución.
 export function Findings({ user, requestedRun, onNew }: { user: SessionUser; requestedRun: string | null; onNew: () => void }) {
+  const { t } = useTranslation('findings')
   const [asset, setAsset] = useState<Asset | null>(null)
   // Resumen del activo para el selector: se refresca tras cada carga (p. ej. cuando termina un análisis) sin volver a disparar la carga.
   const [assetView, setAssetView] = useState<Asset | null>(null)
@@ -73,27 +79,27 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
   const searchRuns = useCallback(async (text: string) => {
     if (!asset) return { options: [], total: 0 }
     const page = await api.get<Page<RunRow>>(`/api/runs/page?${query({ asset: asset.key, type: 'repository_scan,image_scan,pr_review', q: text || undefined, limit: 50 })}`)
-    const current: ComboOption = { id: CURRENT, label: 'Estado actual', hint: 'escaneos y PRs juntos, con lo remediado aparte' }
+    const current: ComboOption = { id: CURRENT, label: t('page.current'), hint: t('page.current_hint') }
     return { options: [...(text ? [] : [current]), ...page.items.map(runOption)], total: page.total + (text ? 0 : 1) }
-  }, [asset])
+  }, [asset, t])
 
   // Los contadores salen del estado recién consultado: cambian en cuanto se triagea algo.
   const counts = (detail?.summary as { lifecycle?: { open: number; fixed: number; suppressed: number; excluded?: number } } | undefined)?.lifecycle ?? null
-  if (empty) return <Card className="border-app-line bg-panel"><CardContent className="py-14 text-center text-sm text-app-muted">Aún no hay repositorios ni imágenes analizados. Lanza un análisis de código o de una imagen para empezar.</CardContent></Card>
+  if (empty) return <Card className="border-app-line bg-panel"><CardContent className="py-14 text-center text-sm text-app-muted">{t('page.empty')}</CardContent></Card>
   return <div className="space-y-5">
     <div className="grid gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-      <div className="space-y-1"><span className="text-xs text-app-muted">Activo</span><Combobox label="Activo" placeholder="Busca un repositorio o una imagen…" value={asset ? assetOption(assetView?.key === asset.key ? assetView : asset) : null}
+      <div className="space-y-1"><span className="text-xs text-app-muted">{t('page.asset')}</span><Combobox label={t('page.asset')} placeholder={t('page.asset_placeholder')} value={asset ? assetOption(assetView?.key === asset.key ? assetView : asset) : null}
         search={searchAssets} onSelect={option => { void searchAssets(option.label).then(result => { const next = result.items.find(item => item.key === option.id); if (next) { setAsset(next); setRun(CURRENT); setRunLabel(null) } }) }} /></div>
-      <div className="space-y-1"><span className="text-xs text-app-muted">Ejecución</span><Combobox label="Ejecución" placeholder="Estado actual" value={run === CURRENT ? { id: CURRENT, label: 'Estado actual', hint: 'escaneos y PRs' } : runLabel}
-        search={searchRuns} onSelect={option => { setRun(option.id); setRunLabel(option.id === CURRENT ? null : option) }} emptyText="Sin ejecuciones que coincidan" /></div>
+      <div className="space-y-1"><span className="text-xs text-app-muted">{t('page.run')}</span><Combobox label={t('page.run')} placeholder={t('page.current')} value={run === CURRENT ? { id: CURRENT, label: t('page.current'), hint: t('page.current_hint_short') } : runLabel}
+        search={searchRuns} onSelect={option => { setRun(option.id); setRunLabel(option.id === CURRENT ? null : option) }} emptyText={t('page.no_runs')} /></div>
     </div>
-    {asset?.removed_at && <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger"><TriangleAlert className="mt-0.5 size-4 shrink-0" /><span>GitHub ya no da acceso a este repositorio (se borró o se quitó de la App) desde el {formatDate(asset.removed_at)}. Si no vuelve, sus hallazgos, triage y tickets enlazados se borran a las 24 horas.</span></div>}
+    {asset?.removed_at && <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger"><TriangleAlert className="mt-0.5 size-4 shrink-0" /><span>{t('page.removed', { date: formatDate(asset.removed_at) })}</span></div>}
     {/* Configuración a la vista pero en una sola fila: la lista de hallazgos es lo importante. */}
     {run === CURRENT && asset && <div className="grid items-start gap-3 lg:grid-cols-2">
       <ExclusionsCard key={asset.key} assetKey={asset.key} canEdit={user.role === 'admin'} onChanged={() => void load()} />
       <SlaPolicyCard canEdit={user.role === 'admin'} onChanged={() => void load()} />
     </div>}
-    {run === CURRENT && <div className="flex flex-wrap gap-1.5">{([['open', 'Abiertos'], ['fixed', 'Remediados'], ['excluded', 'Excluidos'], ['all', 'Todos']] as const)
+    {run === CURRENT && <div className="flex flex-wrap gap-1.5">{([['open', t('page.tabs.open')], ['fixed', t('page.tabs.fixed')], ['excluded', t('page.tabs.excluded')], ['all', t('common:state.all')]] as const)
       .filter(([key]) => key !== 'excluded' || tab === 'excluded' || (counts?.excluded ?? 0) > 0)
       .map(([key, text]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)} className={`rounded-lg border px-3 py-1.5 text-sm ${tab === key ? 'border-brand/50 bg-brand/10 text-brand' : 'border-app-line bg-app-soft text-app-muted'}`}>{text}{counts ? ` · ${key === 'open' ? counts.open + counts.suppressed : key === 'fixed' ? counts.fixed : key === 'excluded' ? (counts.excluded ?? 0) : counts.open + counts.suppressed + counts.fixed + (counts.excluded ?? 0)}` : ''}</button>)}</div>}
     {loading && !detail ? <Skeleton tiles={6} rows={5} />
@@ -105,6 +111,8 @@ export function Findings({ user, requestedRun, onNew }: { user: SessionUser; req
 
 function runOption(row: RunRow | Detail): ComboOption {
   const pull = (row as Detail).pull_request ?? (row as RunRow & { pull_request?: { number: number; title: string } }).pull_request
-  const kind = row.type === 'pr_review' ? `PR${pull ? ` #${pull.number}` : ''}` : row.type === 'advisory_watch' ? 'Avisos nuevos' : 'Escaneo completo'
-  return { id: row.id, label: `${kind} · ${formatDate(row.created_at)}`, hint: `${statusLabel(row.status)} · ${plural(row.summary?.candidates ?? 0, 'hallazgo', 'hallazgos')}${pull?.title ? ` · ${pull.title}` : ''}` }
+  const kind = row.type === 'pr_review' ? (pull ? i18n.t('findings:page.kind_pr_number', { number: pull.number }) : i18n.t('findings:page.kind_pr'))
+    : row.type === 'advisory_watch' ? i18n.t('findings:page.kind_advisory') : i18n.t('findings:page.kind_scan')
+  const status = RUN_STATUS[row.status] ? i18n.t(RUN_STATUS[row.status]) : row.status
+  return { id: row.id, label: `${kind} · ${formatDate(row.created_at)}`, hint: `${status} · ${i18n.t('common:count.findings', { count: row.summary?.candidates ?? 0 })}${pull?.title ? ` · ${pull.title}` : ''}` }
 }

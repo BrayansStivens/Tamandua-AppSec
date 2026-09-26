@@ -29,6 +29,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
 _log = logging_setup.get("cve-db")
@@ -144,7 +145,7 @@ def _nvd_get(params: dict) -> dict:
     with urlopen(Request(f"{NVD_URL}?{urlencode(params)}", headers=headers), timeout=120) as response:
         body = response.read(MAX_BODY + 1)
     if len(body) > MAX_BODY:
-        raise ValueError("respuesta de NVD demasiado grande")
+        raise ValueError("NVD response too large")
     return json.loads(body)
 
 
@@ -341,7 +342,7 @@ def detail(data_dir: Path, identifier: str) -> dict | None:
             if not kev_row and not epss_row:
                 return None
             return {"id": identifier, "published": None, "severity": None, "score": None, "version": None, "status": None,
-                    "description": (kev_row["name"] if kev_row else None) or "Aún no está en la copia local de NVD.",
+                    "description": (kev_row["name"] if kev_row else None) or msg("intel.cve.not_in_local_copy"),
                     "kev": bool(kev_row), "kev_detail": dict(kev_row) if kev_row else None,
                     "epss": epss_row["score"] if epss_row else None, "epss_percentile": epss_row["percentile"] if epss_row else None,
                     "vector": None, "cwe": [], "references": [], "modified": None}

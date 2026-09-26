@@ -1,0 +1,101 @@
+{
+  "unscored": "Unscored",
+  "filters": {
+    "all_severities": "All severities",
+    "severity": "Severity",
+    "sort": "Sort by",
+    "kev_only": "KEV only",
+    "mine": "Only those affecting me",
+    "label": "Filters:",
+    "query_chip": "“{{q}}”",
+    "year_chip": "Year {{year}}",
+    "mine_chip": "Affecting me",
+    "clear_all": "Clear all",
+    "remove_chip": "Remove {{label}}"
+  },
+  "sort": { "published": "Newest", "score": "Highest CVSS", "epss": "Highest EPSS" },
+  "search": {
+    "label": "Search CVEs",
+    "placeholder": "CVE, product or keyword (e.g. log4j, openssl, CVE-2024-3094)"
+  },
+  "table": {
+    "severity": "Severity",
+    "published": "Published",
+    "description": "Description",
+    "kev_title": "In the CISA KEV catalog: actively exploited",
+    "affects": "affects you",
+    "affects_title": "Open in one of your assets"
+  },
+  "empty": {
+    "mine_title": "No open CVEs in your assets",
+    "title": "Nothing matches",
+    "mine_none": "Your scans have no open findings with a CVE, or you haven't scanned anything yet.",
+    "mine_filtered": "Try removing a filter. If the NVD download hasn't finished, some of your CVEs aren't in the local copy yet.",
+    "fewer_words": "Try fewer words or remove a filter.",
+    "downloading": "The local database is still empty while it downloads from NVD."
+  },
+  "pagination": {
+    "showing": "Showing {{from}}–{{to}} of {{total}} CVEs",
+    "per_page_label": "Per page",
+    "per_page": "{{size}} / page",
+    "previous": "Previous"
+  },
+  "mine": {
+    "title": "Does it affect you?",
+    "unavailable": "Can't check right now. Try again in a moment.",
+    "loading": "Loading your CVEs",
+    "count_one": "You have <strong>{{value}}</strong> open CVE in your repositories and images (not counting what was dismissed in triage).",
+    "count_other": "You have <strong>{{value}}</strong> open CVEs in your repositories and images (not counting what was dismissed in triage).",
+    "cta": "Scan your repositories: we match their dependencies against these CVEs, KEV and EPSS, and tell you which ones you actually have.",
+    "show_all": "Show all CVEs",
+    "show_mine": "Show only those affecting me",
+    "new_scan": "New scan"
+  },
+  "years": {
+    "title": "By year",
+    "local_count": "{{value}} CVEs in the local copy",
+    "aria": "Year: {{year}}",
+    "any": "all",
+    "all": "All years",
+    "option": "{{year}} · {{value}} CVEs",
+    "loading": "Loading years"
+  },
+  "kev": {
+    "title": "Active exploitation",
+    "latest": "Latest additions to CISA KEV",
+    "latest_total": "Latest additions to CISA KEV · {{value}} in the catalog",
+    "ransomware": "ransomware",
+    "loading": "Loading KEV additions",
+    "empty": "No KEV catalog downloaded yet.",
+    "show_all": "Show all KEV entries"
+  },
+  "sync": {
+    "preparing": "Preparing the local copy of NVD…",
+    "downloading": "Downloading NVD: {{percent}}",
+    "count": "{{value}} CVEs · newest first",
+    "count_of": "{{value}} of {{total}} CVEs · newest first",
+    "aria": "NVD sync",
+    "error": "NVD isn't responding right now; it will retry on its own.",
+    "hint": "You can already search what's loaded. NVD throttles downloads without an API key; with TAMANDUA_NVD_API_KEY it's about 8 times faster."
+  },
+  "sheet": {
+    "published": "Published {{date}}",
+    "published_modified": "Published {{date}} · modified {{modified}}",
+    "per_euvd": "per EUVD",
+    "percentile": "percentile {{value}}",
+    "since": "since {{date}}",
+    "kev_known": "Known active exploitation",
+    "kev_ransomware": "used by ransomware",
+    "federal_due": "federal due date {{date}}",
+    "enisa": "ENISA lists it as actively exploited",
+    "enisa_since": "Since {{date}}, according to the EU Vulnerability Database (EUVD).",
+    "euvd_score": "NVD hasn't scored this CVE; the score comes from EUVD (ENISA).",
+    "vector": "Vector",
+    "weakness": "Weakness",
+    "in_repos": "In your repositories",
+    "open_one": "{{count}} open", "open_other": "{{count}} open",
+    "fixed": "fixed",
+    "not_affected": "No scanned repository has this CVE among its findings.",
+    "references": "References"
+  }
+}

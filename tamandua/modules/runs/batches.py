@@ -18,6 +18,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from tamandua.shared import documents
+from tamandua.shared.i18n import msg, text
 
 MAX_SELECTED = 100      # selección a mano, cualquier miembro
 MAX_ITEMS = 5000        # organización entera (administración)
@@ -25,7 +26,14 @@ ID = re.compile(r"[0-9a-f]{32}")
 
 
 class BatchError(ValueError):
-    pass
+    """`message` is a catalog message; the API renders it for the reader."""
+
+    def __init__(self, message: dict):
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self) -> str:
+        return text(self.message)
 
 
 def _now() -> str:
@@ -34,7 +42,7 @@ def _now() -> str:
 
 def _name(batch_id: str) -> str:
     if not ID.fullmatch(batch_id or ""):
-        raise BatchError("Lote inválido")
+        raise BatchError(msg("runs.batch.invalid"))
     return f"batches/{batch_id}"
 
 
@@ -45,7 +53,7 @@ def _write(data_dir: Path, batch: dict) -> None:
 def load(data_dir: Path, batch_id: str) -> dict:
     batch = documents.load(data_dir, _name(batch_id))
     if batch is None:
-        raise BatchError("Lote no encontrado")
+        raise BatchError(msg("runs.batch.not_found"))
     return batch
 
 
@@ -62,12 +70,12 @@ def create(data_dir: Path, items: list[dict], *, by: str, label: str, allow_osv_
     """`items`: repositorios ya validados ({source_id, name, uid, installation_id}) o imágenes ya validadas
     ({kind: "image", image, name}). Uno activo a la vez."""
     if not items:
-        raise BatchError("No hay nada que analizar")
+        raise BatchError(msg("runs.batch.empty"))
     if len(items) > MAX_ITEMS:
-        raise BatchError(f"Como mucho {MAX_ITEMS} elementos por lote")
+        raise BatchError(msg("runs.batch.too_many", max=MAX_ITEMS))
     with documents.lock(data_dir, "batches"):
         if active(data_dir):
-            raise BatchError("Ya hay un lote en curso: espera a que termine o cancélalo")
+            raise BatchError(msg("runs.batch.already_running"))
         # Una imagen se identifica por su referencia completa (dos etiquetas del mismo repositorio son dos análisis).
         unique = list({(item["image"]["reference"] if item.get("kind") == "image" else item["source_id"]): item for item in items}.values())
         batch = {"id": uuid.uuid4().hex, "created_at": _now(), "by": by, "label": label[:120], "status": "running",
@@ -121,13 +129,13 @@ def release_taken(data_dir: Path) -> None:
             _write(data_dir, batch)
 
 
-def attach(data_dir: Path, batch_id: str, index: int, *, run_id: str | None = None, error: str | None = None) -> None:
+def attach(data_dir: Path, batch_id: str, index: int, *, run_id: str | None = None, error: str | dict | None = None) -> None:
     with documents.lock(data_dir, "batches"):
         batch = load(data_dir, batch_id)
         item = batch["items"][index]
         item["run_id"] = run_id
         if error:
-            item["error"] = error[:200]
+            item["error"] = error[:200] if isinstance(error, str) else error
         _write(data_dir, batch)
 
 
@@ -160,5 +168,5 @@ def summary(data_dir: Path, batch: dict) -> dict:
     return {"id": batch["id"], "label": batch.get("label"), "status": batch["status"], "created_at": batch["created_at"], "by": batch.get("by"),
             "total": len(batch["items"]), **counts, "critical": critical, "high": high,
             "eta_seconds": round(remaining * average) if batch["status"] == "running" else 0,
-            "failed_items": [{"name": item["name"], "error": item.get("error") or "El análisis falló"} for item in batch["items"]
+            "failed_items": [{"name": item["name"], "error": item.get("error") or msg("runs.batch.item_failed")} for item in batch["items"]
                              if item.get("error") or (runs.get(item.get("run_id") or "") or {}).get("status") == "failed"][:20]}

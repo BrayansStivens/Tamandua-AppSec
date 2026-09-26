@@ -62,4 +62,4 @@ class CraOverview(BaseModel):
 @router.get("/api/cra", response_model=CraOverview)
 def overview(context: Context = Depends(guard())) -> dict:
     """Lo ve cualquier sesión (el equipo necesita saber qué vence); solo un administrador lo cambia."""
-    return cra.overview(context.data_dir)
+    return context.render(cra.overview(context.data_dir))

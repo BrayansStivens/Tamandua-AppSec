@@ -17,7 +17,8 @@ from tamandua.modules.intel.advisories import MAX_DETAILS, dependency_finding, f
 from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
-from tamandua.modules.scanning.engines import IMAGES, docker_available, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from tamandua.modules.scanning.engines import IMAGES, SEVERITY_NAME, and_list, docker_available, joined as join_messages, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
 
@@ -32,12 +33,23 @@ SECRET_RULES = (
     ("Slack token", re.compile(r"\bxox[abposr]-[A-Za-z0-9-]{10,}\b")),
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
 )
+# Titles of the internal secret patterns (the name above is part of the rule id and must not change).
+SECRET_TITLES = {
+    "GitHub token": msg("scanning.internal.secret_titles.github_token"),
+    "OpenAI API key": msg("scanning.internal.secret_titles.openai_api_key"),
+    "AWS access key ID": msg("scanning.internal.secret_titles.aws_access_key_id"),
+    "JSON Web Token": msg("scanning.internal.secret_titles.jwt"),
+    "clave privada": msg("scanning.internal.secret_titles.private_key"),
+    "Stripe secret key": msg("scanning.internal.secret_titles.stripe_secret_key"),
+    "Slack token": msg("scanning.internal.secret_titles.slack_token"),
+    "Google API key": msg("scanning.internal.secret_titles.google_api_key"),
+}
 CODE_EXTENSIONS = {".py", ".js", ".ts", ".tsx", ".jsx", ".json", ".yaml", ".yml", ".env", ".md", ".txt", ".html", ".xml",
                    ".rst", ".ipynb", ".pem", ".key", ".toml", ".ini", ".cfg", ".conf", ".properties", ".sh", ".tf"}
 
 
-def _finding(scanner: str, rule: str, title: str, path: str, line: int, severity: str,
-             reason: str, cwe: int, owasp: str, *, cve: list[str] | None = None,
+def _finding(scanner: str, rule: str, title, path: str, line: int, severity: str,
+             reason, cwe: int, owasp: str, *, cve: list[str] | None = None,
              ghsa: list[str] | None = None) -> dict:
     fingerprint = hashlib.sha256(f"{scanner}|{rule}|{path}|{line}".encode()).hexdigest()
     action = "attend" if severity in ("critical", "high") else "track"
@@ -46,8 +58,8 @@ def _finding(scanner: str, rule: str, title: str, path: str, line: int, severity
             "confidence": 6, "verdict": "candidate", "cwe": [cwe] if cwe else [], "owasp": [owasp],
             "cve": cve or [], "ghsa": ghsa or [], "reason": reason, "package": None, "advisory": None,
             "kev": None, "epss": None,
-            "priority": {"action": action, "factors": [f"Patrón estático de severidad {severity}; requiere confirmar alcanzabilidad"]},
-            "remediation": "Revisar el flujo y la versión afectada; validar la alcanzabilidad antes de priorizar."}
+            "priority": {"action": action, "factors": [msg("scanning.priority.internal_pattern", severity=SEVERITY_NAME.get(severity, severity))]},
+            "remediation": msg("scanning.internal.remediation")}
 
 
 def _python_sast(path: Path, relative: str) -> list[dict]:
@@ -62,16 +74,16 @@ def _python_sast(path: Path, relative: str) -> list[dict]:
         func = node.func
         name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else ""
         if name in ("execute", "executemany") and node.args and isinstance(node.args[0], (ast.JoinedStr, ast.BinOp)):
-            results.append(_finding("sast", "PY-SQL-STRING", "SQL construido dinámicamente", relative, node.lineno,
-                                    "high", "Consulta formada con interpolación o concatenación; revisar si incorpora entrada no confiable.", 89, "A05:2025"))
+            results.append(_finding("sast", "PY-SQL-STRING", msg("scanning.internal.sql.title"), relative, node.lineno,
+                                    "high", msg("scanning.internal.sql.reason"), 89, "A05:2025"))
         if name in ("run", "Popen", "call", "check_output") and any(
                 keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True
                 for keyword in node.keywords):
-            results.append(_finding("sast", "PY-SHELL-TRUE", "Comando con shell=True", relative, node.lineno,
-                                    "high", "La ejecución usa intérprete de shell; revisar el origen de sus argumentos.", 78, "A05:2025"))
+            results.append(_finding("sast", "PY-SHELL-TRUE", msg("scanning.internal.shell.title"), relative, node.lineno,
+                                    "high", msg("scanning.internal.shell.reason"), 78, "A05:2025"))
         if name in ("eval", "exec") and isinstance(func, ast.Name):
-            results.append(_finding("sast", "PY-DYNAMIC-CODE", "Ejecución dinámica de código", relative, node.lineno,
-                                    "medium", "eval/exec requiere revisión del origen y validación del contenido.", 95, "A05:2025"))
+            results.append(_finding("sast", "PY-DYNAMIC-CODE", msg("scanning.internal.dynamic_code.title"), relative, node.lineno,
+                                    "medium", msg("scanning.internal.dynamic_code.reason"), 95, "A05:2025"))
     return results
 
 
@@ -85,9 +97,8 @@ def _secret_candidates(path: Path, relative: str) -> list[dict]:
         for name, pattern in SECRET_RULES:
             if pattern.search(line):
                 result.append(_finding("secrets", name.upper().replace(" ", "-"),
-                                       f"Posible {name}", relative, number, "high",
-                                       "Patrón de credencial detectado. El valor se omitió del reporte y no se envió al navegador.",
-                                       798, "A04:2025"))
+                                       SECRET_TITLES[name], relative, number, "high",
+                                       msg("scanning.internal.secret_reason"), 798, "A04:2025"))
     return result
 
 
@@ -149,7 +160,7 @@ def _query_osv(dependencies: list[dict]) -> list[dict]:
 
 def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                     context: str = "", data_dir: Path | None = None, progress=None) -> dict:
-    def report(level: str, message: str) -> None:
+    def report(level: str, message) -> None:
         if progress is not None:
             progress(level, message)
 
@@ -158,15 +169,13 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     snapshot = source.get("snapshot") or {}
     skipped = (snapshot.get("skipped", 0) + snapshot.get("skipped_not_analyzable", 0)
                + snapshot.get("skipped_too_large", 0) + snapshot.get("skipped_over_budget", 0))
-    detail = f"{len(files)} archivos copiados en solo lectura, sin instalar dependencias ni ejecutar scripts."
+    detail = msg("scanning.repository.snapshot.copied", files=len(files))
     if skipped:
-        detail += (f" Se dejaron fuera {skipped}: "
-                   f"{snapshot.get('skipped_not_analyzable', 0)} no analizables (binarios, imágenes, bundles), "
-                   f"{snapshot.get('skipped_too_large', 0)} por tamaño de archivo")
-        if snapshot.get("skipped_over_budget"):
-            detail += f" y {snapshot['skipped_over_budget']} al agotarse el presupuesto del snapshot"
-        detail += "."
-    steps = [{"id": "snapshot", "name": "Snapshot de código",
+        counts = {"skipped": skipped, "not_analyzable": snapshot.get("skipped_not_analyzable", 0),
+                  "too_large": snapshot.get("skipped_too_large", 0)}
+        detail = (msg("scanning.repository.snapshot.skipped_budget", detail=detail, over_budget=snapshot["skipped_over_budget"], **counts)
+                  if snapshot.get("skipped_over_budget") else msg("scanning.repository.snapshot.skipped", detail=detail, **counts))
+    steps = [{"id": "snapshot", "name": msg("scanning.repository.steps.snapshot"),
               "status": "partial" if snapshot.get("truncated") else "completed", "detail": detail}]
     digest = hashlib.sha256()
     for path in files:
@@ -184,27 +193,27 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         mount_problem = host_mount_problem()
         if mount_problem:
             report("warn", mount_problem)
-        report("info", "Opengrep 1.30.0: SAST multi-lenguaje con reglas propias…")
+        report("info", msg("scanning.progress.opengrep", version=IMAGES["opengrep"]["version"]))
         sast = run_opengrep(root)
-        report("ok" if sast["status"] != "inconclusive" else "warn", f"Opengrep: {sast['detail']}")
-        report("info", "Gitleaks 8.30.1: buscando secretos…")
+        report("ok" if sast["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Opengrep", detail=sast["detail"]))
+        report("info", msg("scanning.progress.gitleaks", version=IMAGES["gitleaks"]["version"]))
         secrets_gitleaks = run_gitleaks(root)
-        report("ok" if secrets_gitleaks["status"] != "inconclusive" else "warn", f"Gitleaks: {secrets_gitleaks['detail']}")
-        report("info", "Trivy 0.74.0: dependencias, infraestructura y secretos…")
+        report("ok" if secrets_gitleaks["status"] != "inconclusive" else "warn",
+               msg("scanning.progress.engine", engine="Gitleaks", detail=secrets_gitleaks["detail"]))
+        report("info", msg("scanning.progress.trivy", version=IMAGES["trivy"]["version"]))
         trivy = run_trivy(root, (data_dir or Path("data")) / "trivy-cache", feeds)
-        report("ok" if trivy["status"] != "inconclusive" else "warn", f"Trivy: {trivy['detail']}")
-        report("info", f"OSV-Scanner {IMAGES['osv-scanner']['version']}: dependencias con la base OSV (la primera vez descarga las bases de avisos)…")
+        report("ok" if trivy["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Trivy", detail=trivy["detail"]))
+        report("info", msg("scanning.progress.osv", version=IMAGES["osv-scanner"]["version"]))
         osv = run_osv_scanner(root, (data_dir or Path("data")) / "osv-cache", feeds, resolve=allow_osv_upload)
-        report("info", f"Checkov {IMAGES['checkov']['version']}: infraestructura como código y pipelines…")
+        report("info", msg("scanning.progress.checkov", version=IMAGES["checkov"]["version"]))
         checkov = run_checkov(root)
-        report("info", f"zizmor {IMAGES['zizmor']['version']}: seguridad de GitHub Actions…")
+        report("info", msg("scanning.progress.zizmor", version=IMAGES["zizmor"]["version"]))
         zizmor = run_zizmor(root)
         tools = [sast, secrets_gitleaks, trivy, osv, checkov, zizmor]
         # Un motor que no corrió no es «cero hallazgos»: se dice en claro y la ejecución queda incompleta.
         failed = [tool["name"] for tool in (sast, secrets_gitleaks, trivy, osv) if tool["status"] == "inconclusive"]
         if failed:
-            report("warn", f"No se pudieron ejecutar: {', '.join(failed)}. El resultado no equivale a «sin hallazgos»; "
-                           "revisa en el servidor que las imágenes estén construidas (docker compose build).")
+            report("warn", msg("scanning.progress.engines_failed", engines=", ".join(failed)))
         findings.extend(sast["findings"])
         trivy_secrets = [item for item in trivy["findings"] if item["scanner"] == "secrets"]
         findings.extend(merge_secrets(secrets_gitleaks["findings"], trivy_secrets))
@@ -214,24 +223,24 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                                                                   ("osv-scanner", osv["findings"]))
         findings.extend(dependencies_found)
         if osv["status"] == "completed" and osv["findings"]:
-            osv["detail"] += (f" {dependency_merge['joined']} coinciden con Trivy y se unieron al mismo hallazgo; "
-                              f"{dependency_merge['new']} son nuevos.")
-        report("ok" if osv["status"] != "inconclusive" else "warn", f"OSV-Scanner: {osv['detail']}")
+            osv["detail"] = msg("scanning.repository.osv_merged", detail=osv["detail"], joined=dependency_merge["joined"],
+                                new=dependency_merge["new"])
+        report("ok" if osv["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="OSV-Scanner", detail=osv["detail"]))
         # Lo que Trivy y Checkov (o zizmor y Checkov) ven a la vez queda como un solo hallazgo con los dos motores.
         configuration, joined = merge_repository([item for item in trivy["findings"] if item["scanner"] == "iac"],
                                                  checkov["findings"], zizmor["findings"])
         findings.extend(configuration)
         if checkov["status"] == "completed" and checkov["findings"]:
-            checkov["detail"] += (f" {joined['joined']} coinciden con Trivy o zizmor y se unieron al mismo hallazgo; "
-                                  f"{joined['checkov_new']} son nuevos.")
-        report("ok" if checkov["status"] != "inconclusive" else "warn", f"Checkov: {checkov['detail']}")
-        report("ok" if zizmor["status"] != "inconclusive" else "warn", f"zizmor: {zizmor['detail']}")
+            checkov["detail"] = msg("scanning.repository.checkov_merged", detail=checkov["detail"], joined=joined["joined"],
+                                    new=joined["checkov_new"])
+        report("ok" if checkov["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Checkov", detail=checkov["detail"]))
+        report("ok" if zizmor["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="zizmor", detail=zizmor["detail"]))
         for tool in tools:
             steps.append({"id": tool["tool"], "name": f"{tool['name']} {tool['version']}", "status": tool["status"],
                           "detail": tool["detail"], "tool": {"name": tool["tool"], "version": tool["version"],
                                                             "image": tool["image"], "duration_s": tool["duration_s"]}})
     else:
-        report("warn", "Docker no disponible: se usan las reglas internas (solo Python) y patrones de secretos.")
+        report("warn", msg("scanning.progress.no_docker"))
         for path in files:
             relative = path.relative_to(root).as_posix()
             if path.suffix == ".py":
@@ -239,11 +248,11 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             if path.suffix in CODE_EXTENSIONS or path.name.startswith(".env"):
                 findings.extend(_secret_candidates(path, relative))
         steps.extend([
-            {"id": "sast", "name": "SAST interno (Python)", "status": "partial",
-             "detail": f"{sum(item['scanner'] == 'sast' for item in findings)} candidatos con reglas AST internas. "
-                       "Docker no disponible: sin Opengrep, solo Python queda cubierto."},
-            {"id": "secrets", "name": "Secretos (patrones internos)", "status": "partial",
-             "detail": f"{sum(item['scanner'] == 'secrets' for item in findings)} candidatos; valores redactados. Docker no disponible: sin Gitleaks ni Trivy."},
+            {"id": "sast", "name": msg("scanning.repository.steps.internal_sast.name"), "status": "partial",
+             "detail": msg("scanning.repository.steps.internal_sast.detail", candidates=sum(item["scanner"] == "sast" for item in findings))},
+            {"id": "secrets", "name": msg("scanning.repository.steps.internal_secrets.name"), "status": "partial",
+             "detail": msg("scanning.repository.steps.internal_secrets.detail",
+                           candidates=sum(item["scanner"] == "secrets" for item in findings))},
         ])
     # Invariante del registro: una huella, un hallazgo. Ningún motor ni fusión puede colar un duplicado.
     unique, seen = [], set()
@@ -257,22 +266,21 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     engine_sca = [tool["name"] for tool in tools if tool["tool"] in ("trivy", "osv-scanner") and tool["status"] == "completed"]
     trivy_sca = engines and bool(engine_sca)
     dependencies, manifests = _dependencies(root)
-    dependency_scope = f"primeras {len(dependencies)} versiones fijadas" if len(dependencies) >= 250 else f"{len(dependencies)} versiones fijadas"
+    dependency_scope = (msg("scanning.repository.sca.scope_first", versions=len(dependencies)) if len(dependencies) >= 250
+                        else msg("scanning.repository.sca.scope", versions=len(dependencies)))
     if trivy_sca:
-        report("info", "Cruzando avisos con CISA KEV y EPSS para priorizar…")
+        report("info", msg("scanning.progress.feeds"))
         sca_count = sum(item["scanner"] == "sca" for item in findings)
         sca_status = "partial"
         joined = sum(1 for item in findings if item["scanner"] == "sca" and item.get("also_detected_by"))
-        sca_detail = (f"Dependencias de todos los ecosistemas del snapshot con {' y '.join(engine_sca)}: {sca_count} avisos "
-                      f"únicos con versión corregida, CVSS, KEV y EPSS"
-                      + (f"; {joined} confirmados por los dos motores" if joined else "") + ".")
+        sca_detail = (msg("scanning.repository.sca.engines_confirmed", engines=and_list(engine_sca), advisories=sca_count, confirmed=joined)
+                      if joined else msg("scanning.repository.sca.engines", engines=and_list(engine_sca), advisories=sca_count))
     elif not manifests:
-        sca_status, sca_detail = "not_tested", "No se encontró package-lock.json ni requirements.txt con versiones fijadas."
+        sca_status, sca_detail = "not_tested", msg("scanning.repository.sca.no_manifests")
     elif not dependencies:
-        sca_status, sca_detail = "inconclusive", "Hay manifiestos, pero no se extrajeron versiones fijadas compatibles."
+        sca_status, sca_detail = "inconclusive", msg("scanning.repository.sca.no_versions")
     elif not allow_osv_upload:
-        sca_status, sca_detail = ("not_tested", f"{dependency_scope} detectadas. Consulta OSV no autorizada; "
-                                  "se requiere consentimiento para transmitir nombres y versiones de paquetes a api.osv.dev.")
+        sca_status, sca_detail = "not_tested", msg("scanning.repository.sca.osv_not_allowed", scope=dependency_scope)
     else:
         try:
             responses = _query_osv(dependencies)
@@ -294,7 +302,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                     elif re.fullmatch(r"[A-Za-z0-9-]{5,80}", identifier):
                         finding = _finding("sca", identifier, f"{dependency['name']} {dependency['version']}: {identifier}",
                                            dependency["path"], 1, "medium",
-                                           f"OSV asocia {identifier} a esta versión; no se pudo obtener el detalle del aviso.",
+                                           msg("scanning.repository.sca.osv_without_detail", advisory=identifier),
                                            1104, "A03:2025", cve=[identifier] if identifier.startswith("CVE-") else [],
                                            ghsa=[identifier] if identifier.startswith("GHSA-") else [])
                         finding["package"] = {"ecosystem": dependency["ecosystem"], "name": dependency["name"],
@@ -309,17 +317,20 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             packages = {(item["package"] or {}).get("name") for item in sca_findings}
             fixed = sum(1 for item in sca_findings if (item.get("package") or {}).get("fixed_version"))
             in_kev = sum(1 for item in sca_findings if item.get("kev"))
-            sca_detail = (f"{dependency_scope} consultadas en OSV; {len(sca_findings)} avisos en {len(packages)} paquetes, "
-                          f"{fixed} con versión corregida publicada, {in_kev} en CISA KEV.")
+            parts = [msg("scanning.repository.sca.osv_detail", scope=dependency_scope, advisories=len(sca_findings),
+                         packages=len(packages), fixed=fixed, kev=in_kev)]
             if not feeds.get("kev") or not feeds.get("epss"):
-                sca_detail += " KEV/EPSS no disponibles en esta ejecución; la prioridad se calculó solo con CVSS."
+                parts.append(msg("scanning.repository.sca.no_feeds"))
             if len(identifiers) > MAX_DETAILS:
-                sca_detail += f" Se detalló el aviso de {MAX_DETAILS} de {len(identifiers)} identificadores."
+                parts.append(msg("scanning.repository.sca.detailed_subset", detailed=MAX_DETAILS, total=len(identifiers)))
+            sca_detail = join_messages(parts, "scanning.join.sentences")
             sca_status = "partial"
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, TypeError):
-            sca_status, sca_detail = "inconclusive", "No se pudo completar la consulta a OSV. No equivale a cero vulnerabilidades."
-    steps.append({"id": "sca", "name": f"Dependencias · {' + '.join(engine_sca)}" if trivy_sca else "Dependencias · OSV", "status": sca_status, "detail": sca_detail})
-    steps.append({"id": "review", "name": "Triage humano", "status": "pending", "detail": "Los resultados estáticos son candidatos; revisar flujo, alcanzabilidad y aplicabilidad."})
+            sca_status, sca_detail = "inconclusive", msg("scanning.repository.sca.osv_failed")
+    steps.append({"id": "sca", "name": msg("scanning.repository.steps.sca", engines=" + ".join(engine_sca) if trivy_sca else "OSV"),
+                  "status": sca_status, "detail": sca_detail})
+    steps.append({"id": "review", "name": msg("scanning.steps.review"), "status": "pending",
+                  "detail": msg("scanning.repository.steps.review")})
     iac_tools = tuple(tool["name"] for tool in tools if tool["tool"] in ("trivy", "checkov") and tool["status"] == "completed")
     iac_ran = engines and bool(iac_tools)
     cicd_tools = tuple(tool["name"] for tool in tools if tool["tool"] in ("checkov", "zizmor") and tool["status"] == "completed")
@@ -361,12 +372,11 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                                                     "tools": [{"name": tool["tool"], "version": tool["version"], "status": tool["status"]} for tool in tools],
                                                     "planned": 3, "executed": 2 + (sca_status == "partial"),
                                                     "confirmed": 0},
-            "limitations": ([f"El snapshot se truncó: {snapshot.get('skipped_over_budget', 0)} archivos "
-                             "no se analizaron por límite de tamaño total. La cobertura de este repositorio es parcial."]
+            "limitations": ([msg("scanning.repository.limitations.truncated", files=snapshot.get("skipped_over_budget", 0))]
                             if snapshot.get("truncated") else [])
-                           + ["No se ejecutó código del repositorio",
-                              ("SAST con reglas propias: cobertura limitada a los lenguajes con reglas y sin análisis entre archivos"
-                               if engines else "Sin Docker: SAST solo Python con reglas internas y secretos por patrones"),
-                            "SCA limita la consulta a 250 versiones por ejecución",
-                            "Los avisos de OSV no prueban explotación", "IA y DAST no participaron en esta ejecución"],
+                           + [msg("scanning.repository.limitations.no_execution"),
+                              msg("scanning.repository.limitations.sast_rules") if engines
+                              else msg("scanning.repository.limitations.no_docker"),
+                              msg("scanning.repository.limitations.sca_cap"), msg("scanning.repository.limitations.osv_not_exploit"),
+                              msg("scanning.repository.limitations.no_ai_dast")],
             "scanned_at": datetime.now(timezone.utc).isoformat()}

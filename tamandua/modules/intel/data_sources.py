@@ -7,8 +7,15 @@ gestionado sepa qué fuentes no admiten uso comercial. Licencias revisadas el 20
 
 from __future__ import annotations
 
+from tamandua.shared.i18n import MARK, is_msg, msg, t
+
+UNDECLARED = msg("intel.sources.licenses.undeclared")
+# Licenses that say nothing usable: the attribution line skips the terms for them.
+NO_LICENSE = {"intel.sources.licenses.undeclared", "intel.sources.licenses.undeclared_copyright",
+              "intel.sources.licenses.undeclared_restrictive", "intel.sources.licenses.unreviewed"}
+
 # terms: «open» (sin condiciones), «attribution», «share-alike», «non-commercial», «unclear» (sin licencia o ambigua)
-_CATALOG: dict[str, tuple[str, str, str, str]] = {
+_CATALOG: dict[str, tuple[str, str | dict, str, str]] = {
     # id: (nombre, licencia, página, términos)
     "ghsa": ("GitHub Advisory Database", "CC BY 4.0", "https://github.com/advisories", "attribution"),
     "glad": ("GitLab Advisory Database (community)", "MIT", "https://gitlab.com/gitlab-org/advisories-community", "attribution"),
@@ -17,40 +24,40 @@ _CATALOG: dict[str, tuple[str, str, str, str]] = {
     "k8s": ("Kubernetes CVE feed", "CC BY 4.0", "https://kubernetes.io/docs/reference/issues-security/official-cve-feed/", "attribution"),
     "nodejs-security-wg": ("Node.js Security WG", "MIT", "https://github.com/nodejs/security-wg", "attribution"),
     "php-security-advisories": ("FriendsOfPHP security-advisories", "Unlicense", "https://github.com/FriendsOfPHP/security-advisories", "open"),
-    "ruby-advisory-db": ("Ruby Advisory Database", "Dominio público (parte bajo licencia OSVDB, no comercial)",
+    "ruby-advisory-db": ("Ruby Advisory Database", msg("intel.sources.licenses.ruby_advisory_db"),
                          "https://github.com/rubysec/ruby-advisory-db", "unclear"),
     "pypa": ("PyPA Advisory Database", "CC BY 4.0", "https://github.com/pypa/advisory-database", "attribution"),
     "rustsec": ("RustSec Advisory Database", "CC0 1.0", "https://rustsec.org", "open"),
-    "osv": ("OSV.dev", "Según la fuente de cada aviso", "https://osv.dev", "attribution"),
+    "osv": ("OSV.dev", msg("intel.sources.licenses.per_advisory"), "https://osv.dev", "attribution"),
     "ossf-malicious": ("OpenSSF Malicious Packages", "Apache-2.0", "https://github.com/ossf/malicious-packages", "open"),
-    "nvd": ("NVD (NIST)", "Dominio público", "https://nvd.nist.gov", "attribution"),
-    "euvd": ("EUVD (ENISA)", "Reutilización citando la fuente (aviso legal de ENISA); condiciones de la API por confirmar",
+    "nvd": ("NVD (NIST)", msg("intel.sources.licenses.public_domain"), "https://nvd.nist.gov", "attribution"),
+    "euvd": ("EUVD (ENISA)", msg("intel.sources.licenses.euvd"),
              "https://euvd.enisa.europa.eu", "unclear"),
     "redhat": ("Red Hat Security Data", "CC BY 4.0", "https://access.redhat.com/security/data", "attribution"),
     "suse-cvrf": ("SUSE Security", "CC BY 4.0", "https://www.suse.com/support/security/", "attribution"),
-    "ubuntu": ("Ubuntu Security", "CC BY-SA 4.0 (avisos); CVE Tracker sin licencia declarada", "https://ubuntu.com/security", "share-alike"),
+    "ubuntu": ("Ubuntu Security", msg("intel.sources.licenses.ubuntu"), "https://ubuntu.com/security", "share-alike"),
     "alpine": ("Alpine secdb", "CC BY-SA 4.0", "https://secdb.alpinelinux.org", "share-alike"),
-    "debian": ("Debian Security Tracker", "Sin licencia declarada", "https://security-tracker.debian.org", "unclear"),
-    "amazon": ("Amazon Linux Security Center", "Términos del sitio de AWS (excluyen uso comercial)", "https://alas.aws.amazon.com", "unclear"),
-    "oracle-oval": ("Oracle Linux OVAL", "Sin licencia declarada (solo copyright)", "https://linux.oracle.com/security/", "unclear"),
-    "alma": ("AlmaLinux Errata", "MIT (OSV); errata sin licencia declarada", "https://errata.almalinux.org", "unclear"),
+    "debian": ("Debian Security Tracker", UNDECLARED, "https://security-tracker.debian.org", "unclear"),
+    "amazon": ("Amazon Linux Security Center", msg("intel.sources.licenses.amazon"), "https://alas.aws.amazon.com", "unclear"),
+    "oracle-oval": ("Oracle Linux OVAL", msg("intel.sources.licenses.undeclared_copyright"), "https://linux.oracle.com/security/", "unclear"),
+    "alma": ("AlmaLinux Errata", msg("intel.sources.licenses.alma"), "https://errata.almalinux.org", "unclear"),
     "rocky": ("Rocky Linux Errata", "BSD", "https://errata.rockylinux.org", "attribution"),
-    "centos": ("CentOS", "Sin licencia declarada", "https://www.centos.org", "unclear"),
-    "fedora": ("Fedora Bodhi", "Sin licencia declarada", "https://bodhi.fedoraproject.org", "unclear"),
-    "arch-linux": ("Arch Linux Security", "Sin licencia declarada", "https://security.archlinux.org", "unclear"),
+    "centos": ("CentOS", UNDECLARED, "https://www.centos.org", "unclear"),
+    "fedora": ("Fedora Bodhi", UNDECLARED, "https://bodhi.fedoraproject.org", "unclear"),
+    "arch-linux": ("Arch Linux Security", UNDECLARED, "https://security.archlinux.org", "unclear"),
     "azure": ("Azure Linux", "MIT", "https://github.com/microsoft/AzureLinuxVulnerabilityData", "attribution"),
     "cbl-mariner": ("CBL-Mariner", "MIT", "https://github.com/microsoft/AzureLinuxVulnerabilityData", "attribution"),
-    "photon": ("VMware Photon OS", "Sin licencia declarada", "https://packages.broadcom.com/photon/photon_cve_metadata/", "unclear"),
-    "bottlerocket": ("Bottlerocket", "Sin licencia declarada", "https://advisories.bottlerocket.aws", "unclear"),
+    "photon": ("VMware Photon OS", UNDECLARED, "https://packages.broadcom.com/photon/photon_cve_metadata/", "unclear"),
+    "bottlerocket": ("Bottlerocket", UNDECLARED, "https://advisories.bottlerocket.aws", "unclear"),
     "bitnami": ("Bitnami Vulnerability Database", "Apache-2.0", "https://github.com/bitnami/vulndb", "attribution"),
     "wolfi": ("Wolfi", "CC BY-NC-ND 4.0", "https://github.com/wolfi-dev/advisories", "non-commercial"),
     "chainguard": ("Chainguard", "CC BY-NC-ND 4.0", "https://images.chainguard.dev/security", "non-commercial"),
     "minimos": ("Minimus", "CC BY-NC-ND 4.0", "https://docs.minimus.io/scanning/advisories-feed", "non-commercial"),
-    "echo": ("Echo", "Sin licencia declarada (términos del sitio restrictivos)", "https://advisory.echohq.com", "unclear"),
-    "rootio": ("Root.io", "Sin licencia declarada", "https://root.io", "unclear"),
-    "seal": ("Seal Security", "Sin licencia declarada", "https://sealsecurity.io", "unclear"),
-    "rapidfort": ("RapidFort", "Sin licencia declarada", "https://github.com/rapidfort/security-advisories", "unclear"),
-    "secureos": ("SecureOS", "Sin licencia declarada", "https://security.secureos.io", "unclear"),
+    "echo": ("Echo", msg("intel.sources.licenses.undeclared_restrictive"), "https://advisory.echohq.com", "unclear"),
+    "rootio": ("Root.io", UNDECLARED, "https://root.io", "unclear"),
+    "seal": ("Seal Security", UNDECLARED, "https://sealsecurity.io", "unclear"),
+    "rapidfort": ("RapidFort", UNDECLARED, "https://github.com/rapidfort/security-advisories", "unclear"),
+    "secureos": ("SecureOS", UNDECLARED, "https://security.secureos.io", "unclear"),
     "aqua": ("Aqua Security", "Apache-2.0", "https://github.com/aquasecurity/vuln-list-aqua", "attribution"),
 }
 # Variantes con las que Trivy o Grype nombran la misma base.
@@ -72,8 +79,9 @@ _SHORT = {"ghsa": "GitHub", "glad": "GitLab", "govulndb": "Go", "julia": "Julia"
           "bitnami": "Bitnami", "wolfi": "Wolfi", "chainguard": "Chainguard", "minimos": "Minimus", "echo": "Echo", "rootio": "Root.io",
           "seal": "Seal", "ossf-malicious": "OpenSSF", "rapidfort": "RapidFort", "secureos": "SecureOS", "aqua": "Aqua"}
 
-TERMS_LABEL = {"open": "uso libre", "attribution": "requiere atribución", "share-alike": "atribución y compartir igual",
-               "non-commercial": "no comercial", "unclear": "sin licencia clara"}
+TERMS_LABEL = {"open": msg("intel.sources.terms.open"), "attribution": msg("intel.sources.terms.attribution"),
+               "share-alike": msg("intel.sources.terms.share_alike"), "non-commercial": msg("intel.sources.terms.non_commercial"),
+               "unclear": msg("intel.sources.terms.unclear")}
 
 
 def describe(source_id: str, *, url: str | None = None, name: str | None = None) -> dict:
@@ -83,7 +91,7 @@ def describe(source_id: str, *, url: str | None = None, name: str | None = None)
     if known:
         label, license_name, home, terms = known
     else:
-        label, license_name, home, terms = name or source_id, "Sin revisar", "", "unclear"
+        label, license_name, home, terms = name or source_id, msg("intel.sources.licenses.unreviewed"), "", "unclear"
     link = url if isinstance(url, str) and url.startswith("https://") else home
     return {"id": key, "name": label, "short": _SHORT.get(key, label[:14]), "url": link[:300], "license": license_name, "terms": terms}
 
@@ -109,7 +117,13 @@ def from_osv(identifier: str) -> dict:
     return describe("osv")
 
 
-def attribution(findings: list[dict]) -> list[str]:
+def _no_license(value) -> bool:
+    if is_msg(value):
+        return value[MARK] in NO_LICENSE
+    return str(value or "").startswith("Sin")  # runs stored before i18n
+
+
+def attribution(findings: list[dict], *, locale: str | None = None) -> list[str]:
     """Líneas de atribución de un informe: cada base usada, su licencia y su página, más los avisos de NVD, KEV y EPSS."""
     used: dict[str, tuple[dict, int]] = {}
     for finding in findings:
@@ -119,17 +133,21 @@ def attribution(findings: list[dict]) -> list[str]:
             used[source["id"]] = (current[0] if current else source, (current[1] if current else 0) + 1)
     lines = []
     for source, count in sorted(used.values(), key=lambda pair: -pair[1]):
-        terms = "" if source["terms"] == "unclear" and source["license"].startswith("Sin") else f" ({TERMS_LABEL.get(source['terms'], source['terms'])})"
         link = describe(source["id"])["url"] or source.get("url") or ""
-        lines.append(f"{source['name']}: {source['license']}{terms} · {count} {'aviso' if count == 1 else 'avisos'}" + (f" · {link}" if link else ""))
+        if source["terms"] == "unclear" and _no_license(source["license"]):
+            line = t("intel.sources.line", locale, name=source["name"], license=source["license"], count=count)
+        else:
+            line = t("intel.sources.line_terms", locale, name=source["name"], license=source["license"], count=count,
+                     terms=TERMS_LABEL.get(source["terms"], source["terms"]))
+        lines.append(line + (f" · {link}" if link else ""))
     missing = sum(1 for finding in findings if finding.get("scanner") == "sca" and not (finding.get("source") or {}).get("id"))
     if missing:
-        lines.append(f"{missing} {'aviso' if missing == 1 else 'avisos'} sin fuente registrada (análisis anterior a la atribución: "
-                     "vuelve a analizar para registrarla).")
+        lines.append(t("intel.sources.missing", locale, count=missing))
     if any(finding.get("scanner") == "sca" for finding in findings):
+        # Wording required by the NVD terms of use: always in English.
         lines.append("This product uses the NVD API but is not endorsed or certified by the NVD.")
     if any(finding.get("kev") for finding in findings):
-        lines.append("Explotación activa: catálogo KEV de CISA (CC0 1.0).")
+        lines.append(t("intel.sources.kev", locale))
     if any(finding.get("epss") for finding in findings):
-        lines.append("Probabilidad de explotación: EPSS de FIRST.org.")
+        lines.append(t("intel.sources.epss", locale))
     return lines

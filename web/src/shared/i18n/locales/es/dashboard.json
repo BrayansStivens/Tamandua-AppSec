@@ -1,0 +1,73 @@
+{
+  "window": { "days_7": "Últimos 7 días", "days_30": "Últimos 30 días", "days_90": "Últimos 90 días", "days_365": "Último año" },
+  "summary": {
+    "assets_one": "{{count}} activo analizado", "assets_other": "{{count}} activos analizados",
+    "runs_one": "{{count}} ejecución en la ventana", "runs_other": "{{count}} ejecuciones en la ventana",
+    "updated": "actualizado {{date}}"
+  },
+  "empty": {
+    "title": "Todavía no hay ejecuciones",
+    "text": "El panel se calcula a partir de tus escaneos: hallazgos abiertos por severidad, qué se corrigió entre ejecuciones, explotabilidad y actividad.",
+    "new_analysis": "Nuevo análisis"
+  },
+  "kpi": {
+    "score": "Puntuación",
+    "open": "Abiertos", "open_hint": "{{critical}} críticos · {{high}} altos",
+    "overdue": "Fuera de plazo", "due_soon_one": "{{count}} vence en los próximos 7 días", "due_soon_other": "{{count}} vencen en los próximos 7 días",
+    "no_due_dates": "sin plazos",
+    "fixed": "Corregidos", "fix_rate": "tasa de corrección {{rate}}", "no_comparable_runs": "sin ejecuciones comparables",
+    "mttr": "Tiempo medio de corrección", "days_one": "día", "days_other": "días", "mttr_hint": "entre detección y desaparición",
+    "kev": "En CISA KEV", "kev_hint": "abiertos con explotación activa"
+  },
+  "panels": {
+    "new_per_day": { "title": "Hallazgos nuevos por día", "description": "Primera vez que aparece cada huella, por severidad: {{total}} en la ventana." },
+    "open_by_severity": { "title": "Abiertos por severidad", "description": "Lo que hay en la última ejecución de cada activo." },
+    "found_vs_fixed": { "title": "Hallados frente a corregidos", "description": "Acumulado en la ventana. Corregido = la huella dejó de aparecer en el activo." },
+    "by_cwe": { "title": "Por tipo de vulnerabilidad", "description": "Los CWE más frecuentes entre los abiertos.", "empty": "Sin CWE todavía." },
+    "exploitability": { "title": "Explotabilidad", "description": "Abiertos en CISA KEV o con EPSS ≥ 10 %, lo más urgente primero." },
+    "top_assets": {
+      "title": "Activos más afectados", "description": "Última ejecución de cada repositorio.",
+      "open_one": "{{count}} abierto", "open_other": "{{count}} abiertos", "trend": "{{trend}} vs anterior",
+      "more": "Ver en Hallazgos", "empty": "Sin activos analizados."
+    },
+    "top_issues": {
+      "title": "Hallazgos prioritarios", "description": "Los primeros por prioridad, severidad y EPSS.",
+      "severity": "Severidad {{severity}}", "more": "Ver todos en Hallazgos", "empty": "Nada abierto."
+    },
+    "recent_runs": { "title": "Ejecuciones recientes", "description": "Últimos escaneos.", "more": "Ver todas en Análisis", "empty": "Sin ejecuciones." }
+  },
+  "activity": {
+    "title": "Actividad de análisis", "description": "Ejecuciones por día, hasta hoy.",
+    "runs_30d": "ejecuciones en 30 días", "active_days": "días con actividad en el último año",
+    "streak_days_one": "{{count}} día", "streak_days_other": "{{count}} días", "streak": "racha actual",
+    "last_day": "último día con análisis"
+  },
+  "tools": "Motores en la última ejecución: {{tools}}",
+  "news": {
+    "title": "Novedades en ciberseguridad",
+    "description": "Vulnerabilidades publicadas según NVD",
+    "description_refreshing": "Vulnerabilidades publicadas según NVD · actualizando…",
+    "last_7_days": "últimos 7 días", "last_30_days": "últimos 30 días",
+    "skyline_loading": "Cargando el skyline de severidad",
+    "skyline_empty": "El skyline de severidad aparece en cuanto la base local<br/>tenga los CVE de los últimos 30 días.",
+    "latest_title": "Últimos CVE publicados",
+    "latest_description": "«Te afecta» cuando menciona un paquete o CVE de tus hallazgos abiertos.",
+    "tracker": "CVE tracker",
+    "affects_you": "te afecta",
+    "feed_empty": "Sin feed de NVD todavía: se descarga en segundo plano.",
+    "search_all": "Buscar en todos los CVE"
+  },
+  "kev": {
+    "title": "Novedades: explotación activa",
+    "description": "Altas en CISA KEV · catálogo {{version}}",
+    "added_7d": "añadidas en 7 días", "added_30d": "en 30 días",
+    "more": "Ver en el CVE tracker"
+  },
+  "exploitability": {
+    "empty": "Ningún hallazgo abierto tiene explotación conocida ni EPSS alto.",
+    "region": "Hallazgos explotables",
+    "show_less": "Ver menos",
+    "show_all": "Ver los {{total}}",
+    "showing": "Se muestran {{shown}} de {{total}}: el resto, en Hallazgos"
+  }
+}

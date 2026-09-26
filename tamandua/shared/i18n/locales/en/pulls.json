@@ -1,0 +1,74 @@
+{
+  "verdict": {
+    "blocking_one": "1 new finding at severity {{gate}}",
+    "blocking_other": "{{count}} new findings at severity {{gate}}",
+    "below_one": "1 new finding below the threshold",
+    "below_other": "{{count}} new findings below the threshold",
+    "clean": "No new findings in the code that changes"
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "info": "Info"
+  },
+  "gate": {
+    "critical": "critical",
+    "high": "high or above",
+    "medium": "medium or above",
+    "low": "low or above",
+    "never": "never blocks"
+  },
+  "table": {
+    "header": "| Severity | Finding | Location | Fix |",
+    "update_to": "Update to `{{version}}`",
+    "more": "… and {{count}} more in the panel"
+  },
+  "comment": {
+    "heading": "## Security review",
+    "blocking_one": "**1 new finding blocks this PR** (severity {{gate}}).",
+    "blocking_other": "**{{count}} new findings block this PR** (severity {{gate}}).",
+    "blocking_hint": "Fix it before merging: the `tamandua` status is recomputed on every push.",
+    "below_one": "**1 new finding** below the blocking threshold.",
+    "below_other": "**{{count}} new findings** below the blocking threshold.",
+    "below_hint": "Review them before merging. They don't block the PR.",
+    "clean": "**This PR introduces no findings** in the code that changes (commit {{commit}}). Nothing to do here.",
+    "attention": "### Need attention ({{count}})",
+    "preexisting_one": "1 pre-existing finding in the code this PR touches, already on the main branch",
+    "preexisting_other": "{{count}} pre-existing findings in the code this PR touches, already on the main branch",
+    "basis_baseline": "compared with the last scan of the main branch",
+    "basis_none": "no previous scan of the main branch: everything on changed lines counts",
+    "where_link": "[in the panel]({{url}})",
+    "where_plain": "in the Tamandua panel",
+    "footer": "<sub>Commit {{commit}} · {{basis}} · blocks from severity {{gate}}{{engines}}. Details, triage and export to Jira {{where}} (run `{{run}}`). Secrets are cited by rule and location; their value is never published.</sub>"
+  },
+  "unused": {
+    "heading": "## Unused dependencies",
+    "header": "| Package | Ecosystem | Declared in |",
+    "more": "… and {{count}} more",
+    "new_one": "**1 new dependency isn't used** in the code.",
+    "new_other": "**{{count}} new dependencies aren't used** in the code.",
+    "new_hint": "Remove them if they aren't needed, or ignore this notice if they're loaded in a way the code doesn't show.",
+    "added": "### Added in this PR ({{count}})",
+    "clean": "**This PR adds no unused dependencies.** Nothing to do here.",
+    "before_one": "1 unused pre-existing dependency, older than this PR",
+    "before_other": "{{count}} unused pre-existing dependencies, older than this PR",
+    "no_manifests": "no recognized manifests",
+    "footer_one": "<sub>Informational: it doesn't block the merge. Project {{projects}}, 1 new dependency unused in the PR. Runtime dependencies are checked; an import or a mention in configuration, scripts or a Dockerfile counts as use. A declared but unused dependency still ends up in the build and in the vulnerability analysis.</sub>",
+    "footer_other": "<sub>Informational: it doesn't block the merge. Project {{projects}}, {{count}} new dependencies unused in the PR. Runtime dependencies are checked; an import or a mention in configuration, scripts or a Dockerfile counts as use. A declared but unused dependency still ends up in the build and in the vulnerability analysis.</sub>"
+  },
+  "watch": {
+    "invalid_gate": "Invalid threshold"
+  },
+  "errors": {
+    "pick_repository": "Choose a repository from the connected GitHub App",
+    "connect_app": "Connect the GitHub App to watch pull requests",
+    "invalid_settings": "Invalid settings",
+    "choose_range": "Choose between 1 and {{max}} repositories",
+    "not_in_app": "Some repositories aren't in the connected GitHub App",
+    "invalid_pull": "Invalid pull request",
+    "repo_not_in_app": "Repository not available in the connected GitHub App",
+    "no_head": "GitHub didn't return the PR's head commit"
+  }
+}

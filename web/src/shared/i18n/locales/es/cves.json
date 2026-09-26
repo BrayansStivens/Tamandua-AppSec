@@ -1,0 +1,101 @@
+{
+  "unscored": "Sin puntuar",
+  "filters": {
+    "all_severities": "Todas las severidades",
+    "severity": "Severidad",
+    "sort": "Orden",
+    "kev_only": "Solo KEV",
+    "mine": "Solo los que me afectan",
+    "label": "Filtros:",
+    "query_chip": "«{{q}}»",
+    "year_chip": "Año {{year}}",
+    "mine_chip": "Me afectan",
+    "clear_all": "Limpiar todo",
+    "remove_chip": "Quitar {{label}}"
+  },
+  "sort": { "published": "Más recientes", "score": "Mayor CVSS", "epss": "Mayor EPSS" },
+  "search": {
+    "label": "Buscar CVE",
+    "placeholder": "CVE, producto o palabra clave (p. ej. log4j, openssl, CVE-2024-3094)"
+  },
+  "table": {
+    "severity": "Severidad",
+    "published": "Publicado",
+    "description": "Descripción",
+    "kev_title": "En el catálogo CISA KEV: explotación activa",
+    "affects": "te afecta",
+    "affects_title": "Abierto en alguno de tus activos"
+  },
+  "empty": {
+    "mine_title": "Ningún CVE abierto en tus activos",
+    "title": "Nada coincide",
+    "mine_none": "Tus análisis no tienen hallazgos abiertos con CVE, o aún no has analizado nada.",
+    "mine_filtered": "Prueba quitando algún filtro. Si la descarga de NVD no ha terminado, algunos de tus CVE aún no están en la copia local.",
+    "fewer_words": "Prueba con menos palabras o quita algún filtro.",
+    "downloading": "La base local aún está vacía: se está descargando de NVD."
+  },
+  "pagination": {
+    "showing": "Mostrando {{from}}–{{to}} de {{total}} CVE",
+    "per_page_label": "Por página",
+    "per_page": "{{size}} / página",
+    "previous": "Anterior"
+  },
+  "mine": {
+    "title": "¿Te afecta?",
+    "unavailable": "Ahora no se puede comprobar: vuelve a intentarlo en un momento.",
+    "loading": "Cargando tus CVE",
+    "count_one": "Tienes <strong>{{value}}</strong> CVE abierto en tus repositorios e imágenes (sin contar lo descartado en triage).",
+    "count_other": "Tienes <strong>{{value}}</strong> CVE abiertos en tus repositorios e imágenes (sin contar lo descartado en triage).",
+    "cta": "Analiza tus repositorios: cruzamos las dependencias con estos CVE, con KEV y EPSS, y te decimos cuáles tienes de verdad.",
+    "show_all": "Ver todos los CVE",
+    "show_mine": "Ver solo los que me afectan",
+    "new_scan": "Nuevo análisis"
+  },
+  "years": {
+    "title": "Por año",
+    "local_count": "{{value}} CVE en la copia local",
+    "aria": "Año: {{year}}",
+    "any": "todos",
+    "all": "Todos los años",
+    "option": "{{year}} · {{value}} CVE",
+    "loading": "Cargando años"
+  },
+  "kev": {
+    "title": "Explotación activa",
+    "latest": "Últimas altas en CISA KEV",
+    "latest_total": "Últimas altas en CISA KEV · {{value}} en el catálogo",
+    "ransomware": "ransomware",
+    "loading": "Cargando altas en KEV",
+    "empty": "Sin catálogo KEV descargado todavía.",
+    "show_all": "Ver todos los KEV"
+  },
+  "sync": {
+    "preparing": "Preparando la copia local de NVD…",
+    "downloading": "Descargando NVD: {{percent}}",
+    "count": "{{value}} CVE · lo más reciente primero",
+    "count_of": "{{value}} de {{total}} CVE · lo más reciente primero",
+    "aria": "Sincronización con NVD",
+    "error": "NVD no responde ahora; se reintenta solo.",
+    "hint": "Ya puedes buscar en lo cargado. NVD limita la descarga sin API key; con TAMANDUA_NVD_API_KEY va unas 8 veces más rápido."
+  },
+  "sheet": {
+    "published": "Publicado {{date}}",
+    "published_modified": "Publicado {{date}} · modificado {{modified}}",
+    "per_euvd": "según EUVD",
+    "percentile": "percentil {{value}}",
+    "since": "desde {{date}}",
+    "kev_known": "Explotación activa conocida",
+    "kev_ransomware": "usada por ransomware",
+    "federal_due": "fecha límite federal {{date}}",
+    "enisa": "ENISA la registra como explotada activamente",
+    "enisa_since": "Desde {{date}}, según la base europea de vulnerabilidades (EUVD).",
+    "euvd_score": "NVD no ha puntuado este CVE; la puntuación sale de EUVD (ENISA).",
+    "vector": "Vector",
+    "weakness": "Debilidad",
+    "in_repos": "En tus repositorios",
+    "open_one": "{{count}} abierto", "open_other": "{{count}} abiertos",
+    "fixed": "remediado",
+    "not_affected": "Ningún repositorio analizado tiene este CVE entre sus hallazgos.",
+    "references": "Referencias"
+  }
+}

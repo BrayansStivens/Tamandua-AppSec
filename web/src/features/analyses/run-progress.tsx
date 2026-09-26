@@ -1,5 +1,8 @@
+import { formatTime } from '@/shared/i18n/format'
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
+import {} from '@/shared/i18n'
 import { runQuery } from '@/shared/api/queries'
 import { BRAND } from '@/shared/lib/brand'
 import { CircleAlert, CircleCheck, LoaderCircle, Terminal, X } from 'lucide-react'
@@ -10,6 +13,7 @@ export type RunningRun = { id: string; status: string; created_at: string; start
 
 // Consola de progreso del escaneo: solo eventos pensados para el usuario, nunca salida del servidor.
 export function RunProgress({ run, onFinished }: { run: RunningRun; onFinished: (run: RunningRun) => void }) {
+  const { t } = useTranslation('analyses')
   // La consulta sondea sola mientras la ejecución está en cola o corriendo (ver runQuery) y comparte caché.
   const { data } = useQuery({ ...runQuery<RunningRun>(run.id), initialData: run })
   const live = data ?? run
@@ -26,22 +30,23 @@ export function RunProgress({ run, onFinished }: { run: RunningRun; onFinished: 
   const elapsed = live.started_at ? Math.max(0, Math.round((Date.now() - Date.parse(live.started_at)) / 1000)) : 0
   return <Card className="overflow-hidden border-app-line bg-console">
     <div className="flex items-center justify-between gap-3 border-b border-app-line bg-console-top px-4 py-3 text-xs">
-      <span className="flex items-center gap-2 font-mono text-app-muted"><Terminal className="size-3.5" />{live.source?.name ?? 'escaneo'} · {live.id.slice(0, 8)}</span>
+      <span className="flex items-center gap-2 font-mono text-app-muted"><Terminal className="size-3.5" />{live.source?.name ?? t('progress.scan')} · {live.id.slice(0, 8)}</span>
       <span role="status" aria-live="polite" className={`flex items-center gap-1.5 ${active ? 'text-brand' : live.status === 'failed' ? 'text-danger' : 'text-app-muted'}`}>
         {active ? <LoaderCircle className="size-3.5 animate-spin" /> : live.status === 'failed' ? <CircleAlert className="size-3.5" /> : <CircleCheck className="size-3.5" />}
-        {live.status === 'queued' ? 'En cola' : live.status === 'running' ? `Analizando · ${elapsed}s` : live.status === 'failed' ? 'Falló' : 'Terminado'}
+        {live.status === 'queued' ? t('common:run_status.queued') : live.status === 'running' ? t('progress.running', { seconds: elapsed }) : live.status === 'failed' ? t('progress.failed') : t('progress.done')}
       </span>
     </div>
     {/* 4.1.3: cada paso nuevo se anuncia; el nivel no depende solo del color (1.4.1). */}
-    <CardContent role="log" aria-live="polite" aria-label="Progreso del análisis" tabIndex={0} className="max-h-72 overflow-y-auto p-4 font-mono text-xs leading-6">
-      {(live.progress ?? []).map((event, index) => <div key={index} className="flex gap-3"><span className="shrink-0 text-app-subtle">{new Date(event.at).toLocaleTimeString('es-CO')}</span><span className={event.level === 'ok' ? 'text-brand' : event.level === 'warn' ? 'text-warning' : event.level === 'error' ? 'text-danger' : 'text-app-secondary'}>{event.level === 'warn' ? <span className="font-semibold">Aviso: </span> : event.level === 'error' ? <span className="font-semibold">Error: </span> : null}{event.message}</span></div>)}
-      {active && <div aria-hidden className="flex gap-3 text-app-subtle"><span className="shrink-0">{new Date().toLocaleTimeString('es-CO')}</span><span className="motion-safe:animate-pulse">…</span></div>}
+    <CardContent role="log" aria-live="polite" aria-label={t('progress.log')} tabIndex={0} className="max-h-72 overflow-y-auto p-4 font-mono text-xs leading-6">
+      {(live.progress ?? []).map((event, index) => <div key={index} className="flex gap-3"><span className="shrink-0 text-app-subtle">{formatTime(event.at)}</span><span className={event.level === 'ok' ? 'text-brand' : event.level === 'warn' ? 'text-warning' : event.level === 'error' ? 'text-danger' : 'text-app-secondary'}>{event.level === 'warn' ? <span className="font-semibold">{t('progress.warning')} </span> : event.level === 'error' ? <span className="font-semibold">{t('progress.error')} </span> : null}{event.message}</span></div>)}
+      {active && <div aria-hidden className="flex gap-3 text-app-subtle"><span className="shrink-0">{formatTime(Date.now())}</span><span className="motion-safe:animate-pulse">…</span></div>}
       <div ref={bottom} />
     </CardContent>
   </Card>
 }
 
 export function useToasts() {
+  const { t } = useTranslation('analyses')
   const [toasts, setToasts] = useState<{ id: number; tone: 'ok' | 'error'; text: string }[]>([])
   // 2.2.1: el aviso se pausa mientras el puntero o el foco están encima, y se puede cerrar.
   const timers = useRef(new Map<number, number>())
@@ -59,7 +64,7 @@ export function useToasts() {
     <div key={item.id} role={item.tone === 'error' ? 'alert' : 'status'} onMouseEnter={() => hold(item.id)} onMouseLeave={() => schedule(item.id)} onFocus={() => hold(item.id)} onBlur={() => schedule(item.id)}
       className={`pointer-events-auto flex items-start gap-2 rounded-xl border px-4 py-3 text-sm shadow-xl ${item.tone === 'ok' ? 'border-brand/30 bg-panel text-app-fg' : 'border-danger-line bg-panel text-danger'}`}>
       <span className="min-w-0 flex-1">{item.text}</span>
-      <button type="button" onClick={() => dismiss(item.id)} aria-label="Cerrar aviso" className="-m-1 grid size-6 shrink-0 place-items-center rounded-md text-app-muted hover:bg-app-soft hover:text-app-fg"><X className="size-3.5" /></button>
+      <button type="button" onClick={() => dismiss(item.id)} aria-label={t('progress.dismiss')} className="-m-1 grid size-6 shrink-0 place-items-center rounded-md text-app-muted hover:bg-app-soft hover:text-app-fg"><X className="size-3.5" /></button>
     </div>)}</div>
   return { push, view }
 }

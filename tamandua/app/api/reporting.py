@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from tamandua.app.api.deps import ApiError, Context, guard
 from tamandua.modules.reporting.dashboard import cached, zone
+from tamandua.shared.i18n import msg
 
 router = APIRouter(tags=["resumen"])
 WINDOWS = (7, 30, 90, 365)
@@ -35,5 +36,5 @@ class Dashboard(BaseModel):
 def dashboard(days: int = 30, tz: str | None = None, context: Context = Depends(guard())) -> dict:
     # Entero y comprobado a mano: un Literal[7, 30, …] rechazaba el «30» que llega como texto en la URL.
     if days not in WINDOWS:
-        raise ApiError(400, "Ventana inválida")
-    return cached(context.data_dir, days, zone(tz))
+        raise ApiError(400, msg("api.invalid_window"))
+    return context.render(cached(context.data_dir, days, zone(tz)))

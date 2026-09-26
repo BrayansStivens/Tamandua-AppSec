@@ -22,6 +22,7 @@ from tempfile import TemporaryDirectory
 from tamandua.modules.pullrequests.review import SEVERITY_ORDER, changed_lines, classify, verdict
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import snapshot_directory
+from tamandua.shared.i18n import default_locale, localize, msg, t, text
 
 # Códigos de salida (documentados en docs/cli.md).
 EXIT_OK, EXIT_BLOCKED, EXIT_ERROR, EXIT_INCOMPLETE = 0, 1, 2, 3
@@ -33,7 +34,14 @@ CORE_ENGINES = ("opengrep", "gitleaks", "trivy", "osv-scanner")
 
 
 class LocalScanError(ValueError):
-    pass
+    """Carries a message; `str()` renders it in the default locale (the CLI's)."""
+
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self) -> str:
+        return text(self.message, default_locale())
 
 
 def _git(path: Path, *args: str, binary: bool = False, timeout: int = 120):
@@ -43,22 +51,23 @@ def _git(path: Path, *args: str, binary: bool = False, timeout: int = 120):
         completed = subprocess.run(["git", "-c", f"safe.directory={path}", "-c", "core.fsmonitor=false", "-C", str(path), *args],
                                    capture_output=True, text=not binary, timeout=timeout)
     except FileNotFoundError as exc:
-        raise LocalScanError("Para comparar con --base hace falta git instalado") from exc
+        raise LocalScanError(msg("scanning.local.errors.no_git")) from exc
     except subprocess.TimeoutExpired as exc:
-        raise LocalScanError(f"git {args[0]} tardó demasiado") from exc
+        raise LocalScanError(msg("scanning.local.errors.git_timeout", command=args[0])) from exc
     if completed.returncode != 0:
-        detail = completed.stderr.decode(errors="replace") if binary else completed.stderr
-        raise LocalScanError(f"git {args[0]}: {' '.join(detail.split())[:200] or 'falló'}")
+        detail = " ".join((completed.stderr.decode(errors="replace") if binary else completed.stderr).split())[:200]
+        raise LocalScanError(msg("scanning.local.errors.git_failed", command=args[0], detail=detail) if detail
+                             else msg("scanning.local.errors.git_failed_silently", command=args[0]))
     return completed.stdout
 
 
 def merge_base(path: Path, base: str) -> str:
     """El commit desde el que parte el cambio: el merge-base entre la base y HEAD."""
     if not REF.fullmatch(base or ""):
-        raise LocalScanError(f"Referencia de git inválida: {base!r}")
+        raise LocalScanError(msg("scanning.local.errors.invalid_ref", ref=repr(base)))
     commit = _git(path, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{base}^{{commit}}").strip()
     if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
-        raise LocalScanError(f"No existe la referencia {base!r} en este repositorio (¿falta `git fetch`?)")
+        raise LocalScanError(msg("scanning.local.errors.unknown_ref", ref=repr(base)))
     return _git(path, "merge-base", commit, "HEAD").strip()
 
 
@@ -140,12 +149,12 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
     try:
         patterns = normalize(list(exclude or []))
     except ExclusionError as exc:
-        raise LocalScanError(f"--exclude: {exc}") from exc
+        raise LocalScanError(msg("scanning.local.errors.exclude", error=exc.args[0] if exc.args else str(exc))) from exc
     path = path.expanduser().resolve()
     if not path.is_dir():
-        raise LocalScanError(f"No es una carpeta: {path}")
+        raise LocalScanError(msg("scanning.local.errors.not_a_folder", path=str(path)))
     if fail_on not in FAIL_ON:
-        raise LocalScanError(f"--fail-on debe ser uno de: {', '.join(FAIL_ON)}")
+        raise LocalScanError(msg("scanning.local.errors.fail_on", options=", ".join(FAIL_ON)))
     report = progress or (lambda level, message: None)
     work = data_dir / "work"
     work.mkdir(parents=True, exist_ok=True)
@@ -155,7 +164,7 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
     with TemporaryDirectory(prefix="scan-", dir=work) as temporary:
         head = Path(temporary) / "head"
         stats = snapshot_directory(path, head)
-        report("info", f"Copia de solo lectura: {stats['files']} archivos analizables.")
+        report("info", msg("scanning.local.progress.copied", files=stats["files"]))
         scan = scan_repository(head, {**source, "files": stats["files"], "snapshot": stats},
                                allow_osv_upload=allow_osv_upload, data_dir=data_dir, progress=report)
         findings = [item for item in scan["findings"] if not excluded(item.get("path", ""), patterns)]
@@ -163,12 +172,12 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
         if base:
             commit = merge_base(path, base)
             changed = changed_lines(diff_files(path, commit))
-            report("info", f"Comparando con {base} (merge-base {commit[:8]}): {len(changed)} archivos cambiados.")
+            report("info", msg("scanning.local.progress.comparing", base=base, commit=commit[:8], files=len(changed)))
             prints, base_status = None, None
             if baseline and changed:
                 base_dir = Path(temporary) / "base"
                 base_stats = snapshot_commit(path, commit, base_dir)
-                report("info", f"Analizando el punto de partida para no contar lo que ya estaba ({base_stats['files']} archivos)…")
+                report("info", msg("scanning.local.progress.baseline", files=base_stats["files"]))
                 base_scan = scan_repository(base_dir, {**source, "files": base_stats["files"], "snapshot": base_stats},
                                             allow_osv_upload=allow_osv_upload, data_dir=data_dir)
                 prints, base_status = {item["fingerprint"] for item in base_scan["findings"]}, base_scan["status"]
@@ -178,7 +187,7 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
                           "baseline": prints is not None, "baseline_status": base_status,
                           "preexisting_in_changed_code": len(outcome["preexisting"])}
     ran, failed = _engines(scan)
-    missing = [] if docker_available() else [docker_problem() or "Docker no disponible: los motores no se ejecutaron."]
+    missing = [] if docker_available() else [docker_problem() or msg("scanning.local.no_docker")]
     incomplete = scan["status"] == "incomplete" or bool(failed) or bool(missing)
     order = {level: index for index, level in enumerate(SEVERITY_ORDER)}
     findings = sorted(findings, key=lambda item: (order.get(item["severity"], 9), item["path"], item["line"]))
@@ -189,19 +198,25 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
     return {"target": str(path), "name": name, "comparison": comparison, "fail_on": fail_on,
             "excluded": {"patterns": patterns, "findings": skipped},
             "status": "incomplete" if incomplete else "completed", "engines": {"ran": ran, "failed": failed},
-            "not_analyzed": missing + [f"{step['name']}: {step['detail']}" for step in scan.get("steps") or []
+            "not_analyzed": missing + [msg("scanning.local.not_analyzed_step", step=step["name"], detail=step["detail"])
+                                       for step in scan.get("steps") or []
                                        if (step.get("tool") or {}).get("name") in CORE_ENGINES and step["status"] not in ("completed", "partial")],
             "findings": findings, "gate": gate, "exit_code": code, "scan": scan}
 
 
 # --- salida ----------------------------------------------------------------------------
 
-SEVERITY_TEXT = {"critical": "CRÍTICA", "high": "ALTA", "medium": "MEDIA", "low": "BAJA", "info": "INFO"}
-FAIL_ON_TEXT = {"critical": "crítica", "high": "alta o superior", "medium": "media o superior", "low": "baja o superior",
-                "never": "nunca (solo informa)"}
+SEVERITY_TEXT = {"critical": "scanning.cli.severity.critical", "high": "scanning.cli.severity.high",
+                 "medium": "scanning.cli.severity.medium", "low": "scanning.cli.severity.low", "info": "scanning.cli.severity.info"}
+FAIL_ON_TEXT = {"critical": "scanning.cli.fail_on.critical", "high": "scanning.cli.fail_on.high", "medium": "scanning.cli.fail_on.medium",
+                "low": "scanning.cli.fail_on.low", "never": "scanning.cli.fail_on.never"}
 
 
-def _grouped(findings: list[dict]) -> list[tuple[str, str, str]]:
+def _severity(level: str, locale: str) -> str:
+    return t(SEVERITY_TEXT[level], locale) if level in SEVERITY_TEXT else level
+
+
+def _grouped(findings: list[dict], locale: str) -> list[tuple[str, str, str]]:
     """Una línea por corrección: los avisos de un mismo paquete se cierran con una sola actualización.
 
     La versión propuesta es la más alta entre las que corrigen cada aviso (la que los cierra todos)."""
@@ -213,18 +228,19 @@ def _grouped(findings: list[dict]) -> list[tuple[str, str, str]]:
         if item.get("scanner") == "sca" and package.get("name"):
             packages.setdefault((item["path"], package["name"], package.get("version") or ""), []).append(item)
         else:
-            rows.append((item["severity"], f"{item['path']}:{item['line']}", item["title"]))
+            rows.append((item["severity"], f"{item['path']}:{item['line']}", text(item["title"], locale)))
     for (path, name, version), items in packages.items():
         worst = min((item["severity"] for item in items), key=lambda level: order.get(level, 9))
         fixes = [item["package"]["fixed_version"] for item in items if item["package"].get("fixed_version")]
         target = None
         for fix in fixes:
             target = fix if target is None or compare_versions(fix, target) > 0 else target
-        counts = ", ".join(f"{sum(1 for item in items if item['severity'] == level)} {SEVERITY_TEXT[level].lower()}"
+        counts = ", ".join(f"{sum(1 for item in items if item['severity'] == level)} {_severity(level, locale).lower()}"
                            for level in SEVERITY_ORDER if any(item["severity"] == level for item in items))
-        advice = f"actualiza a {target}" if target and len(fixes) == len(items) else \
-                 f"actualiza a {target} (hay avisos sin versión corregida)" if target else "sin versión corregida publicada"
-        rows.append((worst, path, f"{name} {version}: {len(items)} {'aviso' if len(items) == 1 else 'avisos'} ({counts}) → {advice}"))
+        advice = t("scanning.cli.upgrade", locale, version=target) if target and len(fixes) == len(items) else \
+            t("scanning.cli.upgrade_partial", locale, version=target) if target else t("scanning.cli.no_fix", locale)
+        rows.append((worst, path, t("scanning.cli.package_row", locale, package=name, version=version,
+                                    advisories=t("scanning.cli.advisories", locale, count=len(items)), counts=counts, advice=advice)))
     return sorted(rows, key=lambda row: (order.get(row[0], 9), row[1]))
 
 
@@ -237,39 +253,44 @@ def _safe(value) -> str:
     return _CONTROL.sub("?", str(value))
 
 
-def render_text(result: dict, *, limit: int = 50) -> str:
+def render_text(result: dict, *, limit: int = 50, locale: str | None = None) -> str:
+    locale = locale or default_locale()
     comparison = result["comparison"]
-    scope = (f"cambios respecto a {comparison['base']} (merge-base {comparison['merge_base'][:8]}, "
-             f"{comparison['changed_files']} archivos)" if comparison else "toda la carpeta")
+    scope = (t("scanning.cli.scope_changes", locale, base=comparison["base"], commit=comparison["merge_base"][:8],
+               files=comparison["changed_files"]) if comparison else t("scanning.cli.scope_all", locale))
     lines = [f"Tamandua · {_safe(result['name'])} · {scope}", ""]
     if comparison and not comparison["baseline"] and comparison["changed_files"]:
-        lines += ["Sin analizar el punto de partida (--no-baseline): cuenta todo lo que cae en líneas cambiadas.", ""]
+        lines += [t("scanning.cli.no_baseline", locale), ""]
     findings = result["findings"]
     if findings:
-        rows = _grouped(findings)
-        for severity, where, text in rows[:limit]:
-            lines.append(f"{SEVERITY_TEXT.get(severity, severity).ljust(8)} {_safe(where)}  {_safe(text)}")
+        rows = _grouped(findings, locale)
+        for severity, where, title in rows[:limit]:
+            lines.append(f"{_severity(severity, locale).upper().ljust(8)} {_safe(where)}  {_safe(title)}")
         if len(rows) > limit:
-            lines.append(f"… y {len(rows) - limit} más (usa --format json o sarif para verlos todos)")
+            lines.append(t("scanning.cli.more", locale, count=len(rows) - limit))
     else:
-        lines.append("Sin hallazgos nuevos." if comparison else "Sin hallazgos.")
+        lines.append(t("scanning.cli.no_new_findings", locale) if comparison else t("scanning.cli.no_findings", locale))
     if comparison and comparison["preexisting_in_changed_code"]:
-        lines += ["", f"{comparison['preexisting_in_changed_code']} ya existían en el código que tocas: no bloquean."]
+        lines += ["", t("scanning.cli.preexisting", locale, count=comparison["preexisting_in_changed_code"])]
     skipped = (result.get("excluded") or {}).get("findings") or 0
     if skipped:
-        lines += ["", f"{skipped} en rutas excluidas ({', '.join(_safe(item) for item in result['excluded']['patterns'])}): no cuentan."]
-    lines += ["", f"Motores: {', '.join(result['engines']['ran']) or 'ninguno'}"
-              + (f" · no se ejecutaron: {', '.join(result['engines']['failed'])}" if result["engines"]["failed"] else "")]
+        lines += ["", t("scanning.cli.excluded", locale, count=skipped,
+                        patterns=", ".join(_safe(item) for item in result["excluded"]["patterns"]))]
+    ran = ", ".join(text(item, locale) for item in result["engines"]["ran"]) or t("scanning.cli.no_engines", locale)
+    failed = ", ".join(text(item, locale) for item in result["engines"]["failed"])
+    lines += ["", t("scanning.cli.engines_failed", locale, ran=ran, failed=failed) if failed else t("scanning.cli.engines", locale, ran=ran)]
     for item in result["not_analyzed"]:
-        lines.append(f"Sin analizar: {_safe(item)}")
+        lines.append(t("scanning.cli.not_analyzed", locale, item=_safe(text(item, locale))))
     gate = result["gate"]
-    verdict_line = {EXIT_OK: "PASA", EXIT_BLOCKED: "BLOQUEA", EXIT_INCOMPLETE: "INCOMPLETO"}[result["exit_code"]]
-    detail = gate["description"] if result["exit_code"] != EXIT_INCOMPLETE else "el análisis no terminó: no equivale a «sin hallazgos»"
-    lines += ["", f"{verdict_line} · umbral: {FAIL_ON_TEXT[result['fail_on']]} · {detail}"]
+    verdict_line = t({EXIT_OK: "scanning.cli.verdict.pass", EXIT_BLOCKED: "scanning.cli.verdict.blocked",
+                      EXIT_INCOMPLETE: "scanning.cli.verdict.incomplete"}[result["exit_code"]], locale)
+    detail = text(gate["description"], locale) if result["exit_code"] != EXIT_INCOMPLETE else t("scanning.cli.incomplete", locale)
+    lines += ["", t("scanning.cli.verdict_line", locale, verdict=verdict_line, threshold=t(FAIL_ON_TEXT[result["fail_on"]], locale),
+                    detail=detail)]
     return "\n".join(lines) + "\n"
 
 
-def render_json(result: dict) -> str:
+def render_json(result: dict, *, locale: str | None = None) -> str:
     from tamandua.modules.findings.fix_guide import attach
     fields = ("fingerprint", "severity", "scanner", "tool", "also_detected_by", "rule_id", "title", "path", "line",
               "cwe", "cve", "ghsa", "package", "malicious", "remediation", "fix", "priority", "kev", "epss")
@@ -278,9 +299,11 @@ def render_json(result: dict) -> str:
     # `fix`: la misma guía de corrección que el panel (pasos, órdenes y ejemplo), para quien corrige desde la terminal.
     findings = attach([dict(item) for item in result["findings"]])
     payload["findings"] = [{key: item.get(key) for key in fields if item.get(key) is not None} for item in findings]
-    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    return json.dumps(localize(payload, locale or default_locale()), ensure_ascii=False, indent=2) + "\n"
 
 
-def render_sarif(result: dict) -> str:
+def render_sarif(result: dict, *, locale: str | None = None) -> str:
     from tamandua.modules.runs.store import render_repository_sarif
-    return json.dumps(render_repository_sarif({"findings": result["findings"]}), ensure_ascii=False, indent=2) + "\n"
+    locale = locale or default_locale()
+    sarif = render_repository_sarif({"findings": localize(result["findings"], locale)})
+    return json.dumps(localize(sarif, locale), ensure_ascii=False, indent=2) + "\n"

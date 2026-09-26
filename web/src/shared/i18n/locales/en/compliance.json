@@ -1,0 +1,64 @@
+{
+  "loading": "Loading compliance",
+  "loading_events": "Loading notifications",
+  "cra": {
+    "title": "Cyber Resilience Act (CRA) · vulnerability reporting",
+    "description": "From 11 September 2026, if you sell a product with software in the EU, every actively exploited vulnerability in it must be reported through ENISA's single reporting platform (to the coordinating CSIRT and to ENISA): an early warning within 24 h, a notification within 72 h and a final report 14 days after a fix is available. Here you see those deadlines for your products; active exploitation comes from the CISA KEV catalog.",
+    "how_to_report": "How to report (European Commission)"
+  },
+  "events": {
+    "pending_one": "{{count}} possible notification",
+    "pending_other": "{{count}} possible notifications",
+    "none_pending": "No pending notifications",
+    "no_products": "First, mark which repositories or images are products under the CRA.",
+    "not_scanned": "Your products don't have a completed full scan yet; without one there's no way to know whether anything needs reporting.",
+    "none_in_kev": "None of the vulnerabilities in your scanned products is in the CISA KEV catalog. This is checked on every scan.",
+    "unscanned_one": "{{count}} without a full scan.",
+    "unscanned_other": "{{count}} without a full scan."
+  },
+  "products": {
+    "title": "Products under the CRA",
+    "title_none": "Products under the CRA: none",
+    "supported_until": "{{asset}} · supported until {{date}}",
+    "not_scanned": "No completed full scan yet: run one to find out whether anything needs reporting.",
+    "remove": "Remove {{name}} from CRA products",
+    "scan_first": "Scan a repository or an image first.",
+    "new_scan": "New scan",
+    "mark": "Mark a product",
+    "admin_only": "Only an admin can mark products and record notifications.",
+    "asset": "Repository or image",
+    "choose": "Choose…",
+    "name": "Product name (as marketed)",
+    "support_until": "Supported until"
+  },
+  "event": {
+    "ransomware": "ransomware",
+    "fixed": "fixed",
+    "in_kev": "in KEV since {{date}}",
+    "clock": "deadline counted from {{date}}",
+    "candidate": "Scanner candidate: confirm it affects the product before you report it.",
+    "copy_draft": "Copy draft",
+    "draft_copied": "Draft copied",
+    "hide_draft": "Hide",
+    "view_draft": "View draft",
+    "draft_label": "Draft for {{cve}}"
+  },
+  "stage": {
+    "sent_by": "Sent by {{by}}, {{date}}",
+    "waiting": "Starts once a fix is available",
+    "mark": "Mark as sent",
+    "unmark": "Unmark",
+    "mark_label": "Mark as sent: {{stage}} for {{cve}}",
+    "unmark_label": "Unmark: {{stage}} for {{cve}}"
+  },
+  "due": {
+    "overdue_days_one": "overdue by {{count}} day",
+    "overdue_days_other": "overdue by {{count}} days",
+    "overdue_hours_one": "overdue by {{count}} h",
+    "overdue_hours_other": "overdue by {{count}} h",
+    "left_days_one": "{{count}} day left",
+    "left_days_other": "{{count}} days left",
+    "left_hours_one": "{{count}} h left",
+    "left_hours_other": "{{count}} h left"
+  }
+}

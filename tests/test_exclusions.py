@@ -11,6 +11,7 @@ from tamandua.modules.identity.auth import Users
 from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
+from tamandua.shared.i18n import localize
 
 ADMIN = {"username": "operadora", "role": "admin"}
 KEY = "github#7"
@@ -83,7 +84,7 @@ class RecordAndRegistryTests(unittest.TestCase):
         self.assertEqual([item["path"] for item in record["findings"]], ["app/main.py"])
         self.assertEqual((record["summary"]["candidates"], record["summary"]["excluded"], record["summary"]["severities"]["critical"]), (1, 1, 0))
         self.assertEqual(record["excluded"]["by_pattern"], {"fixtures/**": 1})
-        self.assertTrue(any("fixtures/**" in line for line in record["limitations"]))
+        self.assertTrue(any("fixtures/**" in line for line in localize(record["limitations"])))
         state = findings_registry.summarize(self.data_dir, KEY)
         self.assertEqual((state["open"], state["excluded"], state["fixed"]), (1, 1, 0))
         view = findings_registry.view(self.data_dir, KEY, status="excluded")

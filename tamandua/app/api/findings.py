@@ -36,4 +36,4 @@ class SlaPolicy(BaseModel):
 @router.get("/api/sla", response_model=SlaPolicy)
 def policy(context: Context = Depends(guard())) -> dict:
     """Los ve cualquiera (explican las fechas límite); los cambia un administrador."""
-    return sla.policy(context.data_dir)
+    return context.render(sla.policy(context.data_dir))

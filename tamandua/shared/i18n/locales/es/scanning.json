@@ -1,0 +1,459 @@
+{
+  "join": {
+    "comma": "{{first}}, {{second}}",
+    "and": "{{rest}} y {{last}}",
+    "sentences": "{{first}} {{second}}"
+  },
+  "severity": {
+    "critical": "crítica",
+    "high": "alta",
+    "medium": "media",
+    "low": "baja",
+    "info": "informativa"
+  },
+  "steps": {
+    "review": "Triage humano"
+  },
+  "priority": {
+    "static_severity": "Hallazgo estático de severidad {{severity}}",
+    "confirm_reachability": "Requiere confirmar alcanzabilidad en el contexto de la aplicación",
+    "internal_pattern": "Patrón estático de severidad {{severity}}; requiere confirmar alcanzabilidad",
+    "dev_dependency": "Dependencia de desarrollo: no llega a producción, pero se ejecuta en tu equipo y en la CI"
+  },
+  "progress": {
+    "engine": "{{engine}}: {{detail}}",
+    "opengrep": "Opengrep {{version}}: SAST multi-lenguaje con reglas propias…",
+    "gitleaks": "Gitleaks {{version}}: buscando secretos…",
+    "trivy": "Trivy {{version}}: dependencias, infraestructura y secretos…",
+    "osv": "OSV-Scanner {{version}}: dependencias con la base OSV (la primera vez descarga las bases de avisos)…",
+    "checkov": "Checkov {{version}}: infraestructura como código y pipelines…",
+    "zizmor": "zizmor {{version}}: seguridad de GitHub Actions…",
+    "engines_failed": "No se pudieron ejecutar: {{engines}}. El resultado no equivale a «sin hallazgos»; revisa en el servidor que las imágenes estén construidas (docker compose build).",
+    "no_docker": "Docker no disponible: se usan las reglas internas (solo Python) y patrones de secretos.",
+    "feeds": "Cruzando avisos con CISA KEV y EPSS para priorizar…"
+  },
+  "engines": {
+    "with_cause": "{{message}}: {{cause}}",
+    "host_mount_problem": "No se pudo averiguar la ruta de ./data en el host, así que los motores no pueden leer el código. Define TAMANDUA_HOST_DATA_DIR en .env con la ruta absoluta de ./data y reinicia (make up).",
+    "socket_problem": "Sin permiso sobre el socket de Docker (grupo {{gid}}): los motores no pueden arrancar. Reinicia con `make up`, que detecta ese grupo, o añade DOCKER_SOCKET_GID={{gid}} a .env y reinicia.",
+    "docker_unresponsive": "Docker no responde.",
+    "pulling": "Descargando {{name}} {{version}}… (puede tardar varios minutos)",
+    "action": {
+      "none": "ninguna",
+      "build": "construir con make build",
+      "no_docker": "docker no disponible",
+      "pulled": "descargada",
+      "pull_failed": "falló la descarga"
+    },
+    "unreadable": "{{engine}} no devolvió una salida legible.",
+    "timeout": "{{engine}} superó el tiempo máximo.",
+    "failed": "{{engine}} terminó con error",
+    "failed_early": "{{engine}} terminó con error antes de producir resultados"
+  },
+  "opengrep": {
+    "no_docker": "Docker no disponible: el SAST multi-lenguaje no se ejecutó. {{problem}}",
+    "image_missing": "Imagen de Opengrep no construida: ejecuta make build (o docker compose build).",
+    "image_error": "Docker no pudo consultar la imagen de Opengrep: {{cause}}",
+    "exit_code": "Opengrep terminó con error (código {{code}}); el SAST no concluyó",
+    "timeout": "Opengrep superó el tiempo máximo; el SAST no concluyó.",
+    "no_covered_language": "ninguno con reglas",
+    "detail": "{{rulesets}} conjuntos de reglas propias sobre {{languages}}; {{candidates}} candidatos.",
+    "uncovered": "Sin reglas todavía para: {{languages}}.",
+    "minified": "{{files}} archivos compilados o minificados quedaron fuera del SAST (siguen en la búsqueda de secretos).",
+    "errors": "{{files}} archivos no se pudieron analizar (sintaxis o tamaño).",
+    "reason": "`{{snippet}}` en {{path}}:{{line}}."
+  },
+  "sca": {
+    "upgrade": "Actualiza {{package}} de {{installed}} a {{fixed}} o superior en {{target}} y regenera el lockfile.",
+    "no_fix": "No hay versión corregida publicada para {{package}}. Evalúa alcanzabilidad, mitiga o sustituye la dependencia.",
+    "dev_remediation": "{{remediation}} Es una dependencia de desarrollo: el riesgo está en los equipos de tu equipo y en la CI, no en producción."
+  },
+  "iac": {
+    "review_reference": "Revisa la configuración según la referencia del aviso."
+  },
+  "secrets": {
+    "exposed_titled": "Secreto expuesto: {{title}}",
+    "exposed_rule": "Secreto expuesto ({{rule}})",
+    "trivy_reason": "Patrón {{category}} en {{path}}:{{line}}; valor redactado.",
+    "trivy_reason_generic": "Patrón de secreto en {{path}}:{{line}}; valor redactado.",
+    "gitleaks_reason": "Regla {{rule}} en {{path}}:{{line}} (entropía {{entropy}}); valor redactado.",
+    "rotate": "Rota la credencial ahora y muévela a un gestor de secretos. Si el repositorio es público, considera reescribir el historial.",
+    "titles": {
+      "jwt": "JSON Web Token expuesto",
+      "generic_api_key": "Clave de API expuesta",
+      "private_key": "Clave privada expuesta",
+      "aws_access_token": "Clave de acceso de AWS expuesta",
+      "aws_secret_access_key": "Clave secreta de AWS expuesta",
+      "github_pat": "Token personal de GitHub expuesto",
+      "github_fine_grained_pat": "Token de GitHub expuesto",
+      "github_app_token": "Token de GitHub App expuesto",
+      "github_oauth": "Token OAuth de GitHub expuesto",
+      "gitlab_pat": "Token de GitLab expuesto",
+      "slack_bot_token": "Token de Slack expuesto",
+      "slack_webhook_url": "Webhook de Slack expuesto",
+      "stripe_access_token": "Clave de Stripe expuesta",
+      "gcp_api_key": "Clave de API de Google expuesta",
+      "openai_api_key": "Clave de API de OpenAI expuesta",
+      "anthropic_api_key": "Clave de API de Anthropic expuesta",
+      "twilio_api_key": "Clave de API de Twilio expuesta",
+      "sendgrid_api_token": "Token de SendGrid expuesto",
+      "npm_access_token": "Token de npm expuesto",
+      "pypi_upload_token": "Token de PyPI expuesto",
+      "azure_ad_client_secret": "Secreto de cliente de Azure AD expuesto",
+      "heroku_api_key": "Clave de API de Heroku expuesta"
+    }
+  },
+  "trivy": {
+    "no_docker": "Docker no disponible: dependencias, IaC y secretos con Trivy no se ejecutaron.",
+    "failed_download": "Trivy terminó con error antes de producir resultados (sin acceso a su base de vulnerabilidades)",
+    "timeout": "Trivy superó el tiempo máximo; dependencias e IaC no concluyeron.",
+    "detail": "{{manifests}} manifiestos de dependencias y {{configs}} archivos de infraestructura examinados: {{sca}} avisos de dependencias, {{iac}} fallos de configuración, {{secrets}} secretos.",
+    "detail_dev": "{{manifests}} manifiestos de dependencias y {{configs}} archivos de infraestructura examinados: {{sca}} avisos de dependencias ({{dev}} en dependencias de desarrollo, con menos prioridad), {{iac}} fallos de configuración, {{secrets}} secretos.",
+    "no_feeds": "KEV/EPSS no disponibles; la prioridad usa solo CVSS."
+  },
+  "osv": {
+    "no_docker": "Docker no disponible: dependencias con OSV-Scanner no se ejecutaron.",
+    "no_manifests": "No hay manifiestos de dependencias que OSV-Scanner reconozca.",
+    "timeout": "OSV-Scanner superó el tiempo máximo (la primera vez descarga las bases de avisos).",
+    "detail": "{{manifests}} manifiestos con {{packages}} paquetes vulnerables: {{advisories}} avisos, comparados en local con la base OSV (sin resolver transitivas: no se envía la lista de dependencias).",
+    "detail_resolved": "{{manifests}} manifiestos con {{packages}} paquetes vulnerables: {{advisories}} avisos, comparados en local con la base OSV."
+  },
+  "gitleaks": {
+    "no_docker": "Docker no disponible: la detección de secretos con Gitleaks no se ejecutó.",
+    "unreadable": "Gitleaks no devolvió un reporte legible.",
+    "detail": "Reglas de Gitleaks sobre el snapshot: {{secrets}} secretos; valores redactados."
+  },
+  "checkov": {
+    "image_reason": "Checkov ({{rule}}) sobre el Dockerfile reconstruido del historial de la imagen.",
+    "image_reason_step": "Checkov ({{rule}}) sobre el Dockerfile reconstruido del historial de la imagen, paso {{step}}.",
+    "image_remediation": "Corrige el Dockerfile que genera la imagen para cumplir «{{check}}». Índice de reglas: {{index}}",
+    "reason": "{{framework}}: {{resource}} no cumple la regla {{rule}} de Checkov (líneas {{start}}–{{end}}).",
+    "remediation": "Ajusta {{resource}} para cumplir «{{check}}». Índice de reglas: {{index}}",
+    "remediation_generic": "Ajusta el recurso para cumplir «{{check}}». Índice de reglas: {{index}}",
+    "no_docker": "Docker no disponible: infraestructura y pipelines con Checkov no se ejecutaron.",
+    "timeout": "Checkov superó el tiempo máximo; infraestructura y pipelines no concluyeron.",
+    "detail": "{{failures}} fallos de configuración en {{frameworks}}.",
+    "clean": "Sin fallos en la infraestructura como código ni en los pipelines del repositorio.",
+    "image_no_docker": "Docker no disponible: Checkov no revisó la configuración de la imagen.",
+    "image_no_history": "La imagen no guarda historial de construcción: Checkov no tiene Dockerfile que revisar.",
+    "image_timeout": "Checkov superó el tiempo máximo con el historial de la imagen.",
+    "image_detail": "{{failures}} fallos en el Dockerfile reconstruido de {{steps}} pasos del historial."
+  },
+  "zizmor": {
+    "audits": {
+      "template_injection": "Inyección de código en una plantilla de GitHub Actions",
+      "dangerous_triggers": "Disparador peligroso: el workflow corre con permisos del repositorio ante código ajeno",
+      "excessive_permissions": "Permisos del GITHUB_TOKEN más amplios de lo necesario",
+      "unpinned_uses": "Acción de terceros sin fijar por SHA",
+      "artipacked": "Las credenciales de git quedan guardadas tras actions/checkout",
+      "cache_poisoning": "Riesgo de envenenamiento de la caché en un workflow de publicación",
+      "archived_uses": "Se usa una acción de un repositorio archivado (ya no recibe parches)",
+      "insecure_commands": "Comandos inseguros de workflow habilitados (ACTIONS_ALLOW_UNSECURE_COMMANDS)",
+      "github_env": "Escritura peligrosa en GITHUB_ENV o GITHUB_PATH",
+      "hardcoded_container_credentials": "Credenciales fijas de un contenedor o servicio en el workflow",
+      "self_hosted_runner": "Runner autoalojado expuesto a código no confiable",
+      "secrets_inherit": "Un workflow reutilizable hereda todos los secretos",
+      "overprovisioned_secrets": "Se exponen más secretos de los necesarios",
+      "unredacted_secrets": "Secretos que pueden salir sin censurar en los logs",
+      "bot_conditions": "Condición de bot suplantable",
+      "unsound_condition": "Condición que siempre se cumple",
+      "unsound_contains": "contains() que se puede burlar",
+      "unpinned_images": "Imagen de contenedor sin fijar por digest",
+      "use_trusted_publishing": "Publicación con token cuando se puede usar trusted publishing",
+      "obfuscation": "Expresión ofuscada en el workflow",
+      "forbidden_uses": "Acción no permitida por la política",
+      "ref_version_mismatch": "El comentario de versión no coincide con el SHA fijado",
+      "anonymous_definition": "Workflow o job sin nombre",
+      "dependabot_cooldown": "Dependabot sin periodo de espera antes de actualizar",
+      "dependabot_execution": "Dependabot puede ejecutar código externo al actualizar",
+      "concurrency_limits": "Workflow sin límite de concurrencia",
+      "undocumented_permissions": "Permisos sin justificar en un comentario"
+    },
+    "reason": "{{description}} ({{path}}:{{line}}).",
+    "reason_annotated": "{{description}}: {{annotation}} ({{path}}:{{line}}).",
+    "remediation": "Guía y corrección de zizmor: {{url}}",
+    "no_docker": "Docker no disponible: los workflows de GitHub Actions no se auditaron con zizmor.",
+    "nothing_to_audit": "El repositorio no tiene workflows ni acciones de GitHub que auditar.",
+    "detail": "{{audited}} workflows o acciones de GitHub auditados sin conexión: {{problems}} problemas en {{affected}} de ellos.",
+    "clean": "{{audited}} workflows o acciones de GitHub auditados sin conexión: sin problemas."
+  },
+  "image": {
+    "errors": {
+      "invalid_reference": "Referencia de imagen inválida: usa registro/repositorio:etiqueta, p. ej. ghcr.io/acme/api:1.4",
+      "unresolvable": "No se pudo resolver el registro {{registry}}",
+      "private_address": "El registro {{registry}} resuelve a una dirección privada. Si es un registro propio de tu red, arranca el servidor con TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.",
+      "invalid_registry": "Registro inválido: solo el host, p. ej. ghcr.io o 123456789.dkr.ecr.us-east-1.amazonaws.com",
+      "invalid_username": "Usuario inválido",
+      "invalid_token": "Token inválido: pega el token de acceso de solo lectura del registro"
+    },
+    "no_docker": "Docker no disponible: la imagen no se analizó con {{engine}}.",
+    "timeout": "{{engine}} superó el tiempo máximo con esta imagen.",
+    "trivy_detail": "{{sca}} avisos en paquetes, {{iac}} problemas de configuración de la imagen y {{secrets}} secretos en capas, variables de entorno o historial.",
+    "grype_detail": "{{advisories}} avisos en paquetes.",
+    "registry": {
+      "denied": "El registro rechazó el acceso: revisa que la imagen exista y que las credenciales guardadas para ese registro tengan permiso de lectura.",
+      "credentials_needed": "El registro pide credenciales: guárdalas en Integraciones → Registros de contenedores.",
+      "not_found": "El registro no tiene esa imagen o esa etiqueta.",
+      "unreadable": "No se pudo leer la imagen del registro."
+    },
+    "rules": {
+      "root": {
+        "title": "La imagen se ejecuta como root",
+        "reason": "No declara USER (o declara root): un fallo en la aplicación da control de root dentro del contenedor y facilita escapar de él.",
+        "remediation": "Añade un usuario sin privilegios en el Dockerfile (RUN adduser … && USER app) o ejecútala con --user."
+      },
+      "env_secret": {
+        "title": "Posible credencial en la variable de entorno {{name}}",
+        "reason": "La imagen define {{name}} con un valor fijo (redactado): cualquiera que pueda descargar la imagen puede leerlo con docker inspect.",
+        "remediation": "Rota la credencial. No la pongas en ENV: pásala en tiempo de ejecución (secreto de Docker/Kubernetes o variable del orquestador) o, si solo hace falta al construir, con RUN --mount=type=secret de BuildKit."
+      },
+      "build_secret": {
+        "title": "Credencial en el historial de construcción ({{name}})",
+        "reason": "El paso {{step}} del historial contiene {{name}} con un valor (redactado). Los ARG y las variables de un RUN quedan guardados en la imagen y se leen con docker history.",
+        "remediation": "Rota la credencial ya. Reconstruye usando secretos de BuildKit (RUN --mount=type=secret,id=npm …) en lugar de ARG o ENV, y borra las etiquetas publicadas con la credencial."
+      },
+      "build_url_credential": {
+        "title": "Credencial en una URL o cabecera del historial de construcción",
+        "reason": "El paso {{step}} del historial usa una URL con usuario y contraseña o una cabecera Authorization con valor fijo (redactado).",
+        "remediation": "Rota la credencial y usa secretos de BuildKit o un fichero .netrc montado como secreto durante la construcción."
+      },
+      "add_url": {
+        "title": "ADD descarga ficheros desde una URL",
+        "reason": "El paso {{step}} usa ADD con una URL: el contenido no se verifica y puede cambiar entre construcciones.",
+        "remediation": "Descarga con curl y comprueba el SHA-256 (o usa ADD --checksum=sha256:… con BuildKit)."
+      },
+      "ssh": {
+        "title": "La imagen expone SSH (22/tcp)",
+        "reason": "Un servidor SSH en un contenedor amplía la superficie de ataque y suele indicar credenciales dentro de la imagen.",
+        "remediation": "Quita el servidor SSH; para depurar usa docker exec o kubectl exec."
+      },
+      "no_healthcheck": {
+        "title": "La imagen no define HEALTHCHECK",
+        "reason": "Sin HEALTHCHECK, el orquestador no detecta un proceso colgado o degradado.",
+        "remediation": "Añade HEALTHCHECK en el Dockerfile o define la sonda en el orquestador."
+      },
+      "latest": {
+        "title": "Se analiza la etiqueta latest",
+        "reason": "latest cambia sin aviso: lo que se analiza hoy puede no ser lo que se despliega mañana.",
+        "remediation": "Despliega y analiza etiquetas inmutables (versión o @sha256:…)."
+      },
+      "stale": {
+        "title": "La imagen se construyó hace {{months}} meses",
+        "reason": "Una imagen antigua acumula parches de seguridad sin aplicar en su base.",
+        "remediation": "Reconstruye la imagen periódicamente (p. ej. cada semana) para recoger los parches de la base."
+      }
+    },
+    "remediation": {
+      "os_upgrade": "Reconstruye la imagen sobre una base actualizada o actualiza {{package}} a {{fixed}} en el Dockerfile (apt/apk/dnf upgrade).",
+      "os_no_fix": "La distribución no publica aún una versión corregida de {{package}}. Valora otra imagen base (slim, distroless) o si el paquete se usa de verdad.",
+      "app_upgrade": "Actualiza {{package}} a {{fixed}} en la aplicación empaquetada y reconstruye la imagen.",
+      "app_no_fix": "No hay versión corregida de {{package}}: evalúa sustituirla o mitigar."
+    },
+    "progress": {
+      "reading_credentials": "Leyendo {{reference}} desde el registro con las credenciales guardadas…",
+      "reading_public": "Leyendo {{reference}} desde el registro sin credenciales (imagen pública)…",
+      "grype": "Segunda opinión sobre los paquetes con Grype…",
+      "checkov": "Checkov sobre el Dockerfile reconstruido del historial de la imagen…"
+    },
+    "checkov_without_config": "Sin la configuración de la imagen (Trivy no pudo leerla), Checkov no tiene qué revisar.",
+    "steps": {
+      "image": {
+        "name": "Imagen",
+        "detail": "{{where}} · usuario {{user}}. Leída del registro, sin ejecutarla."
+      },
+      "sca": {
+        "name": "Paquetes · Trivy + Grype",
+        "detail": "{{advisories}} avisos: {{both}} los ven ambos motores, {{only_trivy}} solo Trivy y {{only_grype}} solo Grype. Prioridad con CVSS, KEV y EPSS.",
+        "single_engine": "{{advisories}} avisos con un solo motor: Trivy: {{trivy}} · Grype: {{grype}}"
+      },
+      "config": {
+        "name": "Configuración de la imagen · reglas propias + Checkov",
+        "detail": "{{problems}} problemas (usuario root, HEALTHCHECK, instrucciones inseguras) en la configuración y el historial. {{checkov}}",
+        "detail_checkov": "{{problems}} problemas (usuario root, HEALTHCHECK, instrucciones inseguras) en la configuración y el historial. Checkov revisó el Dockerfile reconstruido: {{failures}} fallos, {{joined}} ya cubiertos por otra regla."
+      },
+      "secrets": {
+        "name": "Secretos en capas, ENV e historial",
+        "detail": "{{secrets}} secretos; valores redactados. Incluye variables de entorno y argumentos de construcción que quedaron en la imagen."
+      },
+      "review": {
+        "detail": "Confirma que los paquetes se usan y prioriza por exposición de la imagen."
+      }
+    },
+    "limitations": {
+      "read_only": "La imagen se leyó del registro: no se ejecutó ni se construyó",
+      "no_source": "No se analizó el código fuente que generó la imagen (para eso, analiza su repositorio)",
+      "backports": "Los motores pueden discrepar en paquetes con parches retroportados por la distribución",
+      "system_package": "Un aviso en un paquete del sistema no prueba que la aplicación lo use"
+    }
+  },
+  "internal": {
+    "remediation": "Revisar el flujo y la versión afectada; validar la alcanzabilidad antes de priorizar.",
+    "sql": {
+      "title": "SQL construido dinámicamente",
+      "reason": "Consulta formada con interpolación o concatenación; revisar si incorpora entrada no confiable."
+    },
+    "shell": {
+      "title": "Comando con shell=True",
+      "reason": "La ejecución usa intérprete de shell; revisar el origen de sus argumentos."
+    },
+    "dynamic_code": {
+      "title": "Ejecución dinámica de código",
+      "reason": "eval/exec requiere revisión del origen y validación del contenido."
+    },
+    "secret_reason": "Patrón de credencial detectado. El valor se omitió del reporte y no se envió al navegador.",
+    "secret_titles": {
+      "github_token": "Posible GitHub token",
+      "openai_api_key": "Posible OpenAI API key",
+      "aws_access_key_id": "Posible AWS access key ID",
+      "jwt": "Posible JSON Web Token",
+      "private_key": "Posible clave privada",
+      "stripe_secret_key": "Posible Stripe secret key",
+      "slack_token": "Posible Slack token",
+      "google_api_key": "Posible Google API key"
+    }
+  },
+  "repository": {
+    "snapshot": {
+      "copied": "{{files}} archivos copiados en solo lectura, sin instalar dependencias ni ejecutar scripts.",
+      "skipped": "{{detail}} Se dejaron fuera {{skipped}}: {{not_analyzable}} no analizables (binarios, imágenes, bundles), {{too_large}} por tamaño de archivo.",
+      "skipped_budget": "{{detail}} Se dejaron fuera {{skipped}}: {{not_analyzable}} no analizables (binarios, imágenes, bundles), {{too_large}} por tamaño de archivo y {{over_budget}} al agotarse el presupuesto del snapshot."
+    },
+    "steps": {
+      "snapshot": "Snapshot de código",
+      "internal_sast": {
+        "name": "SAST interno (Python)",
+        "detail": "{{candidates}} candidatos con reglas AST internas. Docker no disponible: sin Opengrep, solo Python queda cubierto."
+      },
+      "internal_secrets": {
+        "name": "Secretos (patrones internos)",
+        "detail": "{{candidates}} candidatos; valores redactados. Docker no disponible: sin Gitleaks ni Trivy."
+      },
+      "sca": "Dependencias · {{engines}}",
+      "review": "Los resultados estáticos son candidatos; revisar flujo, alcanzabilidad y aplicabilidad."
+    },
+    "osv_merged": "{{detail}} {{joined}} coinciden con Trivy y se unieron al mismo hallazgo; {{new}} son nuevos.",
+    "checkov_merged": "{{detail}} {{joined}} coinciden con Trivy o zizmor y se unieron al mismo hallazgo; {{new}} son nuevos.",
+    "sca": {
+      "scope_first": "primeras {{versions}} versiones fijadas",
+      "scope": "{{versions}} versiones fijadas",
+      "engines": "Dependencias de todos los ecosistemas del snapshot con {{engines}}: {{advisories}} avisos únicos con versión corregida, CVSS, KEV y EPSS.",
+      "engines_confirmed": "Dependencias de todos los ecosistemas del snapshot con {{engines}}: {{advisories}} avisos únicos con versión corregida, CVSS, KEV y EPSS; {{confirmed}} confirmados por los dos motores.",
+      "no_manifests": "No se encontró package-lock.json ni requirements.txt con versiones fijadas.",
+      "no_versions": "Hay manifiestos, pero no se extrajeron versiones fijadas compatibles.",
+      "osv_not_allowed": "{{scope}} detectadas. Consulta OSV no autorizada; se requiere consentimiento para transmitir nombres y versiones de paquetes a api.osv.dev.",
+      "osv_without_detail": "OSV asocia {{advisory}} a esta versión; no se pudo obtener el detalle del aviso.",
+      "osv_detail": "{{scope}} consultadas en OSV; {{advisories}} avisos en {{packages}} paquetes, {{fixed}} con versión corregida publicada, {{kev}} en CISA KEV.",
+      "no_feeds": "KEV/EPSS no disponibles en esta ejecución; la prioridad se calculó solo con CVSS.",
+      "detailed_subset": "Se detalló el aviso de {{detailed}} de {{total}} identificadores.",
+      "osv_failed": "No se pudo completar la consulta a OSV. No equivale a cero vulnerabilidades."
+    },
+    "limitations": {
+      "truncated": "El snapshot se truncó: {{files}} archivos no se analizaron por límite de tamaño total. La cobertura de este repositorio es parcial.",
+      "no_execution": "No se ejecutó código del repositorio",
+      "sast_rules": "SAST con reglas propias: cobertura limitada a los lenguajes con reglas y sin análisis entre archivos",
+      "no_docker": "Sin Docker: SAST solo Python con reglas internas y secretos por patrones",
+      "sca_cap": "SCA limita la consulta a 250 versiones por ejecución",
+      "osv_not_exploit": "Los avisos de OSV no prueban explotación",
+      "no_ai_dast": "IA y DAST no participaron en esta ejecución"
+    }
+  },
+  "plan": {
+    "rules_one": "{{count}} regla",
+    "rules_other": "{{count}} reglas",
+    "files_one": "{{count}} fichero",
+    "files_other": "{{count}} ficheros",
+    "manifests_one": "{{count}} manifiesto",
+    "manifests_other": "{{count}} manifiestos",
+    "workflows_one": "{{count}} workflow",
+    "workflows_other": "{{count}} workflows",
+    "language_rules": "{{name}} ({{rules}}, {{files}})",
+    "language": "{{name}} ({{files}})",
+    "runs": {
+      "snapshot": "Snapshot de solo lectura del repositorio y hash SHA-256 del contenido",
+      "sast": "SAST con {{engine}} {{version}}: {{languages}}",
+      "internal_sast": "SAST interno solo para Python (Opengrep no está disponible en este servidor)",
+      "secrets": "Secretos con {{engine}} {{version}} en todo el snapshot; el valor nunca se guarda",
+      "internal_secrets": "Secretos con patrones internos (Gitleaks no está disponible)",
+      "dependencies": "Dependencias con {{engine}} {{version}}, con sus bases de avisos en local: {{manifests}} ({{sample}}), cruzados con CISA KEV y EPSS",
+      "dependencies_osv": "Dependencias con {{engine}} {{version}} y {{osv}} {{osv_version}} (base OSV, la de Dependabot incluida), con sus bases de avisos en local: {{manifests}} ({{sample}}), cruzados con CISA KEV y EPSS; un aviso que detectan los dos cuenta una vez",
+      "iac": "Infraestructura como código con {{engine}}: {{sample}}",
+      "osv_only": "Dependencias con OSV solo si lo autorizas (Trivy no está disponible)",
+      "checkov": "Infraestructura y pipelines con {{engine}} {{version}} (Terraform, CloudFormation, Kubernetes, Helm, Dockerfile, GitHub Actions, GitLab CI…), sin red; lo que ya ve Trivy se une al mismo hallazgo",
+      "zizmor": "GitHub Actions con {{engine}} {{version}}: inyección en plantillas, disparadores peligrosos, permisos y acciones sin fijar",
+      "zizmor_workflows": "GitHub Actions con {{engine}} {{version}}: inyección en plantillas, disparadores peligrosos, permisos y acciones sin fijar ({{workflows}})",
+      "languages_later": "Los lenguajes se conocerán al descargar el snapshot (este proveedor no permite listarlos antes)"
+    },
+    "skips": {
+      "no_execution": "No se instala ni se ejecuta el código del repositorio: el análisis es estático",
+      "sast_no_files": "SAST: no hay ficheros en los lenguajes que cubren las reglas propias",
+      "no_rules": "Sin reglas SAST propias para {{languages}}: solo se revisan sus secretos y dependencias",
+      "no_manifests": "Dependencias: no hay lockfiles ni manifiestos con versiones que resolver",
+      "iac_without_trivy": "Infraestructura como código: hay {{files}}, pero Trivy no está disponible",
+      "no_checkov": "Checkov no está disponible: la infraestructura se revisa solo con Trivy",
+      "no_zizmor": "zizmor no está disponible: los workflows de GitHub Actions solo los revisa Checkov",
+      "no_dast": "Sin pruebas dinámicas: no se envía tráfico a ninguna aplicación",
+      "no_ai": "Sin IA: no se envía código fuente a OpenAI ni a Anthropic"
+    }
+  },
+  "local": {
+    "errors": {
+      "no_git": "Para comparar con --base hace falta git instalado",
+      "git_timeout": "git {{command}} tardó demasiado",
+      "git_failed": "git {{command}}: {{detail}}",
+      "git_failed_silently": "git {{command}}: falló",
+      "invalid_ref": "Referencia de git inválida: {{ref}}",
+      "unknown_ref": "No existe la referencia {{ref}} en este repositorio (¿falta `git fetch`?)",
+      "exclude": "--exclude: {{error}}",
+      "not_a_folder": "No es una carpeta: {{path}}",
+      "fail_on": "--fail-on debe ser uno de: {{options}}"
+    },
+    "progress": {
+      "copied": "Copia de solo lectura: {{files}} archivos analizables.",
+      "comparing": "Comparando con {{base}} (merge-base {{commit}}): {{files}} archivos cambiados.",
+      "baseline": "Analizando el punto de partida para no contar lo que ya estaba ({{files}} archivos)…"
+    },
+    "no_docker": "Docker no disponible: los motores no se ejecutaron.",
+    "not_analyzed_step": "{{step}}: {{detail}}"
+  },
+  "cli": {
+    "severity": {
+      "critical": "crítica",
+      "high": "alta",
+      "medium": "media",
+      "low": "baja",
+      "info": "info"
+    },
+    "fail_on": {
+      "critical": "crítica",
+      "high": "alta o superior",
+      "medium": "media o superior",
+      "low": "baja o superior",
+      "never": "nunca (solo informa)"
+    },
+    "verdict": {
+      "pass": "PASA",
+      "blocked": "BLOQUEA",
+      "incomplete": "INCOMPLETO"
+    },
+    "advisories_one": "{{count}} aviso",
+    "advisories_other": "{{count}} avisos",
+    "upgrade": "actualiza a {{version}}",
+    "upgrade_partial": "actualiza a {{version}} (hay avisos sin versión corregida)",
+    "no_fix": "sin versión corregida publicada",
+    "package_row": "{{package}} {{version}}: {{advisories}} ({{counts}}) → {{advice}}",
+    "scope_changes": "cambios respecto a {{base}} (merge-base {{commit}}, {{files}} archivos)",
+    "scope_all": "toda la carpeta",
+    "no_baseline": "Sin analizar el punto de partida (--no-baseline): cuenta todo lo que cae en líneas cambiadas.",
+    "more": "… y {{count}} más (usa --format json o sarif para verlos todos)",
+    "no_new_findings": "Sin hallazgos nuevos.",
+    "no_findings": "Sin hallazgos.",
+    "preexisting": "{{count}} ya existían en el código que tocas: no bloquean.",
+    "excluded": "{{count}} en rutas excluidas ({{patterns}}): no cuentan.",
+    "engines": "Motores: {{ran}}",
+    "engines_failed": "Motores: {{ran}} · no se ejecutaron: {{failed}}",
+    "no_engines": "ninguno",
+    "not_analyzed": "Sin analizar: {{item}}",
+    "incomplete": "el análisis no terminó: no equivale a «sin hallazgos»",
+    "verdict_line": "{{verdict}} · umbral: {{threshold}} · {{detail}}"
+  }
+}

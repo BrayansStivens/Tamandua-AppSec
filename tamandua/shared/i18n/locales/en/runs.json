@@ -1,0 +1,50 @@
+{
+  "progress": {
+    "queued": "Queued: waiting for the scan worker.",
+    "queued_pr": "Queued: review of PR #{{number}} ({{sha}}).",
+    "queued_image": "Queued: scan of image {{image}}.",
+    "downloading_snapshot": "Downloading a read-only snapshot of the repository…",
+    "snapshot_ready_one": "Snapshot ready: {{count}} file to analyze.",
+    "snapshot_ready_other": "Snapshot ready: {{count}} files to analyze.",
+    "snapshot_ready_skipped_one": "Snapshot ready: {{count}} file to analyze, {{skipped}} skipped because they aren't code.",
+    "snapshot_ready_skipped_other": "Snapshot ready: {{count}} files to analyze, {{skipped}} skipped because they aren't code.",
+    "counts_one": "{{count}} finding ({{critical}} critical, {{high}} high)",
+    "counts_other": "{{count}} findings ({{critical}} critical, {{high}} high)",
+    "finished": "Finished: {{counts}}.",
+    "finished_incomplete": "Finished with incomplete coverage: {{counts}}. Check above what didn't run.",
+    "pr_files_one": "The PR changes {{count}} file.",
+    "pr_files_other": "The PR changes {{count}} files.",
+    "downloading_commit": "Downloading commit {{sha}} read-only…",
+    "pr_excluded_one": "{{count}} finding in paths an administrator excluded is left out of the review.",
+    "pr_excluded_other": "{{count}} findings in paths an administrator excluded are left out of the review.",
+    "pr_summary_one": "{{count}} new finding introduced by the PR; {{preexisting}} already existed.",
+    "pr_summary_other": "{{count}} new findings introduced by the PR; {{preexisting}} already existed.",
+    "pr_summary_no_baseline_one": "{{count}} new finding introduced by the PR; {{preexisting}} already existed (no earlier scan of the main branch: counting what falls on changed lines).",
+    "pr_summary_no_baseline_other": "{{count}} new findings introduced by the PR; {{preexisting}} already existed (no earlier scan of the main branch: counting what falls on changed lines).",
+    "comment_posted": "Comment posted on the PR.",
+    "comment_failed": "Couldn't comment on the PR: {{reason}}",
+    "no_comment_permission": "The result wasn't posted to GitHub: the App can't write to pull requests."
+  },
+  "failure": {
+    "restart": "The server restarted while this run was in progress, so it was interrupted. Run it again.",
+    "source": "Couldn't fetch the repository: {{reason}}",
+    "internal": "The scan failed with an internal error; your team can check the server logs using the run ID.",
+    "image_internal": "The image scan failed with an internal error; check the logs using the run ID.",
+    "pr": "Couldn't review the PR: {{reason}}",
+    "pr_internal": "The review failed with an internal error; your team can check the server logs using the run ID."
+  },
+  "delivery": {
+    "disabled": "off",
+    "error": "error: {{reason}}",
+    "no_comment_permission": "no permission: the App needs write access to Pull requests",
+    "no_status_permission": "no permission: the App needs write access to Commit statuses"
+  },
+  "batch": {
+    "invalid": "Invalid batch",
+    "not_found": "Batch not found",
+    "empty": "There's nothing to scan",
+    "too_many": "At most {{max}} items per batch",
+    "already_running": "A batch is already running: wait for it to finish or cancel it",
+    "item_failed": "The scan failed"
+  }
+}

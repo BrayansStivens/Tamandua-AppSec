@@ -1,0 +1,664 @@
+{
+  "common": {
+    "severity": {
+      "critical": "Critical",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "info": "Info"
+    },
+    "action": {
+      "act": "Act now",
+      "attend": "Attend",
+      "track": "Track"
+    },
+    "step_status": {
+      "completed": "completed",
+      "partial": "partial",
+      "not_tested": "not run",
+      "inconclusive": "inconclusive",
+      "failed": "failed",
+      "pending": "pending",
+      "skipped": "skipped"
+    },
+    "yes": "yes",
+    "none": "none",
+    "unknown": "unknown",
+    "no_date": "no date",
+    "sources": "Advisory sources",
+    "limitations": "Limitations",
+    "summary": "Summary",
+    "scope": "Scope",
+    "findings": "Findings",
+    "findings_count": "Findings ({{count}})",
+    "what_first": "What to do first",
+    "code_heading": "Code, secrets and infrastructure ({{count}})",
+    "medium_low": "Medium and low ({{count}})",
+    "annex": "Annex · Vulnerability index ({{count}})",
+    "method_coverage": "Method and coverage",
+    "references": "References: {{list}}",
+    "kev_mark": "Known active exploitation (CISA KEV)",
+    "malicious_mark": "Known malicious package (OpenSSF)",
+    "risk_label": "Risk:",
+    "fix_label": "Fix:"
+  },
+  "columns": {
+    "severity": "Severity",
+    "what": "What",
+    "where": "Where",
+    "action": "Action",
+    "priority": "Priority",
+    "count": "Count",
+    "package": "Package",
+    "manifest": "Manifest",
+    "advisories": "Advisories",
+    "update_to": "Update to",
+    "command": "Command",
+    "finding": "Finding",
+    "location": "Location",
+    "fix": "Fix",
+    "identifier": "Identifier",
+    "cvss": "CVSS",
+    "epss": "EPSS",
+    "kev": "KEV",
+    "fixed_in": "Fixed in",
+    "source": "Source",
+    "decision": "Decision",
+    "reason": "Reason",
+    "by": "By",
+    "expires": "Expires",
+    "aspect": "Aspect",
+    "evidence_here": "Technical evidence in this dossier",
+    "still_needed": "Documentation still needed",
+    "control": "Control",
+    "contributes": "What this evidence provides",
+    "detected": "Detected",
+    "was_due": "Was due",
+    "overdue_by": "Overdue by",
+    "status": "Status",
+    "recommended_action": "Recommended action",
+    "decided_by": "Decided by",
+    "date": "Date",
+    "repository": "Repository",
+    "critical_short": "Crit.",
+    "high_plural": "High",
+    "medium_plural": "Medium",
+    "low_plural": "Low",
+    "open_plural": "Open",
+    "fixed_short": "Fixed",
+    "exceptions_short": "Exc.",
+    "last_complete": "Last full scan",
+    "vulnerabilities": "Vulnerabilities",
+    "role": "Role",
+    "name": "Name",
+    "signature": "Signature"
+  },
+  "count": {
+    "findings_one": "{{count}} finding",
+    "findings_other": "{{count}} findings",
+    "pending_findings_one": "{{count}} pending finding",
+    "pending_findings_other": "{{count}} pending findings",
+    "fixed_findings_one": "{{count}} fixed finding",
+    "fixed_findings_other": "{{count}} fixed findings",
+    "advisories_one": "{{count}} advisory",
+    "advisories_other": "{{count}} advisories",
+    "actions_one": "{{count}} action",
+    "actions_other": "{{count}} actions",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "vulnerabilities_one": "{{count}} vulnerability",
+    "vulnerabilities_other": "{{count}} vulnerabilities",
+    "packages_one": "{{count}} package",
+    "packages_other": "{{count}} packages",
+    "packages_to_update_one": "{{count}} dependency to update or replace",
+    "packages_to_update_other": "{{count}} dependencies to update or replace",
+    "repositories_one": "{{count}} repository",
+    "repositories_other": "{{count}} repositories",
+    "approved_exceptions_one": "{{count}} approved exception",
+    "approved_exceptions_other": "{{count}} approved exceptions",
+    "critical_one": "{{count}} critical",
+    "critical_other": "{{count}} critical",
+    "high_one": "{{count}} high",
+    "high_other": "{{count}} high",
+    "medium_one": "{{count}} medium",
+    "medium_other": "{{count}} medium",
+    "low_info_one": "{{count}} low or informational",
+    "low_info_other": "{{count}} low or informational",
+    "are_critical_one": "{{count}} is critical",
+    "are_critical_other": "{{count}} are critical"
+  },
+  "design": {
+    "listing_last": "{{items}} and {{last}}",
+    "listing_more": "{{items}} and {{count}} more",
+    "signoff": "Review and approval",
+    "prepared_by": "Prepared by",
+    "reviewed_by": "Reviewed by",
+    "approved_by": "Approved by",
+    "page_footer": "Tamandua {{version}}  ·  page {{page}}",
+    "disclaimer": "Technical evidence produced with automated tools and reviewed by the team. It is not an audit opinion, a certification or a statement of compliance."
+  },
+  "markdown": {
+    "identifiers": "Identifiers: {{list}}",
+    "package": "Package: `{{name}}` {{version}} ({{ecosystem}}) · {{fix}} · declared in `{{path}}`",
+    "fixed_in": "**fixed in {{version}}**",
+    "no_fixed_version": "**no fixed version**",
+    "location": "Location: `{{where}}`",
+    "advisory_source": "Advisory source: {{source}} · {{license}}",
+    "license_unreviewed": "license not reviewed",
+    "kev": "**CISA KEV** since {{date}}",
+    "kev_ransomware": "**CISA KEV** since {{date}} · used by ransomware",
+    "epss": "EPSS {{score}} ({{percentile}} percentile)",
+    "triage": "Triage: **{{status}}**",
+    "triage_by": "Triage: **{{status}}** by {{by}} ({{date}})",
+    "triage_expires": "expires {{date}}",
+    "triage_expired": "the previous acceptance expired",
+    "triage_reason": "reason: {{reason}}",
+    "why_priority": "**Why this priority:** {{factors}}",
+    "remediation": "**Remediation:** {{text}}",
+    "how_to_fix": "**How to fix it:**",
+    "before": "Before:",
+    "after": "After:",
+    "title_code": "Code scan · {{name}}",
+    "title_image": "Image scan · {{name}}",
+    "identity_image": "image `{{reference}}`",
+    "identity_image_digest": "image `{{reference}}` · digest `{{digest}}`",
+    "identity_snapshot": "snapshot SHA-256 `{{sha}}`",
+    "run_line": "Run `{{id}}` · {{date}} · source `{{provider}}` · {{identity}}",
+    "status_line": "Status: **{{status}}** · {{files}} files · {{dependencies}} dependencies examined.",
+    "executive_summary": "Executive summary",
+    "kev_total_one": "{{count}} finding in the CISA KEV catalog (known active exploitation).",
+    "kev_total_other": "{{count}} findings in the CISA KEV catalog (known active exploitation).",
+    "fixable_total_one": "{{count}} dependency with a published fixed version.",
+    "fixable_total_other": "{{count}} dependencies with a published fixed version.",
+    "findings_total_one": "{{count}} finding in total; each one carries a stable fingerprint so tickets aren't duplicated across runs.",
+    "findings_total_other": "{{count}} findings in total; each one carries a stable fingerprint so tickets aren't duplicated across runs.",
+    "declared_context": "Declared context",
+    "context_note": "Description provided by the team, not a verification of the system.",
+    "dismissed": "Dismissed in triage",
+    "dismissed_intro_one": "{{count}} finding marked as false positive or accepted risk, with who decided and why.",
+    "dismissed_intro_other": "{{count}} findings marked as false positive or accepted risk, with who decided and why.",
+    "coverage": "Coverage of this run",
+    "no_findings": "The rules and dependencies examined produced no findings. Coverage is detailed below.",
+    "pending_intro": "{{pending}}, closed by {{actions}}.",
+    "dependencies": "Dependencies ({{packages}} · {{advisories}})",
+    "no_fix": "no fix",
+    "detail_truncated": "Detailing {{shown}} of {{total}} critical and high findings; the rest are in the panel, the JSON and the SARIF.",
+    "more_in_panel": "… and {{count}} more in the panel",
+    "annex_more": "… and {{count}} more in the JSON and the SARIF"
+  },
+  "asset": {
+    "title": "Current state of findings · {{name}}",
+    "asset_line": "Asset: `{{id}}` · UTC cutoff: `{{date}}`",
+    "scope_text": "Cumulative view of this asset's findings registry. It combines full scans and PR reviews; it isn't an independent test and doesn't show continuous coverage.",
+    "included_one": "{{count}} finding included in this view.",
+    "included_other": "{{count}} findings included in this view.",
+    "lifecycle_counts": "{{open}} open; {{fixed}} fixed; {{suppressed}} dismissed in triage; {{excluded}} excluded.",
+    "empty": "The selected view has no findings.",
+    "lifecycle_line": "Lifecycle: **{{status}}** · first seen `{{first}}` · last seen `{{last}}`.",
+    "limit_tools": "The registry only reflects the tools, paths and repositories analyzed.",
+    "limit_runs": "Check each original run for its steps, versions and specific coverage."
+  },
+  "profile": {
+    "label": {
+      "soc2": "SOC 2 Type II",
+      "iso27001": "ISO/IEC 27001:2022",
+      "custom": "Custom"
+    },
+    "heading": "Technical evidence for {{framework}}",
+    "pdf_kind": "Dossier for review",
+    "scope_state": "`{{name}}`, cumulative findings registry; see the original runs for coverage.",
+    "scope_image": "`{{name}}`, image `{{reference}}` read from the registry; point-in-time static analysis.",
+    "scope_snapshot": "`{{name}}`, snapshot SHA-256 `{{sha}}`; point-in-time static analysis.",
+    "profile_line": "Profile: **{{profile}}** · {{kind}}: `{{id}}` · UTC: `{{date}}`",
+    "kind_state": "Registry",
+    "kind_run": "Run",
+    "disclaimer": "Supporting document for the security team. It is not a SOC 2 audit, an ISO 27001 certification or a compliance opinion.",
+    "review_context": "Context for review",
+    "owner": "Organization and control owner: to be completed by the responsible team.",
+    "system_scope": "System and scope: {{scope}}",
+    "evidence_state": "Evidence: cumulative state, finding fingerprints and triage decisions; see each run for its hash and test steps.",
+    "evidence_run": "Evidence: run ID, code hash, test steps, observations and coverage status.",
+    "frequency_state": "Frequency and observation period: cumulative registry; its entries alone don't show continuous operation of the control.",
+    "frequency_run": "Frequency and observation period: a single run; it doesn't show continuous operation of the control.",
+    "applicability": "Applicability and control assessment: requires human review and additional documentation.",
+    "matrix": "Evidence readiness matrix",
+    "matrix_note": "The matrix is a preparation guide; it doesn't assess control effectiveness or replace the auditor's judgment.",
+    "attached": "Attached technical record",
+    "rows": {
+      "soc2": {
+        "design": {
+          "aspect": "Control design",
+          "available": "Objective, owners and frequency",
+          "missing": "Approved control description and owner"
+        },
+        "operation": {
+          "aspect": "Operation",
+          "available": "Date, source, steps and findings of this run",
+          "missing": "Samples spread across the evaluation period"
+        },
+        "exceptions": {
+          "aspect": "Exceptions",
+          "available": "Findings and triage decisions",
+          "missing": "Tickets, approvals and proof of remediation"
+        }
+      },
+      "iso27001": {
+        "scope": {
+          "aspect": "ISMS scope",
+          "available": "Asset and source analyzed",
+          "missing": "Approved scope and its link to the asset inventory"
+        },
+        "risk": {
+          "aspect": "Risk treatment",
+          "available": "Findings, severity and triage",
+          "missing": "Approved risk assessment and treatment plan"
+        },
+        "improvement": {
+          "aspect": "Improvement and follow-up",
+          "available": "Steps and limits of the point-in-time analysis",
+          "missing": "Statement of applicability and follow-up evidence"
+        }
+      },
+      "custom": {
+        "scope": {
+          "aspect": "Scope",
+          "available": "Asset, date and technical coverage",
+          "missing": "Define the review criteria and period"
+        },
+        "result": {
+          "aspect": "Result",
+          "available": "Findings and triage decisions",
+          "missing": "Add the owner's validation and approval"
+        }
+      }
+    }
+  },
+  "audit": {
+    "status": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "fixed": "Fixed",
+      "false_positive": "False positive",
+      "accepted": "Accepted risk",
+      "excluded": "Out of scope"
+    },
+    "status_count": {
+      "open_one": "{{count}} open",
+      "open_other": "{{count}} open",
+      "in_progress_one": "{{count}} in progress",
+      "in_progress_other": "{{count}} in progress",
+      "fixed_one": "{{count}} fixed",
+      "fixed_other": "{{count}} fixed",
+      "false_positive_one": "{{count}} false positive",
+      "false_positive_other": "{{count}} false positives",
+      "accepted_one": "{{count}} accepted",
+      "accepted_other": "{{count}} accepted",
+      "excluded_one": "{{count}} out of scope",
+      "excluded_other": "{{count}} out of scope"
+    },
+    "package_group": "{{vulnerabilities}} ({{counts}})",
+    "sla_level": {
+      "critical": "critical",
+      "high": "high",
+      "medium": "medium",
+      "low": "low"
+    },
+    "sla_policy_item": "{{level}} {{days}}",
+    "sla_policy_none": "{{level}} no deadline",
+    "deadlines_heading": "Remediation deadlines ({{advisories}} overdue)",
+    "deadlines_body": "Workspace policy: {{policy}}, counted from first detection. They apply to open or in-progress findings; fixed findings and approved exceptions don't expire. With a deadline running: {{running}}; overdue: {{overdue}} across {{actions}}; due in the next 7 days: {{soon}}.",
+    "none_overdue": "No pending finding is overdue.",
+    "deadlines_truncated": "Listing the {{limit}} most overdue actions out of {{total}}; all of them are in the findings table.",
+    "deadlines_included": "Remediation deadlines are in the “Remediation deadlines” section of this report.",
+    "deadlines_missing": "This report doesn't include remediation deadlines: generate it from the repository's current state (Findings → Current state) to include them.",
+    "controls_heading": "Related controls · {{framework}}",
+    "controls_note": "The link to each control is indicative: the auditor assesses the control's effectiveness together with the rest of the team's documentation (policy, owners, frequency and samples from the period).",
+    "more_advisories": "{{risks}}; and {{count}} more advisories",
+    "evidence": "Vulnerability management evidence",
+    "evidence_consolidated": "Vulnerability management evidence · consolidated",
+    "title_with_system": "Vulnerability management evidence · {{system}}",
+    "period_range": "{{start}} to {{end}}",
+    "period_scan": "Scan of {{date}}",
+    "period_state": "State as of {{date}}",
+    "issued_value": "{{date}} · ref. {{ref}}",
+    "meta": {
+      "organization": "Organization",
+      "system": "System / scope",
+      "period": "Period",
+      "prepared_by": "Prepared by",
+      "prepared_for": "Prepared for",
+      "issued": "Issued"
+    },
+    "kpi": {
+      "in_scope": "in scope",
+      "critical": "critical",
+      "high": "high",
+      "open": "open or in progress",
+      "fixed": "fixed",
+      "excepted": "approved exceptions",
+      "analysed": "repositories with a full scan",
+      "open_critical": "open critical",
+      "open_high": "open high"
+    },
+    "of_total": "{{done}} of {{total}}",
+    "summary": "{{findings}} in the scope of this report: {{critical}}, {{high}}, {{medium}} and {{low}}. Open or in progress: {{active}}; fixed: {{fixed}}; with an approved exception: {{excepted}}.",
+    "summary_kev_one": "{{count}} is a vulnerability with known active exploitation (CISA KEV).",
+    "summary_kev_other": "{{count}} are vulnerabilities with known active exploitation (CISA KEV).",
+    "summary_grouped": "They group into {{actions}}: advisories on the same dependency are closed by a single update.",
+    "method_static": "Static analysis of {{date}}, without running the code or sending it to external services.",
+    "method_engines": "Engines: {{list}}.",
+    "method_snapshot": "Analyzed snapshot: SHA-256 {{sha}}…",
+    "method_state": "Cumulative state of the repository as of {{date}}: it combines full scans and pull request reviews, with the date each finding was detected and, where relevant, fixed.",
+    "method_gaps": "Not fully completed: {{gaps}}. Those areas don't mean “no findings”.",
+    "method_complete": "All scan engines completed.",
+    "no_findings": "No findings in the chosen scope.",
+    "exceptions_heading": "Exceptions and decisions ({{count}})",
+    "no_exceptions_scope": "No accepted risks or false positives declared in scope.",
+    "no_exceptions": "No accepted risks or false positives declared.",
+    "detail": "Detail",
+    "detail_high": "Critical and high in detail",
+    "detail_truncated": "Detailing the first {{limit}} of {{total}} actions (active exploitation and severity first); all are in the findings table and the full detail is in the technical report.",
+    "portfolio_summary": "{{repositories}} in the report; {{pending}}, of which {{critical}} and {{high}} high. {{fixed}} and {{exceptions}}.",
+    "coverage": "Coverage",
+    "coverage_known": "{{analysed}} of the organization's {{total}} repositories have at least one full scan ({{percent}}%).",
+    "coverage_report": "{{analysed}} of the {{total}} repositories in the report have at least one full scan.",
+    "coverage_incomplete": "Scanned, but none complete (an engine didn't run): {{list}}.",
+    "coverage_missing": "Never scanned ({{count}}): {{list}}.",
+    "method": "Method",
+    "portfolio_method_static": "Static analysis of each repository (code, dependencies, secrets, infrastructure and pipelines), without running the code or sending it to external services.",
+    "portfolio_method_state": "Each repository's state combines its full scans and pull request reviews: a finding is marked fixed when it stops appearing in a full scan, never because of an incomplete one.",
+    "by_repository": "By repository ({{count}})",
+    "no_full_scan": "No full scan",
+    "open_heading": "Open critical and high ({{count}})",
+    "open_truncated": "Showing {{shown}} of {{total}} actions; the full detail is in each repository's report.",
+    "no_open": "No open critical or high findings."
+  },
+  "frameworks": {
+    "soc2": {
+      "label": "SOC 2 Type II",
+      "controls": {
+        "cc3_2": {
+          "code": "CC3.2",
+          "name": "Risk identification and analysis",
+          "text": "Findings prioritized by severity, active exploitation (CISA KEV) and likelihood (EPSS)."
+        },
+        "cc7_1": {
+          "code": "CC7.1",
+          "name": "Detection of vulnerabilities and misconfigurations",
+          "text": "Analysis of code, dependencies, secrets and infrastructure, with its engines and coverage."
+        },
+        "cc8_1": {
+          "code": "CC8.1",
+          "name": "Change management",
+          "text": "Review of what each change introduces before it's merged, when used on pull requests or in CI."
+        }
+      }
+    },
+    "iso27001": {
+      "label": "ISO/IEC 27001:2022",
+      "controls": {
+        "a8_8": {
+          "code": "A.8.8",
+          "name": "Management of technical vulnerabilities",
+          "text": "Vulnerabilities identified, assessed and under treatment, with their status and owner."
+        },
+        "a8_9": {
+          "code": "A.8.9",
+          "name": "Configuration management",
+          "text": "Review of infrastructure as code, containers and pipelines."
+        },
+        "a8_28": {
+          "code": "A.8.28",
+          "name": "Secure coding",
+          "text": "Static analysis of in-house code and secret detection."
+        },
+        "a8_29": {
+          "code": "A.8.29",
+          "name": "Security testing in development",
+          "text": "Automated security tests built into the development lifecycle."
+        }
+      }
+    },
+    "pci": {
+      "label": "PCI DSS 4.0.1",
+      "controls": {
+        "r6_2_4": {
+          "code": "6.2.4",
+          "name": "Prevent common software attacks",
+          "text": "Static analysis of in-house code against injection, XSS, deserialization and other common flaws."
+        },
+        "r6_3_1": {
+          "code": "6.3.1",
+          "name": "Identify vulnerabilities and rank their risk",
+          "text": "Findings with severity, active exploitation (CISA KEV) and likelihood (EPSS)."
+        },
+        "r6_3_2": {
+          "code": "6.3.2",
+          "name": "Inventory of software and its components",
+          "text": "Dependency inventory exportable as an SBOM (CycloneDX) from every scan."
+        },
+        "r6_3_3": {
+          "code": "6.3.3",
+          "name": "Critical patches within one month",
+          "text": "Remediation deadlines by severity and overdue findings."
+        }
+      }
+    },
+    "cra": {
+      "label": "Cyber Resilience Act (EU) 2024/2847",
+      "controls": {
+        "annex_i_ii_1": {
+          "code": "Annex I, II.1",
+          "name": "Identify and document vulnerabilities and components",
+          "text": "Findings per scan and a component inventory exportable as a CycloneDX SBOM."
+        },
+        "annex_i_ii_2": {
+          "code": "Annex I, II.2",
+          "name": "Address and remediate vulnerabilities without delay",
+          "text": "Status of each vulnerability, recommended action and remediation deadlines."
+        },
+        "annex_i_ii_3": {
+          "code": "Annex I, II.3",
+          "name": "Regular security testing and reviews",
+          "text": "Automated scans on every change and on the main branch, with their coverage."
+        },
+        "art_14": {
+          "code": "Art. 14",
+          "name": "Report actively exploited vulnerabilities",
+          "text": "Input: vulnerabilities from the CISA KEV catalog flagged as actively exploited. The record of notifications is in Tamandua's Compliance view."
+        }
+      }
+    },
+    "br_cmn": {
+      "label": "Brazil · CMN Res. 4,893 (as amended by 5,274/2025)",
+      "controls": {
+        "vulnerabilities": {
+          "code": "Vulnerabilities",
+          "name": "Ongoing prevention and treatment of vulnerabilities",
+          "text": "Findings identified and prioritized, with their status and remediation deadline."
+        },
+        "testing": {
+          "code": "Testing",
+          "name": "Security testing and action plan",
+          "text": "Automated scans with their coverage; recommended actions per finding."
+        },
+        "traceability": {
+          "code": "Traceability",
+          "name": "Traceability of decisions",
+          "text": "Exceptions and decisions with reason, owner, date and expiry."
+        }
+      }
+    },
+    "cl_21663": {
+      "label": "Chile · Cybersecurity Framework Law 21.663",
+      "controls": {
+        "risk": {
+          "code": "Risk management",
+          "name": "Measures to prevent incidents",
+          "text": "Software vulnerabilities identified and prioritized by risk and active exploitation."
+        },
+        "improvement": {
+          "code": "Continuous improvement",
+          "name": "Periodic security review",
+          "text": "Scans on every change and of the main branch, with their coverage and remediation deadlines."
+        },
+        "evidence": {
+          "code": "Evidence",
+          "name": "Record of measures and decisions",
+          "text": "Triage decisions with reason, owner and date, kept as history."
+        }
+      }
+    },
+    "co_sfc": {
+      "label": "Colombia · SFC, cybersecurity risk (CE 007 of 2018)",
+      "controls": {
+        "vulnerabilities": {
+          "code": "Vulnerabilities",
+          "name": "Management of technical vulnerabilities",
+          "text": "Vulnerabilities in code, dependencies and images with severity, status and deadline."
+        },
+        "secure_development": {
+          "code": "Secure development",
+          "name": "Security in the development lifecycle",
+          "text": "Review of what each change introduces before it's merged, and scans of the main branch."
+        },
+        "evidence": {
+          "code": "Evidence",
+          "name": "Record for supervision",
+          "text": "Report with scope, method, coverage and decisions, ready for review."
+        }
+      }
+    },
+    "general": {
+      "label": "Vulnerability management"
+    }
+  },
+  "technical": {
+    "kind": {
+      "repository_scan": "Full scan",
+      "image_scan": "Image scan",
+      "pr_review": "Pull request review",
+      "asset_state": "Cumulative state",
+      "default": "Scan"
+    },
+    "eyebrow": "Technical findings report · {{kind}}",
+    "subtitle_state": "Cumulative state as of {{date}}",
+    "subtitle_scan": "Scan of {{date}}",
+    "meta": {
+      "asset": "Asset",
+      "type": "Type",
+      "date": "Date",
+      "revision": "Branch / revision",
+      "engines": "Engines",
+      "reference": "Reference"
+    },
+    "kpi": {
+      "pending": "pending",
+      "kev": "with active exploitation (KEV)",
+      "actions": "actions to close them"
+    },
+    "summary": "{{pending}} ({{counts}}), closed by {{actions}}: {{packages}} ({{fixable}} with a fixed version) and {{code}} in code, secrets or infrastructure.",
+    "decided_one": "{{count}} team decision (accepted risk or false positive) is left out of the count.",
+    "decided_other": "{{count}} team decisions (accepted risk or false positive) are left out of the count.",
+    "incomplete": "Incomplete coverage: {{gaps}}. What wasn't analyzed doesn't mean “no findings”.",
+    "first_truncated": "The first 15 of {{total}} actions, by active exploitation, severity and reach. The rest are in the sections below.",
+    "dependencies": "Dependencies ({{packages}} · {{vulnerabilities}})",
+    "partial_fix": "some advisory has no fix",
+    "no_fixed_version": "no fixed version",
+    "update_note": "“Update to” is the highest of the versions that fix each advisory: the one that closes them all. Then regenerate the lockfile and scan again.",
+    "what_label": "What:",
+    "fallback_fix": "Review it following the finding's guide",
+    "detail_truncated": "Detailing {{shown}} of {{total}} critical and high; the rest are in the JSON, the SARIF and the panel.",
+    "table_truncated": "Showing {{shown}} of {{total}}; the rest are in the JSON, the SARIF and the panel.",
+    "decisions": "Team decisions ({{count}})",
+    "decisions_truncated": "Showing {{shown}} of {{total}} decisions; all of them are in the panel.",
+    "state_note": "Cumulative state: it combines full scans and pull request reviews; a finding is marked fixed when it stops appearing in a full scan, never because of an incomplete one.",
+    "no_engines": "No engine detail in this record.",
+    "annex_truncated": "Showing {{shown}} of {{total}}; the rest are in the scan's JSON and SARIF.",
+    "closing": "Technical evidence produced with automated tools: review it before acting. Dependency advisories don't prove exploitation in this application.",
+    "title": "Technical report · {{name}}",
+    "footer": "Technical report · {{name}} · issued {{date}}"
+  },
+  "pdf": {
+    "footer": "Tamandua  ·  Technical evidence; human review required"
+  },
+  "dashboard": {
+    "score_formula": "100·e^(−risk/150); risk = 8·critical + 3·high + 0.8·medium + 0.1·low + 15·in KEV + 5·EPSS ≥ 10%",
+    "cwe": {
+      "79": "Cross-site scripting",
+      "89": "SQL injection",
+      "78": "Command injection",
+      "22": "Path traversal",
+      "502": "Insecure deserialization",
+      "798": "Hard-coded credentials",
+      "295": "Certificate validation",
+      "918": "SSRF",
+      "601": "Open redirect",
+      "347": "Signature verification",
+      "327": "Weak cryptography",
+      "328": "Weak hash",
+      "916": "Weak password hash",
+      "95": "Code eval",
+      "1333": "ReDoS",
+      "1321": "Prototype pollution",
+      "400": "Uncontrolled resource consumption",
+      "770": "Allocation without limits",
+      "20": "Input validation",
+      "200": "Information exposure",
+      "287": "Improper authentication",
+      "352": "CSRF",
+      "611": "XXE",
+      "94": "Code injection",
+      "1104": "Vulnerable component",
+      "285": "Improper authorization",
+      "306": "Missing authentication",
+      "74": "Injection",
+      "1336": "Template injection",
+      "915": "Mass assignment",
+      "125": "Out-of-bounds read",
+      "787": "Out-of-bounds write",
+      "119": "Buffer overflow",
+      "120": "Unchecked buffer copy",
+      "416": "Use after free",
+      "415": "Double free",
+      "476": "Null pointer dereference",
+      "190": "Integer overflow",
+      "191": "Integer underflow",
+      "401": "Memory leak",
+      "404": "Improper resource release",
+      "674": "Uncontrolled recursion",
+      "835": "Infinite loop",
+      "362": "Race condition",
+      "367": "TOCTOU",
+      "369": "Division by zero",
+      "908": "Uninitialized memory",
+      "459": "Incomplete cleanup",
+      "59": "Link following",
+      "732": "Incorrect permissions",
+      "269": "Privilege management",
+      "522": "Insufficiently protected credentials",
+      "319": "Cleartext transmission",
+      "297": "Hostname validation",
+      "330": "Insufficient randomness",
+      "203": "Observable discrepancy side channel",
+      "444": "HTTP request smuggling",
+      "113": "CRLF injection",
+      "117": "Log injection",
+      "23": "Relative path traversal",
+      "434": "Unrestricted file upload",
+      "639": "Authorization through user-controlled key (IDOR)",
+      "862": "Missing authorization",
+      "863": "Incorrect authorization",
+      "1395": "Vulnerable third-party component"
+    }
+  },
+  "errors": {
+    "invalid_options": "Invalid report options",
+    "invalid_field": "Invalid field “{{field}}” (up to {{limit}} characters, no line breaks)",
+    "invalid_period_date": "Invalid period date (YYYY-MM-DD)",
+    "period_reversed": "The period ends before it starts",
+    "too_many_findings": "Too many findings for one report: filter or pick fewer (up to 5000)",
+    "unsupported_profile": "Unsupported profile or run",
+    "invalid_title": "Invalid title"
+  }
+}

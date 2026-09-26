@@ -1,0 +1,216 @@
+{
+  "run_type": {
+    "repository_scan": "Code analysis", "image_scan": "Container image", "pr_review": "PR review",
+    "advisory_watch": "New advisories", "dast": "Dynamic web app or API testing"
+  },
+  "duration": { "minutes": "~{{value}} min", "hours": "~{{value}} h", "under_two_minutes": "under 2 min" },
+  "listing_more": "{{names}} and {{rest}} more",
+  "remove_item": "Remove {{name}}",
+  "wizard": {
+    "choose_type": "Choose the type of analysis",
+    "continue": "Continue",
+    "back": "Back",
+    "back_to_types": "Back to analysis types",
+    "steps": { "source": "Source code", "targets": "Targets", "image": "Image", "context": "Context", "review": "Review and launch" },
+    "kinds": {
+      "code": {
+        "description": "Scans a snapshot of your repository without running its code or installing dependencies.",
+        "sast": "Multi-language SAST (Opengrep)", "secrets": "Secrets (Gitleaks)", "dependencies": "Dependencies (Trivy + OSV-Scanner)",
+        "iac": "Infrastructure and CI/CD (Trivy + Checkov + zizmor)"
+      },
+      "image": {
+        "description": "Scans an image straight from its registry (Docker Hub, GHCR, ECR…) without running or building it.",
+        "packages": "Packages: Trivy + Grype", "secrets": "Secrets in layers, ENV and history", "config": "Configuration: Tamandua rules + Checkov"
+      },
+      "web": {
+        "description": "Active scanning (DAST) against your running application, on verified domains. Not producing results yet.",
+        "dns": "Ownership verified through DNS", "isolated": "DAST in an isolated container", "evidence": "Evidence with request and response"
+      }
+    }
+  },
+  "source": {
+    "description": "Choose one or more repositories. Each one is scanned from a read-only snapshot.",
+    "description_with_org": "Choose one or more repositories, or a whole organization. Each one is scanned from a read-only snapshot.",
+    "mode": {
+      "label": "What to scan",
+      "repos": "Repositories", "repos_hint": "One or more, picked by hand (up to {{limit}})",
+      "org": "A whole organization", "org_hint": "All its repositories except archived ones"
+    },
+    "default_branch": "default branch",
+    "not_in_app": "not in the GitHub App",
+    "not_in_app_single": "not in the GitHub App: one at a time only",
+    "add_more": "Add more repositories",
+    "add": "Add repositories",
+    "empty_title": "No repositories yet",
+    "empty_text": "Pick one or more of your connected repositories from GitHub, GitLab or this workspace.",
+    "without_app": "Scanning several at once only works with GitHub App repositories: their access renews on its own, so it holds up through a batch that runs for hours. Remove {{names}} or scan them one at a time.",
+    "over_limit": "Up to {{limit}} by hand; for more, scan the whole organization.",
+    "batch_active": "A batch is already running ({{label}}): wait for it to finish or cancel it in Analyses. Meanwhile you can still scan a single repository.",
+    "batch_hint": "Several at once run as a batch: one at a time and only when nothing else is scanning, so your own scans and PR reviews never wait. Follow its progress in Analyses, where you can cancel it.",
+    "single_hint": "Each run scans one repository: the snapshot and its hash identify exactly what was reviewed.",
+    "dialog_description": "Select one or more. Several are scanned as a batch (GitHub App repositories, up to {{limit}}).",
+    "no_provider": "No code provider connected",
+    "connect": "Connect",
+    "selected_one": "{{count}} selected", "selected_other": "{{count}} selected",
+    "done": "Done"
+  },
+  "org": {
+    "label": "Organization",
+    "choose": "Choose an organization…",
+    "count_error": "Couldn't count the repositories in {{name}}. Try again in a moment.",
+    "counting": "Counting repositories…",
+    "estimate_one": "<strong>{{count}}</strong> repository · estimated time {{duration}} (about 1 min per repository; it adjusts to how long they actually take).",
+    "estimate_other": "<strong>{{count}}</strong> repositories · estimated time {{duration}} (about 1 min per repository; it adjusts to how long they actually take).",
+    "none": "No repositories from that organization are in the GitHub App.",
+    "dialog_title": "Scan the {{name}} organization",
+    "dialog_description": "All its repositories are scanned (except archived ones), one at a time and only when nothing else is scanning, so your own scans and PR reviews never wait. You can keep using the panel and cancel it whenever you like.",
+    "scan_one": "Scan {{count}} repository", "scan_other": "Scan {{count}} repositories",
+    "scan_pending": "Scan repositories"
+  },
+  "image": {
+    "title": "Images",
+    "description": "One or more references, just as you'd use them with <code>docker pull</code>. They're read from the registry: never pulled into your Docker, run or built.",
+    "references": "References",
+    "references_hint": "(one per line, up to {{limit}})",
+    "placeholder": "e.g. nginx:1.21\nghcr.io/your-org/your-image:1.0",
+    "invalid": "These don't look like valid references (registry/repository:tag, lowercase): <mono>{{names}}</mono>",
+    "over_limit": "At most {{limit}} images per batch.",
+    "batch_info": "{{total}} images: they run as a batch, one at a time and only when nothing else is scanning. Follow its progress in Analyses.",
+    "batch_active": "A batch is already running ({{label}}): wait for it to finish or scan a single image.",
+    "try_public": "Try a public one:",
+    "samples": { "old": "old, lots of advisories", "recent": "recent, few", "vulnerable": "vulnerable on purpose" },
+    "registry_saved": "{{registry}}: saved credentials",
+    "registry_anonymous": "{{registry}}: anonymous access",
+    "credentials_saved": "The saved credentials for <strong>{{registry}}</strong> will be used (user {{username}}, token ····{{last4}}).",
+    "credentials_missing": "No credentials for <strong>{{registry}}</strong>: fine for public images. If it's private, an admin can save a read-only token in <link>Integrations → Container registries</link>.",
+    "tip": "Tip: scan an immutable tag (a version or <mono>@sha256:</mono>) rather than <mono>latest</mono>, so you know exactly what you reviewed."
+  },
+  "targets": {
+    "description": "Choose the registered domains and APIs to include in these tests.",
+    "verified": "Verified", "unverified": "Unverified",
+    "add_more": "Add more targets",
+    "empty_title": "No targets yet",
+    "empty_text": "Pick from your registered domains or register a new one.",
+    "add_domains_ellipsis": "Add domains…",
+    "limit_hint": "Up to {{limit}} targets per run. Adding a domain doesn't send it any test traffic.",
+    "dialog_title": "Add domains",
+    "dialog_description": "Pick from the domains registered in this workspace. Up to {{limit}} per run.",
+    "search": "Search registered domains",
+    "search_placeholder": "app.yourdomain.com…",
+    "loading": "Loading domains",
+    "no_match": "No registered domains match.",
+    "register": "Register a new domain…",
+    "selected_of": "{{selected}}/{{limit}} selected",
+    "add": "Add targets"
+  },
+  "context": {
+    "description": "Whatever you write here is stored with the run and shows up in the report.",
+    "question": "What does this target do?",
+    "optional": "(optional)",
+    "placeholder": "Stack and framework, how it authenticates, what sensitive data it handles, which part worries you most…",
+    "counter": "{{length}}/{{max}} · a statement from your team: it doesn't change which rules run and is never sent to an AI model."
+  },
+  "review": {
+    "description": "This is exactly what will run, and what won't.",
+    "type": "Type", "target": "Target",
+    "no_context": "no context given",
+    "target_none": "nothing selected",
+    "target_org": "Organization {{name}}",
+    "target_org_unset": "Organization not chosen yet",
+    "target_repositories": "{{total}} repositories: {{names}}",
+    "target_images": "{{total}} images: {{names}}",
+    "batch_code": "This creates a batch: each repository is scanned with its own plan, one at a time and only when nothing else is scanning. You can follow it and cancel it in Analyses; whatever is already scanned is kept. Batches never send dependencies to api.osv.dev.",
+    "batch_image": "This creates a batch: each image is scanned with its own plan, one at a time and only when nothing else is scanning. You can follow it and cancel it in Analyses; whatever is already scanned is kept.",
+    "plan_loading": "Reading the repository to work out what to scan",
+    "languages": "Repository languages",
+    "languages_files_one": "Repository languages · {{count}} file", "languages_files_other": "Repository languages · {{count}} files",
+    "rules_one": "{{count}} rule", "rules_other": "{{count}} rules",
+    "no_rules": "no SAST rules",
+    "runs": "What runs",
+    "skips": "What doesn't run",
+    "osv_authorized": "Dependencies: api.osv.dev lookup authorized",
+    "osv_consent": "<strong>Query OSV for SCA.</strong> Turning this on lets Tamandua send this repository's dependency names and versions to <mono>api.osv.dev</mono>. It's only needed because Trivy isn't available on this server; without it, dependencies go unchecked.",
+    "image_runs": {
+      "packages": "System and application packages with Trivy and Grype; advisories both of them report are flagged",
+      "secrets": "Secrets in the layers, the environment variables (ENV) and the build history (ARG, URLs with credentials)",
+      "config": "Configuration: root user, HEALTHCHECK, ADD from a URL, exposed SSH, image age",
+      "checkov": "Checkov on the Dockerfile rebuilt from the history: downloads without TLS verification, unsigned package managers…",
+      "priority": "Priority from CVSS, CISA KEV and EPSS",
+      "saved_credentials": "Access with the saved credentials for {{registry}}",
+      "anonymous": "Anonymous access to the registry"
+    },
+    "image_skips": {
+      "run": "The image is never run or built",
+      "source": "The source code that produced it isn't scanned (run a code analysis on its repository)",
+      "secrets": "No secret value that turns up is stored, only where it was found"
+    },
+    "dast_unavailable": "Dynamic tests can't be launched yet: the isolated runner and the rate and scope limits are still missing. This setup is prepared, not run.",
+    "unverified_targets": "Some targets aren't verified. Proving ownership with a DNS TXT record is required before any active test."
+  },
+  "launch": {
+    "queuing": "Queuing…",
+    "images": "Scan {{total}} images",
+    "image": "Scan image",
+    "organization": "Scan the organization",
+    "organization_count": "Scan the organization ({{total}})",
+    "repositories": "Scan {{total}} repositories",
+    "code": "Start code review",
+    "dast": "Launch dynamic tests",
+    "dast_unavailable": "The isolated DAST runner isn't available yet"
+  },
+  "batch": {
+    "last_one": "Last batch · {{label}}: {{count}} scanned{{failed}}{{cancelled}}{{critical}}.",
+    "last_other": "Last batch · {{label}}: {{count}} scanned{{failed}}{{cancelled}}{{critical}}.",
+    "failed_one": ", {{count}} failed", "failed_other": ", {{count}} failed",
+    "cancelled": " · cancelled",
+    "critical_one": " · {{count}} critical", "critical_other": " · {{count}} critical",
+    "confirm_cancel": "Cancel the batch? Whatever is already scanned is kept, and the scan in progress finishes.",
+    "running": "Batch in progress · {{label}}",
+    "cancel": "Cancel batch",
+    "progress_label": "Batch: {{done}} of {{total}} scanned",
+    "progress": "{{done}} of {{total}} scanned{{failed}} · {{critical}} critical and {{high}} high so far · {{duration}} left. It moves forward whenever nothing else is scanning, so you can keep using the panel.",
+    "progress_failed_one": " ({{count}} failed)", "progress_failed_other": " ({{count}} failed)",
+    "show_failed": "Show failed"
+  },
+  "picker": {
+    "search": "Search runs",
+    "placeholder": "Repository, ID…",
+    "more": "{{count}} more — refine your search"
+  },
+  "list": {
+    "search": "Search analyses",
+    "search_placeholder": "Search analyses…",
+    "filter_status": "Filter by status",
+    "all_statuses": "All statuses",
+    "status_running": "Scanning",
+    "filter_type": "Filter by type",
+    "all_types": "All types",
+    "loading": "Loading analyses",
+    "empty_title": "No analyses yet",
+    "empty_text": "Your analyses will show up here. Run the first one on a repository or a container image.",
+    "new": "New analysis",
+    "columns": { "status": "Status", "analysis": "Analysis", "type": "Type", "findings": "Findings", "started": "Started" },
+    "fallback": { "asset": "Asset", "repository": "Repository", "image": "Image", "pull_request": "Pull request", "analysis": "Analysis" },
+    "hint": {
+      "pr_review_one": "new in the PR", "pr_review_other": "new in the PR",
+      "advisory_watch_one": "new advisory", "advisory_watch_other": "new advisories",
+      "candidates_one": "candidate", "candidates_other": "candidates"
+    },
+    "trigger_branch": "· automatic: the main branch changed",
+    "trigger_branch_sha": "· automatic: the main branch changed ({{sha}})",
+    "trigger_advisories": "· automatic: published after the last analysis",
+    "severity_letter": { "critical": "C", "high": "H", "medium": "M", "low": "L" },
+    "severity_count": "{{severity}}: {{value}}",
+    "noun": "analyses"
+  },
+  "progress": {
+    "scan": "scan",
+    "running": "Scanning · {{seconds}}s",
+    "failed": "Failed",
+    "done": "Done",
+    "log": "Analysis progress",
+    "warning": "Warning:",
+    "error": "Error:",
+    "dismiss": "Dismiss notification"
+  }
+}

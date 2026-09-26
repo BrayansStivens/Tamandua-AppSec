@@ -9,37 +9,41 @@ en anexos. El diagrama y la tabla de flujos comparten la numeración.
 
 from __future__ import annotations
 
+import html
+
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, Spacer
 
 from tamandua.modules.threats import diagram as threat_diagram
 from tamandua.modules.threats import methods as threat_methods
 from tamandua.modules.reporting.design import (ATTENTION, ATTENTION_BG, BRAND, BRAND_BG, DANGER_BG, INK, SEVERITY, SOFT, STYLE, SUCCESS,
-                            SUCCESS_BG, WIDTH, DISCLAIMER, build, bullets, chip, h2, header, kpis, listing, meta, n, t, table, wide_page,
-                            wide_size)
+                            SUCCESS_BG, WIDTH, build, bullets, chip, disclaimer, h2, header, kpis, listing, meta, severity_label,
+                            table, wide_page, wide_size)
+from tamandua.modules.reporting.design import t as esc
+from tamandua.shared.i18n import default_locale, localize, t, text
 
 ORDER = ("critical", "high", "medium", "low")
 PENDING = ("evidenced", "open")
-STATUS = {"evidenced": "Con indicios", "open": "Abierta", "mitigated": "Mitigada", "accepted": "Aceptada", "not_applicable": "No aplica"}
-LEVELS = {"low": "baja", "medium": "media", "high": "alta"}
-FAMILY = {"stride": "STRIDE", "linddun": "LINDDUN", "manual": "Propia"}
-SEVERITY_WORDS = {"critical": ("crítica", "críticas"), "high": ("alta", "altas"), "medium": ("media", "medias"), "low": ("baja", "bajas")}
-NOTE = ("Las amenazas salen de reglas sobre el modelo declarado y de lo que escribe el equipo: si el modelo no refleja el sistema, "
-        "tampoco lo harán las amenazas. Los indicios de los análisis son señales para revisar, no confirmaciones.")
+
+
+def _status(status: str, locale: str) -> str:
+    return t(f"threats.report.status.{status}", locale)
 
 
 def _worst(items: list[dict]) -> str:
     return min((item["severity"] for item in items), key=ORDER.index)
 
 
-def _counts(items: list[dict]) -> str:
-    return ", ".join(f"{value} {SEVERITY_WORDS[level][value != 1]}" for level in ORDER
+def _counts(items: list[dict], locale: str) -> str:
+    return ", ".join(t(f"threats.report.count_{level}", locale, count=value) for level in ORDER
                      if (value := sum(1 for item in items if item["severity"] == level)))
 
 
-def digest(model: dict, rows: list[dict]) -> dict:
-    """Todo lo que muestran el PDF y el Markdown, ya agrupado y ordenado."""
+def digest(model: dict, rows: list[dict], *, locale: str | None = None) -> dict:
+    """Todo lo que muestran el PDF y el Markdown, ya agrupado y ordenado y en el idioma `locale`."""
     from tamandua.modules.threats import model as tm
+    locale = locale or default_locale()
+    rows = localize(rows, locale)
     components = {item["id"]: item for item in model.get("components", [])}
     flows = model.get("flows", [])
     number = {flow["id"]: index for index, flow in enumerate(flows, start=1)}
@@ -56,9 +60,10 @@ def digest(model: dict, rows: list[dict]) -> dict:
         names = [item["element_name"] for item in items if item["element_type"] != "flow"]
         parts = []
         if names:
-            parts.append(listing(list(dict.fromkeys(names)), limit))
+            parts.append(listing(list(dict.fromkeys(names)), limit, locale=locale))
         if flows_hit:
-            parts.append(("flujo " if len(flows_hit) == 1 else "flujos ") + listing([str(value) for value in flows_hit], limit + 2))
+            parts.append(t("threats.report.flows_list", locale, count=len(flows_hit),
+                           list=listing([str(value) for value in flows_hit], limit + 2, locale=locale)))
         return "; ".join(parts)
 
     grouped = []
@@ -66,7 +71,8 @@ def digest(model: dict, rows: list[dict]) -> dict:
         first = items[0]
         grouped.append({"rule": rule, "family": family, "title": first["title"], "category": first["category"], "cwe": first["cwe"],
                         "why": first["why"], "mitigations": first["mitigations"], "severity": _worst(items), "count": len(items),
-                        "counts": _counts(items), "where": where(items), "where_short": where(items, 3), "evidenced": sum(1 for item in items if item["status"] == "evidenced")})
+                        "counts": _counts(items, locale), "where": where(items), "where_short": where(items, 3),
+                        "evidenced": sum(1 for item in items if item["status"] == "evidenced")})
     grouped.sort(key=lambda entry: (ORDER.index(entry["severity"]), -entry["evidenced"], -entry["count"], entry["title"]))
     team.sort(key=lambda row: (row["status"] not in PENDING, ORDER.index(row["severity"]), row["element_name"]))
     evidenced.sort(key=lambda row: (ORDER.index(row["severity"]), -row["evidence_count"], row["element_name"]))
@@ -85,26 +91,26 @@ def digest(model: dict, rows: list[dict]) -> dict:
     decided = [row for row in rows if row["status"] not in PENDING]
     method = model.get("methodology") or "stride"
     linked = [item for item in model.get("components", []) if item.get("asset")]
-    return {"linked": linked, "components": components, "flows": flows, "number": number, "pending": pending, "team": team, "evidenced": evidenced,
-            "patterns": grouped, "first": first[:8], "by_component": by_component, "member_of": member_of, "decided": decided,
-            "method_label": threat_methods.METHODOLOGIES.get(method, method), "kinds": tm.KINDS, "labels": tm.CLASSIFICATION_LABELS,
+    return {"locale": locale, "rows": rows, "linked": linked, "components": components, "flows": flows, "number": number, "pending": pending,
+            "team": team, "evidenced": evidenced, "patterns": grouped, "first": first[:8], "by_component": by_component,
+            "member_of": member_of, "decided": decided,
+            "method_label": text(threat_methods.METHODOLOGIES.get(method, method), locale), "kinds": localize(tm.KINDS, locale),
+            "labels": localize(tm.CLASSIFICATION_LABELS, locale),
             "severity": {level: sum(1 for row in pending if row["severity"] == level) for level in ORDER},
             "rule_based": sum(1 for row in rows if row.get("framework") != "manual")}
 
 
 def coverage(model: dict, data: dict) -> list[str]:
     """Cómo salen las amenazas y qué no se pudo contrastar: sin repositorios, «sin indicios» no significa «sin fallos»."""
+    locale = data["locale"]
     total, linked = len(data["components"]), len(data["linked"])
-    lines = [f"Enfoque {data['method_label']}: las amenazas salen de reglas sobre el modelo declarado (componentes, flujos, datos y "
-             f"exposición) y de las que escribe el equipo ({len(data['team'])})."]
+    lines = [t("threats.report.coverage_method", locale, method=data["method_label"], count=len(data["team"]))]
     if linked:
-        lines.append(f"{linked} de {total} componentes tienen repositorio enlazado: solo en ellos se buscan indicios en los hallazgos "
-                     "abiertos del último análisis. Los demás se evalúan solo por lo declarado.")
+        lines.append(t("threats.report.coverage_linked", locale, linked=linked, total=total))
     else:
-        lines.append("Ningún componente tiene repositorio enlazado: no se buscaron indicios en los análisis. Que ninguna amenaza tenga "
-                     "indicios no significa que el sistema no tenga fallos.")
+        lines.append(t("threats.report.coverage_unlinked", locale))
     if model.get("repository_refs"):
-        lines.append(f"Referencias a repositorios pendientes de vincular: {listing(list(model['repository_refs']), 6)}.")
+        lines.append(t("threats.report.coverage_refs", locale, refs=listing(list(model["repository_refs"]), 6, locale=locale)))
     return lines
 
 
@@ -117,163 +123,191 @@ def _element_name(model: dict, data: dict, element: str) -> str:
         return data["components"][element]["name"]
     for flow in data["flows"]:
         if flow["id"] == element:
-            return f"flujo {data['number'][element]} ({data['components'][flow['source']]['name']} → {data['components'][flow['target']]['name']})"
-    return "todo el sistema"
+            return t("threats.report.flow_element", data["locale"], number=data["number"][element],
+                     source=data["components"][flow["source"]]["name"], target=data["components"][flow["target"]]["name"])
+    return t("threats.report.whole_system", data["locale"])
+
+
+def _extras(row: dict, locale: str) -> list[str]:
+    return [t(f"threats.report.likelihood.{row['likelihood']}", locale) if row.get("likelihood") else "",
+            t(f"threats.report.impact.{row['impact']}", locale) if row.get("impact") else ""]
+
+
+def _node_extras(model: dict, data: dict, node: dict) -> list[str]:
+    locale = data["locale"]
+    return [t(f"threats.report.difficulty.{node['difficulty']}", locale) if node.get("difficulty") else "",
+            t("threats.report.on_element", locale, element=_element_name(model, data, node["element"])) if node.get("element") else "",
+            t("threats.report.mitigated", locale) if node.get("mitigated") else ""]
+
+
+def _yes(value, locale: str) -> str:
+    return t("threats.report.yes" if value else "threats.report.no", locale)
 
 
 # ------------------------------------------------------------------ PDF
 
-def render_pdf(model: dict, rows: list[dict], *, version: str) -> bytes:
-    data = digest(model, rows)
+def render_pdf(model: dict, rows: list[dict], *, version: str, locale: str | None = None) -> bytes:
+    data = digest(model, rows, locale=locale)
+    locale, rows = data["locale"], data["rows"]
+    r = lambda key, **params: t(f"threats.report.{key}", locale, **params)  # noqa: E731
     counts = data["severity"]
     team_open = sum(1 for row in data["team"] if row["status"] in PENDING)
-    story = header("Modelo de amenazas", model["name"], model.get("description") or "")
+    story = header(r("title"), model["name"], model.get("description") or "")
     repositories = len(model.get("repositories") or []) + len(model.get("repository_refs") or [])
-    story.append(meta([("Enfoque", data["method_label"]),
-                       ("Actualizado", f"{str(model.get('updated_at') or '')[:10] or '—'} · {model.get('updated_by') or '—'}"),
-                       ("Alcance", f"{len(data['components'])} componentes · {len(data['flows'])} flujos · {len(model.get('boundaries') or [])} fronteras"),
-                       ("Repositorios enlazados", str(repositories) if repositories else "Ninguno"),
-                       ("Amenazas del equipo", str(len(data["team"]))), ("Referencia", str(model.get("id") or "—")[:24])]))
-    story += [Spacer(1, 10), h2("Resumen"),
-              kpis([("abiertas", len(data["pending"]), INK, SOFT), ("críticas", counts["critical"], SEVERITY["critical"][1], DANGER_BG),
-                    ("altas", counts["high"], ATTENTION, ATTENTION_BG), ("con indicios en los análisis", len(data["evidenced"]), ATTENTION, ATTENTION_BG),
-                    ("escritas por el equipo", team_open, BRAND, BRAND_BG), ("decididas", len(data["decided"]), SUCCESS, SUCCESS_BG)]),
+    story.append(meta([(r("meta_method"), data["method_label"]),
+                       (r("meta_updated"), f"{str(model.get('updated_at') or '')[:10] or '—'} · {model.get('updated_by') or '—'}"),
+                       (r("meta_scope"), r("scope", components=len(data["components"]), flows=len(data["flows"]),
+                                          boundaries=len(model.get("boundaries") or []))),
+                       (r("meta_repositories"), str(repositories) if repositories else r("none")),
+                       (r("meta_team"), str(len(data["team"]))), (r("meta_reference"), str(model.get("id") or "—")[:24])]))
+    evidence_sentence = (r("summary_evidenced", count=len(data["evidenced"])) if data["evidenced"]
+                         else r("summary_no_evidence") if data["linked"] else r("summary_not_searched"))
+    summary = " ".join((r("summary_total", count=len(rows), rules=data["rule_based"], components=len(data["components"]),
+                          flows=len(data["flows"]), patterns=r("patterns_count", count=len(data["patterns"])), team=len(data["team"])),
+                        evidence_sentence, r("summary_decided", count=len(data["decided"]))))
+    story += [Spacer(1, 10), h2(r("summary")),
+              kpis([(r("kpi_open"), len(data["pending"]), INK, SOFT), (r("kpi_critical"), counts["critical"], SEVERITY["critical"][1], DANGER_BG),
+                    (r("kpi_high"), counts["high"], ATTENTION, ATTENTION_BG), (r("kpi_evidenced"), len(data["evidenced"]), ATTENTION, ATTENTION_BG),
+                    (r("kpi_team"), team_open, BRAND, BRAND_BG), (r("kpi_decided"), len(data["decided"]), SUCCESS, SUCCESS_BG)]),
               Spacer(1, 6),
-              Paragraph(t(f"{n(len(rows), 'amenaza', 'amenazas')}: {data['rule_based']} de las reglas del enfoque sobre {len(data['components'])} "
-                          f"componentes y {len(data['flows'])} flujos, que se reducen a {n(len(data['patterns']), 'patrón', 'patrones')}, y "
-                          f"{len(data['team'])} escritas por el equipo. "
-                          + (f"{n(len(data['evidenced']), 'tiene', 'tienen')} indicios en hallazgos abiertos de los análisis. " if data["evidenced"]
-                             else "Ninguna tiene indicios en los análisis enlazados. " if data["linked"]
-                             else "No se buscaron indicios: ningún componente tiene un repositorio enlazado. ")
-                          + f"{n(len(data['decided']), 'está decidida', 'están decididas')} (mitigada, aceptada o no aplica).", 900), STYLE["body"]),
-              Paragraph("Cómo leerlo: empieza por «Qué atender primero»; cada patrón de las reglas se corrige con una misma medida en todos los "
-                        "componentes que lista; el diagrama y la tabla de flujos (anexo A) usan la misma numeración.", STYLE["note"])]
+              Paragraph(esc(summary, 900), STYLE["body"]),
+              Paragraph(esc(r("how_to_read"), 400), STYLE["note"])]
     if data["first"]:
-        story.append(h2("Qué atender primero"))
+        story.append(h2(r("first")))
         body = []
         for source, item in data["first"]:
             if source == "pattern":
-                body.append([chip(item["severity"]), f"<b>{t(item['title'], 140)}</b><br/>{t(item['category'], 80)} · patrón en {item['count']}",
-                             t(item["where_short"], 200), t("; ".join(item["mitigations"][:2]), 260)])
+                body.append([chip(item["severity"], locale=locale),
+                             f"<b>{esc(item['title'], 140)}</b><br/>{esc(item['category'], 80)} · {esc(r('pattern_in', count=item['count']), 60)}",
+                             esc(item["where_short"], 200), esc("; ".join(item["mitigations"][:2]), 260)])
             else:
-                label = "Con indicios" if source == "evidence" else "Del equipo"
-                body.append([chip(item["severity"]), f"<b>{t(item['title'], 140)}</b><br/><font color=\"#636363\">{label}</font>",
-                             t(_element_name(model, data, item["element"]) if item["element"] else item["element_name"], 160),
-                             t("; ".join(item["mitigations"][:2]) or "—", 260)])
-        story.append(table(["Severidad", "Amenaza", "Dónde", "Qué hacer"], body, [19 * mm, 55 * mm, 45 * mm, WIDTH - 119 * mm]))
+                label = _status("evidenced", locale) if source == "evidence" else r("from_team")
+                body.append([chip(item["severity"], locale=locale),
+                             f"<b>{esc(item['title'], 140)}</b><br/><font color=\"#636363\">{esc(label, 40)}</font>",
+                             esc(_element_name(model, data, item["element"]) if item["element"] else item["element_name"], 160),
+                             esc("; ".join(item["mitigations"][:2]) or "—", 260)])
+        story.append(table([r("col_severity"), r("col_threat"), r("col_where"), r("col_action")], body,
+                           [19 * mm, 55 * mm, 45 * mm, WIDTH - 119 * mm]))
     # El diagrama, en una página apaisada (A3 si es grande: sigue siendo vectorial y se puede ampliar).
     if data["components"]:
-        drawn = threat_diagram.scene(model, data["kinds"])
+        drawn = threat_diagram.scene(model, data["kinds"], locale=locale)
         _, _, width, height = drawn["bounds"]
         area = wide_size(None)
         size = "a3" if min(area[0] / width, area[1] / height) < 0.5 else None  # por debajo, el texto no se lee impreso
         area = wide_size(size)
-        story += wide_page([Paragraph("Diagrama", STYLE["h3"]), threat_diagram.to_drawing(model, area[0], area[1] - 12 * mm, data["kinds"])], size=size)
+        story += wide_page([Paragraph(esc(r("diagram")), STYLE["h3"]),
+                            threat_diagram.to_drawing(model, area[0], area[1] - 12 * mm, data["kinds"], locale=locale)], size=size)
     if data["team"]:
-        story.append(h2(f"Amenazas identificadas por el equipo ({len(data['team'])})"))
+        story.append(h2(r("team_heading", count=len(data["team"]))))
         body = []
         for row in data["team"]:
-            extra = " · ".join(value for value in (f"posibilidad {LEVELS[row['likelihood']]}" if row.get("likelihood") else "",
-                                                     f"impacto {LEVELS[row['impact']]}" if row.get("impact") else "") if value)
-            body.append([chip(row["severity"]),
-                         f"<b>{t(row['title'], 160)}</b>" + (f'<br/><font color="#636363">{t(row["why"], 320)}</font>' if row["why"] else ""),
-                         t(row["element_name"], 120) + (f'<br/><font color="#636363">{t(extra, 80)}</font>' if extra else ""),
-                         t("; ".join(row["mitigations"]) or "—", 320),
-                         t(STATUS[row["status"]], 30) + (f'<br/><font color="#636363">{t(row["owner"], 60)}</font>' if row.get("owner") else "")])
-        story.append(table(["Severidad", "Amenaza y escenario", "Dónde", "Mitigación", "Estado"], body,
+            extra = " · ".join(value for value in _extras(row, locale) if value)
+            body.append([chip(row["severity"], locale=locale),
+                         f"<b>{esc(row['title'], 160)}</b>" + (f'<br/><font color="#636363">{esc(row["why"], 320)}</font>' if row["why"] else ""),
+                         esc(row["element_name"], 120) + (f'<br/><font color="#636363">{esc(extra, 80)}</font>' if extra else ""),
+                         esc("; ".join(row["mitigations"]) or "—", 320),
+                         esc(_status(row["status"], locale), 30) + (f'<br/><font color="#636363">{esc(row["owner"], 60)}</font>' if row.get("owner") else "")])
+        story.append(table([r("col_severity"), r("col_threat_scenario"), r("col_where"), r("col_mitigation"), r("col_status")], body,
                            [19 * mm, 62 * mm, 32 * mm, WIDTH - 131 * mm, 18 * mm]))
     if data["evidenced"]:
-        story.append(h2(f"Con indicios en los análisis ({len(data['evidenced'])})"))
+        story.append(h2(r("evidenced_heading", count=len(data["evidenced"]))))
         body = []
         for row in data["evidenced"]:
-            evidence = "<br/>".join(f"{t(item['title'], 80)} · {t(item['location'], 80)}" for item in row["evidence"][:3])
+            evidence = "<br/>".join(f"{esc(item['title'], 80)} · {esc(item['location'], 80)}" for item in row["evidence"][:3])
             more = row["evidence_count"] - min(3, len(row["evidence"]))
-            body.append([chip(row["severity"]), f"<b>{t(row['title'], 140)}</b>", t(row["element_name"], 120),
-                         evidence + (f"<br/>y {more} más" if more > 0 else "")])
-        story.append(table(["Severidad", "Amenaza", "Dónde", "Indicios (hallazgos abiertos)"], body, [19 * mm, 50 * mm, 38 * mm, WIDTH - 107 * mm]))
-        story.append(Paragraph("Un indicio es un hallazgo abierto del código del componente relacionado con la amenaza: una señal para revisar, "
-                               "no una confirmación.", STYLE["note"]))
+            body.append([chip(row["severity"], locale=locale), f"<b>{esc(row['title'], 140)}</b>", esc(row["element_name"], 120),
+                         evidence + (f"<br/>{esc(r('and_more', count=more), 40)}" if more > 0 else "")])
+        story.append(table([r("col_severity"), r("col_threat"), r("col_where"), r("col_evidence")], body,
+                           [19 * mm, 50 * mm, 38 * mm, WIDTH - 107 * mm]))
+        story.append(Paragraph(esc(r("evidence_note"), 400), STYLE["note"]))
     if data["patterns"]:
         pending_rules = sum(entry["count"] for entry in data["patterns"])
-        story.append(h2(f"Patrones de las reglas ({len(data['patterns'])} patrones · {pending_rules} amenazas)"))
-        body = [[chip(entry["severity"]),
-                 f"<b>{t(entry['title'], 140)}</b><br/><font color=\"#636363\">{t(entry['category'], 60)}"
+        story.append(h2(r("patterns_heading", patterns=len(data["patterns"]), threats=pending_rules)))
+        body = [[chip(entry["severity"], locale=locale),
+                 f"<b>{esc(entry['title'], 140)}</b><br/><font color=\"#636363\">{esc(entry['category'], 60)}"
                  + (f" · CWE-{', CWE-'.join(str(value) for value in entry['cwe'][:3])}" if entry["cwe"] else "") + "</font>",
-                 f"<b>{entry['count']}</b> · {t(entry['counts'], 80)}<br/>{t(entry['where'], 320)}",
-                 t("; ".join(entry["mitigations"][:3]), 300)] for entry in data["patterns"]]
-        story.append(table(["Severidad", "Patrón", "Afecta a", "Medida"], body, [19 * mm, 50 * mm, 55 * mm, WIDTH - 124 * mm]))
-        story.append(Paragraph("La severidad es la peor entre los componentes del patrón (sube con Internet, datos sensibles o indicios). "
-                               "El detalle por componente está en el panel.", STYLE["note"]))
-    story.append(h2(f"Decisiones ({len(data['decided'])})"))
+                 f"<b>{entry['count']}</b> · {esc(entry['counts'], 80)}<br/>{esc(entry['where'], 320)}",
+                 esc("; ".join(entry["mitigations"][:3]), 300)] for entry in data["patterns"]]
+        story.append(table([r("col_severity"), r("col_pattern"), r("col_affects"), r("col_measure")], body,
+                           [19 * mm, 50 * mm, 55 * mm, WIDTH - 124 * mm]))
+        story.append(Paragraph(esc(r("patterns_note"), 400), STYLE["note"]))
+    story.append(h2(r("decisions_heading", count=len(data["decided"]))))
     if data["decided"]:
-        body = [[t(row["title"], 120), t(row["element_name"], 100), t(STATUS[row["status"]], 20),
-                 t((row.get("decision") or {}).get("reason") or "—", 240), t((row.get("decision") or {}).get("by") or "—", 40)]
+        body = [[esc(row["title"], 120), esc(row["element_name"], 100), esc(_status(row["status"], locale), 20),
+                 esc((row.get("decision") or {}).get("reason") or "—", 240), esc((row.get("decision") or {}).get("by") or "—", 40)]
                 for row in data["decided"][:400]]
-        story.append(table(["Amenaza", "Dónde", "Decisión", "Motivo", "Por"], body, [50 * mm, 36 * mm, 20 * mm, WIDTH - 128 * mm, 22 * mm]))
+        story.append(table([r("col_threat"), r("col_where"), r("col_decision"), r("col_reason"), r("col_by")], body,
+                           [50 * mm, 36 * mm, 20 * mm, WIDTH - 128 * mm, 22 * mm]))
         if len(data["decided"]) > 400:
-            story.append(Paragraph(f"Se muestran 400 de {len(data['decided'])} decisiones; todas están en el panel.", STYLE["note"]))
+            story.append(Paragraph(esc(r("decisions_truncated", shown=400, count=len(data["decided"]))), STYLE["note"]))
     else:
-        story.append(Paragraph("Todavía no hay amenazas mitigadas, aceptadas ni descartadas: cada decisión se registra en el panel con su motivo.", STYLE["body"]))
+        story.append(Paragraph(esc(r("no_decisions"), 400), STYLE["body"]))
     # Anexos
+    no = '<font color="#b71824">{}</font>'
     if data["flows"]:
-        story.append(h2("Anexo A · Flujos del diagrama"))
-        body = [[str(data["number"][flow["id"]]), t(f"{data['components'][flow['source']]['name']} → {data['components'][flow['target']]['name']}", 140),
-                 flow["protocol"].upper(), t(flow.get("name") or "—", 160) + (f'<br/><font color="#636363">{t(", ".join(data["labels"][item] for item in flow["data"]), 80)}</font>' if flow.get("data") else ""),
-                 "sí" if flow.get("authenticated") else '<font color="#b71824">no</font>', "sí" if flow.get("encrypted") else '<font color="#b71824">no</font>']
+        story.append(h2(r("appendix_flows")))
+        body = [[str(data["number"][flow["id"]]), esc(f"{data['components'][flow['source']]['name']} → {data['components'][flow['target']]['name']}", 140),
+                 flow["protocol"].upper(), esc(flow.get("name") or "—", 160) + (f'<br/><font color="#636363">{esc(", ".join(data["labels"][item] for item in flow["data"]), 80)}</font>' if flow.get("data") else ""),
+                 esc(_yes(True, locale)) if flow.get("authenticated") else no.format(esc(_yes(False, locale))),
+                 esc(_yes(True, locale)) if flow.get("encrypted") else no.format(esc(_yes(False, locale)))]
                 for flow in data["flows"]]
-        story.append(table(["N.º", "Origen → destino", "Protocolo", "Qué viaja", "Autent.", "Cifrado"], body,
+        story.append(table([r("col_number"), r("col_source_target"), r("col_protocol"), r("col_carries"), r("col_auth_short"), r("col_encrypted")], body,
                            [10 * mm, 62 * mm, 18 * mm, WIDTH - 124 * mm, 17 * mm, 17 * mm]))
-    story.append(h2("Anexo B · Componentes"))
+    story.append(h2(r("appendix_components")))
     body = []
     for entry in data["by_component"]:
         component = entry["component"]
         exposure = ", ".join(value for value in ("Internet" if component.get("internet_facing") else "",
                                                  ", ".join(data["labels"][item] for item in component.get("data") or [])) if value)
-        body.append([f"<b>{t(component['name'], 80)}</b><br/><font color=\"#636363\">{t(_kind(component, data['kinds']), 50)}"
-                     + (f" · {t(component['technology'], 40)}" if component.get("technology") else "") + "</font>",
-                     t(data["member_of"].get(component["id"], "—"), 60), t(exposure or "—", 90),
+        body.append([f"<b>{esc(component['name'], 80)}</b><br/><font color=\"#636363\">{esc(_kind(component, data['kinds']), 50)}"
+                     + (f" · {esc(component['technology'], 40)}" if component.get("technology") else "") + "</font>",
+                     esc(data["member_of"].get(component["id"], "—"), 60), esc(exposure or "—", 90),
                      *[(f'<font color="{SEVERITY[level][1 if level == "critical" else 0].hexval().replace("0x", "#")}"><b>{entry["counts"][level]}</b></font>'
                         if entry["counts"][level] else '<font color="#636363">0</font>') for level in ORDER]])
-    story.append(table(["Componente", "Frontera", "Exposición y datos", "Crít.", "Altas", "Medias", "Bajas"], body,
+    story.append(table([r("col_component"), r("col_boundary"), r("col_exposure"), r("col_critical_short"), r("col_high_short"),
+                        r("col_medium_short"), r("col_low_short")], body,
                        [54 * mm, 36 * mm, WIDTH - 146 * mm, 14 * mm, 14 * mm, 14 * mm, 14 * mm]))
     story += _methods_pdf(model, data)
-    story += [h2("Método y cobertura"), *bullets([t(line, 600) for line in coverage(model, data)]),
-              Spacer(1, 8), Paragraph(t(NOTE, 400) + " " + DISCLAIMER, STYLE["note"])]
-    return build(story, title=f"Modelo de amenazas · {model['name']}", footer=f"Modelo de amenazas · {model['name'][:80]}", version=version,
-                 author=str(model.get("updated_by") or "Tamandua"), subject="Modelo de amenazas")
+    story += [h2(r("method_heading")), *bullets([esc(line, 600) for line in coverage(model, data)]),
+              Spacer(1, 8), Paragraph(esc(r("note"), 400) + " " + esc(disclaimer(locale), 400), STYLE["note"])]
+    return build(story, title=r("document_title", name=model["name"]), footer=r("document_title", name=model["name"][:80]), version=version,
+                 author=str(model.get("updated_by") or "Tamandua"), subject=r("title"), locale=locale)
 
 
 def _methods_pdf(model: dict, data: dict) -> list:
+    locale = data["locale"]
+    r = lambda key, **params: t(f"threats.report.{key}", locale, **params)  # noqa: E731
     story = []
     notes = model.get("pasta") or {}
     if any(notes.values()):
-        story.append(h2("Anexo C · PASTA"))
+        story.append(h2(r("appendix_pasta")))
         for key, title in threat_methods.PASTA_STAGES:
             if notes.get(key):
-                story += [Paragraph(t(title, 80), STYLE["h3"]), Paragraph(t(notes[key], 3000), STYLE["body"])]
+                story += [Paragraph(esc(text(title, locale), 80), STYLE["h3"]), Paragraph(esc(notes[key], 3000), STYLE["body"])]
     for index, tree in enumerate(model.get("attack_trees") or []):
-        story.append(h2(f"Anexo D · Árbol de ataque · {tree['goal'][:90]}") if index == 0 else Paragraph(t(f"Árbol de ataque · {tree['goal']}", 120), STYLE["h3"]))
+        story.append(h2(r("appendix_tree", goal=tree["goal"][:90])) if index == 0
+                     else Paragraph(esc(r("tree_heading", goal=tree["goal"]), 120), STYLE["h3"]))
         lines = []
         for depth, node in _walk(tree):
-            extra = [f"dificultad {LEVELS[node['difficulty']]}" if node.get("difficulty") else "",
-                     f"sobre {_element_name(model, data, node['element'])}" if node.get("element") else "", "mitigado" if node.get("mitigated") else ""]
-            gate = " (se necesitan todos)" if node["gate"] == "and" and node["has_children"] else ""
-            lines.append(Paragraph("&nbsp;" * 6 * depth + "•&nbsp;&nbsp;" + t(node["text"], 200) + t(gate, 40)
-                                   + (f' <font color="#636363">· {t(", ".join(value for value in extra if value), 160)}</font>' if any(extra) else ""),
+            extra = _node_extras(model, data, node)
+            gate = " " + r("all_required") if node["gate"] == "and" and node["has_children"] else ""
+            lines.append(Paragraph("&nbsp;" * 6 * depth + "•&nbsp;&nbsp;" + esc(node["text"], 200) + esc(gate, 40)
+                                   + (f' <font color="#636363">· {esc(", ".join(value for value in extra if value), 160)}</font>' if any(extra) else ""),
                                    STYLE["body"]))
         story += lines
     mappings = model.get("attack_mappings") or []
     if mappings:
-        status = {"relevant": "relevante", "mitigated": "mitigada", "not_applicable": "no aplica"}
-        story.append(h2("Anexo E · MITRE ATT&CK"))
+        story.append(h2(r("appendix_attack")))
         body = []
         for item in mappings:
             name, _, tactics = threat_methods.TECHNIQUES[item["technique"]]
-            body.append([f"<b>{t(item['technique'], 12)}</b> {t(name, 80)}", t(", ".join(threat_methods.TACTICS[tactic] for tactic in tactics), 80),
-                         t(_element_name(model, data, item["element"]) if item.get("element") else "todo el sistema", 100), status[item["status"]],
-                         t(item.get("note") or "—", 200)])
-        story.append(table(["Técnica", "Táctica", "Elemento", "Estado", "Nota"], body, [46 * mm, 30 * mm, 38 * mm, 18 * mm, WIDTH - 132 * mm]))
-        story.append(Paragraph("MITRE ATT&amp;CK® es una marca de The MITRE Corporation: https://attack.mitre.org", STYLE["note"]))
+            body.append([f"<b>{esc(item['technique'], 12)}</b> {esc(name, 80)}",
+                         esc(", ".join(text(threat_methods.TACTICS[tactic], locale) for tactic in tactics), 80),
+                         esc(_element_name(model, data, item["element"]) if item.get("element") else r("whole_system"), 100),
+                         esc(r(f"mapping_status.{item['status']}")), esc(item.get("note") or "—", 200)])
+        story.append(table([r("col_technique"), r("col_tactic"), r("col_element"), r("col_status"), r("col_note")], body,
+                           [46 * mm, 30 * mm, 38 * mm, 18 * mm, WIDTH - 132 * mm]))
+        story.append(Paragraph(html.escape(r("attack_trademark")), STYLE["note"]))
     return story
 
 
@@ -295,97 +329,107 @@ def _cell(value) -> str:
     return " ".join(str(value or "").split()).replace("|", "\\|")
 
 
-def to_markdown(model: dict, rows: list[dict]) -> str:
+def _row(*cells) -> str:
+    return "| " + " | ".join(cells) + " |"
+
+
+def to_markdown(model: dict, rows: list[dict], *, locale: str | None = None) -> str:
     """El mismo informe en Markdown (para un wiki, un ticket o un pull request)."""
-    data = digest(model, rows)
+    data = digest(model, rows, locale=locale)
+    locale = data["locale"]
+    r = lambda key, **params: t(f"threats.report.{key}", locale, **params)  # noqa: E731
     counts = data["severity"]
-    names = {"critical": "Crítica", "high": "Alta", "medium": "Media", "low": "Baja"}
-    lines = [f"# Modelo de amenazas · {model['name']}", "", model.get("description") or "", "",
-             f"Enfoque: **{data['method_label']}** · actualizado {str(model.get('updated_at') or '')[:16].replace('T', ' ')} por {model.get('updated_by') or '—'} · "
-             f"{len(data['components'])} componentes, {len(data['flows'])} flujos, {len(model.get('boundaries') or [])} fronteras.", "",
-             "## Resumen", "",
-             f"- **{len(data['pending'])} abiertas**: {counts['critical']} críticas, {counts['high']} altas, {counts['medium']} medias y {counts['low']} bajas.",
-             f"- {data['rule_based']} salen de las reglas del enfoque y se reducen a **{len(data['patterns'])} patrones**; {len(data['team'])} las escribió el equipo.",
-             (f"- {len(data['evidenced'])} con indicios en hallazgos abiertos de los análisis (señal para revisar, no confirmación); "
-              if data["linked"] else "- No se buscaron indicios en los análisis: ningún componente tiene repositorio enlazado; ")
-             + f"{len(data['decided'])} decididas (mitigadas, aceptadas o no aplican).", ""]
+    names = {level: severity_label(level, locale) for level in ORDER}
+    lines = ["# " + r("document_title", name=model["name"]), "", model.get("description") or "", "",
+             r("md_intro", method=data["method_label"], date=str(model.get("updated_at") or "")[:16].replace("T", " "),
+               by=model.get("updated_by") or "—", components=len(data["components"]), flows=len(data["flows"]),
+               boundaries=len(model.get("boundaries") or [])), "",
+             "## " + r("summary"), "",
+             "- " + r("md_open", open=len(data["pending"]), critical=counts["critical"], high=counts["high"], medium=counts["medium"], low=counts["low"]),
+             "- " + r("md_rules", rules=data["rule_based"], patterns=len(data["patterns"]), team=len(data["team"])),
+             "- " + (r("md_evidence", evidenced=len(data["evidenced"]), decided=len(data["decided"])) if data["linked"]
+                     else r("md_no_evidence", decided=len(data["decided"]))), ""]
     if data["first"]:
-        lines += ["## Qué atender primero", "", "| Severidad | Amenaza | Dónde | Qué hacer |", "|---|---|---|---|"]
+        lines += ["## " + r("first"), "", _row(r("col_severity"), r("col_threat"), r("col_where"), r("col_action")), "|---|---|---|---|"]
         for source, item in data["first"]:
             where = item["where_short"] if source == "pattern" else (_element_name(model, data, item["element"]) if item["element"] else item["element_name"])
-            title = f"{item['title']} (patrón en {item['count']})" if source == "pattern" else item["title"]
-            lines.append(f"| {names[item['severity']]} | {_cell(title)} | {_cell(where)} | {_cell('; '.join(item['mitigations'][:2]) or '—')} |")
+            title = f"{item['title']} ({r('pattern_in', count=item['count'])})" if source == "pattern" else item["title"]
+            lines.append(_row(names[item["severity"]], _cell(title), _cell(where), _cell("; ".join(item["mitigations"][:2]) or "—")))
         lines.append("")
     if data["team"]:
-        lines += [f"## Amenazas identificadas por el equipo ({len(data['team'])})", ""]
+        lines += ["## " + r("team_heading", count=len(data["team"])), ""]
         for row in data["team"]:
-            lines += [f"### {names[row['severity']]} · {row['title']}", "",
-                      f"{row['element_name']} · {row['category']} · estado: **{STATUS[row['status']].lower()}**"
-                      + (f" · responsable: {row['owner']}" if row.get("owner") else "")
-                      + (f" · posibilidad {LEVELS[row['likelihood']]}" if row.get("likelihood") else "")
-                      + (f" · impacto {LEVELS[row['impact']]}" if row.get("impact") else ""), ""]
+            details = [row["element_name"], row["category"], r("md_status", status=_status(row["status"], locale).lower())]
+            details += [r("md_owner", owner=row["owner"])] if row.get("owner") else []
+            details += [value for value in _extras(row, locale) if value]
+            lines += [f"### {names[row['severity']]} · {row['title']}", "", " · ".join(details), ""]
             if row["why"]:
                 lines += [row["why"], ""]
             if row["mitigations"]:
-                lines += ["Mitigación: " + "; ".join(row["mitigations"]), ""]
+                lines += [r("md_mitigation", text="; ".join(row["mitigations"])), ""]
     if data["evidenced"]:
-        lines += [f"## Con indicios en los análisis ({len(data['evidenced'])})", "", "| Severidad | Amenaza | Dónde | Indicios |", "|---|---|---|---|"]
+        lines += ["## " + r("evidenced_heading", count=len(data["evidenced"])), "",
+                  _row(r("col_severity"), r("col_threat"), r("col_where"), r("col_evidence_short")), "|---|---|---|---|"]
         for row in data["evidenced"]:
-            evidence = "; ".join(f"{item['title']} en `{item['location']}`" for item in row["evidence"][:3])
-            lines.append(f"| {names[row['severity']]} | {_cell(row['title'])} | {_cell(row['element_name'])} | {_cell(evidence)} |")
+            evidence = "; ".join(r("md_evidence_item", title=item["title"], location=item["location"]) for item in row["evidence"][:3])
+            lines.append(_row(names[row["severity"]], _cell(row["title"]), _cell(row["element_name"]), _cell(evidence)))
         lines.append("")
     if data["patterns"]:
-        lines += [f"## Amenazas por patrón ({len(data['patterns'])} patrones)", "",
-                  "Cada patrón se corrige con la misma medida en todos los componentes que lista.", "",
-                  "| Severidad | Patrón | Afecta a | Medida |", "|---|---|---|---|"]
+        lines += ["## " + r("md_patterns_heading", count=len(data["patterns"])), "", r("md_patterns_note"), "",
+                  _row(r("col_severity"), r("col_pattern"), r("col_affects"), r("col_measure")), "|---|---|---|---|"]
         for entry in data["patterns"]:
             cwe = f" · CWE-{', CWE-'.join(str(value) for value in entry['cwe'][:3])}" if entry["cwe"] else ""
-            lines.append(f"| {names[entry['severity']]} | {_cell(entry['title'])} ({_cell(entry['category'])}{cwe}) | "
-                         f"{entry['count']} ({entry['counts']}): {_cell(entry['where'])} | {_cell('; '.join(entry['mitigations'][:3]))} |")
+            lines.append(_row(names[entry["severity"]], f"{_cell(entry['title'])} ({_cell(entry['category'])}{cwe})",
+                              f"{entry['count']} ({entry['counts']}): {_cell(entry['where'])}", _cell("; ".join(entry["mitigations"][:3]))))
         lines.append("")
     if data["decided"]:
-        lines += [f"## Decisiones ({len(data['decided'])})", "", "| Amenaza | Dónde | Decisión | Motivo | Por |", "|---|---|---|---|---|"]
+        lines += ["## " + r("decisions_heading", count=len(data["decided"])), "",
+                  _row(r("col_threat"), r("col_where"), r("col_decision"), r("col_reason"), r("col_by")), "|---|---|---|---|---|"]
         for row in data["decided"]:
             decision = row.get("decision") or {}
-            lines.append(f"| {_cell(row['title'])} | {_cell(row['element_name'])} | {STATUS[row['status']]} | {_cell(decision.get('reason') or '—')} | {_cell(decision.get('by') or '—')} |")
+            lines.append(_row(_cell(row["title"]), _cell(row["element_name"]), _status(row["status"], locale),
+                              _cell(decision.get("reason") or "—"), _cell(decision.get("by") or "—")))
         lines.append("")
     if data["flows"]:
-        lines += ["## Anexo A · Flujos del diagrama", "", "| N.º | Origen → destino | Protocolo | Qué viaja | Autenticado | Cifrado |", "|---|---|---|---|---|---|"]
+        lines += ["## " + r("appendix_flows"), "", _row(r("col_number"), r("col_source_target"), r("col_protocol"), r("col_carries"),
+                                                        r("col_authenticated"), r("col_encrypted")), "|---|---|---|---|---|---|"]
         for flow in data["flows"]:
-            lines.append(f"| {data['number'][flow['id']]} | {_cell(data['components'][flow['source']]['name'])} → {_cell(data['components'][flow['target']]['name'])} | "
-                         f"{flow['protocol'].upper()} | {_cell(flow.get('name') or '—')} | {'sí' if flow.get('authenticated') else 'no'} | {'sí' if flow.get('encrypted') else 'no'} |")
+            lines.append(_row(str(data["number"][flow["id"]]),
+                              f"{_cell(data['components'][flow['source']]['name'])} → {_cell(data['components'][flow['target']]['name'])}",
+                              flow["protocol"].upper(), _cell(flow.get("name") or "—"), _yes(flow.get("authenticated"), locale),
+                              _yes(flow.get("encrypted"), locale)))
         lines.append("")
-    lines += ["## Anexo B · Componentes", "", "| Componente | Tipo | Frontera | Datos | Expuesto | Abiertas (C/A/M/B) |", "|---|---|---|---|---|---|"]
+    lines += ["## " + r("appendix_components"), "", _row(r("col_component"), r("col_type"), r("col_boundary"), r("col_data"), r("col_exposed"),
+                                                         r("col_open_by_severity")), "|---|---|---|---|---|---|"]
     for entry in data["by_component"]:
         component = entry["component"]
-        lines.append(f"| {_cell(component['name'])} | {_cell(_kind(component, data['kinds']))} | {_cell(data['member_of'].get(component['id'], '—'))} | "
-                     f"{_cell(', '.join(data['labels'][item] for item in component.get('data') or []) or '—')} | {'sí' if component.get('internet_facing') else 'no'} | "
-                     f"{'/'.join(str(entry['counts'][level]) for level in ORDER)} |")
+        lines.append(_row(_cell(component["name"]), _cell(_kind(component, data["kinds"])), _cell(data["member_of"].get(component["id"], "—")),
+                          _cell(", ".join(data["labels"][item] for item in component.get("data") or []) or "—"),
+                          _yes(component.get("internet_facing"), locale), "/".join(str(entry["counts"][level]) for level in ORDER)))
     lines.append("")
     notes = model.get("pasta") or {}
     if any(notes.values()):
-        lines += ["## Anexo C · PASTA", ""]
+        lines += ["## " + r("appendix_pasta"), ""]
         for key, title in threat_methods.PASTA_STAGES:
             if notes.get(key):
-                lines += [f"### {title}", "", notes[key], ""]
+                lines += [f"### {text(title, locale)}", "", notes[key], ""]
     for tree in model.get("attack_trees") or []:
-        lines += [f"## Anexo D · Árbol de ataque · {tree['goal']}", ""]
+        lines += ["## " + r("appendix_tree", goal=tree["goal"]), ""]
         for depth, node in _walk(tree):
-            extra = [f"dificultad {LEVELS[node['difficulty']]}" if node.get("difficulty") else "",
-                     f"sobre {_element_name(model, data, node['element'])}" if node.get("element") else "", "mitigado" if node.get("mitigated") else ""]
-            gate = " (se necesitan todos)" if node["gate"] == "and" and node["has_children"] else ""
+            extra = _node_extras(model, data, node)
+            gate = " " + r("all_required") if node["gate"] == "and" and node["has_children"] else ""
             lines.append(f"{'  ' * depth}- {node['text']}{gate}" + (f" · {', '.join(item for item in extra if item)}" if any(extra) else ""))
         lines.append("")
     mappings = model.get("attack_mappings") or []
     if mappings:
-        status = {"relevant": "relevante", "mitigated": "mitigada", "not_applicable": "no aplica"}
-        lines += ["## Anexo E · MITRE ATT&CK", "", "| Técnica | Táctica | Elemento | Estado | Nota |", "|---|---|---|---|---|"]
+        lines += ["## " + r("appendix_attack"), "", _row(r("col_technique"), r("col_tactic"), r("col_element"), r("col_status"), r("col_note")),
+                  "|---|---|---|---|---|"]
         for item in mappings:
             name, _, tactics = threat_methods.TECHNIQUES[item["technique"]]
-            element = _element_name(model, data, item["element"]) if item.get("element") else "todo el sistema"
-            lines.append(f"| {item['technique']} {name} | {', '.join(threat_methods.TACTICS[tactic] for tactic in tactics)} | "
-                         f"{_cell(element)} | {status[item['status']]} | {_cell(item.get('note') or '')} |")
-        lines += ["", "MITRE ATT&CK® es una marca de The MITRE Corporation: https://attack.mitre.org", ""]
-    lines += ["## Método y cobertura", "", *(f"- {line}" for line in coverage(model, data)), "", f"> {NOTE} {DISCLAIMER}", ""]
+            element = _element_name(model, data, item["element"]) if item.get("element") else r("whole_system")
+            lines.append(_row(f"{item['technique']} {name}", ", ".join(text(threat_methods.TACTICS[tactic], locale) for tactic in tactics),
+                              _cell(element), r(f"mapping_status.{item['status']}"), _cell(item.get("note") or "")))
+        lines += ["", r("attack_trademark"), ""]
+    lines += ["## " + r("method_heading"), "", *(f"- {line}" for line in coverage(model, data)), "",
+              f"> {r('note')} {disclaimer(locale)}", ""]
     return "\n".join(lines)
-

@@ -11,6 +11,7 @@ from tamandua.app import data_migrations as migrations
 from tamandua.app.api.security import State, public_url
 from tamandua.modules.identity.auth import Authenticator
 from tamandua.modules.runs.jobs import ScanJobs
+from tamandua.shared.i18n import t
 
 
 def embedded_worker() -> bool:
@@ -47,14 +48,12 @@ def transport_check(port: int) -> str | None:
         return None
     if os.environ.get("TAMANDUA_ALLOW_INSECURE_HTTP", "").strip() == "1":
         return None
-    return (f"TAMANDUA_PUBLIC_URL={url} expone el panel por HTTP en claro. Usa HTTPS "
-            "(TAMANDUA_TLS_CERT/TAMANDUA_TLS_KEY o un proxy como Caddy delante) o, solo en una red "
-            "de confianza y bajo tu responsabilidad, TAMANDUA_ALLOW_INSECURE_HTTP=1.")
+    return t("cli.server.insecure_http", url=url)
 
 
 def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
     if port < 0 or port > 65535:
-        raise ValueError("Puerto fuera de rango")
+        raise ValueError(t("cli.server.port_out_of_range"))
     problem = transport_check(port)
     if problem:
         raise SystemExit(problem)
@@ -65,14 +64,14 @@ def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
     import uvicorn
     app = create_app(data_dir, port=port, state=state)
     cert, key = os.environ.get("TAMANDUA_TLS_CERT", "").strip(), os.environ.get("TAMANDUA_TLS_KEY", "").strip()
-    print(f"Panel: {public_url(port)} (escuchando en {address}:{port}{', TLS' if cert else ''})", flush=True)
+    print(t("cli.server.listening_tls" if cert else "cli.server.listening", url=public_url(port), address=f"{address}:{port}"), flush=True)
     code = state.auth.setup_code()
     if code:
         # Directo a la consola y no al log en fichero: solo quien ve la consola del servidor puede reclamarlo.
-        print("\n" + "=" * 64 + "\n  Primer arranque: crea el administrador en el panel con este código\n"
-              f"      {code}\n  (solo sirve una vez y solo mientras no haya usuarios)\n" + "=" * 64 + "\n", flush=True)
+        print("\n" + "=" * 64 + f"\n  {t('cli.server.setup_code')}\n      {code}\n  {t('cli.server.setup_code_hint')}\n" + "=" * 64 + "\n",
+              flush=True)
     # Sin cabecera Server, sin confiar en X-Forwarded-* (el host permitido lo decide TAMANDUA_ALLOWED_ORIGINS)
     # y con los mismos límites de TLS que antes (1.2 como mínimo).
     uvicorn.run(app, host=address, port=port, log_level="warning", access_log=False, server_header=False, proxy_headers=False,
                 ssl_certfile=cert or None, ssl_keyfile=key or None, timeout_keep_alive=5)
-    print("Panel detenido.", flush=True)
+    print(t("cli.server.stopped"), flush=True)

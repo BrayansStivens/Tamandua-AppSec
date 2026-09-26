@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 from tamandua.modules.integrations import github as github_app
 from tamandua.shared import paths
+from tamandua.shared.i18n import localize
 from tamandua.modules.integrations.github import GitHubAppError, config, install_url
 from tamandua.modules.integrations.installations import clear_github, github_installation, github_installations, load, save_github
 
@@ -45,7 +46,7 @@ class GitHubAppTests(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             state = config()
             self.assertFalse(state["configured"])
-            self.assertEqual(state["missing"], ["App ID", "clave privada", "GITHUB_APP_SLUG"])
+            self.assertEqual(localize(state["missing"], "es"), ["App ID", "clave privada", "GITHUB_APP_SLUG"])
             with self.assertRaises(GitHubAppError):
                 install_url()
 

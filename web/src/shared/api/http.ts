@@ -6,7 +6,8 @@ import { currentLocale } from '@/shared/i18n'
 export class ApiError extends Error {
   status: number
   retryIn?: number
-  constructor(message: string, status: number, retryIn?: number) { super(message); this.status = status; this.retryIn = retryIn }
+  code?: string
+  constructor(message: string, status: number, retryIn?: number, code?: string) { super(message); this.status = status; this.retryIn = retryIn; this.code = code }
 }
 
 export const UNAUTHORIZED_EVENT = 'tamandua:unauthorized'
@@ -31,7 +32,7 @@ async function parse<T>(response: Response, path: string): Promise<T> {
     if (response.status === 401 && !path.startsWith('/api/auth/')) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
     if (response.status === 403 && record.code === 'totp_required') window.dispatchEvent(new Event(TOTP_REQUIRED_EVENT))
     throw new ApiError(record.error ? String(record.error) : `Error ${response.status}`, response.status,
-      typeof record.retry_in === 'number' ? record.retry_in : undefined)
+      typeof record.retry_in === 'number' ? record.retry_in : undefined, typeof record.code === 'string' ? record.code : undefined)
   }
   return body as T
 }

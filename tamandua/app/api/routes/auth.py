@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 
 from tamandua.modules.identity.auth import AuthError, Locked, verify_password
-from tamandua.app.api.routing import Request, route
+from tamandua.app.api.routing import Request, problem, route
 from tamandua.app.api.security import public_url
+from tamandua.shared.i18n import msg
 
 
 def _fields(request: Request, *names: str) -> dict | None:
@@ -20,11 +21,12 @@ def _auth_errors(handler):
         try:
             return handler(request)
         except Locked as exc:
-            return request.json(429, {"error": str(exc), "retry_in": exc.retry_in})
+            return request.json(429, {"error": problem(exc), "retry_in": exc.retry_in})
         except AuthError as exc:
-            return request.json(401 if request.path in ("/api/auth/login", "/api/auth/totp") else 400, {"error": str(exc)})
+            return request.json(401 if request.path in ("/api/auth/login", "/api/auth/totp") else 400,
+                                {"error": problem(exc), **({"code": exc.code} if exc.code else {})})
         except OSError:
-            return request.json(500, {"error": "No se pudo guardar el cambio"})
+            return request.json(500, {"error": msg("api.save_failed")})
     wrapper.__name__ = handler.__name__
     return wrapper
 
@@ -50,7 +52,7 @@ def setup_admin(request: Request):
     """Primer administrador desde la web, con el código de un solo uso que imprimió el servidor."""
     body = _fields(request, "code", "username", "password", "display_name")
     if body is None or not all(isinstance(value, str) for value in body.values()):
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     result = request.auth.setup_admin(body["code"], body["username"], body["password"], body["display_name"], request.client)
     return _signed_in(request, result)
 
@@ -60,7 +62,7 @@ def setup_admin(request: Request):
 def login(request: Request):
     body = _fields(request, "username", "password")
     if body is None:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     result = request.auth.login(body["username"], body["password"], request.client)
     if "challenge" in result:
         return request.json(200, {"step": "totp", "challenge": result["challenge"]})
@@ -72,7 +74,7 @@ def login(request: Request):
 def second_factor(request: Request):
     body = _fields(request, "challenge", "code")
     if body is None:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     return _signed_in(request, request.auth.second_factor(body["challenge"], body["code"], request.client))
 
 
@@ -88,7 +90,7 @@ def logout(request: Request):
 def change_password(request: Request):
     body = _fields(request, "current", "new")
     if body is None:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     fresh = request.auth.change_password(request.user, body["current"], body["new"], request.cookie_header)
     return request.send(200, b'{"changed": true}', "application/json; charset=utf-8",
                         cookie=request.auth.sessions.cookie(fresh, secure=request.secure_cookies))
@@ -98,9 +100,9 @@ def change_password(request: Request):
 @_auth_errors
 def totp_setup(request: Request):
     if request.payload != {}:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     if request.user["totp"].get("enabled"):
-        return request.json(409, {"error": "TOTP ya está activo; desactívalo antes de volver a enrolarlo"})
+        return request.json(409, {"error": msg("auth.errors.totp_already_on")})
     return request.json(200, request.auth.users.begin_totp(request.user["id"]))
 
 
@@ -109,7 +111,7 @@ def totp_setup(request: Request):
 def totp_confirm(request: Request):
     body = _fields(request, "code")
     if body is None:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     auth = request.auth
     codes = auth.users.confirm_totp(request.user["id"], body["code"])
     # Todas las sesiones anteriores eran sin segundo factor: se cierran y esta se reemite ya con él.
@@ -124,11 +126,11 @@ def totp_confirm(request: Request):
 def totp_disable(request: Request):
     body = _fields(request, "password")
     if body is None:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     if not request.user["totp"].get("enabled"):
-        return request.json(409, {"error": "TOTP no está activo"})
+        return request.json(409, {"error": msg("auth.errors.totp_not_on")})
     if not verify_password(request.user["password"], body["password"] if isinstance(body["password"], str) else ""):
-        return request.json(400, {"error": "La contraseña no coincide"})
+        return request.json(400, {"error": msg("auth.errors.password_mismatch")})
     request.auth.users.reset_totp(request.user["id"])
     return request.json(200, {"enabled": False})
 
@@ -150,10 +152,10 @@ def _throttled_link(request: Request, token) -> dict | None:
 def link_check(request: Request):
     body = _fields(request, "token")
     if body is None:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     found = _throttled_link(request, body["token"])
     if found is None:
-        return request.json(404, {"error": "El enlace no es válido o ya caducó; pide otro a un administrador"})
+        return request.json(404, {"error": msg("auth.errors.link_expired")})
     return request.json(200, found)
 
 
@@ -162,7 +164,7 @@ def link_check(request: Request):
 def link_accept(request: Request):
     body = _fields(request, "token", "password")
     if body is None:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     _throttled_link(request, body["token"])
     auth = request.auth
     redeemed = auth.users.redeem_link(body["token"], body["password"])
@@ -190,7 +192,7 @@ def manage_users(request: Request):
     payload, auth, actor = request.payload, request.auth, request.user
     if (not isinstance(payload, dict) or payload.get("action") not in USER_ACTIONS
             or not set(payload) <= USER_ACTIONS[payload["action"]]):
-        return request.json(400, {"error": "Solicitud de usuario inválida"})
+        return request.json(400, {"error": msg("auth.errors.invalid_user_request")})
     action = payload["action"]
     link_url = lambda token: f"{public_url(request.port)}/#link={token}"
     try:
@@ -203,7 +205,7 @@ def manage_users(request: Request):
                                       "expires_in_hours": 72})
         target = auth.users.by_id(payload.get("user_id")) if isinstance(payload.get("user_id"), str) else None
         if target is None:
-            return request.json(404, {"error": "Usuario no encontrado"})
+            return request.json(404, {"error": msg("auth.errors.user_not_found")})
         if action == "reset":
             token = auth.users.issue_link(target["id"], "invite" if target.get("password") is None else "reset")
             return request.json(200, {"user": auth.users.public(auth.users.by_id(target["id"])), "link": link_url(token),
@@ -221,6 +223,6 @@ def manage_users(request: Request):
         request.log.info("user_changed", extra={"user": actor["username"], "reason": f"{action}:{target['username']}"})
         return request.json(200, {"user": auth.users.public(auth.users.by_id(target["id"]))})
     except AuthError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": problem(exc)})
     except OSError:
-        return request.json(500, {"error": "No se pudo guardar el cambio"})
+        return request.json(500, {"error": msg("api.save_failed")})

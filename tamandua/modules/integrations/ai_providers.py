@@ -16,6 +16,7 @@ import json
 import os
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
 
@@ -33,7 +34,11 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 class ProviderError(ValueError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 def _load() -> dict:
@@ -75,10 +80,10 @@ def provider_status() -> list[dict]:
 def save_provider_key(name: str, api_key: str) -> dict:
     """Valida la clave contra el proveedor antes de guardarla; si falla, no se guarda."""
     if name not in PROVIDERS:
-        raise ProviderError("Proveedor no admitido")
+        raise ProviderError(msg("integrations.ai.unsupported"))
     if (not isinstance(api_key, str) or not 20 <= len(api_key) <= 400
             or any(character.isspace() or ord(character) < 33 or ord(character) > 126 for character in api_key)):
-        raise ProviderError("Clave inválida")
+        raise ProviderError(msg("integrations.ai.invalid_key"))
     result = check_provider(name, api_key=api_key)
     if result["status"] != "connected":
         raise ProviderError(result["message"])
@@ -92,7 +97,7 @@ def save_provider_key(name: str, api_key: str) -> dict:
 
 def forget_provider_key(name: str) -> None:
     if name not in PROVIDERS:
-        raise ProviderError("Proveedor no admitido")
+        raise ProviderError(msg("integrations.ai.unsupported"))
     data = _load()
     if data.pop(name, None) is not None:
         _write(data)
@@ -100,12 +105,12 @@ def forget_provider_key(name: str) -> None:
 
 def check_provider(name: str, api_key: str | None = None) -> dict:
     if name not in PROVIDERS:
-        raise ValueError("Proveedor no admitido")
+        raise ProviderError(msg("integrations.ai.unsupported"))
     config = PROVIDERS[name]
     key = api_key or _key(name)
     if not key:
         return {"provider": name, "status": "not_configured",
-                "message": "Añade tu clave de API para habilitar la asistencia con IA"}
+                "message": msg("integrations.ai.not_configured")}
     headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     if name == "openai":
         headers["Authorization"] = f"Bearer {key}"
@@ -117,15 +122,15 @@ def check_provider(name: str, api_key: str | None = None) -> dict:
         with build_opener(_NoRedirect).open(request, timeout=8) as response:
             content = response.read(256_001)
             if len(content) > 256_000:
-                return {"provider": name, "status": "error", "message": "Respuesta demasiado grande"}
+                return {"provider": name, "status": "error", "message": msg("integrations.ai.too_large")}
             payload = json.loads(content)
     except HTTPError as exc:
         status = "invalid_credentials" if exc.code in (401, 403) else "rate_limited" if exc.code == 429 else "error"
         return {"provider": name, "status": status, "http_status": exc.code,
-                "message": "El proveedor rechazó la comprobación"}
+                "message": msg("integrations.ai.rejected")}
     except (URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
-        return {"provider": name, "status": "unreachable", "message": "No se pudo verificar el proveedor"}
+        return {"provider": name, "status": "unreachable", "message": msg("integrations.ai.unreachable")}
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-        return {"provider": name, "status": "error", "message": "Respuesta inesperada del proveedor"}
+        return {"provider": name, "status": "error", "message": msg("integrations.ai.unexpected")}
     return {"provider": name, "status": "connected", "models_visible": len(payload["data"]),
-            "message": "Credencial aceptada; la inferencia y el modelo elegido aún no se han probado"}
+            "message": msg("integrations.ai.connected")}

@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 
 from tamandua.modules.intel.advisories import compare_versions
+from tamandua.shared.i18n import t, text
 
 ORDER = {level: index for index, level in enumerate(("critical", "high", "medium", "low", "info"))}
 
@@ -65,28 +66,34 @@ def fix_groups(findings: list[dict], *, by_rule: bool = False) -> list[dict]:
                                              entry.get("path") or entry["items"][0].get("path") or ""))
 
 
-def action(entry: dict, *, short: bool = False) -> str:
+def action(entry: dict, *, short: bool = False, locale: str | None = None) -> str:
     """Qué hacer, en una frase. `short`: para una celda de tabla (el detalle lleva la guía completa)."""
     if entry.get("malicious"):
         # Código hostil: no hay versión que «corrija», se quita (mismo criterio que la guía de corrección del panel).
-        return f"Eliminar {entry.get('name') or 'el paquete'} {entry.get('version') or ''} y rotar las credenciales de donde se instaló".replace("  ", " ")
+        version = entry.get("version") or ""
+        sentence = (t("findings.remediation.remove_malicious", locale, package=entry["name"], version=version) if entry.get("name")
+                    else t("findings.remediation.remove_malicious_unnamed", locale, version=version))
+        return sentence.replace("  ", " ")
     if entry["kind"] == "package":
         name, count = entry["name"], len(entry["items"])
         fixed = sum(1 for item in entry["items"] if item["package"].get("fixed_version"))
         if entry["target"] and entry["complete"]:
-            return f"Actualizar {name} a {entry['target']}" + (f" (cierra los {count})" if count > 1 else "")
+            return t("findings.remediation.update_all" if count > 1 else "findings.remediation.update", locale,
+                     package=name, version=entry["target"], total=count)
         if entry["target"]:
-            return f"Actualizar {name} a {entry['target']}: cierra {fixed} de {count}; el resto no tiene corrección publicada"
-        return "Sin versión corregida: evaluar alcanzabilidad, mitigar o sustituir" if short else \
-               f"No hay versión corregida de {name}: evalúa alcanzabilidad, mitiga o sustituye la dependencia"
-    text = entry["items"][0].get("remediation") or "Revisar y corregir según la guía del hallazgo"
+            return t("findings.remediation.update_partial", locale, package=name, version=entry["target"], fixed=fixed, total=count)
+        return t("findings.remediation.no_fix_short", locale) if short else t("findings.remediation.no_fix", locale, package=name)
+    guidance = text(entry["items"][0].get("remediation"), locale) or t("findings.remediation.review", locale)
     if short:
-        first = re.split(r"(?<=[.;])\s", text, maxsplit=1)[0]
+        first = re.split(r"(?<=[.;])\s", guidance, maxsplit=1)[0]
         return first if len(first) <= 110 else first[:110].rsplit(" ", 1)[0] + "…"
-    return text
+    return guidance
 
 
-def counts_text(counts: dict[str, int]) -> str:
-    names = {"critical": ("crítica", "críticas"), "high": ("alta", "altas"), "medium": ("media", "medias"),
-             "low": ("baja", "bajas"), "info": ("informativa", "informativas")}
-    return ", ".join(f"{value} {names[level][value != 1]}" for level, value in counts.items())
+SEVERITY_COUNT = {"critical": "findings.remediation.severity_count.critical", "high": "findings.remediation.severity_count.high",
+                  "medium": "findings.remediation.severity_count.medium", "low": "findings.remediation.severity_count.low",
+                  "info": "findings.remediation.severity_count.info"}
+
+
+def counts_text(counts: dict[str, int], *, locale: str | None = None) -> str:
+    return ", ".join(t(SEVERITY_COUNT[level], locale, count=value) for level, value in counts.items())

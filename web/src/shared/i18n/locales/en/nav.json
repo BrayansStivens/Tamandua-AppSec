@@ -1,0 +1,60 @@
+{
+  "tagline": "Eats your bugs",
+  "main": "Main",
+  "workspace": "Workspace",
+  "eyebrow": "Security workspace / 01",
+  "open_navigation": "Open navigation",
+  "last_run": "Last run {{date}}",
+  "role_without_2fa": "{{role}} · no 2FA",
+  "two_factor_off": "Two-factor authentication is off",
+  "groups": {
+    "risk": "Risk", "scanning": "Scanning", "settings": "Settings"
+  },
+  "items": {
+    "overview": "Overview", "findings": "Findings", "threats": "Threats", "coverage": "Coverage", "cves": "CVE tracker",
+    "compliance": "Compliance", "analyses": "Scans", "repositories": "Repositories", "pulls": "Pull requests",
+    "integrations": "Integrations", "users": "Users", "new": "New scan", "account": "Account", "domains": "Web testing"
+  },
+  "descriptions": {
+    "overview": "What risks your code, dependencies and images carry, why they matter and how to fix them.",
+    "analyses": "Scan history for this workspace, with type, status and results.",
+    "new": "Choose the target, declare the scope and review what will run before you launch.",
+    "repositories": "Connect your repositories and choose the code you want to scan.",
+    "domains": "This area doesn't produce real results yet; you'll see it here when it's ready.",
+    "integrations": "Manage code providers and check the AI status.",
+    "account": "Your access: password and two-factor authentication.",
+    "users": "Invite your team, assign roles and revoke access.",
+    "pulls": "Each PR is reviewed for what it introduces, not for what was already there.",
+    "cves": "Every vulnerability published in NVD, with active exploitation (KEV) and exploit probability (EPSS), searchable locally.",
+    "compliance": "EU Cyber Resilience Act reporting deadlines for your products, with the draft ready. Export the SBOM and VEX from Findings.",
+    "threats": "Model the system with the approach you prefer (STRIDE, LINDDUN, PASTA, attack trees, ATT&CK) and check the threats against your scans.",
+    "default": "Results for the selected target, with steps and coverage limits in plain view."
+  },
+  "theme": {
+    "label": "Appearance", "system": "System", "light": "Light", "dark": "Dark"
+  },
+  "toast": {
+    "repository": "repository",
+    "image": "image",
+    "failed": "The {{name}} scan failed.",
+    "done_one": "{{name}} scan finished: {{count}} finding.",
+    "done_other": "{{name}} scan finished: {{count}} findings.",
+    "done_severities_one": "{{name}} scan finished: {{count}} finding ({{critical}} critical, {{high}} high).",
+    "done_severities_other": "{{name}} scan finished: {{count}} findings ({{critical}} critical, {{high}} high)."
+  },
+  "dast": {
+    "title": "Dynamic web and API application testing (DAST)",
+    "description": "Dynamic testing (DAST) against your running applications, only on domains you've proven you own.",
+    "plan": {
+      "dns": "Domain ownership verification through a DNS TXT record (already built; it turns on with the rest)",
+      "scan": "Active scanning with ZAP or Nuclei in an isolated container, with rate and scope limits",
+      "auth": "Sign-in to the application with a test account you declare",
+      "evidence": "Findings with the request and response that prove them, in the same lifecycle as code findings"
+    }
+  },
+  "footer": "{{name}} · free software under <license>AGPL-3.0</license> · <source>source code</source> · a clean result doesn't prove there are no vulnerabilities.",
+  "update": {
+    "message": "A new version of the panel is available. Reload to use it, but save any unsaved work first.",
+    "reload": "Reload"
+  }
+}

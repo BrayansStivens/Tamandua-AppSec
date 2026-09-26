@@ -31,6 +31,7 @@ import time
 from pathlib import Path
 
 from tamandua.modules.scanning.engines import _base, _relative, _result, _run, _stable, docker_available, with_cause
+from tamandua.shared.i18n import msg, text
 
 CHECKOV_FRAMEWORKS = ("terraform", "terraform_json", "cloudformation", "kubernetes", "helm", "kustomize", "dockerfile",
                       "arm", "bicep", "serverless", "openapi", "ansible", "github_actions", "gitlab_ci",
@@ -161,8 +162,8 @@ def _words(text: str) -> set[str]:
     return {_SYNONYMS.get(word, word) for word in re.findall(r"[a-z0-9]+", text.lower()) if word not in _STOP}
 
 
-def similar(a: str, b: str) -> float:
-    left, right = _words(a), _words(b)
+def similar(a, b) -> float:
+    left, right = _words(text(a, "en")), _words(text(b, "en"))
     return len(left & right) / max(1, len(left | right))
 
 
@@ -255,24 +256,26 @@ def parse_checkov(payload, *, image: dict | None = None, step_of: dict[int, int]
             start, end = (list(entry.get("file_line_range") or [1, 1]) + [1, 1])[:2]
             start, end = max(1, int(start or 1)), max(1, int(end or 1))
             resource = str(entry.get("resource") or "")
-            label = FRAMEWORK_LABEL.get(framework, framework or "configuración")
+            label = FRAMEWORK_LABEL.get(framework, framework or "IaC")
             severity = checkov_severity(rule, name)
             if image is not None:
                 step = (step_of or {}).get(start) if start == end else None
                 path = f"historial, paso {step + 1}" if step is not None else "configuración de la imagen"
                 digest = _stable("image-config", rule, image["asset"], str(step) if step is not None else "image")
                 finding = _base("iac", rule, name or rule, path, 1, severity, tool="checkov",
-                                reason=f"Checkov ({rule}) sobre el Dockerfile reconstruido del historial de la imagen"
-                                       + (f", paso {step + 1}." if step is not None else "."),
-                                remediation=f"Corrige el Dockerfile que genera la imagen para cumplir «{name}». Índice de reglas: {POLICY_INDEX}",
+                                reason=msg("scanning.checkov.image_reason_step", rule=rule, step=step + 1) if step is not None
+                                else msg("scanning.checkov.image_reason", rule=rule),
+                                remediation=msg("scanning.checkov.image_remediation", check=name or rule, index=POLICY_INDEX),
                                 cwe=[1188], owasp="A02:2025", confidence=6, digest=digest)
             else:
                 path = _relative(str(entry.get("repo_file_path") or entry.get("file_path") or "")).lstrip("/")
                 pipeline = framework in PIPELINE_FRAMEWORKS
                 digest = _stable("cicd" if pipeline else "iac", rule, path, resource or f"{start}-{end}")
                 finding = _base("cicd" if pipeline else "iac", rule, name or rule, path, start, severity, tool="checkov",
-                                reason=f"{label}: {resource or path} no cumple la regla {rule} de Checkov (líneas {start}–{end}).",
-                                remediation=f"Ajusta {resource or 'el recurso'} para cumplir «{name}». Índice de reglas: {POLICY_INDEX}",
+                                reason=msg("scanning.checkov.reason", framework=label, resource=resource or path, rule=rule,
+                                           start=start, end=end),
+                                remediation=msg("scanning.checkov.remediation", resource=resource, check=name or rule, index=POLICY_INDEX)
+                                if resource else msg("scanning.checkov.remediation_generic", check=name or rule, index=POLICY_INDEX),
                                 cwe=[829 if pipeline else 1188], owasp="A03:2025" if pipeline else "A02:2025",
                                 confidence=7, digest=digest)
                 finding["end_line"] = end
@@ -291,21 +294,21 @@ def _checkov(arguments: list[str], mount: Path, timeout: int) -> subprocess.Comp
 def run_checkov(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():
-        return _result("checkov", "not_tested", "Docker no disponible: infraestructura y pipelines con Checkov no se ejecutaron.")
+        return _result("checkov", "not_tested", msg("scanning.checkov.no_docker"))
     try:
         completed = _checkov(["--directory", "/src", "--framework", *CHECKOV_FRAMEWORKS], snapshot, 900)
         text = completed.stdout.strip()
         payload = json.loads(text) if text.startswith(("[", "{")) else []
     except subprocess.TimeoutExpired:
-        return _result("checkov", "inconclusive", "Checkov superó el tiempo máximo; infraestructura y pipelines no concluyeron.", started=started)
+        return _result("checkov", "inconclusive", msg("scanning.checkov.timeout"), started=started)
     except (OSError, ValueError):
-        return _result("checkov", "inconclusive", "Checkov no devolvió una salida legible.", started=started)
+        return _result("checkov", "inconclusive", msg("scanning.engines.unreadable", engine="Checkov"), started=started)
     if completed.returncode not in (0, 1) and not payload:
-        return _result("checkov", "inconclusive", with_cause("Checkov terminó con error antes de producir resultados", completed), started=started)
+        return _result("checkov", "inconclusive", with_cause(msg("scanning.engines.failed_early", engine="Checkov"), completed), started=started)
     findings = parse_checkov(payload)
     frameworks = sorted({item["framework"] for item in findings})
-    detail = (f"{len(findings)} fallos de configuración en " + ", ".join(frameworks) + "."
-              if findings else "Sin fallos en la infraestructura como código ni en los pipelines del repositorio.")
+    detail = (msg("scanning.checkov.detail", failures=len(findings), frameworks=", ".join(frameworks))
+              if findings else msg("scanning.checkov.clean"))
     return _result("checkov", "completed", detail, findings, started)
 
 
@@ -355,11 +358,11 @@ def run_checkov_image(metadata: dict, image: dict, work_dir: Path) -> dict:
     carpeta temporal que se borra al terminar y el contenedor no tiene red."""
     started = time.time()
     if not docker_available():
-        return _result("checkov", "not_tested", "Docker no disponible: Checkov no revisó la configuración de la imagen.")
+        return _result("checkov", "not_tested", msg("scanning.checkov.image_no_docker"))
     config_block = metadata.get("ImageConfig") or {}
     history = [str(item.get("created_by") or "") for item in config_block.get("history") or []]
     if not history:
-        return _result("checkov", "not_tested", "La imagen no guarda historial de construcción: Checkov no tiene Dockerfile que revisar.", started=started)
+        return _result("checkov", "not_tested", msg("scanning.checkov.image_no_history"), started=started)
     dockerfile, step_of = dockerfile_from_history(history, config_block.get("config") or {})
     work_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="checkov-image-", dir=work_dir) as folder:
@@ -369,45 +372,45 @@ def run_checkov_image(metadata: dict, image: dict, work_dir: Path) -> dict:
             text = completed.stdout.strip()
             payload = json.loads(text) if text.startswith(("[", "{")) else []
         except subprocess.TimeoutExpired:
-            return _result("checkov", "inconclusive", "Checkov superó el tiempo máximo con el historial de la imagen.", started=started)
+            return _result("checkov", "inconclusive", msg("scanning.checkov.image_timeout"), started=started)
         except (OSError, ValueError):
-            return _result("checkov", "inconclusive", "Checkov no devolvió una salida legible.", started=started)
+            return _result("checkov", "inconclusive", msg("scanning.engines.unreadable", engine="Checkov"), started=started)
     findings = parse_checkov(payload, image=image, step_of=step_of)
-    return _result("checkov", "completed", f"{len(findings)} fallos en el Dockerfile reconstruido de {len(step_of)} pasos del historial.",
+    return _result("checkov", "completed", msg("scanning.checkov.image_detail", failures=len(findings), steps=len(step_of)),
                    findings, started)
 
 
 # --- zizmor ------------------------------------------------------------------------------------
 
-# Audiencia de zizmor → (título en español, CWE). Las que no están usan la descripción de zizmor.
+# zizmor audit → (our title, CWE). Audits not listed use zizmor's own description.
 ZIZMOR_AUDITS = {
-    "template-injection": ("Inyección de código en una plantilla de GitHub Actions", 94),
-    "dangerous-triggers": ("Disparador peligroso: el workflow corre con permisos del repositorio ante código ajeno", 863),
-    "excessive-permissions": ("Permisos del GITHUB_TOKEN más amplios de lo necesario", 250),
-    "unpinned-uses": ("Acción de terceros sin fijar por SHA", 829),
-    "artipacked": ("Las credenciales de git quedan guardadas tras actions/checkout", 522),
-    "cache-poisoning": ("Riesgo de envenenamiento de la caché en un workflow de publicación", 349),
-    "archived-uses": ("Se usa una acción de un repositorio archivado (ya no recibe parches)", 1104),
-    "insecure-commands": ("Comandos inseguros de workflow habilitados (ACTIONS_ALLOW_UNSECURE_COMMANDS)", 77),
-    "github-env": ("Escritura peligrosa en GITHUB_ENV o GITHUB_PATH", 94),
-    "hardcoded-container-credentials": ("Credenciales fijas de un contenedor o servicio en el workflow", 798),
-    "self-hosted-runner": ("Runner autoalojado expuesto a código no confiable", 250),
-    "secrets-inherit": ("Un workflow reutilizable hereda todos los secretos", 250),
-    "overprovisioned-secrets": ("Se exponen más secretos de los necesarios", 250),
-    "unredacted-secrets": ("Secretos que pueden salir sin censurar en los logs", 532),
-    "bot-conditions": ("Condición de bot suplantable", 290),
-    "unsound-condition": ("Condición que siempre se cumple", 670),
-    "unsound-contains": ("contains() que se puede burlar", 697),
-    "unpinned-images": ("Imagen de contenedor sin fijar por digest", 829),
-    "use-trusted-publishing": ("Publicación con token cuando se puede usar trusted publishing", 522),
-    "obfuscation": ("Expresión ofuscada en el workflow", 506),
-    "forbidden-uses": ("Acción no permitida por la política", 829),
-    "ref-version-mismatch": ("El comentario de versión no coincide con el SHA fijado", 1104),
-    "anonymous-definition": ("Workflow o job sin nombre", 1104),
-    "dependabot-cooldown": ("Dependabot sin periodo de espera antes de actualizar", 1104),
-    "dependabot-execution": ("Dependabot puede ejecutar código externo al actualizar", 829),
-    "concurrency-limits": ("Workflow sin límite de concurrencia", 400),
-    "undocumented-permissions": ("Permisos sin justificar en un comentario", 1104),
+    "template-injection": (msg("scanning.zizmor.audits.template_injection"), 94),
+    "dangerous-triggers": (msg("scanning.zizmor.audits.dangerous_triggers"), 863),
+    "excessive-permissions": (msg("scanning.zizmor.audits.excessive_permissions"), 250),
+    "unpinned-uses": (msg("scanning.zizmor.audits.unpinned_uses"), 829),
+    "artipacked": (msg("scanning.zizmor.audits.artipacked"), 522),
+    "cache-poisoning": (msg("scanning.zizmor.audits.cache_poisoning"), 349),
+    "archived-uses": (msg("scanning.zizmor.audits.archived_uses"), 1104),
+    "insecure-commands": (msg("scanning.zizmor.audits.insecure_commands"), 77),
+    "github-env": (msg("scanning.zizmor.audits.github_env"), 94),
+    "hardcoded-container-credentials": (msg("scanning.zizmor.audits.hardcoded_container_credentials"), 798),
+    "self-hosted-runner": (msg("scanning.zizmor.audits.self_hosted_runner"), 250),
+    "secrets-inherit": (msg("scanning.zizmor.audits.secrets_inherit"), 250),
+    "overprovisioned-secrets": (msg("scanning.zizmor.audits.overprovisioned_secrets"), 250),
+    "unredacted-secrets": (msg("scanning.zizmor.audits.unredacted_secrets"), 532),
+    "bot-conditions": (msg("scanning.zizmor.audits.bot_conditions"), 290),
+    "unsound-condition": (msg("scanning.zizmor.audits.unsound_condition"), 670),
+    "unsound-contains": (msg("scanning.zizmor.audits.unsound_contains"), 697),
+    "unpinned-images": (msg("scanning.zizmor.audits.unpinned_images"), 829),
+    "use-trusted-publishing": (msg("scanning.zizmor.audits.use_trusted_publishing"), 522),
+    "obfuscation": (msg("scanning.zizmor.audits.obfuscation"), 506),
+    "forbidden-uses": (msg("scanning.zizmor.audits.forbidden_uses"), 829),
+    "ref-version-mismatch": (msg("scanning.zizmor.audits.ref_version_mismatch"), 1104),
+    "anonymous-definition": (msg("scanning.zizmor.audits.anonymous_definition"), 1104),
+    "dependabot-cooldown": (msg("scanning.zizmor.audits.dependabot_cooldown"), 1104),
+    "dependabot-execution": (msg("scanning.zizmor.audits.dependabot_execution"), 829),
+    "concurrency-limits": (msg("scanning.zizmor.audits.concurrency_limits"), 400),
+    "undocumented-permissions": (msg("scanning.zizmor.audits.undocumented_permissions"), 1104),
 }
 ZIZMOR_SEVERITY = {"high": "high", "medium": "medium", "low": "low", "informational": "info", "unknown": "low"}
 ZIZMOR_CONFIDENCE = {"high": 8, "medium": 6, "low": 4, "unknown": 4}
@@ -435,8 +438,9 @@ def parse_zizmor(payload: list) -> list[dict]:
         annotation = str((primary.get("symbolic") or {}).get("annotation") or "").strip()
         digest = _stable("cicd", ident, path, str(line))
         finding = _base("cicd", ident, title, path, line, severity, tool="zizmor",
-                        reason=(str(entry.get("desc") or title).rstrip(".") + (f": {annotation}" if annotation else "") + f" ({path}:{line})."),
-                        remediation=f"Guía y corrección de zizmor: {entry.get('url') or 'https://docs.zizmor.sh/audits/'}",
+                        reason=msg("scanning.zizmor.reason_annotated" if annotation else "scanning.zizmor.reason",
+                                   description=str(entry.get("desc") or "").rstrip(".") or title, annotation=annotation, path=path, line=line),
+                        remediation=msg("scanning.zizmor.remediation", url=entry.get("url") or "https://docs.zizmor.sh/audits/"),
                         cwe=[cwe], owasp="A03:2025", confidence=ZIZMOR_CONFIDENCE.get(str(determinations.get("confidence") or "").lower(), 6),
                         digest=digest)
         finding["end_line"] = max(line, end)
@@ -457,23 +461,23 @@ def github_actions_files(snapshot: Path) -> list[Path]:
 def run_zizmor(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():
-        return _result("zizmor", "not_tested", "Docker no disponible: los workflows de GitHub Actions no se auditaron con zizmor.")
+        return _result("zizmor", "not_tested", msg("scanning.zizmor.no_docker"))
     audited = github_actions_files(snapshot)
     if not audited:
-        return _result("zizmor", "completed", "El repositorio no tiene workflows ni acciones de GitHub que auditar.", started=started)
+        return _result("zizmor", "completed", msg("scanning.zizmor.nothing_to_audit"), started=started)
     try:
         completed = _run("zizmor", ["--offline", "--no-exit-codes", "--no-progress", "--format", "json", "/src"], snapshot, timeout=300)
         payload = json.loads(completed.stdout or "[]")
     except subprocess.TimeoutExpired:
-        return _result("zizmor", "inconclusive", "zizmor superó el tiempo máximo.", started=started)
+        return _result("zizmor", "inconclusive", msg("scanning.engines.timeout", engine="zizmor"), started=started)
     except (OSError, ValueError):
-        return _result("zizmor", "inconclusive", "zizmor no devolvió una salida legible.", started=started)
+        return _result("zizmor", "inconclusive", msg("scanning.engines.unreadable", engine="zizmor"), started=started)
     if completed.returncode != 0 and not payload:
-        return _result("zizmor", "inconclusive", with_cause("zizmor terminó con error antes de producir resultados", completed), started=started)
+        return _result("zizmor", "inconclusive", with_cause(msg("scanning.engines.failed_early", engine="zizmor"), completed), started=started)
     findings = parse_zizmor(payload)
     affected = len({item["path"] for item in findings})
-    detail = (f"{len(audited)} workflows o acciones de GitHub auditados sin conexión: "
-              + (f"{len(findings)} problemas en {affected} de ellos." if findings else "sin problemas."))
+    detail = (msg("scanning.zizmor.detail", audited=len(audited), problems=len(findings), affected=affected)
+              if findings else msg("scanning.zizmor.clean", audited=len(audited)))
     return _result("zizmor", "completed", detail, findings, started)
 
 

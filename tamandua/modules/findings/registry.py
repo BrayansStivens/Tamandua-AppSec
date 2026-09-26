@@ -34,6 +34,7 @@ from tamandua.shared.db import TENANT
 
 from tamandua.modules.runs.kinds import FINDING_RUNS, FULL_SCANS
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import msg, text
 from tamandua.modules.findings import sla
 from tamandua.modules.findings import triage
 from tamandua.modules.sources.assets import asset_key
@@ -104,7 +105,7 @@ def _reopen_manual(data_dir: Path, record: dict, fingerprints: set[str]) -> None
     back = [digest for digest in fingerprints if (decisions.get(digest) or {}).get("status") == "fixed"
             and (decisions[digest].get("at") or "") < stamp]
     if back:
-        triage.decide(data_dir, record, back, "open", note=f"Reapareció en la ejecución {record['id'][:12]}",
+        triage.decide(data_dir, record, back, "open", system_note=msg("findings.registry.reappeared", run=record["id"][:12]),
                       user={"username": "sistema", "role": "admin"})
 
 
@@ -157,9 +158,9 @@ def apply(data_dir: Path, record: dict) -> dict:
             origin = entry.get("origin") or {}
             # Un aviso nuevo afecta a la rama principal: el siguiente análisis completo sin él lo da por corregido.
             if record["type"] in FULL_SCANS and (origin.get("kind") in ("scan", "advisory") or origin.get("merged")):
-                how = f"Ya no aparece en el escaneo completo del {stamp[:10]}"
+                how = msg("findings.registry.gone_from_scan", date=stamp[:10])
             elif record["type"] == "pr_review" and origin.get("kind") == "pr" and origin.get("pr") == pull.get("number"):
-                how = f"Corregido en el commit {str(pull.get('head_sha') or '')[:7]} del PR #{pull.get('number')}"
+                how = msg("findings.registry.fixed_in_pr", commit=str(pull.get("head_sha") or "")[:7], number=pull.get("number"))
             else:
                 continue
             entry.update(status="fixed", fixed={"at": stamp, "run_id": record["id"], "how": how, "auto": True})
@@ -202,7 +203,7 @@ def pull_closed(data_dir: Path, key: str, number: int, *, merged: bool, when: st
             if merged:
                 origin["merged"] = True
             else:
-                entry.update(status="fixed", fixed={"at": when, "run_id": None, "how": f"El PR #{number} se cerró sin merge", "auto": True})
+                entry.update(status="fixed", fixed={"at": when, "run_id": None, "how": msg("findings.registry.pr_closed", number=number), "auto": True})
             changed += 1
         if changed:
             _save(data_dir, state)
@@ -297,10 +298,17 @@ def assets_with_cve(data_dir: Path, cve: str) -> list[dict]:
             by_asset.setdefault(key, []).append(entry)
         names = dict(connection.execute(select(registry_assets.c.asset_key, registry_assets.c.name)
                                         .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key.in_(list(by_asset)))).all())
+    def packages(hits: list[dict]) -> list:
+        # Titles may be messages: dedup and sort by their text, return the values as stored (rendered by the reader).
+        labels = {}
+        for entry in hits:
+            value = (entry["finding"].get("package") or {}).get("name") or entry["finding"].get("title", "")
+            labels.setdefault(text(value, "en"), value)
+        return [labels[label] for label in sorted(labels)][:5]
     return [{"asset": key, "name": names.get(key) or key,
              "open": sum(1 for entry in hits if entry.get("status") == "open"),
              "fixed": sum(1 for entry in hits if entry.get("status") == "fixed"),
-             "packages": sorted({(entry["finding"].get("package") or {}).get("name") or entry["finding"].get("title", "") for entry in hits})[:5]}
+             "packages": packages(hits)}
             for key, hits in by_asset.items()]
 
 

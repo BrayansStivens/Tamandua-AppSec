@@ -23,26 +23,13 @@ from tamandua.modules.intel.advisories import load_feeds, load_recent_cves
 from tamandua.modules.sources.assets import asset_key
 from tamandua.modules.runs.store import list_runs, load_run
 from tamandua.modules.findings.triage import annotate, is_active, load as load_triage
+from tamandua.shared.i18n import msg
 
 SEVERITIES = ("critical", "high", "medium", "low")
-CWE_NAMES = {
-    79: "Cross-site scripting", 89: "Inyección SQL", 78: "Inyección de comandos", 22: "Path traversal",
-    502: "Deserialización insegura", 798: "Credenciales embebidas", 295: "Validación de certificado",
-    918: "SSRF", 601: "Redirección abierta", 347: "Verificación de firma", 327: "Criptografía débil",
-    328: "Hash débil", 916: "Hash de contraseña débil", 95: "Eval de código", 1333: "ReDoS", 1321: "Prototype pollution",
-    400: "Consumo de recursos sin límite", 770: "Asignación sin límites", 20: "Validación de entrada", 200: "Exposición de información",
-    287: "Autenticación incorrecta", 352: "CSRF", 611: "XXE", 94: "Inyección de código", 1104: "Componente vulnerable",
-    285: "Autorización incorrecta", 306: "Sin autenticación", 74: "Inyección", 1336: "Inyección de plantilla", 915: "Asignación masiva",
-    # Las más comunes en paquetes del sistema (imágenes): memoria y recursos.
-    125: "Lectura fuera de límites", 787: "Escritura fuera de límites", 119: "Desbordamiento de búfer", 120: "Copia de búfer sin comprobar",
-    416: "Uso tras liberar", 415: "Doble liberación", 476: "Desreferencia de puntero nulo", 190: "Desbordamiento de entero",
-    191: "Subdesbordamiento de entero", 401: "Fuga de memoria", 404: "Liberación de recursos incorrecta", 674: "Recursión sin control",
-    835: "Bucle infinito", 362: "Condición de carrera", 367: "TOCTOU", 369: "División por cero", 908: "Memoria sin inicializar",
-    459: "Limpieza incompleta", 59: "Seguimiento de enlaces", 732: "Permisos incorrectos", 269: "Gestión de privilegios", 522: "Credenciales poco protegidas",
-    319: "Transmisión en claro", 297: "Validación de nombre de host", 330: "Aleatoriedad insuficiente", 203: "Canal lateral por diferencias",
-    444: "HTTP request smuggling", 113: "Inyección CRLF", 117: "Inyección en logs", 23: "Path traversal relativo", 434: "Subida de archivos sin restricción",
-    639: "Autorización por clave de usuario (IDOR)", 862: "Sin autorización", 863: "Autorización incorrecta", 1395: "Componente de terceros vulnerable",
-}
+# CWEs with a short name in the catalog (`reports.dashboard.cwe.<id>`).
+CWE_NAMED = frozenset((79, 89, 78, 22, 502, 798, 295, 918, 601, 347, 327, 328, 916, 95, 1333, 1321, 400, 770, 20, 200, 287, 352, 611, 94,
+                       1104, 285, 306, 74, 1336, 915, 125, 787, 119, 120, 416, 415, 476, 190, 191, 401, 404, 674, 835, 362, 367, 369, 908,
+                       459, 59, 732, 269, 522, 319, 297, 330, 203, 444, 113, 117, 23, 434, 639, 862, 863, 1395))
 
 
 def _day(stamp: str) -> str:
@@ -79,7 +66,7 @@ def _score(open_by_severity: dict, kev: int = 0, high_epss: int = 0) -> dict:
     risk = (8 * open_by_severity.get("critical", 0) + 3 * open_by_severity.get("high", 0)
             + 0.8 * open_by_severity.get("medium", 0) + 0.1 * open_by_severity.get("low", 0) + 15 * kev + 5 * high_epss)
     return {"value": round(100 * math.exp(-risk / 150), 1), "risk": round(risk, 1),
-            "formula": "100·e^(−riesgo/150); riesgo = 8·críticos + 3·altos + 0,8·medios + 0,1·bajos + 15·en KEV + 5·EPSS ≥ 10 %"}
+            "formula": msg("reports.dashboard.score_formula")}
 
 
 def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dict:
@@ -247,7 +234,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                              for offset in range(days, -1, -1)],
         "open_vs_fixed": open_vs_fixed,
         "top_assets": top_assets[:10],
-        "by_cwe": [{"cwe": cwe, "name": CWE_NAMES.get(cwe), "count": count} for cwe, count in cwe_counter.most_common(8)],
+        "by_cwe": [{"cwe": cwe, "name": msg(f"reports.dashboard.cwe.{cwe}") if cwe in CWE_NAMED else None, "count": count} for cwe, count in cwe_counter.most_common(8)],
         "exploitability": {"kev": kev_items[:25], "high_epss": epss_items[:25], "kev_total": len(kev_items), "epss_total": len(epss_items)},
         "activity": year,
         "recent_runs": rows[:8],

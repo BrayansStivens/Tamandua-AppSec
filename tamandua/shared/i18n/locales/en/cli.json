@@ -1,0 +1,42 @@
+{
+  "error": "Error: {{detail}}",
+  "server": {
+    "insecure_http": "TAMANDUA_PUBLIC_URL={{url}} serves the panel over plain HTTP. Use HTTPS (TAMANDUA_TLS_CERT/TAMANDUA_TLS_KEY or a proxy such as Caddy in front) or, only on a trusted network and at your own risk, TAMANDUA_ALLOW_INSECURE_HTTP=1.",
+    "port_out_of_range": "Port out of range",
+    "listening": "Panel: {{url}} (listening on {{address}})",
+    "listening_tls": "Panel: {{url}} (listening on {{address}}, TLS)",
+    "setup_code": "First start: create the administrator in the panel with this code",
+    "setup_code_hint": "(it works once, and only while there are no users)",
+    "stopped": "Panel stopped."
+  },
+  "worker": {
+    "started": "Worker running: it picks up queued analyses.",
+    "stopped": "Worker stopped."
+  },
+  "migrations": {
+    "data_too_new": "The data in {{path}} comes from a newer Tamandua (format {{version}}; this one understands up to {{latest}}). Update Tamandua or restore an earlier backup."
+  },
+  "demo": {
+    "no_fixtures": "Can't find the examples in {{path}}",
+    "analyzing_one": "Analyzing 1 example file with Tamandua's engines…",
+    "analyzing_other": "Analyzing {{count}} example files with Tamandua's engines…",
+    "code_done_one": "Code: 1 finding ({{status}}).",
+    "code_done_other": "Code: {{count}} findings ({{status}}).",
+    "model_exists": "Example threat model: already imported.",
+    "model_imported": "Example threat model imported: \"{{name}}\".",
+    "analyzing_image": "Analyzing the image {{reference}} (read from the registry; it can take a couple of minutes)…",
+    "image_done_one": "Image: 1 finding ({{status}}).",
+    "image_done_other": "Image: {{count}} findings ({{status}}).",
+    "ready": "Done: open the panel and look at Overview, Findings and Threats."
+  },
+  "engines": {
+    "ready": "ready",
+    "missing": "missing"
+  },
+  "users": {
+    "password_prompt": "Password (at least {{min}} characters): ",
+    "password_repeat": "Repeat the password: ",
+    "next_steps": "Sign in to the panel and turn on TOTP from Account.",
+    "sessions_closed": "Sessions closed: {{count}}"
+  }
+}

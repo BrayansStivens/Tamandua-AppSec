@@ -1,0 +1,64 @@
+{
+  "loading": "Cargando cumplimiento",
+  "loading_events": "Cargando notificaciones",
+  "cra": {
+    "title": "Reglamento de Ciberresiliencia (CRA) · notificación de vulnerabilidades",
+    "description": "Desde el 11-09-2026, si vendes en la UE un producto con software, cada vulnerabilidad suya que se explote activamente se notifica por la plataforma única de ENISA (al CSIRT coordinador y a ENISA): alerta temprana en 24 h, notificación en 72 h e informe final 14 días después de tener la corrección. Aquí ves esos plazos para tus productos; la explotación activa sale del catálogo CISA KEV.",
+    "how_to_report": "Cómo se notifica (Comisión Europea)"
+  },
+  "events": {
+    "pending_one": "{{count}} posible notificación",
+    "pending_other": "{{count}} posibles notificaciones",
+    "none_pending": "Sin notificaciones pendientes",
+    "no_products": "Marca primero qué repositorios o imágenes son productos bajo el CRA.",
+    "not_scanned": "Tus productos aún no tienen un análisis completo terminado: sin él no se puede saber si hay algo que notificar.",
+    "none_in_kev": "Ninguna vulnerabilidad de tus productos analizados está en el catálogo CISA KEV. Se revisa en cada análisis.",
+    "unscanned_one": "{{count}} sin análisis completo.",
+    "unscanned_other": "{{count}} sin análisis completo."
+  },
+  "products": {
+    "title": "Productos bajo el CRA",
+    "title_none": "Productos bajo el CRA: ninguno",
+    "supported_until": "{{asset}} · soporte hasta {{date}}",
+    "not_scanned": "Sin análisis completo terminado: lánzalo para saber si hay algo que notificar.",
+    "remove": "Quitar {{name}} de los productos CRA",
+    "scan_first": "Analiza primero un repositorio o una imagen.",
+    "new_scan": "Nuevo análisis",
+    "mark": "Marcar un producto",
+    "admin_only": "Solo un administrador marca productos y registra las notificaciones.",
+    "asset": "Repositorio o imagen",
+    "choose": "Elige…",
+    "name": "Nombre comercial del producto",
+    "support_until": "Soporte hasta"
+  },
+  "event": {
+    "ransomware": "ransomware",
+    "fixed": "corregida",
+    "in_kev": "en KEV desde {{date}}",
+    "clock": "el plazo cuenta desde {{date}}",
+    "candidate": "Candidata del escáner: confirma que afecta al producto antes de notificar.",
+    "copy_draft": "Copiar borrador",
+    "draft_copied": "Borrador copiado",
+    "hide_draft": "Ocultar",
+    "view_draft": "Ver borrador",
+    "draft_label": "Borrador de {{cve}}"
+  },
+  "stage": {
+    "sent_by": "Enviada por {{by}}, {{date}}",
+    "waiting": "Empieza cuando haya corrección",
+    "mark": "Marcar como enviada",
+    "unmark": "Desmarcar",
+    "mark_label": "Marcar como enviada: {{stage}} de {{cve}}",
+    "unmark_label": "Desmarcar: {{stage}} de {{cve}}"
+  },
+  "due": {
+    "overdue_days_one": "vencida hace {{count}} día",
+    "overdue_days_other": "vencida hace {{count}} días",
+    "overdue_hours_one": "vencida hace {{count}} h",
+    "overdue_hours_other": "vencida hace {{count}} h",
+    "left_days_one": "queda {{count}} día",
+    "left_days_other": "quedan {{count}} días",
+    "left_hours_one": "queda {{count}} h",
+    "left_hours_other": "quedan {{count}} h"
+  }
+}

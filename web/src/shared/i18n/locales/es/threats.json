@@ -1,0 +1,627 @@
+{
+  "assets": {
+    "project": "Del proyecto",
+    "others": "Otros",
+    "all": "Repositorios y dominios"
+  },
+  "tones": {
+    "neutral": "Gris",
+    "brand": "Morado",
+    "info": "Azul",
+    "success": "Verde",
+    "warning": "Amarillo",
+    "attention": "Naranja",
+    "danger": "Rojo"
+  },
+  "legend": {
+    "clients": "Aplicaciones cliente",
+    "services": "APIs, servicios y tareas",
+    "data": "Datos",
+    "identity": "Identidad",
+    "actors": "Actores y terceros"
+  },
+  "count": {
+    "components_one": "{{count}} componente",
+    "components_other": "{{count}} componentes",
+    "flows_one": "{{count}} flujo",
+    "flows_other": "{{count}} flujos",
+    "boundaries_one": "{{count}} frontera",
+    "boundaries_other": "{{count}} fronteras",
+    "threats_one": "{{count}} amenaza",
+    "threats_other": "{{count}} amenazas",
+    "open_findings_one": "{{count}} hallazgo abierto de los análisis",
+    "open_findings_other": "{{count}} hallazgos abiertos de los análisis",
+    "manual_threats_one": "{{count}} amenaza propia",
+    "manual_threats_other": "{{count}} amenazas propias",
+    "trees_one": "{{count}} árbol",
+    "trees_other": "{{count}} árboles",
+    "techniques_one": "{{count}} técnica",
+    "techniques_other": "{{count}} técnicas",
+    "pasta_stages_one": "{{count}} etapa PASTA",
+    "pasta_stages_other": "{{count}} etapas PASTA",
+    "pending_refs_one": "{{count}} referencia pendiente",
+    "pending_refs_other": "{{count}} referencias pendientes"
+  },
+  "level": {
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta"
+  },
+  "status": {
+    "evidenced": "Con indicios",
+    "open": "Abierta",
+    "mitigated": "Mitigada",
+    "accepted": "Aceptada",
+    "not_applicable": "No aplica"
+  },
+  "methods": {
+    "picker_label": "Enfoque de modelado",
+    "recommended": "Recomendado para empezar",
+    "dialog_title": "Enfoque del modelo",
+    "dialog_description": "El diagrama, las amenazas propias y las decisiones se conservan al cambiar de enfoque; solo cambia cómo se analiza.",
+    "use": "Usar {{name}}"
+  },
+  "guide": {
+    "title": "Guía de {{name}}",
+    "close": "Cerrar la guía",
+    "when": "Cuándo:",
+    "property": "Protege: {{property}}.",
+    "how": "Cómo se hace"
+  },
+  "guides": {
+    "stride": {
+      "name": "STRIDE",
+      "purpose": "Revisar amenazas de seguridad en componentes y flujos: suplantación, manipulación, repudio, exposición de información, denegación de servicio y elevación de privilegios.",
+      "when": "Buen punto de partida para una aplicación web o una API. Tamandua propone las amenazas con reglas sobre el diagrama.",
+      "steps": [
+        "Delimita el alcance: una funcionalidad (login, pagos, subida de ficheros) antes que todo el sistema.",
+        "Dibuja actores, procesos, almacenes, flujos de datos y fronteras de confianza.",
+        "Recorre cada elemento con las seis preguntas; no hace falta inventar seis amenazas por elemento.",
+        "Describe cada escenario: quién hace qué, sobre qué activo y con qué consecuencia.",
+        "Valora posibilidad e impacto, decide la mitigación y quién la lleva.",
+        "Revisa el modelo cuando cambien componentes, datos, permisos o fronteras."
+      ],
+      "categories": {
+        "s": {
+          "name": "Suplantación",
+          "question": "¿Alguien puede hacerse pasar por otro usuario, servicio o componente?",
+          "property": "Autenticación"
+        },
+        "t": {
+          "name": "Manipulación",
+          "question": "¿Se puede alterar información, código o mensajes sin autorización?",
+          "property": "Integridad"
+        },
+        "r": {
+          "name": "Repudio",
+          "question": "¿Alguien podría negar una acción porque no queda un registro confiable?",
+          "property": "No repudio"
+        },
+        "i": {
+          "name": "Divulgación de información",
+          "question": "¿Se podrían exponer datos a quien no debería verlos?",
+          "property": "Confidencialidad"
+        },
+        "d": {
+          "name": "Denegación de servicio",
+          "question": "¿Se puede impedir que los usuarios legítimos usen el sistema?",
+          "property": "Disponibilidad"
+        },
+        "e": {
+          "name": "Elevación de privilegios",
+          "question": "¿Se puede conseguir más acceso del autorizado?",
+          "property": "Autorización"
+        }
+      },
+      "tips": [
+        "Qué aplica a cada elemento: actores → S, R · procesos → las seis · almacenes → T, R, I, D · flujos → T, I, D.",
+        "STRIDE no es una severidad: sirve para formular escenarios que luego se evalúan en contexto."
+      ]
+    },
+    "linddun": {
+      "name": "LINDDUN",
+      "purpose": "Buscar amenazas a la privacidad: que se pueda vincular o identificar a una persona, detectar su actividad o usar sus datos sin que lo sepa.",
+      "when": "Útil si tu sistema maneja datos personales; complementa a STRIDE, que mira la seguridad del sistema. Sirve de base para una evaluación de impacto (EIPD/DPIA).",
+      "steps": [
+        "Marca en el diagrama qué componentes y flujos manejan datos personales.",
+        "Recorre las siete categorías sobre esos elementos.",
+        "Describe el escenario desde la persona afectada: qué podría saberse o hacerse con sus datos.",
+        "Decide la medida: minimizar, seudonimizar, cifrar, informar, dar control o documentar."
+      ],
+      "categories": {
+        "l": {
+          "name": "Vinculación",
+          "question": "¿Se pueden relacionar datos o acciones de la misma persona aunque no se sepa quién es?"
+        },
+        "i": {
+          "name": "Identificación",
+          "question": "¿Se puede saber quién es una persona a partir de sus datos o de su actividad?"
+        },
+        "nr": {
+          "name": "No repudio",
+          "question": "¿Queda una persona atada a una acción cuando debería poder negarla o mantenerla privada?"
+        },
+        "d": {
+          "name": "Detección",
+          "question": "¿Se puede deducir que alguien usa el servicio o que existe un dato suyo, sin llegar a verlo?"
+        },
+        "dd": {
+          "name": "Divulgación de datos",
+          "question": "¿Se recogen, guardan o comparten más datos personales de los necesarios, o con quien no debe?"
+        },
+        "u": {
+          "name": "Desconocimiento",
+          "question": "¿Sabe la persona qué se hace con sus datos y puede decidir (verlos, corregirlos, borrarlos)?"
+        },
+        "nc": {
+          "name": "Incumplimiento",
+          "question": "¿Cumple el tratamiento la normativa y las políticas: base legal, finalidad, plazos?"
+        }
+      },
+      "tips": [
+        "Marca «datos personales» en el diagrama: sin ellos, LINDDUN no tiene sobre qué trabajar."
+      ]
+    },
+    "pasta": {
+      "name": "PASTA",
+      "purpose": "Analizar amenazas desde el riesgo para el negocio, en siete etapas. Es más amplio y formal.",
+      "when": "Sistemas críticos o cuando negocio tiene que priorizar. Puede ser demasiado pesado para empezar: aplícalo a una funcionalidad.",
+      "steps": [
+        "Objetivos: qué debe lograr el sistema para el negocio y qué no puede pasar (fraude, fuga, caída). Requisitos legales.",
+        "Alcance técnico: tecnologías, infraestructura y dependencias; qué queda fuera.",
+        "Descomposición: actores, componentes, flujos y fronteras (el diagrama) y los casos de uso clave.",
+        "Amenazas: quién atacaría y cómo. Aquí se usa STRIDE como biblioteca.",
+        "Vulnerabilidades: debilidades conocidas relacionadas con esas amenazas (los hallazgos de los análisis).",
+        "Ataques: cómo se encadenarían para lograr un objetivo (árboles de ataque).",
+        "Riesgo e impacto: probabilidad e impacto en el negocio, contramedidas y riesgo residual."
+      ],
+      "tips": [
+        "Las etapas 3, 4 y 5 se alimentan solas del diagrama, de las reglas STRIDE y de los análisis; escribe tú lo que no se deduce."
+      ]
+    },
+    "attack_trees": {
+      "name": "Árboles de ataque",
+      "purpose": "Desglosar un objetivo del atacante —como «acceder a la cuenta de otro usuario»— en las distintas rutas posibles para lograrlo.",
+      "when": "Para un objetivo concreto de alto impacto, cuando quieres ver todas las formas de llegar a él y cuál cerrar primero.",
+      "steps": [
+        "Escribe el objetivo del atacante como raíz.",
+        "Desglósalo en pasos hasta que cada hoja sea una acción concreta.",
+        "Marca cada grupo como O (basta una opción) o Y (hacen falta todas).",
+        "Valora la dificultad de las hojas y marca lo que ya está mitigado."
+      ],
+      "tips": [
+        "La ruta más barata para el atacante es la que conviene cerrar primero.",
+        "Una rama Y queda cortada si se mitiga uno solo de sus pasos; una rama O, solo si se mitigan todos."
+      ]
+    },
+    "attack": {
+      "name": "MITRE ATT&CK",
+      "purpose": "Consultar y mapear tácticas y técnicas observadas en atacantes reales. Complementa un modelo como STRIDE; no cumple la misma función.",
+      "when": "Para contrastar el modelo con ataques reales y revisar qué previene o detecta cada técnica.",
+      "steps": [
+        "Para cada componente, revisa las técnicas sugeridas (no se añaden solas).",
+        "Añade las relevantes y anota qué control la previene o la detecta.",
+        "Márcala mitigada o «no aplica» con el motivo."
+      ],
+      "tips": [
+        "Táctica = el objetivo del atacante en ese momento (el porqué); técnica = cómo lo consigue.",
+        "Aquí hay una selección de técnicas útiles para aplicaciones web, APIs, contenedores y nube; el catálogo completo está en attack.mitre.org."
+      ]
+    },
+    "custom": {
+      "name": "Personalizado",
+      "purpose": "Combina a voluntad STRIDE, LINDDUN, amenazas propias, PASTA, árboles de ataque y MITRE ATT&CK sobre el mismo diagrama.",
+      "when": "Cuando necesitas un proceso de modelado adaptado a tu equipo o a un sistema concreto.",
+      "steps": [
+        "Elige las herramientas que quieres usar; puedes activarlas o quitarlas sin borrar su contenido.",
+        "Dibuja el sistema y edita sus componentes, flujos y fronteras.",
+        "Revisa las amenazas calculadas y añade escenarios propios cuando corresponda."
+      ],
+      "tips": [
+        "El diagrama siempre está disponible; las demás herramientas son opcionales y se guardan con el modelo."
+      ]
+    }
+  },
+  "manual": {
+    "add_title": "Añadir amenaza",
+    "edit_title": "Editar amenaza",
+    "description": "Describe el escenario: quién hace qué, sobre qué activo y con qué consecuencia. Se guarda con el modelo.",
+    "title": "Título",
+    "title_placeholder": "p. ej. Robo de la sesión en una red Wi-Fi pública",
+    "category": "Categoría",
+    "category_example": "p. ej. {{code}}",
+    "category_placeholder": "la que uses en tu equipo",
+    "element": "Elemento",
+    "whole_system": "Todo el sistema",
+    "scenario": "Escenario",
+    "scenario_placeholder": "Un atacante en la misma red captura la cookie de sesión porque…",
+    "severity": "Severidad",
+    "likelihood": "Posibilidad",
+    "impact": "Impacto",
+    "owner": "Responsable",
+    "mitigation": "Mitigación"
+  },
+  "pasta": {
+    "hints": {
+      "objectives": "¿Qué debe lograr el sistema para el negocio? ¿Qué no puede pasar nunca (fraude, fuga, caída)? ¿Qué exige la ley o los clientes?",
+      "scope": "Tecnologías, infraestructura, dependencias y proveedores. Qué queda fuera de este análisis.",
+      "decomposition": "Actores, componentes, flujos y fronteras: se dibujan en «Diagrama». Anota aquí los casos de uso clave.",
+      "threats": "Quién atacaría y por qué. Las amenazas STRIDE del diagrama salen solas en «Amenazas»; añade las que conozcas del sector.",
+      "vulnerabilities": "Debilidades conocidas relacionadas con esas amenazas: los hallazgos abiertos de los análisis aparecen abajo; añade auditorías o pentests.",
+      "attacks": "Cómo se encadenarían amenazas y debilidades para lograr un objetivo. Usa los árboles de ataque.",
+      "risk": "Probabilidad e impacto en el negocio de cada escenario, contramedidas y riesgo residual aceptado."
+    },
+    "auto": {
+      "decomposition": "{{components}}, {{flows}} y {{boundaries}}.",
+      "open_diagram": "Abrir el diagrama",
+      "threats_one": "{{threats}} ({{count}} escrita por el equipo).",
+      "threats_other": "{{threats}} ({{count}} escritas por el equipo).",
+      "view_threats": "Ver amenazas",
+      "evidence": "{{threats}} con indicios en {{findings}}: {{titles}}.",
+      "no_evidence": "Ningún hallazgo abierto de los análisis se relaciona aún con estas amenazas.",
+      "view_evidence": "Ver indicios",
+      "trees_one": "{{count}} árbol de ataque.",
+      "trees_other": "{{count}} árboles de ataque.",
+      "open_trees": "Abrir árboles",
+      "risk_one": "{{count}} amenaza pendiente: {{breakdown}}.",
+      "risk_other": "{{count}} amenazas pendientes: {{breakdown}}."
+    },
+    "severity_count": {
+      "critical_one": "{{count}} crítica",
+      "critical_other": "{{count}} críticas",
+      "high_one": "{{count}} alta",
+      "high_other": "{{count}} altas",
+      "medium_one": "{{count}} media",
+      "medium_other": "{{count}} medias",
+      "low_one": "{{count}} baja",
+      "low_other": "{{count}} bajas"
+    },
+    "has_notes": "con notas",
+    "notes_placeholder": "Notas de esta etapa"
+  },
+  "trees": {
+    "goals": [
+      "Acceder a la cuenta de otro usuario",
+      "Obtener datos personales de la base de datos",
+      "Ejecutar código en el servidor",
+      "Dejar el servicio sin disponibilidad",
+      "Hacer un pago o pedido en nombre de otro"
+    ],
+    "new_goal": "Nuevo objetivo",
+    "tree": "Árbol",
+    "common_goals": "Objetivos frecuentes",
+    "start_from_goal": "Empezar desde un objetivo frecuente…",
+    "empty": "Aún no hay árboles. Empieza por el objetivo del atacante que más te preocupe.",
+    "new_step": "Nuevo paso",
+    "step": "Paso",
+    "gate": "Cómo se combinan sus pasos",
+    "gate_hint": "O: basta con uno de sus pasos · Y: hacen falta todos",
+    "gate_or": "O · basta uno",
+    "gate_and": "Y · todos",
+    "difficulty": "Dificultad",
+    "no_element": "Sin elemento",
+    "mitigated": "Mitigado",
+    "add_step": "Añadir un paso debajo",
+    "remove_step": "Quitar este paso y los de debajo",
+    "goal": "Objetivo del atacante",
+    "paths_one": "{{open}} de {{count}} ruta abierta",
+    "paths_other": "{{open}} de {{count}} rutas abiertas (basta una)",
+    "no_paths": "sin rutas",
+    "remove_tree": "Quitar el árbol",
+    "path": "Ruta"
+  },
+  "attack": {
+    "status": {
+      "relevant": "Relevante",
+      "mitigated": "Mitigada",
+      "not_applicable": "No aplica"
+    },
+    "technique": "Técnica",
+    "choose_technique": "Elige una técnica…",
+    "map": "Mapear",
+    "suggestions": "Sugerencias para revisar ({{count}})",
+    "suggestions_hint": "Técnicas habituales contra este tipo de componentes. No se añaden solas: añade las que apliquen.",
+    "empty": "Sin técnicas mapeadas. Empieza por las sugerencias o por la táctica «Acceso inicial».",
+    "status_label": "Estado",
+    "note": "Control o nota",
+    "note_placeholder": "Qué la previene o la detecta",
+    "trademark": "MITRE ATT&CK® es una marca de The MITRE Corporation. Aquí hay una selección de técnicas; el catálogo completo está en attack.mitre.org."
+  },
+  "canvas": {
+    "internet_facing": "Expuesto a Internet",
+    "encrypted_at_rest": "Cifrado en reposo",
+    "sensitive_data": "datos sensibles",
+    "unencrypted_flow": "sin cifrar",
+    "unencrypted": "Sin cifrar",
+    "legend": "Leyenda del diagrama",
+    "aria": {
+      "node": "Pulsa Intro o Espacio para seleccionar el componente. Supr para quitarlo, Escape para cancelar.",
+      "node_keyboard_disabled": "Pulsa Intro o Espacio para seleccionar el componente.",
+      "moved_left": "Componente movido hacia la izquierda, a {{x}}, {{y}}",
+      "moved_right": "Componente movido hacia la derecha, a {{x}}, {{y}}",
+      "moved_up": "Componente movido hacia arriba, a {{x}}, {{y}}",
+      "moved_down": "Componente movido hacia abajo, a {{x}}, {{y}}",
+      "edge": "Pulsa Intro o Espacio para seleccionar el flujo. Supr para quitarlo, Escape para cancelar.",
+      "controls": "Controles del diagrama",
+      "zoom_in": "Acercar",
+      "zoom_out": "Alejar",
+      "fit_view": "Ajustar a la vista",
+      "interactive": "Bloquear o desbloquear el diagrama",
+      "minimap": "Minimapa",
+      "handle": "Punto de conexión"
+    },
+    "new_component": "Nuevo componente",
+    "component": "Componente",
+    "custom_kind_default": "Tipo propio",
+    "new_boundary": "Nueva frontera",
+    "add_component": "Añadir componente",
+    "component_placeholder": "Componente…",
+    "other_kind": "Otro tipo (lo nombras tú)…",
+    "boundary": "Frontera",
+    "tidy": "Ordenar",
+    "tidy_hint": "Colocar en columnas por frontera"
+  },
+  "inspector": {
+    "flow": "Flujo de datos",
+    "flow_name": "Qué viaja",
+    "flow_name_placeholder": "p. ej. consultas de pedidos",
+    "protocol": "Protocolo",
+    "data": "Datos",
+    "authenticated": "Autenticado",
+    "encrypted_in_transit": "Cifrado en tránsito",
+    "reverse": "Invertir",
+    "boundary_heading": "Frontera de confianza · {{components}}",
+    "name": "Nombre",
+    "boundary_color": "Color de la frontera",
+    "boundary_color_default": "Gris (por defecto)",
+    "boundary_help": "Arrástrala por su nombre (se lleva sus componentes) y ajústala desde las esquinas. Un componente pertenece a la frontera en la que está su centro.",
+    "remove_boundary": "Quitar frontera",
+    "kind": "Tipo",
+    "kind_label": "Tipo de componente",
+    "technology": "Tecnología",
+    "technology_placeholder": "p. ej. Django",
+    "custom_kind": "Nombre del tipo propio",
+    "custom_kind_placeholder": "p. ej. Motor de reglas",
+    "custom_base": "Rol base para el análisis",
+    "custom_base_hint": "El nombre es libre; este rol determina qué reglas STRIDE y LINDDUN se aplican.",
+    "color": "Color",
+    "color_by_kind": "Según el tipo ({{color}})",
+    "automatic": "Automático",
+    "description": "Descripción",
+    "description_placeholder": "Qué hace y qué datos maneja",
+    "code": "Código (repositorio)",
+    "not_linked": "Sin enlazar",
+    "imported_ref": "Referencia importada: {{ref}} · pendiente de vincular",
+    "path": "Carpeta dentro del repositorio",
+    "path_placeholder": "vacío = todo el repositorio · p. ej. frontend/",
+    "path_hint": "Solo los hallazgos de esa carpeta cuentan como indicios de sus amenazas. En un monorepo evita que el backend «evidencie» amenazas del frontend.",
+    "component_data": "Datos que guarda o maneja",
+    "authenticates": "Autentica",
+    "remove_component": "Quitar componente"
+  },
+  "help": {
+    "title": "Cómo se usa",
+    "add": "Añade componentes y fronteras desde la barra del lienzo.",
+    "flows": "Para crear un flujo, arrastra desde uno de los puntos de un componente hasta otro. La flecha indica hacia dónde viajan los datos.",
+    "select": "Pulsa un componente, un flujo o el nombre de una frontera para editarlo aquí. Suprimir borra lo seleccionado.",
+    "colors": "Color: el del papel de cada componente (leyenda abajo a la derecha); cámbialo al seleccionarlo. Anillo naranja: amenazas con indicios en los análisis. Línea roja discontinua: flujo sin cifrar.",
+    "numbers": "Cada flujo lleva un número: es el mismo del SVG y de la tabla de flujos del informe."
+  },
+  "importer": {
+    "hints": {
+      "stride": "Diagrama y amenaza de acceso indebido",
+      "linddun": "Datos personales y privacidad",
+      "pasta": "Etapas de riesgo y ruta de ataque",
+      "attack_trees": "Objetivo y alternativas Y/O",
+      "attack": "Técnicas mapeadas a componentes",
+      "custom": "Todos los módulos combinados"
+    },
+    "file_too_large": "El archivo supera el máximo de 600 KB.",
+    "file_loaded": "Archivo cargado: {{name}}. Valídalo antes de importarlo.",
+    "empty": "Pega un JSON o elige un ejemplo para empezar.",
+    "json_too_large": "El JSON supera el máximo de 600 KB.",
+    "invalid_json": "El contenido no es JSON válido. Revisa comas, comillas y llaves.",
+    "file_name": "modelo-amenazas-{{method}}.json",
+    "file_edited": "personalizado",
+    "copy_failed": "No se pudo copiar al portapapeles. Selecciona el texto del editor y cópialo manualmente.",
+    "ai_prompt": "Genera únicamente un objeto JSON válido para importar un modelo de amenazas en Tamandua. Usa este ejemplo como contrato y adapta nombres, componentes, flujos, fronteras y contenido al sistema que te describa. Mantén format=\"tamandua-threat-model\", version=1 y la metodología indicada. Los id deben ser únicos y usar minúsculas, números y guiones; source y target deben referirse a componentes existentes; cada frontera solo puede contener componentes existentes. No incluyas IDs de la instalación ni evidencia de escaneos. Si mencionas repositorios o dominios, usa repository_refs o asset_ref: quedarán pendientes de vincular. No añadas secciones de otra metodología; para combinarlas usa methodology=\"custom\" y activa sus custom_modules. No incluyas position, size ni box: Tamandua coloca el diagrama solo según las fronteras y los flujos. Kinds disponibles: actor, web_app, api, service, function, database, cache, queue, storage, external, identity; para cualquier otro usa kind=\"custom\" con custom_kind (su nombre) y custom_base (uno de los anteriores, el rol con el que se analiza). Devuelve solo JSON, sin Markdown.\n\nEjemplo:\n{{example}}",
+    "title": "Crear modelo desde JSON",
+    "description": "Elige un ejemplo, modifícalo aquí o carga un archivo. Valida el contenido antes de crear el modelo.",
+    "examples_label": "Ejemplos de metodologías",
+    "step_example": "1 · Elige un ejemplo",
+    "step_example_hint": "Cada ejemplo es importable y muestra los campos propios de su enfoque.",
+    "how_title": "Cómo usarlo",
+    "how_ids": "Los componentes usan <code>id</code> únicos; los flujos enlazan <code>source</code> y <code>target</code> con esos ID. En personalizado, <code>custom_modules</code> decide qué secciones puedes incluir.",
+    "how_refs": "Las referencias a repositorios o dominios se importan sin vincularse automáticamente.",
+    "editor_label": "Editor e importación de JSON",
+    "step_edit": "2 · Edita o pega tu JSON",
+    "step_edit_hint": "También puedes pedir a una IA que adapte el ejemplo a tu sistema.",
+    "file_label": "Archivo JSON del modelo",
+    "load_file": "Cargar archivo",
+    "editor": "Editor JSON del modelo",
+    "copy_json": "Copiar JSON",
+    "json_copied": "JSON copiado.",
+    "download_json": "Descargar JSON",
+    "copy_prompt": "Copiar prompt para IA",
+    "prompt_copied": "Instrucciones para IA copiadas.",
+    "size": "{{size}} / {{max}} bytes",
+    "valid": "JSON válido · {{name}}",
+    "relayout": "Las posiciones del JSON no encajaban con sus fronteras (cajas pequeñas o solapadas): el diagrama se colocará solo al importarlo. Puedes moverlo después.",
+    "validate": "3 · Validar JSON",
+    "import": "4 · Importar modelo"
+  },
+  "list": {
+    "title": "Modelos de amenazas",
+    "description": "Dibuja el sistema —componentes, flujos de datos y fronteras de confianza— y analízalo con el enfoque que prefieras. Si el código de un componente tiene hallazgos abiertos relacionados, la amenaza aparece <strong>con indicios</strong>: una señal para revisar, no una confirmación.",
+    "import": "Importar JSON",
+    "new": "Nuevo modelo",
+    "empty": "Aún no hay modelos",
+    "empty_hint": "Crea un proyecto para un sistema o una funcionalidad. Puedes dibujarlo a mano o proponer componentes desde uno o varios repositorios, ahora o más adelante.",
+    "updated": "actualizado {{date}} por {{user}}"
+  },
+  "create": {
+    "default_name": "Nuevo proyecto",
+    "title": "Nuevo proyecto de modelado",
+    "description": "Un proyecto modela un sistema o una funcionalidad. No necesita repositorios para empezar: puedes asociarlos después, uno o varios (microservicios, microfrontends), y proponer componentes desde ellos.",
+    "approach": "Enfoque",
+    "approach_hint": "Se puede cambiar después sin perder el diagrama.",
+    "name": "Nombre del proyecto",
+    "name_placeholder": "p. ej. Pagos, Portal de clientes, Login",
+    "from_repos": "Partir de repositorios (opcional)",
+    "from_repos_chosen_one": "Partir de repositorios (opcional) · {{count}} elegido",
+    "from_repos_chosen_other": "Partir de repositorios (opcional) · {{count}} elegidos",
+    "from_repos_hint": "Se leen sus manifiestos (package.json, pyproject, go.mod, Cargo.toml, compose) y se propone cada componente citando de qué dependencia sale.",
+    "no_repos": "Ningún repositorio coincide. Conecta GitHub en Integraciones si no ves los tuyos.",
+    "scanned": "escaneado",
+    "not_scanned": "sin escanear",
+    "not_scanned_hint": "Los repositorios sin escanear se modelan igual, pero sus amenazas no tendrán indicios hasta que los analices.",
+    "reading": "Leyendo manifiestos…",
+    "submit_propose": "Crear y proponer componentes",
+    "submit": "Crear proyecto"
+  },
+  "editor": {
+    "confirm_delete": "¿Borrar este modelo de amenazas? No se puede deshacer.",
+    "loading_model": "Cargando el modelo",
+    "loading_summary": "Cargando el resumen de amenazas",
+    "loading_threats": "Cargando amenazas",
+    "file_fallback": "modelo",
+    "back": "Modelos",
+    "change_approach": "Cambiar el enfoque",
+    "guide": "Guía",
+    "hide_guide": "Ocultar guía",
+    "updated": "{{date}} por {{user}}",
+    "export": "Exportar",
+    "delete": "Borrar modelo",
+    "total": "Total",
+    "unsaved": "Cambios sin guardar",
+    "save": "Guardar y recalcular"
+  },
+  "repos": {
+    "nothing_new": "No hay componentes nuevos que proponer desde ese repositorio: lo detectado ya está en el diagrama.",
+    "title": "Repositorios del proyecto",
+    "none": "ninguno todavía · el modelo no los necesita, pero con ellos se proponen componentes y aparecen indicios",
+    "propose_from": "Proponer componentes desde {{name}}",
+    "propose_hint": "Proponer componentes desde este repositorio",
+    "remove": "Quitar {{name}}",
+    "ref_hint": "Referencia del archivo importado; no está conectada",
+    "ref": "{{ref}} · sin vincular",
+    "remove_ref": "Quitar referencia {{ref}}",
+    "link": "+ Asociar repositorio…",
+    "already_linked": "{{name}} · ya asociado"
+  },
+  "exports": {
+    "reports": "Informes",
+    "pdf": "Informe PDF",
+    "markdown": "Informe Markdown",
+    "tools": "Para otras herramientas",
+    "json": "Modelo JSON (reimportable)",
+    "svg": "Diagrama SVG",
+    "threat_dragon": "OWASP Threat Dragon",
+    "pytm": "pytm (Python)"
+  },
+  "tabs": {
+    "threats": "Amenazas",
+    "privacy_threats": "Amenazas de privacidad",
+    "diagram": "Diagrama",
+    "elements": "Tabla",
+    "stages": "Etapas",
+    "pasta_stages": "Etapas PASTA",
+    "trees": "Árboles de ataque",
+    "attack": "Técnicas ATT&CK"
+  },
+  "modules": {
+    "title": "Herramientas del modelo",
+    "hint": "El diagrama siempre está disponible. Elige libremente los análisis y vistas que quieres usar; puedes cambiarlos después.",
+    "stride": {
+      "title": "STRIDE",
+      "description": "Reglas automáticas de seguridad sobre el diagrama"
+    },
+    "linddun": {
+      "title": "LINDDUN",
+      "description": "Reglas de privacidad para datos personales"
+    },
+    "manual": {
+      "title": "Amenazas propias",
+      "description": "Escenarios, valoración y mitigaciones escritas por el equipo"
+    },
+    "pasta": {
+      "title": "Etapas PASTA",
+      "description": "Objetivos, alcance, descomposición y riesgo"
+    },
+    "trees": {
+      "title": "Árboles de ataque",
+      "description": "Rutas posibles para alcanzar un objetivo"
+    },
+    "attack": {
+      "title": "MITRE ATT&CK",
+      "description": "Mapeo de técnicas relevantes"
+    },
+    "elements": {
+      "title": "Tabla de elementos",
+      "description": "Edición tabular de componentes, flujos y fronteras"
+    }
+  },
+  "filter": {
+    "all": "Todas",
+    "manual": "PROPIA",
+    "add_threat": "Amenaza",
+    "status": "Estado",
+    "pending": "Pendientes",
+    "all_statuses": "Todos los estados",
+    "no_match": "Nada con estos filtros.",
+    "empty": "Añade componentes y flujos para que aparezcan amenazas."
+  },
+  "threat": {
+    "confirm_remove": "¿Quitar esta amenaza?",
+    "mitigations": "Mitigaciones",
+    "evidence": "Indicios en los análisis ({{count}})",
+    "evidence_repo": "Hallazgos abiertos relacionados con esta amenaza en el repositorio entero: indica la carpeta del componente en el diagrama para afinar. Son una señal para revisar, no una confirmación.",
+    "evidence_paths": "Hallazgos abiertos relacionados con esta amenaza en {{paths}}. Son una señal para revisar, no una confirmación.",
+    "view_findings": "Ver hallazgos",
+    "rating": "Posibilidad: {{likelihood}} · impacto: {{impact}} · responsable: {{owner}}",
+    "likelihood": {
+      "low": "baja",
+      "medium": "media",
+      "high": "alta"
+    },
+    "impact": {
+      "low": "bajo",
+      "medium": "medio",
+      "high": "alto"
+    },
+    "decided": "por {{by}} el {{date}}: {{reason}}",
+    "reopen": "Reabrir"
+  },
+  "decision": {
+    "mitigated": "Di qué control la mitiga (y dónde se puede comprobar).",
+    "accepted": "Di por qué se asume el riesgo y hasta cuándo.",
+    "not_applicable": "Di por qué no aplica a este sistema.",
+    "evidence_one": "Ojo: hay {{count}} hallazgo abierto que la evidencia.",
+    "evidence_other": "Ojo: hay {{count}} hallazgos abiertos que la evidencian.",
+    "reason": "Motivo"
+  },
+  "elements": {
+    "boundaries": "Fronteras de confianza",
+    "boundary_name": "Nombre de la frontera",
+    "no_boundaries": "Sin fronteras: los flujos no cruzan ninguna y se pierden amenazas de tránsito.",
+    "components": "Componentes",
+    "name_technology": "Nombre y tecnología",
+    "asset": "Repositorio o dominio",
+    "properties": "Propiedades",
+    "actions": "Acciones",
+    "suggested": "propuesto desde el repositorio",
+    "no_boundary": "Ninguna",
+    "linked_asset": "Activo enlazado",
+    "pending_ref": "{{ref}} · pendiente de vincular",
+    "flows": "Flujos de datos",
+    "flow": "Flujo",
+    "source_target": "Origen → destino",
+    "name_protocol": "Nombre y protocolo",
+    "source": "Origen",
+    "target": "Destino",
+    "flow_name": "Nombre del flujo",
+    "encrypted": "Cifrado",
+    "remove_flow": "Quitar flujo",
+    "no_flows": "Sin flujos. Los datos que se mueven entre componentes son donde aparecen la mayoría de amenazas."
+  }
+}

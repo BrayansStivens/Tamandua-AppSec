@@ -7,8 +7,9 @@ import type { Component } from '@/features/threats/threat-model-types'
 export const TONES = ['neutral', 'brand', 'info', 'success', 'warning', 'attention', 'danger'] as const
 export type Tone = typeof TONES[number]
 
+// Catalog keys (`threats` namespace).
 export const TONE_NAMES: Record<Tone, string> = {
-  neutral: 'Gris', brand: 'Morado', info: 'Azul', success: 'Verde', warning: 'Amarillo', attention: 'Naranja', danger: 'Rojo',
+  neutral: 'tones.neutral', brand: 'tones.brand', info: 'tones.info', success: 'tones.success', warning: 'tones.warning', attention: 'tones.attention', danger: 'tones.danger',
 }
 
 const KIND_TONE: Record<string, Tone> = {
@@ -17,7 +18,7 @@ const KIND_TONE: Record<string, Tone> = {
 }
 
 export const LEGEND: [Tone, string][] = [
-  ['brand', 'Aplicaciones cliente'], ['info', 'APIs, servicios y tareas'], ['success', 'Datos'], ['warning', 'Identidad'], ['neutral', 'Actores y terceros'],
+  ['brand', 'legend.clients'], ['info', 'legend.services'], ['success', 'legend.data'], ['warning', 'legend.identity'], ['neutral', 'legend.actors'],
 ]
 
 export const isTone = (value: unknown): value is Tone => TONES.includes(value as Tone)

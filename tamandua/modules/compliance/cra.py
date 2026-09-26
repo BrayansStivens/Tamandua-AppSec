@@ -23,17 +23,23 @@ from tamandua.shared import documents
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.shared import log as logging_setup
 from tamandua.modules.findings import triage
+from tamandua.shared.i18n import msg, text
 
 _log = logging_setup.get("cra")
-STAGES = (("early_warning", "Alerta temprana", timedelta(hours=24)), ("notification", "Notificación", timedelta(hours=72)),
-          ("final_report", "Informe final", timedelta(days=14)))
+STAGES = (("early_warning", msg("compliance.cra.stages.early_warning"), timedelta(hours=24)),
+          ("notification", msg("compliance.cra.stages.notification"), timedelta(hours=72)),
+          ("final_report", msg("compliance.cra.stages.final_report"), timedelta(days=14)))
 STAGE_IDS = tuple(stage for stage, _, _ in STAGES)
 REPORTING_PAGE = "https://digital-strategy.ec.europa.eu/en/policies/cra-reporting"
 NAME_MAX = 120
 
 
 class CraError(ValueError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 def load(data_dir: Path) -> dict:
@@ -50,12 +56,12 @@ def _save(data_dir: Path, payload: dict) -> None:
 def set_product(data_dir: Path, key: str, *, name: str, support_until: str | None, user: dict) -> dict:
     name = " ".join(str(name or "").split())
     if not name or len(name) > NAME_MAX:
-        raise CraError(f"Pon el nombre comercial del producto (hasta {NAME_MAX} caracteres).")
+        raise CraError(msg("compliance.cra.errors.product_name", max=NAME_MAX))
     if support_until:
         try:
             date.fromisoformat(support_until)
         except (TypeError, ValueError) as exc:
-            raise CraError("La fecha de fin del soporte debe ser AAAA-MM-DD.") from exc
+            raise CraError(msg("compliance.cra.errors.support_date")) from exc
     with documents.lock(data_dir, "cra"):
         state = load(data_dir)
         state["products"][key] = {"name": name, "support_until": support_until or None, "by": user["username"],
@@ -75,7 +81,7 @@ def remove_product(data_dir: Path, key: str, *, user: dict) -> None:
 
 def mark(data_dir: Path, event_id: str, stage: str, *, sent: bool, user: dict) -> None:
     if stage not in STAGE_IDS or not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9#:_./@+|-]{3,300}", event_id):
-        raise CraError("Evento o etapa no válidos.")
+        raise CraError(msg("compliance.cra.errors.invalid_stage"))
     with documents.lock(data_dir, "cra"):
         state = load(data_dir)
         stages = state["reports"].setdefault(event_id, {})
@@ -95,7 +101,7 @@ def _moment(value) -> datetime | None:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
-def _stage(stage: str, label: str, due: datetime | None, sent: dict | None, now: datetime) -> dict:
+def _stage(stage: str, label: dict, due: datetime | None, sent: dict | None, now: datetime) -> dict:
     state = "sent" if sent else "waiting" if due is None else "overdue" if now > due else "pending"
     return {"id": stage, "label": label, "due": due.isoformat() if due else None, "state": state, "sent": sent}
 
@@ -151,26 +157,22 @@ def events(data_dir: Path, *, now: datetime | None = None) -> list[dict]:
     return result
 
 
-def draft(event: dict) -> str:
-    """Borrador para la plataforma de notificación de ENISA. Guía qué contar; lo que no sabemos queda marcado."""
+def draft_message(event: dict) -> dict:
+    """Draft for ENISA's reporting platform: what to tell, with what we don't know left as placeholders."""
     kev = event["kev"]
-    packages = ", ".join(event["packages"]) or "[componente afectado]"
-    fixed = f"Sí, desde {event['fixed_at'][:10]}" if event.get("fixed_at") else "[aún no: describe la mitigación temporal]"
-    return "\n".join([
-        f"Producto: {event['product']}" + (f" (soporte hasta {event['support_until']})" if event.get("support_until") else ""),
-        f"Vulnerabilidad: {event['cve']}" + (f" · {kev['name']}" if kev.get("name") else ""),
-        f"Componente afectado: {packages}",
-        f"Explotación activa: en el catálogo CISA KEV desde {kev.get('date_added') or '—'}"
-        + (" · usada en campañas de ransomware" if kev.get("ransomware") else ""),
-        f"Conocimiento por el fabricante: {(event.get('aware_at') or '')[:16].replace('T', ' ')} UTC",
-        "Naturaleza general del exploit: [resume cómo se explota, sin detalles que faciliten el ataque]",
-        f"Medida correctora disponible: {fixed}",
-        "Medidas que pueden tomar los usuarios: [p. ej. actualizar a la versión X, desactivar la función Y]",
-        "Estados miembros donde se comercializa el producto: [lista]",
-        "Sensibilidad de la información: [indica si algo no debe compartirse]",
-        "",
-        "Antes de enviar: confirma que la vulnerabilidad afecta de verdad al producto (el hallazgo es un candidato del escáner).",
-    ])
+    return msg("compliance.cra.draft.body", product=event["product"], cve=event["cve"],
+               support=msg("compliance.cra.draft.support", date=event["support_until"]) if event.get("support_until") else "",
+               kev_name=f" · {kev['name']}" if kev.get("name") else "",
+               packages=", ".join(event["packages"]) or msg("compliance.cra.draft.no_component"),
+               kev_date=kev.get("date_added") or "—",
+               ransomware=msg("compliance.cra.draft.ransomware") if kev.get("ransomware") else "",
+               aware=(event.get("aware_at") or "")[:16].replace("T", " "),
+               fixed=msg("compliance.cra.draft.fixed_since", date=event["fixed_at"][:10]) if event.get("fixed_at")
+               else msg("compliance.cra.draft.not_fixed"))
+
+
+def draft(event: dict, locale: str | None = None) -> str:
+    return text(draft_message(event), locale)
 
 
 def overview(data_dir: Path) -> dict:
@@ -186,5 +188,5 @@ def overview(data_dir: Path) -> dict:
             complete.setdefault(asset_key(row), row["created_at"])
     products = [{"key": key, **product, "asset": assets.get(key, key), "last_complete": complete.get(key)}
                 for key, product in load(data_dir)["products"].items()]
-    return {"products": products, "events": [{**event, "draft": draft(event)} for event in events(data_dir)],
+    return {"products": products, "events": [{**event, "draft": draft_message(event)} for event in events(data_dir)],
             "reporting_page": REPORTING_PAGE, "assets": [{"key": key, "name": name} for key, name in assets.items()]}

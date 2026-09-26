@@ -1,23 +1,23 @@
-# Skills de Tamandua para asistentes de programación
+# Tamandua skills for coding agents
 
-Skills en el formato abierto [Agent Skills](https://agentskills.io) para Claude Code, Cursor, Codex y otros
-asistentes: enseñan al asistente a usar Tamandua dentro de tu repositorio.
+Skills in the open [Agent Skills](https://agentskills.io) format for Claude Code, Cursor, Codex and other
+coding agents: they teach the agent to use Tamandua inside your repository.
 
-| Skill | Para qué |
+| Skill | What it does |
 | --- | --- |
-| [`fix-findings-with-tamandua`](fix-findings-with-tamandua/SKILL.md) | Analizar lo que introduce tu cambio, corregir la causa de cada hallazgo y volver a analizar para demostrarlo. |
-| [`set-up-tamandua-in-ci`](set-up-tamandua-in-ci/SKILL.md) | Añadir Tamandua al CI (GitHub Actions, GitLab CI) o como hook `pre-push`. |
+| [`fix-findings-with-tamandua`](fix-findings-with-tamandua/SKILL.md) | Scan what your change introduces, fix the root cause of each finding and re-scan to prove it. |
+| [`set-up-tamandua-in-ci`](set-up-tamandua-in-ci/SKILL.md) | Add Tamandua to CI (GitHub Actions, GitLab CI) or as a `pre-push` hook. |
 
-Necesitan Docker y una copia de Tamandua (por defecto en `~/tamandua`; otra carpeta con `TAMANDUA_DIR`).
+They need Docker and a copy of Tamandua (in `~/tamandua` by default; set `TAMANDUA_DIR` for another folder).
 
-## Instalar
+## Install
 
 ```bash
 npx skills add BrayansStivens/appsec-agent
 ```
 
-O a mano: copia la carpeta de la skill en la de tu asistente (en Claude Code, `~/.claude/skills/` o
-`.claude/skills/` del proyecto).
+Or by hand: copy the skill's folder into your agent's skills folder (in Claude Code, `~/.claude/skills/` or the
+project's `.claude/skills/`).
 
-Las skills no llevan código ejecutable: solo instrucciones. `tests/test_skills.py` comprueba su formato y que no
-citan opciones de la CLI que no existan.
+The skills contain no executable code, only instructions. `tests/test_skills.py` checks their format and that they
+don't mention CLI options that don't exist.

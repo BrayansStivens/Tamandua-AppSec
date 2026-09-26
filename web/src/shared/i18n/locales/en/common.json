@@ -1,29 +1,69 @@
 {
+  "app_title": "Tamandua · Application security",
   "language": "Language",
   "actions": {
-    "save": "Save", "cancel": "Cancel", "edit": "Edit", "delete": "Delete", "remove": "Remove", "close": "Close",
-    "back": "Back", "next": "Next", "retry": "Try again", "search": "Search", "copy": "Copy", "copied": "Copied",
-    "download": "Download", "open": "Open", "add": "Add", "confirm": "Confirm", "refresh": "Refresh", "more": "More"
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "remove": "Remove",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "retry": "Try again",
+    "search": "Search",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download",
+    "open": "Open",
+    "add": "Add",
+    "confirm": "Confirm",
+    "refresh": "Refresh",
+    "more": "More"
   },
   "state": {
-    "loading": "Loading…", "saving": "Saving…", "saved": "Saved", "empty": "Nothing here yet", "error": "Something went wrong",
-    "none": "None", "unknown": "Unknown", "yes": "Yes", "no": "No", "all": "All"
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "empty": "Nothing here yet",
+    "error": "Something went wrong",
+    "none": "None",
+    "unknown": "Unknown",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All"
   },
   "severity": {
-    "critical": "Critical", "high": "High", "medium": "Medium", "low": "Low", "info": "Info"
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "info": "Info"
   },
   "priority": {
-    "act": "Act now", "attend": "Attend", "track": "Track"
+    "act": "Act now",
+    "attend": "Attend",
+    "track": "Track"
   },
   "run_status": {
-    "completed": "Completed", "incomplete": "Incomplete", "failed": "Failed", "queued": "Queued", "running": "Scanning…"
+    "completed": "Completed",
+    "incomplete": "Incomplete",
+    "failed": "Failed",
+    "queued": "Queued",
+    "running": "Scanning…"
   },
   "finding_status": {
-    "open": "Open", "in_progress": "In progress", "fixed": "Fixed", "excluded": "Excluded", "accepted": "Accepted risk",
+    "open": "Open",
+    "in_progress": "In progress",
+    "fixed": "Fixed",
+    "excluded": "Excluded",
+    "accepted": "Accepted risk",
     "false_positive": "False positive"
   },
   "count": {
-    "findings_one": "{{count}} finding", "findings_other": "{{count}} findings",
-    "repositories_one": "{{count}} repository", "repositories_other": "{{count}} repositories"
+    "findings_one": "{{count}} finding",
+    "findings_other": "{{count}} findings",
+    "repositories_one": "{{count}} repository",
+    "repositories_other": "{{count}} repositories"
   }
 }

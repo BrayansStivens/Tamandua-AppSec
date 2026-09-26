@@ -10,16 +10,21 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from tamandua.shared import documents
+from tamandua.shared.i18n import msg, text
 
 
 class IntegrationError(ValueError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 def load(data_dir: Path) -> dict:
     data = documents.load(data_dir, "integrations", {})
     if not isinstance(data, dict):
-        raise IntegrationError("Registro de integraciones inválido")
+        raise IntegrationError(msg("integrations.installations.invalid_registry"))
     return data
 
 
@@ -29,7 +34,7 @@ def _write(data_dir: Path, data: dict) -> None:
 
 def save_github(data_dir: Path, installation_id: int, details: dict, connected_by: str | None) -> dict:
     if not isinstance(installation_id, int) or not 0 < installation_id < 2**63:
-        raise IntegrationError("Identificador de instalación inválido")
+        raise IntegrationError(msg("integrations.github.invalid_installation_id"))
     record = {"provider": "github", "installation_id": installation_id,
               "account": details.get("account"), "account_type": details.get("account_type"),
               "repository_selection": details.get("repository_selection"),

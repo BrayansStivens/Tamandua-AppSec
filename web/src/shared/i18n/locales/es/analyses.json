@@ -1,0 +1,216 @@
+{
+  "run_type": {
+    "repository_scan": "Análisis de código", "image_scan": "Imagen de contenedor", "pr_review": "Revisión de PR",
+    "advisory_watch": "Avisos nuevos", "dast": "Pruebas dinámicas de app web o API"
+  },
+  "duration": { "minutes": "~{{value}} min", "hours": "~{{value}} h", "under_two_minutes": "menos de 2 min" },
+  "listing_more": "{{names}} y {{rest}} más",
+  "remove_item": "Quitar {{name}}",
+  "wizard": {
+    "choose_type": "Elige el tipo de análisis",
+    "continue": "Continuar",
+    "back": "Atrás",
+    "back_to_types": "Volver a tipos de análisis",
+    "steps": { "source": "Código fuente", "targets": "Objetivos", "image": "Imagen", "context": "Contexto", "review": "Revisar y lanzar" },
+    "kinds": {
+      "code": {
+        "description": "Analiza un snapshot de tu repositorio sin ejecutar su código ni instalar dependencias.",
+        "sast": "SAST multi-lenguaje (Opengrep)", "secrets": "Secretos (Gitleaks)", "dependencies": "Dependencias (Trivy + OSV-Scanner)",
+        "iac": "Infraestructura y CI/CD (Trivy + Checkov + zizmor)"
+      },
+      "image": {
+        "description": "Analiza una imagen desde su registro (Docker Hub, GHCR, ECR…) sin ejecutarla ni construirla.",
+        "packages": "Paquetes: Trivy + Grype", "secrets": "Secretos en capas, ENV e historial", "config": "Configuración: reglas de Tamandua + Checkov"
+      },
+      "web": {
+        "description": "Escaneo activo (DAST) contra tu aplicación en marcha, sobre dominios verificados. Todavía no dan resultados.",
+        "dns": "Verificación de propiedad por DNS", "isolated": "DAST en contenedor aislado", "evidence": "Evidencia con petición y respuesta"
+      }
+    }
+  },
+  "source": {
+    "description": "Elige uno o varios repositorios. Se analiza un snapshot de solo lectura de cada uno.",
+    "description_with_org": "Elige uno o varios repositorios, o una organización entera. Se analiza un snapshot de solo lectura de cada uno.",
+    "mode": {
+      "label": "Qué analizar",
+      "repos": "Repositorios", "repos_hint": "Uno o varios, elegidos a mano (hasta {{limit}})",
+      "org": "Una organización entera", "org_hint": "Todos sus repositorios, salvo los archivados"
+    },
+    "default_branch": "rama predeterminada",
+    "not_in_app": "no está en la GitHub App",
+    "not_in_app_single": "no está en la GitHub App: solo de uno en uno",
+    "add_more": "Añadir más repositorios",
+    "add": "Añadir repositorios",
+    "empty_title": "Todavía no hay repositorios",
+    "empty_text": "Elige uno o varios de tus repositorios conectados de GitHub, GitLab o este workspace.",
+    "without_app": "Varios a la vez solo funciona con repositorios de la GitHub App: su acceso se renueva automáticamente, así que aguanta un lote de horas. Quita {{names}} o analízalos de uno en uno.",
+    "over_limit": "Hasta {{limit}} a mano; para más, analiza la organización entera.",
+    "batch_active": "Ya hay un lote en curso ({{label}}): espera a que termine o cancélalo en Análisis. Mientras tanto puedes lanzar un análisis de un solo repositorio.",
+    "batch_hint": "Varios a la vez se analizan en un lote: de uno en uno y solo cuando no hay otros análisis, así los tuyos y las revisiones de PR no esperan. El progreso se ve en Análisis y puedes cancelarlo.",
+    "single_hint": "Cada ejecución analiza un repositorio: el snapshot y su hash identifican exactamente qué se revisó.",
+    "dialog_description": "Marca uno o varios. Con varios se analizan en lote (repositorios de la GitHub App, hasta {{limit}}).",
+    "no_provider": "Ningún proveedor de código conectado",
+    "connect": "Conectar",
+    "selected_one": "{{count}} seleccionado", "selected_other": "{{count}} seleccionados",
+    "done": "Listo"
+  },
+  "org": {
+    "label": "Organización",
+    "choose": "Elige una organización…",
+    "count_error": "No se pudieron contar los repositorios de {{name}}. Vuelve a intentarlo en un momento.",
+    "counting": "Contando repositorios…",
+    "estimate_one": "<strong>{{count}}</strong> repositorio · tiempo estimado {{duration}} (≈1 min por repositorio; se ajusta con lo que tarden de verdad).",
+    "estimate_other": "<strong>{{count}}</strong> repositorios · tiempo estimado {{duration}} (≈1 min por repositorio; se ajusta con lo que tarden de verdad).",
+    "none": "No hay repositorios de esa organización en la GitHub App.",
+    "dialog_title": "Analizar la organización {{name}}",
+    "dialog_description": "Se analizan todos sus repositorios (salvo los archivados), de uno en uno y solo cuando no hay otros análisis: los tuyos y las revisiones de PR no esperan. Puedes seguir usando el panel y cancelarlo cuando quieras.",
+    "scan_one": "Analizar {{count}} repositorio", "scan_other": "Analizar {{count}} repositorios",
+    "scan_pending": "Analizar repositorios"
+  },
+  "image": {
+    "title": "Imágenes",
+    "description": "Una o varias referencias, tal como las usas en <code>docker pull</code>. Se leen del registro: no se descargan en tu Docker, no se ejecutan y no se construyen.",
+    "references": "Referencias",
+    "references_hint": "(una por línea, hasta {{limit}})",
+    "placeholder": "p. ej. nginx:1.21\nghcr.io/tu-org/tu-imagen:1.0",
+    "invalid": "No parecen referencias válidas (registro/repositorio:etiqueta, en minúsculas): <mono>{{names}}</mono>",
+    "over_limit": "Como mucho {{limit}} imágenes por lote.",
+    "batch_info": "{{total}} imágenes: se analizan en un lote, de una en una y solo cuando no hay otros análisis. El progreso se ve en Análisis.",
+    "batch_active": "Ya hay un lote en curso ({{label}}): espera a que termine o analiza una sola imagen.",
+    "try_public": "Prueba con una pública:",
+    "samples": { "old": "antigua, muchos avisos", "recent": "reciente, pocos", "vulnerable": "vulnerable a propósito" },
+    "registry_saved": "{{registry}}: con credenciales guardadas",
+    "registry_anonymous": "{{registry}}: acceso anónimo",
+    "credentials_saved": "Se usarán las credenciales guardadas para <strong>{{registry}}</strong> (usuario {{username}}, token ····{{last4}}).",
+    "credentials_missing": "Sin credenciales para <strong>{{registry}}</strong>: sirve para imágenes públicas. Si es privada, un administrador puede guardar un token de solo lectura en <link>Integraciones → Registros de contenedores</link>.",
+    "tip": "Consejo: analiza una etiqueta inmutable (versión o <mono>@sha256:</mono>) en lugar de <mono>latest</mono>, para saber exactamente qué revisaste."
+  },
+  "targets": {
+    "description": "Elige los dominios y API registrados que quieres incluir en estas pruebas.",
+    "verified": "Verificado", "unverified": "Sin verificar",
+    "add_more": "Añadir más objetivos",
+    "empty_title": "Todavía no hay objetivos",
+    "empty_text": "Elige entre tus dominios registrados o registra uno nuevo.",
+    "add_domains_ellipsis": "Añadir dominios…",
+    "limit_hint": "Hasta {{limit}} objetivos por ejecución. Incluir un dominio no le envía tráfico de prueba.",
+    "dialog_title": "Añadir dominios",
+    "dialog_description": "Elige entre los dominios registrados en este workspace. Hasta {{limit}} por ejecución.",
+    "search": "Buscar dominios registrados",
+    "search_placeholder": "app.tudominio.com…",
+    "loading": "Cargando dominios",
+    "no_match": "No hay dominios registrados que coincidan.",
+    "register": "Registrar un dominio nuevo…",
+    "selected_of": "{{selected}}/{{limit}} seleccionados",
+    "add": "Añadir objetivos"
+  },
+  "context": {
+    "description": "Lo que cuentes aquí queda guardado con la ejecución y aparece en el reporte.",
+    "question": "¿Qué hace este objetivo?",
+    "optional": "(opcional)",
+    "placeholder": "Stack y framework, cómo se autentica, qué datos sensibles maneja, qué parte te preocupa más…",
+    "counter": "{{length}}/{{max}} · es una declaración del equipo: no cambia las reglas que se ejecutan ni se envía a ningún modelo de IA."
+  },
+  "review": {
+    "description": "Esto es exactamente lo que se va a ejecutar y lo que no.",
+    "type": "Tipo", "target": "Objetivo",
+    "no_context": "sin contexto declarado",
+    "target_none": "sin seleccionar",
+    "target_org": "Organización {{name}}",
+    "target_org_unset": "Organización sin elegir",
+    "target_repositories": "{{total}} repositorios: {{names}}",
+    "target_images": "{{total}} imágenes: {{names}}",
+    "batch_code": "Se crea un lote: cada repositorio se analiza con su propio plan, de uno en uno y solo cuando no hay otros análisis. Lo verás avanzar en Análisis y podrás cancelarlo; lo ya analizado se conserva. En lote no se envían dependencias a api.osv.dev.",
+    "batch_image": "Se crea un lote: cada imagen se analiza con su propio plan, de una en una y solo cuando no hay otros análisis. Lo verás avanzar en Análisis y podrás cancelarlo; lo ya analizado se conserva.",
+    "plan_loading": "Leyendo el repositorio para calcular qué se analiza",
+    "languages": "Lenguajes del repositorio",
+    "languages_files_one": "Lenguajes del repositorio · {{count}} archivo", "languages_files_other": "Lenguajes del repositorio · {{count}} archivos",
+    "rules_one": "{{count}} regla", "rules_other": "{{count}} reglas",
+    "no_rules": "sin reglas SAST",
+    "runs": "Se ejecuta",
+    "skips": "No se ejecuta",
+    "osv_authorized": "Dependencias: consulta a api.osv.dev autorizada",
+    "osv_consent": "<strong>Consultar OSV para SCA.</strong> Al activarlo autorizas enviar nombres y versiones de dependencias de este repositorio a <mono>api.osv.dev</mono>. Solo hace falta porque Trivy no está disponible en este servidor; sin activarlo, las dependencias quedan sin revisar.",
+    "image_runs": {
+      "packages": "Paquetes del sistema y de la aplicación con Trivy y Grype; se marcan los avisos que ven ambos",
+      "secrets": "Secretos en las capas, en las variables de entorno (ENV) y en el historial de construcción (ARG, URLs con credenciales)",
+      "config": "Configuración: usuario root, HEALTHCHECK, ADD desde URL, SSH expuesto, antigüedad",
+      "checkov": "Checkov sobre el Dockerfile reconstruido del historial: descargas sin verificar TLS, gestores de paquetes sin firma…",
+      "priority": "Prioridad con CVSS, CISA KEV y EPSS",
+      "saved_credentials": "Acceso con las credenciales guardadas para {{registry}}",
+      "anonymous": "Acceso anónimo al registro"
+    },
+    "image_skips": {
+      "run": "La imagen no se ejecuta ni se construye",
+      "source": "No se analiza el código fuente que la generó (lánzalo sobre su repositorio)",
+      "secrets": "Ningún valor secreto encontrado se guarda: solo su ubicación"
+    },
+    "dast_unavailable": "Las pruebas dinámicas todavía no se pueden lanzar: falta el runner aislado y los límites de tasa y alcance. Esta configuración queda preparada, no ejecutada.",
+    "unverified_targets": "Hay objetivos sin verificar. La propiedad por DNS TXT es requisito previo a cualquier prueba activa."
+  },
+  "launch": {
+    "queuing": "Encolando…",
+    "images": "Analizar {{total}} imágenes",
+    "image": "Analizar imagen",
+    "organization": "Analizar la organización",
+    "organization_count": "Analizar la organización ({{total}})",
+    "repositories": "Analizar {{total}} repositorios",
+    "code": "Iniciar revisión de código",
+    "dast": "Lanzar pruebas dinámicas",
+    "dast_unavailable": "El runner aislado de DAST aún no está disponible"
+  },
+  "batch": {
+    "last_one": "Último lote · {{label}}: {{count}} analizado{{failed}}{{cancelled}}{{critical}}.",
+    "last_other": "Último lote · {{label}}: {{count}} analizados{{failed}}{{cancelled}}{{critical}}.",
+    "failed_one": ", {{count}} fallido", "failed_other": ", {{count}} fallidos",
+    "cancelled": " · cancelado",
+    "critical_one": " · {{count}} crítico", "critical_other": " · {{count}} críticos",
+    "confirm_cancel": "¿Cancelar el lote? Lo ya analizado se conserva; el análisis en curso termina.",
+    "running": "Lote en curso · {{label}}",
+    "cancel": "Cancelar lote",
+    "progress_label": "Lote: {{done}} de {{total}} analizados",
+    "progress": "{{done}} de {{total}} analizados{{failed}} · {{critical}} críticos y {{high}} altos hasta ahora · quedan {{duration}}. Avanza cuando no hay otros análisis: puedes seguir usando el panel.",
+    "progress_failed_one": " ({{count}} fallido)", "progress_failed_other": " ({{count}} fallidos)",
+    "show_failed": "Ver fallidos"
+  },
+  "picker": {
+    "search": "Buscar ejecución",
+    "placeholder": "Repositorio, id…",
+    "more": "{{count}} más — refina la búsqueda"
+  },
+  "list": {
+    "search": "Buscar análisis",
+    "search_placeholder": "Buscar análisis…",
+    "filter_status": "Filtrar por estado",
+    "all_statuses": "Todos los estados",
+    "status_running": "Analizando",
+    "filter_type": "Filtrar por tipo",
+    "all_types": "Todos los tipos",
+    "loading": "Cargando análisis",
+    "empty_title": "Aún no hay análisis",
+    "empty_text": "Aquí aparecerán tus análisis. Lanza el primero sobre un repositorio o una imagen de contenedor.",
+    "new": "Nuevo análisis",
+    "columns": { "status": "Estado", "analysis": "Análisis", "type": "Tipo", "findings": "Hallazgos", "started": "Iniciado" },
+    "fallback": { "asset": "Activo", "repository": "Repositorio", "image": "Imagen", "pull_request": "Pull request", "analysis": "Análisis" },
+    "hint": {
+      "pr_review_one": "nuevo en el PR", "pr_review_other": "nuevos en el PR",
+      "advisory_watch_one": "aviso nuevo", "advisory_watch_other": "avisos nuevos",
+      "candidates_one": "candidato", "candidates_other": "candidatos"
+    },
+    "trigger_branch": "· automático: cambió la rama principal",
+    "trigger_branch_sha": "· automático: cambió la rama principal ({{sha}})",
+    "trigger_advisories": "· automático: publicados después del último análisis",
+    "severity_letter": { "critical": "C", "high": "A", "medium": "M", "low": "B" },
+    "severity_count": "{{severity}}: {{value}}",
+    "noun": "análisis"
+  },
+  "progress": {
+    "scan": "escaneo",
+    "running": "Analizando · {{seconds}}s",
+    "failed": "Falló",
+    "done": "Terminado",
+    "log": "Progreso del análisis",
+    "warning": "Aviso:",
+    "error": "Error:",
+    "dismiss": "Cerrar aviso"
+  }
+}

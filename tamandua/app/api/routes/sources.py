@@ -16,8 +16,9 @@ from tamandua.modules.integrations.installations import clear_github, github_con
 from tamandua.modules.integrations.ai_providers import ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
 from tamandua.modules.sources.repositories import SourceError, find_source, list_repositories, source_page
 from tamandua.modules.runs.store import render_tickets
-from tamandua.app.api.routing import Request, route
+from tamandua.app.api.routing import Request, problem, route
 from tamandua.app.api.security import public_url
+from tamandua.shared.i18n import default_locale, msg, t, text
 
 
 
@@ -44,7 +45,7 @@ def sources(request: Request):
     paged = paging(request)
     query, account, provider = request.arg("q", ""), request.arg("account"), request.arg("provider")
     if paged is None or len(query) > 100 or (account is not None and len(account) > 100) or provider not in (None, "github", "gitlab", "local"):
-        return request.json(400, {"error": "Parámetros de búsqueda inválidos"})
+        return request.json(400, {"error": msg("api.invalid_search")})
     if request.arg("refresh") == "1":
         for installation in installations:
             forget_catalog(installation)
@@ -57,22 +58,22 @@ def connect_code(request: Request):
     payload, state = request.payload, request.state
     if (not isinstance(payload, dict) or set(payload) not in ({"provider", "token"}, {"provider", "disconnect"})
             or payload.get("provider") not in ("github", "gitlab")):
-        return request.json(400, {"error": "Proveedor inválido"})
+        return request.json(400, {"error": msg("integrations.code.invalid_provider")})
     provider = payload["provider"]
     if "disconnect" in payload:
         if payload["disconnect"] is not True:
-            return request.json(400, {"error": "Solicitud inválida"})
+            return request.json(400, {"error": msg("api.invalid_request")})
         with state.code_lock:
             state.code_tokens.pop(provider, None)
         return request.json(200, {"provider": provider, "connected": False})
     token = payload["token"]
     if (not isinstance(token, str) or not 8 <= len(token) <= 512
             or any(character.isspace() or ord(character) < 33 or ord(character) > 126 for character in token)):
-        return request.json(400, {"error": "Token inválido"})
+        return request.json(400, {"error": msg("integrations.code.invalid_token")})
     try:
         repositories = list_repositories(provider, token)
     except SourceError:
-        return request.json(400, {"error": "No se pudo autenticar con el proveedor; revisa el token y sus permisos"})
+        return request.json(400, {"error": msg("integrations.code.auth_failed")})
     with state.code_lock:
         state.code_tokens[provider] = token
     return request.json(200, {"provider": provider, "connected": True, "repositories": len(repositories)})
@@ -91,12 +92,12 @@ def add_domain(request: Request):
     if (not isinstance(payload, dict) or not set(payload) <= {"url", "kind", "context"}
             or not isinstance(payload.get("url"), str) or not isinstance(payload.get("kind", "web"), str)
             or not isinstance(payload.get("context", ""), str)):
-        return request.json(400, {"error": "Solicitud de dominio inválida"})
+        return request.json(400, {"error": msg("sources.domains.invalid_request")})
     with domains.locked(request.data_dir):
         try:
             record = register_domain(request.data_dir, payload["url"], payload.get("kind", "web"), payload.get("context", ""))
         except DomainError as exc:
-            return request.json(400, {"error": str(exc)})
+            return request.json(400, {"error": problem(exc)})
     return request.json(200, record)
 
 
@@ -104,12 +105,12 @@ def add_domain(request: Request):
 def verify(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"domain_id"} or not isinstance(payload["domain_id"], str):
-        return request.json(400, {"error": "Solicitud de dominio inválida"})
+        return request.json(400, {"error": msg("sources.domains.invalid_request")})
     with domains.locked(request.data_dir):
         try:
             record = verify_domain(request.data_dir, payload["domain_id"])
         except DomainError as exc:
-            return request.json(400, {"error": str(exc)})
+            return request.json(400, {"error": problem(exc)})
     return request.json(200, record)
 
 
@@ -117,11 +118,11 @@ def verify(request: Request):
 def reachability(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"url"} or not isinstance(payload["url"], str):
-        return request.json(400, {"error": "Solicitud de dominio inválida"})
+        return request.json(400, {"error": msg("sources.domains.invalid_request")})
     try:
         return request.json(200, check_reachability(payload["url"]))
     except DomainError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": problem(exc)})
 
 
 # ---------------------------------------------------------------------- IA
@@ -136,18 +137,18 @@ def provider_keys(request: Request):
     payload = request.payload
     if (not isinstance(payload, dict) or not {"provider", "action"} <= set(payload)
             or not set(payload) <= {"provider", "action", "api_key"} or payload["action"] not in ("save", "remove")):
-        return request.json(400, {"error": "Solicitud de credencial inválida"})
+        return request.json(400, {"error": msg("integrations.ai.invalid_request")})
     try:
         if payload["action"] == "remove":
             forget_provider_key(payload["provider"])
             return request.json(200, {"providers": provider_status()})
         result = save_provider_key(payload["provider"], payload.get("api_key", ""))
     except ProviderError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": problem(exc)})
     except (ValueError, TypeError):
-        return request.json(400, {"error": "Solicitud de credencial inválida"})
+        return request.json(400, {"error": msg("integrations.ai.invalid_request")})
     except OSError:
-        return request.json(500, {"error": "No se pudo guardar la credencial"})
+        return request.json(500, {"error": msg("integrations.ai.save_failed")})
     return request.json(200, {"result": result, "providers": provider_status()})
 
 
@@ -155,22 +156,23 @@ def provider_keys(request: Request):
 def provider_check(request: Request):
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"provider"}:
-        return request.json(400, {"error": "Proveedor inválido"})
+        return request.json(400, {"error": msg("integrations.code.invalid_provider")})
     try:
         return request.json(200, check_provider(payload["provider"]))
     except (ValueError, TypeError):
-        return request.json(400, {"error": "Proveedor inválido"})
+        return request.json(400, {"error": msg("integrations.code.invalid_provider")})
 
 
 # -------------------------------------------------------------- GitHub App
 
-def _landing(request: Request, title: str, detail: str):
+def _landing(request: Request, title, detail):
     """Página mínima de vuelta: sin scripts, y vuelve al panel con un enlace."""
-    body = ("<!doctype html><meta charset=utf-8><title>Tamandua</title>"
+    locale = request.locale
+    body = (f"<!doctype html><html lang={locale}><meta charset=utf-8><title>Tamandua</title>"
             "<style>body{font:15px system-ui,sans-serif;background:#0a0a0a;color:#eee;max-width:560px;margin:15vh auto;padding:0 20px}"
             "a{color:#fff}</style>"
-            f"<h1>{html.escape(title)}</h1><p>{html.escape(detail)}</p>"
-            f"<p><a href=\"{html.escape(public_url(request.port))}/#/integraciones\">Volver al panel</a></p>")
+            f"<h1>{html.escape(text(title, locale))}</h1><p>{html.escape(text(detail, locale))}</p>"
+            f"<p><a href=\"{html.escape(public_url(request.port))}/#/integraciones\">{html.escape(t('integrations.github.landing.back', locale))}</a></p>")
     return request.send(200, body.encode("utf-8"), "text/html; charset=utf-8",
                         csp="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'")
 
@@ -228,14 +230,14 @@ def github_app_credentials(request: Request):
     """App ID + clave privada pegados por un administrador: se verifican con GitHub y se guardan cifrados."""
     payload = request.payload
     if not isinstance(payload, dict) or set(payload) != {"app_id", "private_key"}:
-        return request.json(400, {"error": "Solicitud inválida"})
+        return request.json(400, {"error": msg("api.invalid_request")})
     if github_config()["source"] == "entorno":
-        return request.json(409, {"error": "La App viene de variables de entorno del servidor; cámbiala allí"})
+        return request.json(409, {"error": msg("integrations.github.env_managed_change")})
     previous_app = github_config().get("app_id")
     try:
         verified = verify_app(payload["app_id"], payload["private_key"])
     except GitHubAppError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": problem(exc)})
     save_credentials(verified)
     if previous_app != verified["app_id"]:
         clear_github(request.data_dir)
@@ -252,15 +254,15 @@ def github_action(request: Request):
                                                  or not isinstance(payload["installation_id"], int)
                                                  or isinstance(payload["installation_id"], bool) or payload["installation_id"] <= 0))
             or (payload.get("action") == "connect" and "installation_id" not in payload)):
-        return request.json(400, {"error": "Acción de integración inválida"})
+        return request.json(400, {"error": msg("integrations.github.invalid_action")})
     action = payload["action"]
     if action in ("disconnect", "forget_app"):
         if action == "forget_app":
             if github_config()["source"] == "entorno":
-                return request.json(409, {"error": "La App viene de variables de entorno del servidor; quítala allí"})
+                return request.json(409, {"error": msg("integrations.github.env_managed_remove")})
         installation_id = payload.get("installation_id")
         if installation_id is not None and installation_id not in github_installations(request.data_dir):
-            return request.json(404, {"error": "Esa instalación no está conectada"})
+            return request.json(404, {"error": msg("integrations.github.not_connected")})
         to_forget = [installation_id] if installation_id is not None else github_installations(request.data_dir)
         clear_github(request.data_dir, installation_id)
         for current in to_forget:
@@ -273,17 +275,17 @@ def github_action(request: Request):
             return request.json(200, {"url": install_url()})
         if action == "connect":
             if _attach(request, payload["installation_id"]) is None:
-                return request.json(404, {"error": "Esta instalación no pertenece a la GitHub App configurada"})
+                return request.json(404, {"error": msg("integrations.github.foreign_installation")})
             return request.json(200, github_status(request, live=True))
         rows = app_installations()
         if not rows:
-            return request.json(404, {"error": "La App todavía no está instalada en ninguna cuenta. Pulsa Instalar en GitHub y elige los repositorios."})
+            return request.json(404, {"error": msg("integrations.github.not_installed")})
         connected = set(github_installations(request.data_dir))
         status = github_status(request, live=True)
         status["available_installations"] = [{**row, "connected": row["installation_id"] in connected} for row in rows]
         return request.json(200, status)
     except GitHubAppError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": problem(exc)})
 
 
 # Vuelta opcional tras instalar (Setup URL de la App). La cookie SameSite=Strict no viaja
@@ -292,18 +294,18 @@ def github_action(request: Request):
 def github_callback(request: Request):
     raw = request.arg("installation_id", "") or ""
     if not raw.isdigit() or len(raw) > 19:
-        return _landing(request, "GitHub no devolvió una instalación", "Si cancelaste la instalación no hay nada que guardar.")
+        return _landing(request, msg("integrations.github.landing.no_installation"), msg("integrations.github.landing.no_installation_detail"))
     # Pública y con llamada a GitHub detrás: con límite, para que no sirva para agotar la cuota de la App.
     scope = f"oauth-callback:{request.client}"
     if request.auth.throttle.reserve(scope):
-        return _landing(request, "Demasiados intentos", "Espera unos minutos y vuelve a pulsar «Buscar instalaciones» en Integraciones.")
+        return _landing(request, msg("integrations.github.landing.too_many"), msg("integrations.github.landing.too_many_detail"))
     try:
         if not any(row["installation_id"] == int(raw) for row in app_installations()):
-            return _landing(request, "Instalación desconocida", "Esa instalación no pertenece a la GitHub App configurada en este panel.")
+            return _landing(request, msg("integrations.github.landing.unknown"), msg("integrations.github.landing.unknown_detail"))
     except (GitHubAppError, ValueError) as exc:
-        return _landing(request, "La conexión con GitHub falló", str(exc))
+        return _landing(request, msg("integrations.github.landing.failed"), problem(exc))
     request.auth.throttle.succeeded(scope)
-    return _landing(request, "Instalación disponible", "Vuelve al panel, pulsa «Buscar instalaciones» y elige la cuenta que quieres conectar.")
+    return _landing(request, msg("integrations.github.landing.available"), msg("integrations.github.landing.available_detail"))
 
 
 # -------------------------------------------------------------------- Jira
@@ -323,31 +325,32 @@ def jira_configure(request: Request):
     fields = {"action", "site", "email", "token", "project", "issue_type"}
     if not isinstance(payload, dict) or payload.get("action") != "save" or not set(payload) <= fields \
             or not {"site", "email", "token", "project"} <= set(payload):
-        return request.json(400, {"error": "Solicitud de Jira inválida"})
+        return request.json(400, {"error": msg("integrations.jira.invalid_request")})
     try:
         return request.json(200, jira.configure(payload["site"], payload["email"], payload["token"], payload["project"],
                                                 payload.get("issue_type", "Task"), by=request.user["username"]))
     except jira.JiraError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": problem(exc)})
     except OSError:
-        return request.json(500, {"error": "No se pudo guardar la configuración"})
+        return request.json(500, {"error": msg("api.save_settings_failed")})
 
 
 @route("POST", "/api/integrations/jira/issues", action="export-jira", body=6000)
 def jira_export(request: Request):
     payload = request.payload
     if (not isinstance(payload, dict) or set(payload) != {"run_id", "fingerprints"} or not isinstance(payload["run_id"], str)):
-        return request.json(400, {"error": "Solicitud de exportación inválida"})
+        return request.json(400, {"error": msg("integrations.jira.invalid_export")})
     try:
         from tamandua.modules.findings.registry import resolve
         record = resolve(request.data_dir, payload["run_id"])
         record = record if record.get("type") == "asset_state" else triage.annotate(request.data_dir, record)
     except (ValueError, OSError, json.JSONDecodeError):
-        return request.json(404, {"error": "Ejecución no encontrada"})
+        return request.json(404, {"error": msg("api.run_not_found")})
     if record.get("type") not in (*FINDING_RUNS, "asset_state"):
-        return request.json(400, {"error": "Solo las revisiones de código generan tickets"})
+        return request.json(400, {"error": msg("integrations.jira.code_only")})
     try:
-        return request.json(200, jira.export(request.data_dir, record, render_tickets(record), payload["fingerprints"],
+        # Issues are read by the whole team: TAMANDUA_DEFAULT_LOCALE, not the requester's language.
+        return request.json(200, jira.export(request.data_dir, record, render_tickets(record, locale=default_locale()), payload["fingerprints"],
                                              by=request.user["username"]))
     except jira.JiraError as exc:
-        return request.json(400, {"error": str(exc)})
+        return request.json(400, {"error": problem(exc)})

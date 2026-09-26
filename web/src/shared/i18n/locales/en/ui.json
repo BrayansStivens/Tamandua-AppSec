@@ -1,0 +1,20 @@
+{
+  "brand_mark": "{{name}} logo",
+  "splash": "Loading {{name}}",
+  "loading": "Loading",
+  "pagination": {
+    "showing": "Showing {{from}}–{{to}} of {{total}} {{noun}}",
+    "items": "items",
+    "previous": "Previous page",
+    "next": "Next page"
+  },
+  "soon": {
+    "badge": "In development",
+    "page_note": "It doesn't produce real results yet, so it's turned off. Once it's ready it will show up here, with nothing for you to do."
+  },
+  "combobox": {
+    "empty": "No matches",
+    "placeholder": "Type to search…",
+    "more": "{{remaining}} more: keep typing to narrow it down"
+  }
+}

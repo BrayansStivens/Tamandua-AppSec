@@ -2,8 +2,11 @@ rules:
   - id: appsec.rb.sql-interpolation
     languages: [ruby]
     severity: ERROR
-    message: "SQL con interpolación de cadenas. Usa condiciones parametrizadas: where('col = ?', valor) o hashes."
-    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "The SQL text uses string interpolation. Use parameterized conditions, such as where('col = ?', value), or hash conditions."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "SQL query built with string interpolation", es: "Consulta SQL construida con interpolación"},
+      fix: {en: "The SQL text uses string interpolation. Use parameterized conditions, such as where('col = ?', value), or hash conditions.",
+            es: "SQL con interpolación de cadenas. Usa condiciones parametrizadas: where('col = ?', valor) o hashes."}}
     pattern-either:
       - pattern: $M.where("...#{$X}...", ...)
       - pattern: $M.find_by_sql("...#{$X}...", ...)
@@ -15,8 +18,11 @@ rules:
   - id: appsec.rb.command-injection
     languages: [ruby]
     severity: ERROR
-    message: "Comando del sistema con interpolación de cadenas. Usa la forma con argumentos separados: system('cmd', arg1, arg2)."
-    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "The command uses string interpolation. Pass the arguments separately: system('cmd', arg1, arg2)."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "System command built with string interpolation", es: "Comando del sistema construido con interpolación"},
+      fix: {en: "The command uses string interpolation. Pass the arguments separately: system('cmd', arg1, arg2).",
+            es: "Comando del sistema con interpolación de cadenas. Usa la forma con argumentos separados: system('cmd', arg1, arg2)."}}
     pattern-either:
       - pattern: system("...#{$X}...")
       - pattern: exec("...#{$X}...")
@@ -28,8 +34,11 @@ rules:
   - id: appsec.rb.unsafe-deserialization
     languages: [ruby]
     severity: ERROR
-    message: "Marshal.load / YAML.load instancian objetos arbitrarios: ejecución de código con datos no confiables. Usa YAML.safe_load o JSON."
-    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: MEDIUM}
+    message: "Marshal.load and YAML.load build arbitrary objects: code execution on untrusted data. Use YAML.safe_load or JSON."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: MEDIUM,
+      title: {en: "Unsafe deserialization (Marshal/YAML)", es: "Deserialización insegura (Marshal/YAML)"},
+      fix: {en: "Marshal.load and YAML.load build arbitrary objects: code execution on untrusted data. Use YAML.safe_load or JSON.",
+            es: "Marshal.load / YAML.load instancian objetos arbitrarios: ejecución de código con datos no confiables. Usa YAML.safe_load o JSON."}}
     pattern-either:
       - pattern: Marshal.load(...)
       - pattern: YAML.load(...)
@@ -38,8 +47,11 @@ rules:
   - id: appsec.rb.html-safe-non-literal
     languages: [ruby]
     severity: WARNING
-    message: "html_safe / raw sobre un valor dinámico desactiva el escape de Rails: XSS si contiene datos externos. Usa sanitize."
-    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    message: "html_safe or raw on a dynamic value turns off Rails escaping and allows XSS if it holds external data. Use sanitize."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM,
+      title: {en: "Unescaped HTML via html_safe/raw", es: "HTML sin escapar con html_safe/raw"},
+      fix: {en: "html_safe or raw on a dynamic value turns off Rails escaping and allows XSS if it holds external data. Use sanitize.",
+            es: "html_safe / raw sobre un valor dinámico desactiva el escape de Rails: XSS si contiene datos externos. Usa sanitize."}}
     patterns:
       - pattern-either:
           - pattern: $X.html_safe
@@ -50,14 +62,20 @@ rules:
   - id: appsec.rb.mass-assignment-permit-all
     languages: [ruby]
     severity: WARNING
-    message: "params.permit! acepta cualquier atributo: asignación masiva de campos sensibles (rol, admin). Permite atributos explícitos."
-    metadata: {cwe: [915], owasp: "A01:2025", category: mass-assignment, confidence: HIGH}
+    message: "params.permit! accepts any attribute, so sensitive fields such as role or admin can be mass-assigned. Permit attributes explicitly."
+    metadata: {cwe: [915], owasp: "A01:2025", category: mass-assignment, confidence: HIGH,
+      title: {en: "Mass assignment with params.permit!", es: "Asignación masiva con params.permit!"},
+      fix: {en: "params.permit! accepts any attribute, so sensitive fields such as role or admin can be mass-assigned. Permit attributes explicitly.",
+            es: "params.permit! acepta cualquier atributo: asignación masiva de campos sensibles (rol, admin). Permite atributos explícitos."}}
     pattern: $P.permit!
   - id: appsec.rb.open-redirect
     languages: [ruby]
     severity: WARNING
-    message: "redirect_to con destino de params: redirección abierta. Valida contra rutas permitidas o usa only_path: true."
-    metadata: {cwe: [601], owasp: "A01:2025", category: redirect, confidence: HIGH}
+    message: "redirect_to takes its target from params. Check it against allowed paths, or use only_path: true."
+    metadata: {cwe: [601], owasp: "A01:2025", category: redirect, confidence: HIGH,
+      title: {en: "Open redirect from request params", es: "Redirección abierta desde params"},
+      fix: {en: "redirect_to takes its target from params. Check it against allowed paths, or use only_path: true.",
+            es: "redirect_to con destino de params: redirección abierta. Valida contra rutas permitidas o usa only_path: true."}}
     pattern-either:
       - pattern: redirect_to params[$K]
       - pattern: redirect_to params[$K], ...

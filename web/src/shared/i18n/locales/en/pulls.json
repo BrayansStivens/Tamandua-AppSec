@@ -1,0 +1,90 @@
+{
+  "gate": {
+    "critical": "Critical",
+    "high": "High and above",
+    "medium": "Medium and above",
+    "never": "Never block"
+  },
+  "gate_inline": {
+    "critical": "blocks on critical",
+    "high": "blocks on high and above",
+    "medium": "blocks on medium and above",
+    "never": "never blocks"
+  },
+  "badge": {
+    "not_reviewed": "Not reviewed",
+    "reviewing": "Reviewing",
+    "failed": "Failed",
+    "new_commits": "New commits",
+    "clean": "No new findings",
+    "new_one": "{{count}} new",
+    "new_other": "{{count}} new",
+    "blocking_one": "{{count}} critical/high",
+    "blocking_other": "{{count}} critical/high"
+  },
+  "loading": {
+    "watched": "Loading watched repositories",
+    "repository": "Loading repository",
+    "pulls": "Loading pull requests"
+  },
+  "connect": {
+    "title": "Connect GitHub to review pull requests",
+    "body": "Reviews use the installed GitHub App: choose the repositories in Integrations."
+  },
+  "repo": {
+    "choose": "Choose a repository",
+    "description": "Every new commit on a pull request is scanned and compared with the main branch, so only what the pull request introduces counts. Its findings join the repository's status and are marked fixed automatically when a later commit removes them or the pull request is closed without merging.",
+    "watching": "Watching",
+    "not_watching": "Not watched",
+    "post_comment": "Comment and set the commit status on GitHub",
+    "branch": "Rescan the main branch when it changes",
+    "gate": "Block at",
+    "gate_label": "Blocking threshold",
+    "admin_only": "Only an administrator can change these settings.",
+    "enable_hint": "Turn it on with its switch in the list so every push gets reviewed automatically, or use \"Review now\" on a pull request.",
+    "branch_scanned": "Main branch: last scanned after a change on {{date}} (commit <code>{{sha}}</code>). After a merge, the repository status catches up on its own, at most once every {{minutes}} min.",
+    "branch_pending": "Main branch: it will be scanned on the watcher's next pass. After a merge, the repository status catches up on its own, at most once every {{minutes}} min.",
+    "missing_write": "The installed GitHub App can't comment yet: it needs write access to <b>Pull requests</b> and <b>Commit statuses</b>. Reviews still run and show up here; once the installation accepts those permissions, they'll be posted on GitHub."
+  },
+  "list": {
+    "title": "Open pull requests",
+    "title_count": "Open pull requests · {{total}}",
+    "empty": "No open pull requests in this repository.",
+    "draft": "draft",
+    "reviewed": "reviewed {{date}}",
+    "view_result": "View result",
+    "review_now": "Review now"
+  },
+  "watch": {
+    "title": "Watched repositories · {{total}}",
+    "description": "Enabled repositories review every new pull request or push automatically and rescan the main branch when it changes (checked every {{minutes}} min).",
+    "admin_hint": "Turn them on one by one or in bulk.",
+    "member_hint": "Only an administrator can change what's watched.",
+    "bulk": "Bulk actions",
+    "watch_all": "Watch all repositories",
+    "unwatch_all": "Stop watching all",
+    "confirm_all": "Watch every repository in the GitHub App? Each push to any of them will trigger a review.",
+    "search": "Search repositories",
+    "search_placeholder": "Search…",
+    "only_watched": "Watched only",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "enable": "Turn on",
+    "disable": "Turn off",
+    "clear_selection": "Clear selection",
+    "partial": "Partial results: this account's repository list is still being read from GitHub.",
+    "select_page": "Select this page",
+    "select_one": "Select {{name}}",
+    "comments": "comments on GitHub",
+    "panel_only": "panel only",
+    "branch_current": "main branch kept up to date",
+    "not_watched": "not watched",
+    "reviewed_one": "{{count}} PR reviewed",
+    "reviewed_other": "{{count}} PRs reviewed",
+    "on": "On",
+    "off": "Off",
+    "toggle": "Watch {{name}}",
+    "no_watched_match": "No watched repository matches.",
+    "no_match": "No repository matches."
+  }
+}

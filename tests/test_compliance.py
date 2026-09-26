@@ -15,6 +15,7 @@ from tamandua.modules.compliance import sbom
 from tamandua.modules.findings import triage
 from tamandua.modules.compliance import vex
 from tamandua.modules.intel.advisories import dependency_finding
+from tamandua.shared.i18n import localize, text
 from tamandua.modules.reporting.audit import FRAMEWORKS, render_audit_pdf, validate_options
 from tamandua.modules.identity.auth import Users
 from tamandua.modules.runs.store import save_repository_scan
@@ -38,13 +39,13 @@ class MaliciousTests(unittest.TestCase):
         self.assertEqual((finding["severity"], finding["malicious"], finding["priority"]["action"], finding["package"]["fixed_version"]),
                          ("critical", True, "act", None))
         self.assertEqual(finding["source"]["id"], "ossf-malicious")
-        self.assertIn("rota sus tokens", finding["remediation"])
+        self.assertIn("rota sus tokens", text(finding["remediation"]))
         # Otro aviso del mismo paquete tampoco propone «actualiza a…».
         other = {**_finding("b" * 64, "high", package="event-stream"), "path": "package-lock.json",
                  "package": {"ecosystem": "npm", "name": "event-stream", "version": "3.3.6", "fixed_version": "4.0.0"}}
         fix_guide.attach([finding, other])
-        self.assertIn("paquete malicioso", other["fix"]["steps"][0])
-        self.assertFalse(any("Actualiza" in step for step in finding["fix"]["steps"]))
+        self.assertIn("paquete malicioso", text(other["fix"]["steps"][0]))
+        self.assertFalse(any("Actualiza" in step for step in localize(finding["fix"]["steps"])))
         # Los informes (tabla y «qué hacer primero») dicen lo mismo que el panel, y lo malicioso va primero.
         from tamandua.modules.findings.remediation import action, fix_groups
         groups = fix_groups([_finding("c" * 64, "critical", package="axios"), finding, other])

@@ -1,0 +1,18 @@
+{
+  "tested": "{{tested}}/{{total}} con alguna prueba",
+  "description": "Cada categoría dice qué motor o cuántas reglas la cubrieron y cuántos hallazgos produjo. Lo no probado dice por qué.",
+  "rules_one": "{{count}} regla", "rules_other": "{{count}} reglas",
+  "step_status": { "completed": "Completado", "partial": "Parcial", "not_tested": "No probado", "inconclusive": "Inconcluso", "pending": "Pendiente" },
+  "run": { "title": "Ejecución evaluada", "none": "Sin ejecución seleccionada", "pick": "Elige una ejecución en Hallazgos para ver su cobertura." },
+  "not_covered": {
+    "title": "Qué no cubre un análisis estático",
+    "plan": "Estas categorías se cubren con modelado de amenazas y pruebas dinámicas, que están en el plan."
+  },
+  "no_full_scan": "Sin escaneo completo de este repositorio",
+  "repository": "Repositorio",
+  "loading": "Cargando cobertura",
+  "empty": {
+    "no_repositories": "Aún no hay repositorios analizados. La cobertura OWASP aparece tras el primer escaneo completo.",
+    "no_full_scan": "Este repositorio aún no tiene un escaneo completo terminado. La cobertura OWASP se mide sobre él: lanza uno desde «Nuevo análisis»."
+  }
+}

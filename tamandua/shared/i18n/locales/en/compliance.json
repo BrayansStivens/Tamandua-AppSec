@@ -1,0 +1,35 @@
+{
+  "cra": {
+    "stages": {
+      "early_warning": "Early warning",
+      "notification": "Notification",
+      "final_report": "Final report"
+    },
+    "errors": {
+      "product_name": "Enter the product's commercial name (up to {{max}} characters).",
+      "support_date": "The end-of-support date must be YYYY-MM-DD.",
+      "invalid_stage": "Invalid event or stage."
+    },
+    "draft": {
+      "body": "Product: {{product}}{{support}}\nVulnerability: {{cve}}{{kev_name}}\nAffected component: {{packages}}\nActive exploitation: in the CISA KEV catalog since {{kev_date}}{{ransomware}}\nManufacturer became aware: {{aware}} UTC\nGeneral nature of the exploit: [summarize how it is exploited, without details that would help an attacker]\nCorrective measure available: {{fixed}}\nMeasures users can take: [e.g. update to version X, turn off feature Y]\nMember states where the product is sold: [list]\nSensitivity of the information: [say whether anything must not be shared]\n\nBefore you send it: confirm the vulnerability really affects the product (the finding is a scanner candidate).",
+      "support": " (supported until {{date}})",
+      "no_component": "[affected component]",
+      "ransomware": " · used in ransomware campaigns",
+      "fixed_since": "Yes, since {{date}}",
+      "not_fixed": "[not yet: describe the temporary mitigation]"
+    }
+  },
+  "vex": {
+    "false_positive": "Dismissed in triage as a false positive.",
+    "accepted": "Risk accepted: {{reason}}",
+    "accepted_until": "Risk accepted (until {{date}}): {{reason}}",
+    "in_progress": "Fix in progress.",
+    "role": "Document generated from triage"
+  },
+  "sbom": {
+    "needs_full_scan": "The SBOM comes from a full analysis that has finished: this one isn't.",
+    "os_package": "operating system",
+    "origin": "Trivy inventory of the analyzed manifests and lockfiles. No supplier or hash per component: they aren't inferred.",
+    "origin_image": "Trivy inventory of the analyzed manifests and lockfiles and of the image's system packages. No supplier or hash per component: they aren't inferred."
+  }
+}

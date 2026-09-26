@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { formatDay, formatNumber } from '@/shared/i18n/format'
 
 export type SkylineCell = { day: string; severity: string; count: number }
 const ROWS = ['critical', 'high', 'medium', 'low', 'none'] as const
-const ROW_NAME: Record<string, string> = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja', none: 'Sin puntuar' }
+const ROW_KEY: Record<string, string> = { critical: 'common:severity.critical', high: 'common:severity.high', medium: 'common:severity.medium', low: 'common:severity.low', none: 'charts:unscored' }
 const TOKEN: Record<string, string> = { critical: '--sev-critical', high: '--sev-high', medium: '--sev-medium', low: '--sev-low', none: '--axis-line' }
 type Face = { points: [number, number][]; cell: SkylineCell }
 
@@ -27,6 +29,8 @@ function inside(point: [number, number], polygon: [number, number][]) {
 // Es la huella de los últimos 30 días según la copia local de NVD, girando despacio; con movimiento
 // reducido queda quieta. Las cifras exactas se leen al pasar el ratón y en el resumen accesible.
 export function SeveritySkyline({ cells, days = 30, height = 260 }: { cells: SkylineCell[]; days?: number; height?: number }) {
+  const { t } = useTranslation('charts')
+  const rowName = (row: string) => t(ROW_KEY[row])
   const canvas = useRef<HTMLCanvasElement>(null)
   const faces = useRef<Face[]>([])
   const [hover, setHover] = useState<{ x: number; y: number; cell: SkylineCell } | null>(null)
@@ -140,15 +144,15 @@ export function SeveritySkyline({ cells, days = 30, height = 260 }: { cells: Sky
       context.fillStyle = ink
       context.font = '11px Geist Variable, system-ui, sans-serif'
       context.textAlign = 'right'
-      ROWS.forEach((row, index) => { const [px, py] = project(-0.5, 0, index * GAP + GAP / 2); context.fillText(ROW_NAME[row], px, py + 3) })
+      ROWS.forEach((row, index) => { const [px, py] = project(-0.5, 0, index * GAP + GAP / 2); context.fillText(t(ROW_KEY[row]), px, py + 3) })
       context.textAlign = 'center'
       const short = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}`
-      for (const column of [0, days - 1]) { const [px, py] = project(column + 0.5, 0, depth3 + 0.5); context.fillText(column === days - 1 ? 'hoy' : short(labels[column]), px, py + 12) }
+      for (const column of [0, days - 1]) { const [px, py] = project(column + 0.5, 0, depth3 + 0.5); context.fillText(column === days - 1 ? t('today') : short(labels[column]), px, py + 12) }
       if (!still) frame = requestAnimationFrame(draw)
     }
     draw(performance.now())
     return () => cancelAnimationFrame(frame)
-  }, [cells, days])
+  }, [cells, days, t])
 
   const move = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const box = event.currentTarget.getBoundingClientRect()
@@ -159,14 +163,14 @@ export function SeveritySkyline({ cells, days = 30, height = 260 }: { cells: Sky
     setHover(face ? { x: point[0], y: point[1], cell: face.cell } : null)
   }
   const total = cells.reduce((sum, cell) => sum + cell.count, 0)
-  const bySeverity = ROWS.map(row => `${ROW_NAME[row]} ${cells.filter(cell => cell.severity === row).reduce((sum, cell) => sum + cell.count, 0)}`).join(', ')
+  const bySeverity = ROWS.map(row => `${rowName(row)} ${cells.filter(cell => cell.severity === row).reduce((sum, cell) => sum + cell.count, 0)}`).join(', ')
   return <div className="relative">
-    <canvas ref={canvas} role="img" aria-label={`CVE publicados en los últimos ${days} días por severidad: ${total} en total; ${bySeverity}.`}
+    <canvas ref={canvas} role="img" aria-label={t('skyline_label', { days, total, breakdown: bySeverity })}
       onMouseMove={move} onMouseLeave={() => { hovered.current = null; setHover(null) }} className="block w-full" style={{ height }} />
     {hover && <div className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-md border border-app-line bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-lg" style={{ left: hover.x, top: hover.y - 8 }}>
-      <div className="font-medium tabular-nums">{hover.cell.count.toLocaleString('es-CO')} CVE</div>
-      <div className="text-app-muted">{ROW_NAME[hover.cell.severity]} · {new Date(`${hover.cell.day}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}</div>
+      <div className="font-medium tabular-nums">{formatNumber(hover.cell.count)} CVE</div>
+      <div className="text-app-muted">{rowName(hover.cell.severity)} · {formatDay(`${hover.cell.day}T12:00:00`, { day: 'numeric', month: 'short' })}</div>
     </div>}
-    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-app-muted">{ROWS.map(row => <span key={row} className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm" style={{ background: `var(${TOKEN[row]})` }} />{ROW_NAME[row]}</span>)}</div>
+    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-app-muted">{ROWS.map(row => <span key={row} className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm" style={{ background: `var(${TOKEN[row]})` }} />{rowName(row)}</span>)}</div>
   </div>
 }

@@ -1,4 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { Check, CircleCheck, Copy, ExternalLink, FileKey2, LoaderCircle, RefreshCw, ShieldCheck, TriangleAlert, Upload } from 'lucide-react'
 import { Button, buttonVariants } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -15,16 +16,19 @@ export type GitHubStatus = {
 
 export type GitHubInstallation = { installation_id: number; account: string | null; account_type: string | null; repository_selection: 'all' | 'selected' | null; permissions: Record<string, string>; connected_by: string | null; connected_at: string; permission_review?: PermissionReview }
 
+// GitHub's own UI labels, shown as they appear on GitHub.
 const PERMISSION_LABEL: Record<string, string> = { contents: 'Contents', metadata: 'Metadata', pull_requests: 'Pull requests', statuses: 'Commit statuses' }
 const LEVEL_LABEL: Record<string, string> = { read: 'Read-only', write: 'Read and write' }
+const STRONG = <strong className="font-medium text-app-secondary" />
 
 function CopyValue({ value }: { value: string }) {
+  const { t } = useTranslation('sources')
   const [copied, setCopied] = useState(false)
   return <span className="inline-flex max-w-full items-center gap-1 rounded-md border border-app-line bg-app-soft py-0.5 pr-0.5 pl-2 align-middle">
     <code className="truncate font-mono text-[11px]">{value}</code>
-    <button type="button" aria-label={`Copiar ${value}`} onClick={() => { void navigator.clipboard.writeText(value).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1200) }) }}
+    <button type="button" aria-label={t('github.copy_value', { value })} onClick={() => { void navigator.clipboard.writeText(value).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1200) }) }}
       className="grid size-6 place-items-center rounded text-app-subtle hover:bg-accent hover:text-app-fg">{copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}</button>
-    <span role="status" className="sr-only">{copied ? 'Copiado al portapapeles' : ''}</span>
+    <span role="status" className="sr-only">{copied ? t('copied_to_clipboard') : ''}</span>
   </span>
 }
 
@@ -37,6 +41,7 @@ function Step({ number, title, children }: { number: number; title: string; chil
 
 // Guía para crear la GitHub App a mano en GitHub y formulario para conectarla aquí.
 export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubStatus; canManage: boolean; onSaved: (next: GitHubStatus) => void }) {
+  const { t } = useTranslation('sources')
   const [org, setOrg] = useState('')
   const [appId, setAppId] = useState('')
   const [pem, setPem] = useState('')
@@ -50,9 +55,9 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
   const readFile = async (selected: File | undefined) => {
     setError('')
     if (!selected) return
-    if (selected.size > 16000) { setError('Ese fichero es demasiado grande para ser una clave .pem'); return }
+    if (selected.size > 16000) { setError(t('github.pem_too_large')); return }
     const text = await selected.text()
-    if (!text.includes('PRIVATE KEY')) { setError('Ese fichero no parece una clave privada (.pem) de GitHub App'); return }
+    if (!text.includes('PRIVATE KEY')) { setError(t('github.pem_invalid')); return }
     setPem(text); setPemName(selected.name)
   }
   const submit = async (event: FormEvent) => {
@@ -69,58 +74,59 @@ export function GitHubAppGuide({ status, canManage, onSaved }: { status: GitHubS
 
   return <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
     <ol className="rounded-xl border border-app-line bg-panel p-4">
-      <Step number={1} title="Abre el formulario de nueva GitHub App">
-        <p>En tu cuenta personal o en una organización que administres (escribe su nombre):</p>
-        <div className="flex flex-wrap items-center gap-2"><Input aria-label="Organización (opcional)" value={org} onChange={event => setOrg(event.target.value.replace(/[^A-Za-z0-9-]/g, ''))} maxLength={39} placeholder="organización (opcional)" className="h-8 w-48 border-app-line bg-app-soft text-xs" />
-          <a href={createUrl} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: 'sm', variant: 'outline', className: 'border-app-line bg-app-soft' })}>Abrir en GitHub <ExternalLink /><span className="sr-only">(se abre en otra pestaña)</span></a></div>
+      <Step number={1} title={t('github.steps.open.title')}>
+        <p>{t('github.steps.open.body')}</p>
+        <div className="flex flex-wrap items-center gap-2"><Input aria-label={t('github.steps.open.organization')} value={org} onChange={event => setOrg(event.target.value.replace(/[^A-Za-z0-9-]/g, ''))} maxLength={39} placeholder={t('github.steps.open.organization_placeholder')} className="h-8 w-48 border-app-line bg-app-soft text-xs" />
+          <a href={createUrl} target="_blank" rel="noopener noreferrer" className={buttonVariants({ size: 'sm', variant: 'outline', className: 'border-app-line bg-app-soft' })}>{t('github.steps.open.open_github')} <ExternalLink /><span className="sr-only">{t('new_tab')}</span></a></div>
       </Step>
-      <Step number={2} title="Nombre y página de inicio">
-        <p><strong className="font-medium text-app-secondary">GitHub App name:</strong> el que quieras, p. ej. <CopyValue value={`${BRAND.name} de mi equipo`} /> (debe ser único en GitHub; añade tu equipo si ya existe).</p>
-        <p><strong className="font-medium text-app-secondary">Homepage URL:</strong> cualquier URL tuya, p. ej. <CopyValue value={base.startsWith('https://') ? base : `https://github.com/${org.trim() || 'tu-usuario'}`} /></p>
+      <Step number={2} title={t('github.steps.name.title')}>
+        <p><Trans t={t} i18nKey="github.steps.name.app_name" components={{ b: STRONG, copy: <CopyValue value={t('github.steps.name.app_name_example', { brand: BRAND.name })} /> }} /></p>
+        <p><Trans t={t} i18nKey="github.steps.name.homepage" components={{ b: STRONG, copy: <CopyValue value={base.startsWith('https://') ? base : `https://github.com/${org.trim() || t('github.steps.name.your_user')}`} /> }} /></p>
       </Step>
-      <Step number={3} title="Sin OAuth ni webhooks">
-        <p>Deja <strong className="font-medium text-app-secondary">Callback URL</strong> vacío y <strong className="font-medium text-app-secondary">sin marcar</strong> «Request user authorization (OAuth) during installation».</p>
-        <p><strong className="font-medium text-app-secondary">Setup URL</strong> (opcional, te devuelve aquí al instalar): <CopyValue value={`${base}/oauth/callback`} /> y marca «Redirect on update».</p>
-        <p>En <strong className="font-medium text-app-secondary">Webhook</strong>, desmarca «Active»: el panel consulta los PRs por su cuenta, así no necesita estar publicado en internet.</p>
+      <Step number={3} title={t('github.steps.hooks.title')}>
+        <p><Trans t={t} i18nKey="github.steps.hooks.callback" components={{ b: STRONG }} /></p>
+        <p><Trans t={t} i18nKey="github.steps.hooks.setup" components={{ b: STRONG, copy: <CopyValue value={`${base}/oauth/callback`} /> }} /></p>
+        <p><Trans t={t} i18nKey="github.steps.hooks.webhook" components={{ b: STRONG }} /></p>
       </Step>
-      <Step number={4} title="Permisos: solo estos cuatro">
-        <p>En <em>Repository permissions</em>:</p>
+      <Step number={4} title={t('github.steps.permissions.title')}>
+        <p><Trans t={t} i18nKey="github.steps.permissions.intro" components={{ i: <em /> }} /></p>
         <ul className="space-y-1">{Object.entries(status.required_permissions).map(([name, level]) => <li key={name} className="flex items-center justify-between gap-3 rounded-md border border-app-line px-2.5 py-1"><span className="text-app-secondary">{PERMISSION_LABEL[name] ?? name}</span><span className="font-mono text-[11px]">{LEVEL_LABEL[level] ?? level}</span></li>)}</ul>
-        <p>Nada en <em>Organization</em> ni <em>Account permissions</em>, y ningún evento. Cuanto menos permiso, menos daño si la clave se filtrara.</p>
+        <p><Trans t={t} i18nKey="github.steps.permissions.outro" components={{ i: <em /> }} /></p>
       </Step>
-      <Step number={5} title="Cuentas donde se puede instalar">
-        <p>En «Where can this GitHub App be installed?» elige <strong className="font-medium text-app-secondary">Any account</strong> si vas a conectar varias organizaciones. Después pulsa <strong className="font-medium text-app-secondary">Create GitHub App</strong>.</p>
+      <Step number={5} title={t('github.steps.install_scope.title')}>
+        <p><Trans t={t} i18nKey="github.steps.install_scope.body" components={{ b: STRONG }} /></p>
       </Step>
-      <Step number={6} title="Copia el App ID y genera la clave privada">
-        <p>El <strong className="font-medium text-app-secondary">App ID</strong> aparece arriba, en «About». Baja hasta <strong className="font-medium text-app-secondary">Private keys</strong> y pulsa «Generate a private key»: se descarga un fichero <code className="font-mono">.pem</code>.</p>
+      <Step number={6} title={t('github.steps.key.title')}>
+        <p><Trans t={t} i18nKey="github.steps.key.body" components={{ b: STRONG, code: <code className="font-mono" /> }} /></p>
       </Step>
     </ol>
 
     <form onSubmit={submit} className="space-y-4 self-start rounded-xl border border-app-line bg-panel p-4">
-      <div><p className="text-sm font-medium">7 · Conéctala aquí</p><p className="mt-1 text-xs leading-5 text-app-muted">El panel comprueba con GitHub que la clave es de esa App antes de guardar nada.</p></div>
-      {!canManage && <p className="rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-muted">Solo un administrador puede conectar la GitHub App.</p>}
-      {status.source === 'entorno' && <p className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">El servidor tiene <code className="font-mono">GITHUB_APP_ID</code> en su entorno, pero le falta: {status.missing.join(', ')}.</p>}
-      <div className="space-y-1.5"><label htmlFor="github-app-id" className="text-xs text-app-muted">App ID</label>
+      <div><p className="text-sm font-medium">{t('github.form.title')}</p><p className="mt-1 text-xs leading-5 text-app-muted">{t('github.form.description')}</p></div>
+      {!canManage && <p className="rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-muted">{t('github.form.admin_only')}</p>}
+      {status.source === 'entorno' && <p className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning"><Trans t={t} i18nKey="github.form.env_missing" values={{ missing: status.missing.join(', ') }} components={{ code: <code className="font-mono" /> }} /></p>}
+      <div className="space-y-1.5"><label htmlFor="github-app-id" className="text-xs text-app-muted">{t('github.form.app_id')}</label>
         <Input id="github-app-id" required inputMode="numeric" pattern="[1-9][0-9]{0,11}" maxLength={12} disabled={!canManage} value={appId} onChange={event => setAppId(event.target.value.replace(/\D/g, ''))} placeholder="123456" className="border-app-line bg-app-soft font-mono" /></div>
-      <div className="space-y-1.5"><span className="text-xs text-app-muted">Clave privada (.pem)</span>
+      <div className="space-y-1.5"><span className="text-xs text-app-muted">{t('github.form.private_key')}</span>
         <input ref={file} type="file" accept=".pem,application/x-pem-file,application/x-x509-ca-cert" className="sr-only" id="github-app-pem" disabled={!canManage} onChange={event => void readFile(event.target.files?.[0])} />
         <label htmlFor="github-app-pem" className={`flex cursor-pointer items-center gap-3 rounded-lg border border-dashed px-3 py-3 text-sm ${pem ? 'border-app-line bg-app-soft' : 'border-app-faint/50 hover:bg-app-soft'}`}>
           {pem ? <FileKey2 className="size-4 shrink-0 text-app-secondary" /> : <Upload className="size-4 shrink-0 text-app-subtle" />}
-          <span className="min-w-0 truncate">{pem ? pemName || 'Clave cargada' : 'Elige el fichero .pem descargado'}</span>
+          <span className="min-w-0 truncate">{pem ? pemName || t('github.form.key_loaded') : t('github.form.choose_file')}</span>
         </label>
-        <details className="text-xs"><summary className="cursor-pointer text-app-subtle">o pégala como texto</summary>
-          <textarea aria-label="Clave privada en texto" rows={4} spellCheck={false} autoComplete="off" disabled={!canManage} value={pemName ? '' : pem} onChange={event => { setPem(event.target.value); setPemName('') }}
+        <details className="text-xs"><summary className="cursor-pointer text-app-subtle">{t('github.form.paste')}</summary>
+          <textarea aria-label={t('github.form.paste_label')} rows={4} spellCheck={false} autoComplete="off" disabled={!canManage} value={pemName ? '' : pem} onChange={event => { setPem(event.target.value); setPemName('') }}
             placeholder="-----BEGIN RSA PRIVATE KEY-----" className="mt-2 w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 font-mono text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50" /></details>
       </div>
       {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
-      <Button type="submit" disabled={!canManage || busy || !appId || !pem} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <ShieldCheck />}Verificar y guardar</Button>
-      <p className="flex items-start gap-2 text-[11px] leading-4 text-app-subtle"><ShieldCheck className="mt-0.5 size-3 shrink-0" />La clave se guarda cifrada (AES-256-GCM) en el servidor, nunca vuelve al navegador ni aparece en los logs. Después, borra el .pem de tu carpeta de descargas.</p>
+      <Button type="submit" disabled={!canManage || busy || !appId || !pem} className="w-full bg-primary text-primary-foreground hover:bg-primary/90">{busy ? <LoaderCircle className="animate-spin" /> : <ShieldCheck />}{t('github.form.submit')}</Button>
+      <p className="flex items-start gap-2 text-[11px] leading-4 text-app-subtle"><ShieldCheck className="mt-0.5 size-3 shrink-0" />{t('github.form.key_note')}</p>
     </form>
   </div>
 }
 
 // Paso siguiente: la App existe y hay que instalarla en la cuenta eligiendo repositorios.
 export function GitHubInstall({ status, canManage, onChanged }: { status: GitHubStatus; canManage: boolean; onChanged: (next: GitHubStatus) => void }) {
+  const { t } = useTranslation('sources')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [available, setAvailable] = useState<NonNullable<GitHubStatus['available_installations']>>([])
@@ -141,29 +147,32 @@ export function GitHubInstall({ status, canManage, onChanged }: { status: GitHub
     } catch (caught) { setError(caught instanceof Error ? caught.message : String(caught)) } finally { setBusy(false) }
   }
   const review = status.permissions
+  const bold = { b: <strong className="font-medium" /> }
   return <div className="mt-4 space-y-3">
     <div className="flex items-start gap-2 rounded-lg border border-app-line bg-app-soft px-3 py-2.5 text-sm"><CircleCheck className="mt-0.5 size-4 shrink-0 text-brand" />
-      <span>App <strong className="font-medium">{status.name ?? status.slug}</strong>{status.owner ? <> de <strong className="font-medium">{status.owner}</strong></> : null} verificada. {status.connected ? 'Puedes añadir otra organización y elegir sus repositorios.' : 'Instálala en las organizaciones que necesites y elige sus repositorios.'}</span></div>
+      <span>{status.owner
+        ? <Trans t={t} i18nKey="github.install.verified_owner" values={{ name: status.name ?? status.slug, owner: status.owner }} components={bold} />
+        : <Trans t={t} i18nKey="github.install.verified" values={{ name: status.name ?? status.slug }} components={bold} />} {status.connected ? t('github.install.next_connected') : t('github.install.next_first')}</span></div>
     {review && (review.excess.length > 0 || review.missing.length > 0) && <PermissionWarning review={review} />}
     <ol className="ml-4 list-decimal space-y-1 text-xs leading-5 text-app-muted">
-      <li>Pulsa <strong className="font-medium text-app-secondary">Instalar en GitHub</strong> y elige <strong className="font-medium text-app-secondary">Only select repositories</strong> con los que quieras analizar.</li>
-      <li>Vuelve y pulsa <strong className="font-medium text-app-secondary">Buscar instalaciones</strong>; selecciona las organizaciones que quieres usar en este workspace.</li>
+      <li><Trans t={t} i18nKey="github.install.step_install" components={{ b: STRONG }} /></li>
+      <li><Trans t={t} i18nKey="github.install.step_detect" components={{ b: STRONG }} /></li>
     </ol>
     {error && <div role="alert" className="rounded-lg border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning">{error}</div>}
     <div className="flex flex-wrap gap-2">
-      {canManage ? <a href={`https://github.com/apps/${status.slug}/installations/new`} target="_blank" rel="noopener noreferrer" className={buttonVariants({ className: 'bg-primary text-primary-foreground hover:bg-primary/90' })}>Instalar en GitHub <ExternalLink /><span className="sr-only">(se abre en otra pestaña)</span></a>
-        : <Button disabled className="bg-primary text-primary-foreground">Instalar en GitHub <ExternalLink /></Button>}
-      <Button variant="outline" disabled={!canManage || busy} onClick={() => void detect()} className="border-app-line bg-app-soft">{busy ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}Buscar instalaciones</Button>
+      {canManage ? <a href={`https://github.com/apps/${status.slug}/installations/new`} target="_blank" rel="noopener noreferrer" className={buttonVariants({ className: 'bg-primary text-primary-foreground hover:bg-primary/90' })}>{t('github.install.install')} <ExternalLink /><span className="sr-only">{t('new_tab')}</span></a>
+        : <Button disabled className="bg-primary text-primary-foreground">{t('github.install.install')} <ExternalLink /></Button>}
+      <Button variant="outline" disabled={!canManage || busy} onClick={() => void detect()} className="border-app-line bg-app-soft">{busy ? <LoaderCircle className="animate-spin" /> : <RefreshCw />}{t('github.install.detect')}</Button>
     </div>
     {available.length > 0 && <div className="space-y-2 rounded-lg border border-app-line bg-app-soft p-3">
-      <p className="text-xs font-medium text-app-secondary">Cuentas donde la App está instalada</p>
+      <p className="text-xs font-medium text-app-secondary">{t('github.install.installed_on')}</p>
       {available.map(item => {
         const connected = status.installations.some(current => current.installation_id === item.installation_id)
         return <div key={item.installation_id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-app-line bg-panel px-3 py-2 text-sm">
-          <div><p className="font-medium">{item.account ?? `Instalación #${item.installation_id}`}</p>
-            <p className="text-xs text-app-muted">{item.account_type === 'Organization' ? 'Organización' : 'Cuenta personal'} · {item.repository_selection === 'selected' ? 'Repositorios seleccionados' : 'Todos los repositorios'}</p></div>
+          <div><p className="font-medium">{item.account ?? t('github.install.installation', { id: item.installation_id })}</p>
+            <p className="text-xs text-app-muted">{item.account_type === 'Organization' ? t('github.install.organization') : t('github.install.personal')} · {item.repository_selection === 'selected' ? t('github.install.selected_repositories') : t('github.install.all_repositories')}</p></div>
           <Button size="sm" variant={connected ? 'outline' : 'default'} disabled={busy || !canManage || connected} onClick={() => void connect(item.installation_id)}>
-            {connected ? 'Conectada' : 'Conectar cuenta'}
+            {connected ? t('github.install.connected') : t('github.install.connect')}
           </Button>
         </div>
       })}
@@ -172,8 +181,10 @@ export function GitHubInstall({ status, canManage, onChanged }: { status: GitHub
 }
 
 export function PermissionWarning({ review }: { review: PermissionReview }) {
+  const { t } = useTranslation('sources')
   if (review.excess.length) return <div role="alert" className="flex gap-2 rounded-lg border border-danger-line bg-danger-soft p-3 text-xs leading-5 text-danger"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-    <div><strong>La App pide {review.excess.length} permisos adicionales.</strong> Revisa los permisos de la GitHub App; los repositorios instalados siguen teniendo el alcance que elegiste.<details className="mt-1"><summary className="cursor-pointer font-medium">Ver permisos</summary><p className="mt-1 break-words">{review.excess.map(name => `${name}: ${review.declared[name]}`).join(' · ')}</p></details></div></div>
+    <div><strong>{t('github.permission_warning.excess', { count: review.excess.length })}</strong> {t('github.permission_warning.excess_body')}<details className="mt-1"><summary className="cursor-pointer font-medium">{t('github.permission_warning.show')}</summary><p className="mt-1 break-words">{review.excess.map(name => `${name}: ${review.declared[name]}`).join(' · ')}</p></details></div></div>
+  const permissions = review.missing.join(', ')
   return <div className="flex gap-2 rounded-lg border border-warning-line bg-warning-soft p-3 text-xs leading-5 text-warning"><TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-    <span>Faltan permisos: {review.missing.join(', ')}{review.pending_acceptance.length ? ' (hay una actualización de permisos pendiente de aceptar en la instalación)' : ''}. Sin ellos no se revisan pull requests.</span></div>
+    <span>{review.pending_acceptance.length ? t('github.permission_warning.missing_pending', { permissions }) : t('github.permission_warning.missing', { permissions })}</span></div>
 }

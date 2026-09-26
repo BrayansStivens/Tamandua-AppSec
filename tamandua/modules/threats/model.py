@@ -31,23 +31,32 @@ from tamandua.modules.threats import methods as threat_methods
 from tamandua.modules.threats import report as threat_report
 from tamandua.modules.findings import triage
 from tamandua.shared import documents
+from tamandua.shared.i18n import default_locale, localize, msg, t, text
 
 
 class ModelError(ValueError):
-    pass
+    """A validation error; `message` is a language-neutral message, str() renders it in the default locale."""
+
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self) -> str:
+        return text(self.message)
 
 
 KINDS = {
-    "actor": "Usuario o actor externo", "web_app": "Aplicación web (cliente)", "api": "API / backend",
-    "service": "Servicio interno", "function": "Función o tarea", "database": "Base de datos", "cache": "Caché",
-    "queue": "Cola o bus de mensajes", "storage": "Almacenamiento de ficheros", "external": "Servicio de terceros",
-    "identity": "Proveedor de identidad", "custom": "Tipo personalizado",
+    "actor": msg("threats.kinds.actor"), "web_app": msg("threats.kinds.web_app"), "api": msg("threats.kinds.api"),
+    "service": msg("threats.kinds.service"), "function": msg("threats.kinds.function"), "database": msg("threats.kinds.database"),
+    "cache": msg("threats.kinds.cache"), "queue": msg("threats.kinds.queue"), "storage": msg("threats.kinds.storage"),
+    "external": msg("threats.kinds.external"), "identity": msg("threats.kinds.identity"), "custom": msg("threats.kinds.custom"),
 }
 PROCESSES = {"web_app", "api", "service", "function"}
 STORES = {"database", "cache", "queue", "storage"}
 CLASSIFICATIONS = {"public": 1, "internal": 2, "confidential": 3, "pii": 3, "credentials": 4, "payment": 4}
-CLASSIFICATION_LABELS = {"public": "públicos", "internal": "internos", "confidential": "confidenciales",
-                         "pii": "datos personales", "credentials": "credenciales", "payment": "datos de pago"}
+CLASSIFICATION_LABELS = {"public": msg("threats.classifications.public"), "internal": msg("threats.classifications.internal"),
+                         "confidential": msg("threats.classifications.confidential"), "pii": msg("threats.classifications.pii"),
+                         "credentials": msg("threats.classifications.credentials"), "payment": msg("threats.classifications.payment")}
 PROTOCOLS = ("https", "http", "grpc", "websocket", "sql", "amqp", "redis", "smtp", "sftp", "other")
 DECISIONS = ("mitigated", "accepted", "not_applicable")
 ID = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
@@ -60,28 +69,28 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _text(value, limit: int, field: str, *, required: bool = False) -> str:
+def _text(value, limit: int, field, *, required: bool = False) -> str:
     if value is None or value == "":
         if required:
-            raise ModelError(f"Falta {field}")
+            raise ModelError(msg("threats.errors.field_required", field=field))
         return ""
     if not isinstance(value, str) or len(value) > limit:
-        raise ModelError(f"{field} admite hasta {limit} caracteres")
+        raise ModelError(msg("threats.errors.field_too_long", field=field, limit=limit))
     cleaned = " ".join(value.split())
     if any(ord(character) < 32 for character in cleaned):
-        raise ModelError(f"{field} contiene caracteres de control")
+        raise ModelError(msg("threats.errors.control_characters", field=field))
     return cleaned
 
 
-def _folder(value, field: str) -> str:
+def _folder(value, field) -> str:
     """Carpeta del repositorio que es el código de un componente: relativa, sin «..», terminada en «/»."""
     if value in (None, ""):
         return ""
     if not isinstance(value, str) or not FOLDER.fullmatch(value):
-        raise ModelError(f"{field}: usa una carpeta relativa del repositorio, p. ej. frontend/ o services/api/")
+        raise ModelError(msg("threats.errors.folder_relative", field=field))
     clean = value.strip().removeprefix("./").strip("/")
     if any(part in ("", ".", "..") for part in clean.split("/")) and clean:
-        raise ModelError(f"{field}: sin «..» ni tramos vacíos")
+        raise ModelError(msg("threats.errors.folder_segments", field=field))
     return f"{clean}/" if clean else ""
 
 
@@ -120,41 +129,41 @@ def _color(value, identifier: str) -> str:
     if value in (None, ""):
         return ""
     if value not in threat_diagram.COLORS:
-        raise ModelError(f"Color inválido en {identifier}")
+        raise ModelError(msg("threats.errors.invalid_color", id=identifier))
     return value
 
 
 def validate(payload: dict, *, known_assets: set[str]) -> dict:
     """Normaliza un modelo que llega del panel. Todo lo que no se reconoce se rechaza."""
     if not isinstance(payload, dict):
-        raise ModelError("Modelo inválido")
-    model = {"name": _text(payload.get("name"), 80, "El nombre", required=True),
-             "description": _text(payload.get("description"), 1000, "La descripción")}
+        raise ModelError(msg("threats.errors.invalid_model"))
+    model = {"name": _text(payload.get("name"), 80, msg("threats.fields.name"), required=True),
+             "description": _text(payload.get("description"), 1000, msg("threats.fields.description"))}
     components, ids = [], set()
     for raw in payload.get("components") or []:
         if not isinstance(raw, dict):
-            raise ModelError("Componente inválido")
+            raise ModelError(msg("threats.errors.invalid_component"))
         identifier = raw.get("id")
         if not isinstance(identifier, str) or not ID.fullmatch(identifier) or identifier in ids:
-            raise ModelError("Cada componente necesita un identificador único (minúsculas, números y guiones)")
+            raise ModelError(msg("threats.errors.component_id"))
         if raw.get("kind") not in KINDS:
-            raise ModelError(f"Tipo de componente inválido en {identifier}")
+            raise ModelError(msg("threats.errors.invalid_kind", id=identifier))
         if raw.get("kind") == "custom" and raw.get("custom_base", "service") not in KINDS.keys() - {"custom"}:
-            raise ModelError(f"Categoría base inválida en {identifier}")
+            raise ModelError(msg("threats.errors.invalid_base", id=identifier))
         data = raw.get("data") or []
         if not isinstance(data, list) or any(item not in CLASSIFICATIONS for item in data):
-            raise ModelError(f"Clasificación de datos inválida en {identifier}")
+            raise ModelError(msg("threats.errors.invalid_data", id=identifier))
         asset = raw.get("asset")
         if asset not in (None, "") and asset not in known_assets:
-            raise ModelError(f"El componente {identifier} enlaza un activo que no existe")
+            raise ModelError(msg("threats.errors.unknown_asset", id=identifier))
         ids.add(identifier)
-        components.append({"id": identifier, "name": _text(raw.get("name"), 80, "El nombre del componente", required=True),
-                           "kind": raw["kind"], "custom_kind": _text(raw.get("custom_kind"), 80, "El tipo personalizado", required=raw["kind"] == "custom") if raw["kind"] == "custom" else "",
+        components.append({"id": identifier, "name": _text(raw.get("name"), 80, msg("threats.fields.component_name"), required=True),
+                           "kind": raw["kind"], "custom_kind": _text(raw.get("custom_kind"), 80, msg("threats.fields.custom_kind"), required=raw["kind"] == "custom") if raw["kind"] == "custom" else "",
                            "custom_base": raw.get("custom_base", "service") if raw["kind"] == "custom" else "",
-                           "description": _text(raw.get("description"), 400, "La descripción"),
-                           "technology": _text(raw.get("technology"), 80, "La tecnología"),
-                           "asset": asset or None, "asset_ref": _text(raw.get("asset_ref"), 200, "La referencia del activo"),
-                           "path": _folder(raw.get("path"), f"La carpeta de {identifier}"),
+                           "description": _text(raw.get("description"), 400, msg("threats.fields.description")),
+                           "technology": _text(raw.get("technology"), 80, msg("threats.fields.technology")),
+                           "asset": asset or None, "asset_ref": _text(raw.get("asset_ref"), 200, msg("threats.fields.asset_ref")),
+                           "path": _folder(raw.get("path"), msg("threats.fields.folder", id=identifier)),
                            "position": _position(raw.get("position")), "size": _size(raw.get("size")), "data": sorted(set(data)),
                            "internet_facing": bool(raw.get("internet_facing")),
                            "authenticates": bool(raw.get("authenticates")),
@@ -164,58 +173,61 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
     flows, flow_ids = [], set()
     for raw in payload.get("flows") or []:
         if not isinstance(raw, dict):
-            raise ModelError("Flujo inválido")
+            raise ModelError(msg("threats.errors.invalid_flow"))
         identifier = raw.get("id")
         if not isinstance(identifier, str) or not ID.fullmatch(identifier) or identifier in flow_ids:
-            raise ModelError("Cada flujo necesita un identificador único")
+            raise ModelError(msg("threats.errors.flow_id"))
         if raw.get("source") not in ids or raw.get("target") not in ids or raw["source"] == raw["target"]:
-            raise ModelError(f"El flujo {identifier} debe unir dos componentes distintos del modelo")
+            raise ModelError(msg("threats.errors.flow_ends", id=identifier))
         if raw.get("protocol") not in PROTOCOLS:
-            raise ModelError(f"Protocolo inválido en {identifier}")
+            raise ModelError(msg("threats.errors.invalid_protocol", id=identifier))
         data = raw.get("data") or []
         if not isinstance(data, list) or any(item not in CLASSIFICATIONS for item in data):
-            raise ModelError(f"Clasificación de datos inválida en {identifier}")
+            raise ModelError(msg("threats.errors.invalid_data", id=identifier))
         flow_ids.add(identifier)
         flows.append({"id": identifier, "source": raw["source"], "target": raw["target"],
-                      "name": _text(raw.get("name"), 80, "El nombre del flujo"), "protocol": raw["protocol"],
+                      "name": _text(raw.get("name"), 80, msg("threats.fields.flow_name")), "protocol": raw["protocol"],
                       "data": sorted(set(data)), "authenticated": bool(raw.get("authenticated")),
                       "encrypted": bool(raw.get("encrypted")) or raw["protocol"] in ("https", "sftp")})
     boundaries, boundary_ids, placed = [], set(), set()
     for raw in payload.get("boundaries") or []:
         if not isinstance(raw, dict):
-            raise ModelError("Frontera inválida")
+            raise ModelError(msg("threats.errors.invalid_boundary"))
         identifier = raw.get("id")
         members = raw.get("components") or []
         if not isinstance(identifier, str) or not ID.fullmatch(identifier) or identifier in boundary_ids:
-            raise ModelError("Cada frontera necesita un identificador único")
+            raise ModelError(msg("threats.errors.boundary_id"))
         if not isinstance(members, list) or any(item not in ids for item in members):
-            raise ModelError(f"La frontera {identifier} incluye componentes que no existen")
+            raise ModelError(msg("threats.errors.boundary_members", id=identifier))
         if placed.intersection(members):
-            raise ModelError("Un componente solo puede estar en una frontera de confianza")
+            raise ModelError(msg("threats.errors.one_boundary"))
         placed.update(members)
         boundary_ids.add(identifier)
-        boundaries.append({"id": identifier, "name": _text(raw.get("name"), 80, "El nombre de la frontera", required=True),
+        boundaries.append({"id": identifier, "name": _text(raw.get("name"), 80, msg("threats.fields.boundary_name"), required=True),
                            "components": list(dict.fromkeys(members)), "box": _box(raw.get("box")),
                            "color": _color(raw.get("color"), identifier)})
+    too_many = {"components": msg("threats.errors.too_many_components", limit=LIMITS["components"]),
+                "flows": msg("threats.errors.too_many_flows", limit=LIMITS["flows"]),
+                "boundaries": msg("threats.errors.too_many_boundaries", limit=LIMITS["boundaries"])}
     for key, items in (("components", components), ("flows", flows), ("boundaries", boundaries)):
         if len(items) > LIMITS[key]:
-            raise ModelError(f"Máximo {LIMITS[key]} {key} por modelo")
+            raise ModelError(too_many[key])
     repositories = payload.get("repositories") or []
     if not isinstance(repositories, list) or len(repositories) > 50 or any(not isinstance(item, str) for item in repositories):
-        raise ModelError("Repositorios del proyecto inválidos (como mucho 50)")
+        raise ModelError(msg("threats.errors.invalid_repositories"))
     if any(item not in known_assets for item in repositories):
-        raise ModelError("Un repositorio del proyecto no existe o ya no hay acceso a él")
+        raise ModelError(msg("threats.errors.unknown_repository"))
     # Los repositorios que usan los componentes forman parte del proyecto aunque no se hayan añadido a mano.
     model["repositories"] = list(dict.fromkeys([*repositories, *(item["asset"] for item in components if item.get("asset") and not item["asset"].startswith("domain:"))]))
     references = payload.get("repository_refs") or []
     if not isinstance(references, list) or len(references) > 50:
-        raise ModelError("Referencias de repositorios inválidas (como mucho 50)")
-    model["repository_refs"] = list(dict.fromkeys(_text(item, 200, "La referencia del repositorio", required=True) for item in references))
+        raise ModelError(msg("threats.errors.invalid_repository_refs"))
+    model["repository_refs"] = list(dict.fromkeys(_text(item, 200, msg("threats.fields.repository_ref"), required=True) for item in references))
     try:
         # Lo propio del enfoque elegido: amenazas escritas a mano, árboles, técnicas ATT&CK, etapas PASTA.
         extras = threat_methods.validate(payload, elements=ids | flow_ids)
     except threat_methods.MethodError as exc:
-        raise ModelError(str(exc)) from exc
+        raise ModelError(exc.message) from exc
     return {**model, "components": components, "flows": flows, "boundaries": boundaries, **extras}
 
 
@@ -246,26 +258,26 @@ def to_portable(model: dict, assets: dict[str, dict] | None = None) -> dict:
 def from_portable(document: dict) -> dict:
     """Importa un modelo sin confiar en IDs de activos ni enlazarlos automáticamente."""
     if not isinstance(document, dict):
-        raise ModelError("El archivo debe contener un objeto JSON")
+        raise ModelError(msg("threats.errors.not_an_object"))
     if "format" in document or "version" in document:
         if document.get("format") != "tamandua-threat-model" or document.get("version") != 1:
-            raise ModelError("Formato o versión de modelo no compatible")
+            raise ModelError(msg("threats.errors.unsupported_format"))
         raw = document.get("model")
     else:
         raw = document
     if not isinstance(raw, dict):
-        raise ModelError("El campo model debe ser un objeto")
+        raise ModelError(msg("threats.errors.model_not_an_object"))
     repositories = raw.get("repositories") or []
     references = raw.get("repository_refs") or []
     if not isinstance(repositories, list) or not isinstance(references, list):
-        raise ModelError("Las referencias de repositorios deben ser una lista")
+        raise ModelError(msg("threats.errors.refs_not_a_list"))
     components = raw.get("components") or []
     if not isinstance(components, list):
-        raise ModelError("Los componentes deben ser una lista")
+        raise ModelError(msg("threats.errors.components_not_a_list"))
     detached = []
     for item in components:
         if not isinstance(item, dict):
-            raise ModelError("Componente inválido")
+            raise ModelError(msg("threats.errors.invalid_component"))
         reference = item.get("asset_ref") or item.get("asset") or ""
         detached.append({**item, "asset": None, "asset_ref": reference})
     clean = {**raw, "components": detached, "repositories": [], "repository_refs": [*references, *repositories]}
@@ -276,14 +288,14 @@ def from_portable(document: dict) -> dict:
                     "boundaries": [{**item, "box": None} for item in imported["boundaries"]]}
         imported["relayout"] = True
     allowed = _portable_sections(imported)
-    labels = {"manual_threats": "amenazas propias", "attack_trees": "árboles de ataque",
-              "attack_mappings": "técnicas ATT&CK", "pasta": "etapas PASTA"}
+    labels = {"manual_threats": msg("threats.sections.manual_threats"), "attack_trees": msg("threats.sections.attack_trees"),
+              "attack_mappings": msg("threats.sections.attack_mappings"), "pasta": msg("threats.sections.pasta")}
     for section, label in labels.items():
         if imported[section] and section not in allowed:
             method = threat_methods.METHODOLOGIES[imported["methodology"]]
-            raise ModelError(f"El enfoque {method} no admite {label}. Cambia el JSON a un enfoque compatible o usa personalizado con ese módulo activo")
+            raise ModelError(msg("threats.errors.section_not_allowed", method=method, section=label))
     if imported["methodology"] != "custom" and raw.get("custom_modules") not in (None, [], ["manual", "elements"]):
-        raise ModelError("custom_modules solo se usa con el enfoque personalizado")
+        raise ModelError(msg("threats.errors.custom_modules_only"))
     return imported
 
 
@@ -337,14 +349,14 @@ def _portable_sections(model: dict) -> set[str]:
 
 def _name(model_id: str) -> str:
     if not isinstance(model_id, str) or not re.fullmatch(r"[0-9a-f]{24}", model_id):
-        raise ModelError("Modelo no encontrado")
+        raise ModelError(msg("threats.errors.not_found"))
     return f"threat-models/{model_id}"
 
 
 def load(data_dir: Path, model_id: str) -> dict:
     model = documents.load(data_dir, _name(model_id))
     if model is None:
-        raise ModelError("Modelo no encontrado")
+        raise ModelError(msg("threats.errors.not_found"))
     return model
 
 
@@ -383,16 +395,16 @@ def delete(data_dir: Path, model_id: str) -> None:
 
 def decide(data_dir: Path, model_id: str, threat_id: str, status: str, reason, *, by: str) -> dict:
     if status not in (*DECISIONS, "open"):
-        raise ModelError("Decisión inválida")
+        raise ModelError(msg("threats.errors.invalid_decision"))
     if not isinstance(threat_id, str) or not re.fullmatch(r"[0-9a-f]{16}", threat_id):
-        raise ModelError("Amenaza inválida")
-    reason = _text(reason, 500, "El motivo")
+        raise ModelError(msg("threats.errors.invalid_threat"))
+    reason = _text(reason, 500, msg("threats.fields.reason"))
     if status != "open" and len(reason) < 10:
-        raise ModelError("Explica el motivo (mínimo 10 caracteres): queda registrado")
+        raise ModelError(msg("threats.errors.reason_required"))
     with documents.lock(data_dir, "threat-models"):
         model = load(data_dir, model_id)
         if threat_id not in {item["id"] for item in threats(model)}:
-            raise ModelError("La amenaza no pertenece a este modelo")
+            raise ModelError(msg("threats.errors.threat_not_in_model"))
         decisions = model.setdefault("decisions", {})
         if status == "open":
             decisions.pop(threat_id, None)
@@ -405,29 +417,30 @@ def decide(data_dir: Path, model_id: str, threat_id: str, status: str, reason, *
 # ------------------------------------------------------------ propuesta
 
 # Firma de dependencia → componente que sugiere. Nombres exactos o prefijos terminados en «/».
+NEXT_APP, BROWSER_APP, ORM_DATABASE = msg("threats.suggest.nextjs_app"), msg("threats.suggest.browser_app"), msg("threats.suggest.orm_database")
 SIGNATURES = [
-    (("next",), "web_app", "Aplicación Next.js", "Next.js"),
-    (("react", "vue", "@angular/core", "svelte", "solid-js"), "web_app", "Aplicación web en el navegador", None),
-    (("express", "fastify", "koa", "@nestjs/core", "@hapi/hapi", "hono"), "api", "API Node.js", None),
-    (("django", "flask", "fastapi", "starlette", "tornado"), "api", "API Python", None),
-    (("github.com/gin-gonic/gin", "github.com/labstack/echo/v4", "github.com/gofiber/fiber/v2"), "api", "API Go", None),
-    (("axum", "actix-web", "rocket", "warp", "poem"), "api", "API Rust", None),
-    (("clap", "typer", "click", "commander", "yargs", "github.com/spf13/cobra"), "function", "Herramienta de línea de comandos", None),
+    (("next",), "web_app", NEXT_APP, "Next.js"),
+    (("react", "vue", "@angular/core", "svelte", "solid-js"), "web_app", BROWSER_APP, None),
+    (("express", "fastify", "koa", "@nestjs/core", "@hapi/hapi", "hono"), "api", msg("threats.suggest.node_api"), None),
+    (("django", "flask", "fastapi", "starlette", "tornado"), "api", msg("threats.suggest.python_api"), None),
+    (("github.com/gin-gonic/gin", "github.com/labstack/echo/v4", "github.com/gofiber/fiber/v2"), "api", msg("threats.suggest.go_api"), None),
+    (("axum", "actix-web", "rocket", "warp", "poem"), "api", msg("threats.suggest.rust_api"), None),
+    (("clap", "typer", "click", "commander", "yargs", "github.com/spf13/cobra"), "function", msg("threats.suggest.cli"), None),
     (("pg", "postgres", "psycopg2", "psycopg2-binary", "psycopg", "asyncpg", "github.com/lib/pq", "github.com/jackc/pgx/v5"), "database", "PostgreSQL", "PostgreSQL"),
     (("mysql", "mysql2", "pymysql", "mysqlclient"), "database", "MySQL", "MySQL"),
     (("mongoose", "mongodb", "pymongo", "motor"), "database", "MongoDB", "MongoDB"),
-    (("sqlx", "diesel", "tokio-postgres", "sea-orm", "rusqlite"), "database", "Base de datos (Rust)", None),
-    (("@prisma/client", "prisma", "sequelize", "typeorm", "drizzle-orm", "sqlalchemy", "knex"), "database", "Base de datos (ORM)", None),
+    (("sqlx", "diesel", "tokio-postgres", "sea-orm", "rusqlite"), "database", msg("threats.suggest.rust_database"), None),
+    (("@prisma/client", "prisma", "sequelize", "typeorm", "drizzle-orm", "sqlalchemy", "knex"), "database", ORM_DATABASE, None),
     (("redis", "ioredis", "github.com/redis/go-redis/v9"), "cache", "Redis", "Redis"),
-    (("bull", "bullmq", "amqplib", "kafkajs", "celery", "pika", "kombu"), "queue", "Cola de trabajos", None),
-    (("@aws-sdk/client-s3", "aws-sdk", "boto3", "@google-cloud/storage", "cloudinary", "@azure/storage-blob"), "storage", "Almacenamiento de objetos", None),
-    (("stripe",), "external", "Stripe (pagos)", "Stripe"),
-    (("@sendgrid/mail", "nodemailer", "resend", "postmark"), "external", "Correo transaccional", None),
-    (("twilio",), "external", "Twilio (SMS/voz)", "Twilio"),
-    (("openai", "@anthropic-ai/sdk", "anthropic", "@google/generative-ai", "langchain", "ollama-rs", "async-openai", "ollama"), "external", "Proveedor de LLM", None),
+    (("bull", "bullmq", "amqplib", "kafkajs", "celery", "pika", "kombu"), "queue", msg("threats.suggest.job_queue"), None),
+    (("@aws-sdk/client-s3", "aws-sdk", "boto3", "@google-cloud/storage", "cloudinary", "@azure/storage-blob"), "storage", msg("threats.suggest.object_storage"), None),
+    (("stripe",), "external", msg("threats.suggest.stripe"), "Stripe"),
+    (("@sendgrid/mail", "nodemailer", "resend", "postmark"), "external", msg("threats.suggest.email"), None),
+    (("twilio",), "external", msg("threats.suggest.twilio"), "Twilio"),
+    (("openai", "@anthropic-ai/sdk", "anthropic", "@google/generative-ai", "langchain", "ollama-rs", "async-openai", "ollama"), "external", msg("threats.suggest.llm"), None),
     (("@supabase/supabase-js",), "external", "Supabase", "Supabase"),
     (("firebase", "firebase-admin"), "external", "Firebase", "Firebase"),
-    (("next-auth", "@auth/core", "@clerk/nextjs", "@auth0/nextjs-auth0", "passport", "keycloak-js", "authlib"), "identity", "Proveedor de identidad", None),
+    (("next-auth", "@auth/core", "@clerk/nextjs", "@auth0/nextjs-auth0", "passport", "keycloak-js", "authlib"), "identity", msg("threats.suggest.identity"), None),
 ]
 SERVICE_IMAGES = {"postgres": ("database", "PostgreSQL"), "mysql": ("database", "MySQL"), "mariadb": ("database", "MariaDB"),
                   "mongo": ("database", "MongoDB"), "redis": ("cache", "Redis"), "rabbitmq": ("queue", "RabbitMQ"),
@@ -445,12 +458,19 @@ def _slug(text: str, used: set[str]) -> str:
     return candidate
 
 
-def suggest(name: str, repositories: list[dict]) -> dict:
-    """Propuesta inicial a partir del inventario de los últimos escaneos. Todo queda marcado como sugerido."""
+def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -> dict:
+    """Propuesta inicial a partir del inventario de los últimos escaneos. Todo queda marcado como sugerido.
+
+    The proposal becomes the team's own editable content, so it is written in the requester's language."""
+    locale = locale or default_locale()
+    say = lambda value: text(value, locale)  # noqa: E731
+    next_app, browser_app, orm_database = say(NEXT_APP), say(BROWSER_APP), say(ORM_DATABASE)
     used: set[str] = set()
-    components = [{"id": _slug("usuario", used), "name": "Usuario", "kind": "actor", "internet_facing": True, "origin": "suggested"}]
+    user = t("threats.suggest.user", locale)
+    components = [{"id": _slug(user, used), "name": user, "kind": "actor", "internet_facing": True, "origin": "suggested"}]
     flows, app_ids, backends = [], [], []
     found: dict[tuple[str, str], dict] = {}
+    via: set[tuple[str, str]] = set()
     for repository in repositories:
         inventory = repository.get("inventory") or {}
         names = {item for values in (inventory.get("packages") or {}).values() for item in values}
@@ -464,40 +484,48 @@ def suggest(name: str, repositories: list[dict]) -> dict:
             hit = sorted(names.intersection(packages))
             if hit:
                 where = found_in.get(hit[0])
-                matched.append((kind, label, technology or hit[0],
-                                f"Detectado por «{', '.join(hit[:3])}» en {short}/{where}" if where else f"Detectado por «{', '.join(hit[:3])}» en {short}",
-                                where.rsplit("/", 1)[0] + "/" if where and "/" in where else ""))
+                matched.append((kind, say(label), technology or hit[0],
+                                t("threats.suggest.detected_by", locale, packages=", ".join(hit[:3]), where=f"{short}/{where}" if where else short),
+                                where.rsplit("/", 1)[0] + "/" if where and "/" in where else "", ", ".join(hit[:3])))
         for image in inventory.get("services") or []:
             if image in SERVICE_IMAGES:
                 kind, label = SERVICE_IMAGES[image]
                 where = found_in.get(f"image:{image}")
-                matched.append((kind, label, label, f"Imagen «{image}» en {short}/{where}" if where else f"Imagen «{image}» en {short}", ""))
+                matched.append((kind, label, label, t("threats.suggest.image_in", locale, image=image, where=f"{short}/{where}" if where else short),
+                                "", image))
         has_process = any(item[0] in PROCESSES for item in matched)
         if not has_process:
-            read = ", ".join(inventory.get("manifests") or []) or "ningún manifiesto"
-            matched.append(("api", f"Servicio {short}", None,
-                            f"No se reconoció ningún framework en {short} (leído: {read[:200]}); revisa el tipo.", ""))
+            read = ", ".join(inventory.get("manifests") or []) or t("threats.suggest.no_manifest", locale)
+            matched.append(("api", t("threats.suggest.service", locale, name=short), None,
+                            t("threats.suggest.no_framework", locale, name=short, read=read[:200]), "", ""))
         # Un ORM es la forma de hablar con la base de datos, no otra base de datos: si hay motor concreto, se fusionan.
-        orm = next((item for item in matched if item[1] == "Base de datos (ORM)"), None)
-        engines = [item for item in matched if item[0] == "database" and item[1] != "Base de datos (ORM)"]
+        orm = next((item for item in matched if item[1] == orm_database), None)
+        engines = [item for item in matched if item[0] == "database" and item[1] != orm_database]
+        merged_orm = None
         if orm and engines:
             matched = [item for item in matched if item is not orm and item is not engines[0]]
-            kind, label, technology, provenance, folder = engines[0]
-            matched.append((kind, label, f"{technology} vía {orm[2]}", f"{provenance}; acceso con {orm[3].split('«', 1)[-1].split('»', 1)[0]}", folder))
+            kind, label, technology, provenance, folder, _ = engines[0]
+            merged_orm = (kind, label, t("threats.suggest.via", locale, technology=technology, orm=orm[2]),
+                          t("threats.suggest.accessed_with", locale, provenance=provenance, packages=orm[5]), folder, "")
+            matched.append(merged_orm)
         # Next.js ya es la app web: no se duplica con «aplicación en el navegador».
-        if any(item[1] == "Aplicación Next.js" for item in matched):
-            matched = [item for item in matched if item[1] != "Aplicación web en el navegador"]
+        if any(item[1] == next_app for item in matched):
+            matched = [item for item in matched if item[1] != browser_app]
         several = len(repositories) > 1
-        for kind, label, technology, provenance, folder in matched:
+        for entry in matched:
+            kind, label, technology, provenance, folder, _ = entry
             key = (kind, label if kind not in PROCESSES else f"{label}:{repository['id']}")
             if key in found:
                 # Otra pista del mismo componente: se suma a su procedencia en lugar de perderse.
                 existing = found[key]
                 if provenance and provenance not in existing["description"]:
                     existing["description"] = f"{existing['description']}; {provenance}"[:400]
-                if technology and " vía " in technology and " vía " not in existing["technology"]:
+                if entry is merged_orm and key not in via:
                     existing["technology"] = technology
+                    via.add(key)
                 continue
+            if entry is merged_orm:
+                via.add(key)
             # Con varios repositorios, cada proceso lleva el suyo en el nombre: dos «API Python» no se distinguen.
             shown = f"{label} · {short}" if several and kind in PROCESSES and short not in label else label
             component = {"id": _slug(shown, used), "name": shown, "kind": kind, "technology": technology or "",
@@ -532,12 +560,12 @@ def suggest(name: str, repositories: list[dict]) -> dict:
     for flow in flows:
         flow["id"] = _slug(f"{flow['source']}-{flow['target']}", flow_ids)
         flow["name"] = ""
-    boundaries = [{"id": "internet", "name": "Internet", "components": [c["id"] for c in components if c["kind"] in ("actor", "external", "identity")]},
-                  {"id": "aplicacion", "name": "Aplicación", "components": [c["id"] for c in components if c["kind"] in PROCESSES]},
-                  {"id": "datos", "name": "Datos", "components": [c["id"] for c in components if c["kind"] in STORES]}]
-    sources = "; ".join(f"{item['name']} ({', '.join((item.get('inventory') or {}).get('manifests') or []) or 'sin manifiestos'})"
+    boundaries = [{"id": "internet", "name": t("threats.suggest.boundary_internet", locale), "components": [c["id"] for c in components if c["kind"] in ("actor", "external", "identity")]},
+                  {"id": "aplicacion", "name": t("threats.suggest.boundary_application", locale), "components": [c["id"] for c in components if c["kind"] in PROCESSES]},
+                  {"id": "datos", "name": t("threats.suggest.boundary_data", locale), "components": [c["id"] for c in components if c["kind"] in STORES]}]
+    sources = "; ".join(f"{item['name']} ({', '.join((item.get('inventory') or {}).get('manifests') or []) or t('threats.suggest.no_manifests', locale)})"
                         for item in repositories)
-    return {"name": name, "description": f"Propuesta a partir de las dependencias de: {sources}"[:1000] + ". Revisa componentes, flujos y datos.",
+    return {"name": name, "description": t("threats.suggest.description", locale, sources=sources[:880]),
             "components": components, "flows": flows, "boundaries": [item for item in boundaries if item["components"]]}
 
 
@@ -591,7 +619,8 @@ def merge_proposal(model: dict, proposal: dict) -> tuple[dict, dict]:
         members = [same[member] for member in proposed["components"] if same.get(member) in added and same[member] not in placed]
         if not members:
             continue
-        target = by_name.get(proposed["name"].lower())
+        # A proposal may come in another language than the model: its boundary id is stable.
+        target = by_name.get(proposed["name"].lower()) or next((item for item in boundaries if item["id"] == proposed["id"]), None)
         if target is None:
             target = {"id": _slug(proposed["id"], boundary_ids), "name": proposed["name"], "components": []}
             if drawn:
@@ -619,71 +648,31 @@ def merge_proposal(model: dict, proposal: dict) -> tuple[dict, dict]:
 
 # ------------------------------------------------------------ STRIDE
 
-STRIDE = {"S": "Suplantación", "T": "Manipulación", "R": "Repudio", "I": "Divulgación de información",
-          "D": "Denegación de servicio", "E": "Elevación de privilegios"}
+STRIDE = {"S": msg("threats.stride.s"), "T": msg("threats.stride.t"), "R": msg("threats.stride.r"), "I": msg("threats.stride.i"),
+          "D": msg("threats.stride.d"), "E": msg("threats.stride.e")}
 
-# Cada regla: id, categoría STRIDE, a qué aplica, título, por qué, mitigaciones y CWE que la evidencian.
+# Each rule: id, base severity, STRIDE category, what it applies to and the CWEs that evidence it (texts: threats.rules.*).
 RULES = [
-    {"id": "TM-S01", "base": "high", "stride": "S", "applies": "internet_process_unauthenticated", "title": "Acceso sin autenticación a un componente expuesto",
-     "why": "Recibe tráfico de Internet y no está marcado como autenticado: cualquiera puede invocarlo.",
-     "mitigations": ["Exigir autenticación en todas las rutas no públicas", "Inventariar explícitamente las rutas públicas"], "cwe": [306, 287]},
-    {"id": "TM-S02", "base": "high", "stride": "S", "applies": "identity", "title": "Tokens o sesiones aceptados sin validar bien",
-     "why": "El sistema confía en la identidad que emite este proveedor: firma, emisor, audiencia y caducidad deben comprobarse siempre.",
-     "mitigations": ["Validar firma, iss, aud y exp; rechazar alg=none", "Rotar claves y revocar sesiones al cerrar sesión"], "cwe": [287, 345, 347, 384, 613]},
-    {"id": "TM-S03", "base": "medium", "stride": "S", "applies": "inbound_from_external", "title": "Webhooks o llamadas de terceros suplantables",
-     "why": "Un servicio de terceros envía datos a este componente: sin verificar la firma, cualquiera puede fingir ser él.",
-     "mitigations": ["Verificar la firma HMAC del webhook y su marca de tiempo", "Idempotencia por identificador de evento"], "cwe": [345, 347]},
-    {"id": "TM-S04", "base": "medium", "stride": "S", "applies": "web_app", "title": "Peticiones en nombre del usuario (CSRF)",
-     "why": "Una aplicación web con sesión en el navegador puede recibir peticiones forjadas desde otro origen.",
-     "mitigations": ["Cookies SameSite=Strict/Lax y token o cabecera anti-CSRF", "Comprobar Origin en peticiones que cambian estado"], "cwe": [352]},
-    {"id": "TM-T01", "base": "high", "stride": "T", "applies": "process", "title": "Inyección a través de la entrada del componente",
-     "why": "Procesa entrada que no controla: consultas, comandos, plantillas o HTML construidos con ella pueden alterarse.",
-     "mitigations": ["Consultas parametrizadas y APIs sin shell", "Validación por lista blanca y codificación de salida por contexto"],
-     "cwe": [74, 77, 78, 79, 89, 94, 95, 611, 643, 917, 943, 1336]},
-    {"id": "TM-T02", "base": "medium", "stride": "T", "applies": "process", "title": "Dependencias vulnerables o comprometidas",
-     "why": "El componente se construye con código de terceros: una versión vulnerable o un paquete malicioso cambian su comportamiento.",
-     "mitigations": ["Actualizar a versiones corregidas y fijar versiones con lockfile", "Revisar KEV/EPSS y vigilar la cadena de suministro"], "cwe": [1104, 1395, 937, 1035],
-     "evidence": {"scanners": ("sca",), "any_cwe": True}},
-    {"id": "TM-T03", "base": "high", "stride": "T", "applies": "store_written_unauthenticated", "title": "Escritura en el almacén sin autenticación",
-     "why": "Algún flujo escribe en este almacén sin estar autenticado: cualquiera con red puede alterar los datos.",
-     "mitigations": ["Credenciales por servicio con mínimo privilegio", "Aislar el almacén en red privada"], "cwe": [306, 284]},
-    {"id": "TM-T04", "base": "medium", "stride": "T", "applies": "flow_unencrypted_boundary", "title": "Datos alterables en tránsito",
-     "why": "El flujo cruza una frontera de confianza sin cifrar: un intermediario puede modificarlo.",
-     "mitigations": ["TLS en todos los flujos que cruzan fronteras", "Validar certificados; HSTS en lo expuesto"], "cwe": [319, 295]},
-    {"id": "TM-R01", "base": "low", "stride": "R", "applies": "process_sensitive", "title": "Acciones sensibles sin rastro verificable",
-     "why": "Maneja datos sensibles: sin registro de quién hizo qué, no se puede investigar un abuso ni atribuirlo.",
-     "mitigations": ["Registro de auditoría de accesos y cambios (quién, qué, cuándo)", "Logs fuera del alcance de quien opera la app"], "cwe": [778, 223, 117]},
-    {"id": "TM-I01", "base": "medium", "stride": "I", "applies": "process", "title": "Secretos o datos sensibles expuestos por el componente",
-     "why": "Un componente puede filtrar información por errores, respuestas demasiado amplias o secretos en el código.",
-     "mitigations": ["Errores genéricos hacia fuera y detalle solo en logs", "Secretos en un gestor, nunca en el repositorio", "Respuestas con solo los campos necesarios"],
-     "cwe": [200, 209, 213, 532, 538, 540, 798, 312, 359], "evidence": {"scanners": ("sast", "secrets", "iac"), "any_cwe_for": ("secrets",)}},
-    {"id": "TM-I02", "base": "medium", "stride": "I", "applies": "store_sensitive_unencrypted", "title": "Datos sensibles sin cifrar en reposo",
-     "why": "Guarda datos sensibles y no está marcado como cifrado en reposo: una copia del disco o del backup los expone.",
-     "mitigations": ["Cifrado en reposo con claves gestionadas (KMS)", "Minimizar y seudonimizar lo que se guarda"], "cwe": [311, 312]},
-    {"id": "TM-I03", "base": "high", "stride": "I", "applies": "store_credentials", "title": "Credenciales guardadas de forma recuperable",
-     "why": "Guarda credenciales: con hashes débiles o reversibles, una fuga de la base de datos es una fuga de contraseñas.",
-     "mitigations": ["Hash de contraseñas con scrypt, Argon2id o bcrypt", "Tokens de API guardados como hash"], "cwe": [256, 257, 261, 327, 328, 759, 760, 916]},
-    {"id": "TM-I04", "base": "medium", "stride": "I", "applies": "flow_unencrypted_boundary", "title": "Datos legibles en tránsito",
-     "why": "El flujo cruza una frontera de confianza sin cifrar y lleva datos que no son públicos.",
-     "mitigations": ["TLS obligatorio", "No enviar credenciales ni datos personales por canales en claro"], "cwe": [319]},
-    {"id": "TM-I05", "base": "medium", "stride": "I", "applies": "flow_to_external_sensitive", "title": "Datos sensibles enviados a un tercero",
-     "why": "El flujo lleva datos personales, de pago o credenciales a un servicio externo: quedan fuera de tu control.",
-     "mitigations": ["Enviar solo lo imprescindible y seudonimizar", "Contrato de encargo de tratamiento y revisión del proveedor"], "cwe": [359, 201]},
-    {"id": "TM-I06", "base": "medium", "stride": "I", "applies": "storage", "title": "Objetos accesibles sin permiso",
-     "why": "Un almacenamiento de ficheros mal configurado sirve objetos a cualquiera que tenga el enlace.",
-     "mitigations": ["Buckets privados y URLs firmadas de corta duración", "Bloquear el acceso público a nivel de cuenta"], "cwe": [732, 552]},
-    {"id": "TM-D01", "base": "medium", "stride": "D", "applies": "internet_process", "title": "Agotamiento por volumen de peticiones",
-     "why": "Está expuesto a Internet: sin límites, unas pocas peticiones caras bastan para dejarlo sin servicio.",
-     "mitigations": ["Límites de tasa y de tamaño por cliente", "Timeouts y colas acotadas"], "cwe": [400, 770, 1333, 799]},
-    {"id": "TM-D02", "base": "low", "stride": "D", "applies": "external", "title": "Dependencia de un tercero sin plan de fallo",
-     "why": "Si el servicio externo cae o responde lento, el componente que lo llama puede bloquearse con él.",
-     "mitigations": ["Timeouts, reintentos con retroceso y circuit breaker", "Degradar la funcionalidad en lugar de caer"], "cwe": [400]},
-    {"id": "TM-E01", "base": "high", "stride": "E", "applies": "process_authenticated", "title": "Acceso a objetos o funciones de otros usuarios",
-     "why": "Distingue usuarios: sin comprobar la propiedad del objeto y el rol en cada petición, uno accede a lo de otro (BOLA/BFLA).",
-     "mitigations": ["Autorización por objeto en el servidor, en cada petición", "Denegar por defecto y probar con dos usuarios"], "cwe": [285, 639, 862, 863, 269, 915]},
-    {"id": "TM-E02", "base": "high", "stride": "E", "applies": "process_calls_out", "title": "El servidor hace peticiones hacia donde decida el atacante (SSRF)",
-     "why": "Este componente llama a otros servicios: si parte del destino viene de la entrada, puede alcanzar la red interna o metadatos cloud.",
-     "mitigations": ["Lista blanca de destinos y resolución DNS fijada", "Bloquear direcciones privadas y de metadatos"], "cwe": [918]},
+    threat_methods.rule("TM-S01", "high", "S", "internet_process_unauthenticated", [306, 287]),
+    threat_methods.rule("TM-S02", "high", "S", "identity", [287, 345, 347, 384, 613]),
+    threat_methods.rule("TM-S03", "medium", "S", "inbound_from_external", [345, 347]),
+    threat_methods.rule("TM-S04", "medium", "S", "web_app", [352]),
+    threat_methods.rule("TM-T01", "high", "T", "process", [74, 77, 78, 79, 89, 94, 95, 611, 643, 917, 943, 1336]),
+    threat_methods.rule("TM-T02", "medium", "T", "process", [1104, 1395, 937, 1035], evidence={"scanners": ("sca",), "any_cwe": True}),
+    threat_methods.rule("TM-T03", "high", "T", "store_written_unauthenticated", [306, 284]),
+    threat_methods.rule("TM-T04", "medium", "T", "flow_unencrypted_boundary", [319, 295]),
+    threat_methods.rule("TM-R01", "low", "R", "process_sensitive", [778, 223, 117]),
+    threat_methods.rule("TM-I01", "medium", "I", "process", [200, 209, 213, 532, 538, 540, 798, 312, 359],
+                         mitigations=3, evidence={"scanners": ("sast", "secrets", "iac"), "any_cwe_for": ("secrets",)}),
+    threat_methods.rule("TM-I02", "medium", "I", "store_sensitive_unencrypted", [311, 312]),
+    threat_methods.rule("TM-I03", "high", "I", "store_credentials", [256, 257, 261, 327, 328, 759, 760, 916]),
+    threat_methods.rule("TM-I04", "medium", "I", "flow_unencrypted_boundary", [319]),
+    threat_methods.rule("TM-I05", "medium", "I", "flow_to_external_sensitive", [359, 201]),
+    threat_methods.rule("TM-I06", "medium", "I", "storage", [732, 552]),
+    threat_methods.rule("TM-D01", "medium", "D", "internet_process", [400, 770, 1333, 799]),
+    threat_methods.rule("TM-D02", "low", "D", "external", [400]),
+    threat_methods.rule("TM-E01", "high", "E", "process_authenticated", [285, 639, 862, 863, 269, 915]),
+    threat_methods.rule("TM-E02", "high", "E", "process_calls_out", [918]),
 ]
 SEVERITY_ORDER = ("critical", "high", "medium", "low")
 
@@ -782,8 +771,8 @@ def _scopes_near(model: dict, component: dict | None, flow: dict | None) -> set[
     return {(item["asset"], item.get("path") or "") for item in ends if item.get("asset")}
 
 
-def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None) -> list[dict]:
-    """Amenazas del modelo con su severidad, evidencia de los escaneos y decisión del equipo."""
+def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None, *, locale: str | None = None) -> list[dict]:
+    """Amenazas del modelo con su severidad, evidencia de los escaneos y decisión del equipo, rendered for `locale`."""
     decisions = model.get("decisions", {})
     rows = []
     method = model.get("methodology") or "stride"
@@ -829,6 +818,7 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None)
                      "evidence_scope": [{"asset": asset, "path": folder or None} for asset, folder in scopes]})
     if method != "custom" or "manual" in model.get("custom_modules", ["manual", "elements"]):
         rows += _manual_rows(model, decisions)
+    rows = localize(rows, locale or default_locale())
     order = {"evidenced": 0, "open": 1, "accepted": 2, "mitigated": 3, "not_applicable": 4}
     return sorted(rows, key=lambda row: (order[row["status"]], SEVERITY_ORDER.index(row["severity"]), row["stride"], row["element_name"]))
 
@@ -845,9 +835,9 @@ def _manual_rows(model: dict, decisions: dict) -> list[dict]:
         element = item.get("element") or ""
         flow = flows.get(element)
         name = (f"{components[flow['source']]['name']} → {components[flow['target']]['name']}" if flow
-                else components[element]["name"] if element in components else "Todo el sistema")
+                else components[element]["name"] if element in components else msg("threats.threat.whole_system"))
         decision = decisions.get(threat_id)
-        rows.append({"id": threat_id, "rule": "PROPIA", "stride": item.get("category") or "", "category": names.get(item.get("category") or "", item.get("category") or "Sin categoría"),
+        rows.append({"id": threat_id, "rule": "PROPIA", "stride": item.get("category") or "", "category": names.get(item.get("category") or "", item.get("category") or msg("threats.threat.no_category")),
                      "framework": "manual", "manual_id": item["id"], "title": item["title"], "why": item.get("scenario") or "",
                      "mitigations": [item["mitigation"]] if item.get("mitigation") else [], "cwe": [],
                      "element": element, "element_type": "flow" if flow else "component" if element in components else "system",
@@ -889,8 +879,10 @@ def summary(rows: list[dict]) -> dict:
 
 # ------------------------------------------------------------ exportaciones
 
-def to_threat_dragon(model: dict, rows: list[dict]) -> dict:
+def to_threat_dragon(model: dict, rows: list[dict], *, locale: str | None = None) -> dict:
     """OWASP Threat Dragon v2: un diagrama STRIDE con actores, procesos, almacenes, flujos y fronteras."""
+    locale = locale or default_locale()
+    rows = localize(rows, locale)
     shapes = {"actor": ("actor", "tm.Actor"), "external": ("actor", "tm.Actor"), "identity": ("actor", "tm.Actor"),
               **{kind: ("store", "tm.Store") for kind in STORES}, **{kind: ("process", "tm.Process") for kind in PROCESSES}}
     status = {"evidenced": "Open", "open": "Open", "accepted": "Open", "mitigated": "Mitigated", "not_applicable": "NA"}
@@ -899,7 +891,7 @@ def to_threat_dragon(model: dict, rows: list[dict]) -> dict:
         by_element.setdefault(row["element"], []).append({
             "id": row["id"], "number": number, "title": row["title"], "type": STRIDE_EN.get(row["stride"], row["category"]),
             "status": status[row["status"]], "severity": {"critical": "High", "high": "High", "medium": "Medium", "low": "Low"}[row["severity"]],
-            "description": row["why"] + (f" Evidencia: {row['evidence_count']} hallazgos abiertos." if row["evidence_count"] else ""),
+            "description": row["why"] + (" " + t("threats.exports.evidence", locale, count=row["evidence_count"]) if row["evidence_count"] else ""),
             "mitigation": "; ".join(row["mitigations"]), "modelType": "STRIDE", "score": ""})
     layout = _layout(model)
     cells = []
@@ -948,13 +940,15 @@ def _node_size(component: dict) -> tuple[float, float]:
     return threat_diagram.node_size(component)
 
 
-def to_svg(model: dict) -> str:
+def to_svg(model: dict, *, locale: str | None = None) -> str:
     """Exporta solamente el diagrama actual como SVG autónomo, sin código ni scripts."""
-    return threat_diagram.to_svg(model, KINDS)
+    locale = locale or default_locale()
+    return threat_diagram.to_svg(model, localize(KINDS, locale), locale=locale)
 
 
-def to_pytm(model: dict) -> str:
+def to_pytm(model: dict, *, locale: str | None = None) -> str:
     """Script de OWASP pytm equivalente, para quien quiera seguir modelando como código."""
+    locale = locale or default_locale()
     def name(value: str) -> str:
         return json.dumps(value, ensure_ascii=False)
     variables = {item["id"]: "c_" + item["id"].replace("-", "_") for item in model.get("components", [])}
@@ -962,8 +956,9 @@ def to_pytm(model: dict) -> str:
     member_of = {member: boundary["id"] for boundary in model.get("boundaries", []) for member in boundary["components"]}
     classes = {"actor": "Actor", "external": "ExternalEntity", "identity": "ExternalEntity", "web_app": "Server",
                "api": "Server", "service": "Process", "function": "Lambda", **{kind: "Datastore" for kind in STORES}}
-    lines = ["#!/usr/bin/env python3", f"# Generado por Tamandua a partir del modelo {name(model['name'])}.",
-             "# Requiere OWASP pytm: pip install pytm · uso: python3 tm.py --report docs/basic_template.md",
+    comment = lambda value: "# " + " ".join(value.split())  # noqa: E731
+    lines = ["#!/usr/bin/env python3", comment(t("threats.exports.pytm_generated", locale, name=name(model["name"]))),
+             comment(t("threats.exports.pytm_requires", locale)),
              "from pytm import TM, Actor, Boundary, Dataflow, Datastore, ExternalEntity, Lambda, Process, Server", "",
              f"tm = TM({name(model['name'])})", f"tm.description = {name(model.get('description') or model['name'])}",
              "tm.isOrdered = True", ""]
@@ -990,5 +985,5 @@ def to_pytm(model: dict) -> str:
     return "\n".join(lines)
 
 
-def to_markdown(model: dict, rows: list[dict]) -> str:
-    return threat_report.to_markdown(model, rows)
+def to_markdown(model: dict, rows: list[dict], *, locale: str | None = None) -> str:
+    return threat_report.to_markdown(model, rows, locale=locale)

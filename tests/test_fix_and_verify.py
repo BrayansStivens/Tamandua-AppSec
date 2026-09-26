@@ -13,6 +13,7 @@ from tamandua.modules.identity.auth import Users
 from tamandua.modules.runs.store import save_repository_scan
 from test_auth import PASSWORD, HttpCase
 from test_dashboard import _finding, _scan
+from tamandua.shared.i18n import localize, text
 
 
 def dependency(path, name, version, fixed, *, ecosystem="npm", direct=True):
@@ -23,7 +24,7 @@ class FixGuideTests(unittest.TestCase):
     def test_the_command_matches_the_package_manager_and_closes_every_advisory(self):
         findings = fix_guide.attach([dependency("web/package-lock.json", "lodash", "4.17.20", "4.17.19"),
                                      dependency("web/package-lock.json", "lodash", "4.17.20", "4.17.21")])
-        self.assertEqual(findings[0]["fix"]["commands"], [{"label": "Actualiza", "code": "npm install lodash@4.17.21"}])  # la que cierra ambos
+        self.assertEqual(localize(findings[0]["fix"]["commands"]), [{"label": "Actualiza", "action": "update", "code": "npm install lodash@4.17.21"}])  # la que cierra ambos
         cases = {("yarn.lock", "npm", True): "yarn add left-pad@1.3.0", ("poetry.lock", "pip", True): 'poetry add "left-pad>=1.3.0"',
                  ("poetry.lock", "pip", False): "poetry update left-pad", ("uv.lock", "pip", False): "uv lock --upgrade-package left-pad",
                  ("Cargo.lock", "cargo", True): "cargo update -p left-pad@1.0.0 --precise 1.3.0", ("composer.lock", "composer", True): 'composer require "left-pad:^1.3.0"',
@@ -52,7 +53,7 @@ class FixGuideTests(unittest.TestCase):
     def test_transitive_os_and_unfixable_dependencies_get_steps_not_wrong_commands(self):
         transitive = fix_guide.guide(dependency("package-lock.json", "minimist", "0.0.8", "1.2.6", direct=False))
         self.assertIn('"overrides"', transitive["example"]["after"])
-        self.assertEqual(transitive["commands"], [{"label": "Reinstala", "code": "npm install"}])
+        self.assertEqual(localize(transitive["commands"], "en"), [{"label": "Reinstall", "action": "reinstall", "code": "npm install"}])
         image = fix_guide.guide(dependency("var/lib/dpkg/status", "libssl1.1", "1.1.1n", "1.1.1w", ecosystem="debian"))
         self.assertEqual((image["example"]["language"], image["commands"]), ("dockerfile", []))
         self.assertIn("apt-get install -y --only-upgrade libssl1.1", image["example"]["after"])
@@ -66,7 +67,7 @@ class FixGuideTests(unittest.TestCase):
         self.assertEqual(code["example"]["language"], "javascript")
         self.assertIn("$1", code["example"]["after"])
         secret = fix_guide.guide({"scanner": "secrets", "path": "config.py"})
-        self.assertTrue(secret["steps"][0].startswith("Revoca o rota la credencial"))
+        self.assertTrue(text(secret["steps"][0]).startswith("Revoca o rota la credencial"))
 
 
 class FixCommandSafetyTests(unittest.TestCase):

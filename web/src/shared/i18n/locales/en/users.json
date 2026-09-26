@@ -1,0 +1,63 @@
+{
+  "title": "People with access",
+  "description": "Invite people with a single-use link: each person sets their own password and you never see it.",
+  "policy": {
+    "admins": "TOTP required for administrators",
+    "all": "TOTP required for everyone",
+    "none": "TOTP optional"
+  },
+  "role": {
+    "admin": "Administrator",
+    "member": "Member"
+  },
+  "role_hint": {
+    "admin": "Connects providers, manages users and accepts risks",
+    "member": "Runs scans, triages and reviews results"
+  },
+  "invite": "Invite",
+  "loading": "Loading users",
+  "columns": {
+    "user": "User",
+    "role": "Role",
+    "second_factor": "Two-factor",
+    "last_login": "Last sign-in",
+    "actions": "Actions"
+  },
+  "you": "(you)",
+  "flags": {
+    "disabled": "deactivated",
+    "invite_pending": "invitation pending",
+    "reset_pending": "reset pending",
+    "no_password": "no password"
+  },
+  "role_of": "Role of {{username}}",
+  "totp_on": "On",
+  "totp_off": "Not set up",
+  "never": "Never",
+  "actions_for": "Actions for @{{username}}",
+  "send_reset": "Send password link",
+  "resend_invite": "Resend invitation",
+  "remove_totp": "Remove two-factor",
+  "enable": "Reactivate account",
+  "disable": "Deactivate account",
+  "footnote": "Deactivating someone or removing their TOTP ends their open sessions immediately. There's always at least one active administrator.",
+  "invite_dialog": {
+    "title": "Invite someone",
+    "description": "This creates the account without a password, plus a single-use link valid for 72 hours. Send it through a channel you trust.",
+    "username": "Username",
+    "username_placeholder": "jane.smith",
+    "username_hint": "3–40 characters: letters, numbers, dots, hyphens or underscores.",
+    "display_name": "Display name (optional)",
+    "display_name_placeholder": "Jane Smith",
+    "role": "Role",
+    "submit": "Create invitation"
+  },
+  "link_dialog": {
+    "title": "Link for @{{username}}",
+    "description_one": "It works once and expires in {{count}} hour. It won't be shown again: if it's lost, generate another one (the previous one stops working).",
+    "description_other": "It works once and expires in {{count}} hours. It won't be shown again: if it's lost, generate another one (the previous one stops working).",
+    "copy": "Copy link",
+    "copied_to_clipboard": "Copied to clipboard",
+    "done": "Done"
+  }
+}

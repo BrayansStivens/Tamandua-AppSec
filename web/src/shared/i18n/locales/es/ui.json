@@ -1,0 +1,20 @@
+{
+  "brand_mark": "Marca de {{name}}",
+  "splash": "Cargando {{name}}",
+  "loading": "Cargando",
+  "pagination": {
+    "showing": "Mostrando {{from}}–{{to}} de {{total}} {{noun}}",
+    "items": "elementos",
+    "previous": "Página anterior",
+    "next": "Página siguiente"
+  },
+  "soon": {
+    "badge": "En desarrollo",
+    "page_note": "Aún no da resultados reales, por eso está desactivado. Cuando esté listo aparecerá aquí sin que tengas que hacer nada."
+  },
+  "combobox": {
+    "empty": "Nada coincide",
+    "placeholder": "Escribe para buscar…",
+    "more": "{{remaining}} más: sigue escribiendo para acotar"
+  }
+}

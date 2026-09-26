@@ -1,0 +1,70 @@
+{
+  "severity": {
+    "critical": "critical",
+    "high": "high",
+    "medium": "medium",
+    "low": "low",
+    "info": "informational"
+  },
+  "priority": {
+    "kev": "In the CISA KEV catalog: known active exploitation",
+    "kev_ransomware": "In the CISA KEV catalog: known active exploitation, used by ransomware",
+    "epss": "EPSS {{probability}} chance of exploitation within 30 days (percentile {{percentile}})",
+    "cvss": "CVSS {{score}} ({{severity}})",
+    "fixed": "Fix published: {{version}}",
+    "no_fix": "No fixed version published",
+    "malicious": "Known malicious package (OpenSSF Malicious Packages): hostile code, not a bug"
+  },
+  "malicious": {
+    "title": "Malicious package: {{package}} {{version}}",
+    "reason": "{{id}} flags {{package}} {{version}} as malicious.",
+    "remediation": "Remove {{package}} {{version}} from {{path}}, clear the package manager cache and regenerate the lockfile without it. Treat the machines and CI pipelines that installed it as compromised: rotate their tokens and keys (package registry, GitHub, cloud) and check whether they published anything in your name."
+  },
+  "dependency": {
+    "update": "Update {{package}} from {{installed}} to {{version}} or later in {{path}} and regenerate the lockfile.",
+    "no_fix": "No fixed version has been published for {{package}}. Check whether the vulnerable code is reachable, mitigate, or replace the dependency.",
+    "reason": "OSV links {{id}} to {{package}} {{version}}."
+  },
+  "cve": {
+    "not_in_local_copy": "Not in the local NVD copy yet."
+  },
+  "sources": {
+    "licenses": {
+      "ruby_advisory_db": "Public domain (partly under the OSVDB license, non-commercial)",
+      "per_advisory": "Depends on each advisory's source",
+      "public_domain": "Public domain",
+      "euvd": "Reuse with attribution (ENISA legal notice); API terms to be confirmed",
+      "ubuntu": "CC BY-SA 4.0 (notices); CVE Tracker has no declared license",
+      "undeclared": "No declared license",
+      "undeclared_copyright": "No declared license (copyright only)",
+      "undeclared_restrictive": "No declared license (restrictive site terms)",
+      "amazon": "AWS site terms (commercial use excluded)",
+      "alma": "MIT (OSV); errata have no declared license",
+      "unreviewed": "Not reviewed"
+    },
+    "terms": {
+      "open": "free to use",
+      "attribution": "attribution required",
+      "share_alike": "attribution and share-alike",
+      "non_commercial": "non-commercial",
+      "unclear": "no clear license"
+    },
+    "line_one": "{{name}}: {{license}} · {{count}} advisory",
+    "line_other": "{{name}}: {{license}} · {{count}} advisories",
+    "line_terms_one": "{{name}}: {{license}} ({{terms}}) · {{count}} advisory",
+    "line_terms_other": "{{name}}: {{license}} ({{terms}}) · {{count}} advisories",
+    "missing_one": "{{count}} advisory has no recorded source (the analysis predates attribution: analyze again to record it).",
+    "missing_other": "{{count}} advisories have no recorded source (the analysis predates attribution: analyze again to record it).",
+    "kev": "Active exploitation: CISA KEV catalog (CC0 1.0).",
+    "epss": "Exploitation probability: EPSS from FIRST.org."
+  },
+  "watch": {
+    "step": "New advisories (OSV-Scanner offline)",
+    "detail_one": "{{packages}} packages from the {{date}} analysis checked against the updated OSV database: {{count}} new advisory.",
+    "detail_other": "{{packages}} packages from the {{date}} analysis checked against the updated OSV database: {{count}} new advisories.",
+    "limitations": {
+      "os_packages": "Application dependencies only; an image's OS packages are checked when the image is analyzed again.",
+      "not_full": "This isn't a full analysis: it adds advisories and never marks anything as fixed."
+    }
+  }
+}

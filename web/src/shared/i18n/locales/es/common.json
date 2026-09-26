@@ -1,29 +1,69 @@
 {
+  "app_title": "Tamandua · Seguridad de aplicaciones",
   "language": "Idioma",
   "actions": {
-    "save": "Guardar", "cancel": "Cancelar", "edit": "Editar", "delete": "Borrar", "remove": "Quitar", "close": "Cerrar",
-    "back": "Volver", "next": "Siguiente", "retry": "Reintentar", "search": "Buscar", "copy": "Copiar", "copied": "Copiado",
-    "download": "Descargar", "open": "Abrir", "add": "Añadir", "confirm": "Confirmar", "refresh": "Actualizar", "more": "Más"
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "edit": "Editar",
+    "delete": "Borrar",
+    "remove": "Quitar",
+    "close": "Cerrar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "retry": "Reintentar",
+    "search": "Buscar",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "download": "Descargar",
+    "open": "Abrir",
+    "add": "Añadir",
+    "confirm": "Confirmar",
+    "refresh": "Actualizar",
+    "more": "Más"
   },
   "state": {
-    "loading": "Cargando…", "saving": "Guardando…", "saved": "Guardado", "empty": "Aún no hay nada", "error": "Algo salió mal",
-    "none": "Ninguno", "unknown": "Desconocido", "yes": "Sí", "no": "No", "all": "Todos"
+    "loading": "Cargando…",
+    "saving": "Guardando…",
+    "saved": "Guardado",
+    "empty": "Aún no hay nada",
+    "error": "Algo salió mal",
+    "none": "Ninguno",
+    "unknown": "Desconocido",
+    "yes": "Sí",
+    "no": "No",
+    "all": "Todos"
   },
   "severity": {
-    "critical": "Crítica", "high": "Alta", "medium": "Media", "low": "Baja", "info": "Info"
+    "critical": "Crítica",
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja",
+    "info": "Info"
   },
   "priority": {
-    "act": "Actuar ya", "attend": "Atender", "track": "Seguir"
+    "act": "Actuar ya",
+    "attend": "Atender",
+    "track": "Seguir"
   },
   "run_status": {
-    "completed": "Completada", "incomplete": "Incompleta", "failed": "Fallida", "queued": "En cola", "running": "Analizando…"
+    "completed": "Completada",
+    "incomplete": "Incompleta",
+    "failed": "Fallida",
+    "queued": "En cola",
+    "running": "Analizando…"
   },
   "finding_status": {
-    "open": "Abierto", "in_progress": "En curso", "fixed": "Remediado", "excluded": "Excluido", "accepted": "Riesgo aceptado",
+    "open": "Abierto",
+    "in_progress": "En curso",
+    "fixed": "Remediado",
+    "excluded": "Excluido",
+    "accepted": "Riesgo aceptado",
     "false_positive": "Falso positivo"
   },
   "count": {
-    "findings_one": "{{count}} hallazgo", "findings_other": "{{count}} hallazgos",
-    "repositories_one": "{{count}} repositorio", "repositories_other": "{{count}} repositorios"
+    "findings_one": "{{count}} hallazgo",
+    "findings_other": "{{count}} hallazgos",
+    "repositories_one": "{{count}} repositorio",
+    "repositories_other": "{{count}} repositorios"
   }
 }

@@ -14,6 +14,7 @@ from tamandua.modules.runs.jobs import ScanJobs
 from tamandua.modules.sources.repositories import SourceError
 from tamandua.modules.scanning.engines import host_path
 from tamandua.modules.runs.store import load_run
+from tamandua.shared.i18n import text
 
 
 def _wait(data_dir, run_id, timeout=15.0):
@@ -64,7 +65,7 @@ class JobsTests(unittest.TestCase):
                                                   context="", tokens={}, installation_id=None)
             record = _wait(self.data_dir, queued["id"])
         self.assertEqual(record["status"], "failed")
-        self.assertIn("No se pudo obtener el repositorio", record["progress"][-1]["message"])
+        self.assertIn("No se pudo obtener el repositorio", text(record["progress"][-1]["message"]))
 
     def test_unexpected_error_never_leaks_a_traceback_to_the_user(self):
         jobs = ScanJobs(self.data_dir)
@@ -76,7 +77,7 @@ class JobsTests(unittest.TestCase):
         serialized = json.dumps(record["progress"])
         self.assertNotIn("/srv/secret", serialized)
         self.assertNotIn("Traceback", serialized)
-        self.assertIn("error interno", record["progress"][-1]["message"])
+        self.assertIn("error interno", text(record["progress"][-1]["message"]))
 
 
 class HostPathTests(unittest.TestCase):

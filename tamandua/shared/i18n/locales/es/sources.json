@@ -1,0 +1,52 @@
+{
+  "errors": {
+    "joined": "{{first}} · {{second}}",
+    "redirect_not_allowed": "Redirección de archivo no permitida",
+    "over_download_limit": "El repositorio supera el límite de descarga",
+    "provider_unreachable": "No se pudo consultar el proveedor de código",
+    "archive_too_big": "El archivo del repositorio supera 1 GB comprimido",
+    "download_timeout": "La descarga superó {{minutes}} min ({{mb}} MB recibidos); revisa la conexión con {{provider}}",
+    "download_failed": "No se pudo descargar el repositorio",
+    "invalid_provider": "Proveedor de código inválido",
+    "invalid_data": "El proveedor respondió con datos inválidos",
+    "invalid_list": "Lista de repositorios inválida",
+    "list_failed": "No se pudo listar repositorios; revisa el token y sus permisos",
+    "installation": "Instalación {{id}}: {{detail}}",
+    "decompression_bomb": "El archivo se expande de forma desproporcionada; se descarta por posible bomba de descompresión",
+    "invalid_archive_file": "Archivo de repositorio inválido",
+    "invalid_archive": "Archivo comprimido inválido",
+    "invalid_commit": "Commit inválido",
+    "invalid_repository": "Repositorio inválido",
+    "not_available": "Repositorio no disponible para la credencial configurada",
+    "connect_first": "Conecta el proveedor de código antes de analizar"
+  },
+  "progress": {
+    "downloading": "Descargando… {{mb}} MB recibidos",
+    "downloaded": "Descarga completa ({{mb}} MB). Extrayendo archivos analizables…"
+  },
+  "domains": {
+    "invalid_registry": "Registro de dominios inválido",
+    "invalid_url": "URL inválida",
+    "invalid_url_port": "URL o puerto inválido",
+    "https_only": "Usa una URL HTTPS de dominio público, sin usuario, puerto, query ni fragmento",
+    "invalid_domain": "Dominio público inválido",
+    "context_length": "El contexto admite hasta {{max}} caracteres",
+    "context_control": "El contexto contiene caracteres de control",
+    "invalid_kind": "Tipo de objetivo inválido",
+    "already_registered": "El dominio ya está registrado",
+    "limit": "Máximo de dominios registrados alcanzado",
+    "invalid_id": "ID de dominio inválido",
+    "not_found": "Dominio no encontrado",
+    "dns_unavailable": "No se pudo consultar DNS",
+    "dns_failed": "La consulta DNS falló",
+    "txt_missing": "No se encontró el TXT de verificación; revisa el nombre, el valor y la propagación",
+    "check": {
+      "dns_error": "El dominio no resuelve en DNS.",
+      "private_address": "El dominio resuelve a una dirección privada o reservada; no se sondea.",
+      "tls_error": "El certificado TLS no valida para este host.",
+      "unreachable": "No hubo respuesta HTTPS en el puerto 443.",
+      "reachable": "Respuesta HTTPS {{code}} desde {{address}}."
+    },
+    "invalid_request": "Solicitud de dominio inválida"
+  }
+}

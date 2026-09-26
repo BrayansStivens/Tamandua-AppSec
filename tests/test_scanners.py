@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from tamandua.modules.scanning import engines as scanners
 from tamandua.modules.scanning.engines import _pick_fixed, merge_secrets, parse_gitleaks, parse_opengrep, parse_trivy
+from tamandua.shared.i18n import text
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -27,7 +28,7 @@ class TrivyParserTests(unittest.TestCase):
         self.assertEqual(lodash["package"]["fixed_version"], "4.17.21")
         self.assertEqual(lodash["advisory"]["cvss_score"], 7.2)
         self.assertEqual(lodash["severity"], "high")
-        self.assertIn("de 4.17.20 a 4.17.21", lodash["remediation"])
+        self.assertIn("de 4.17.20 a 4.17.21", text(lodash["remediation"]))
         self.assertEqual(lodash["cve"], ["CVE-2021-23337"])
         # Misma huella que produciría el camino OSV para el mismo aviso: no duplica tickets entre motores.
         from tamandua.modules.intel.advisories import fingerprint
@@ -118,7 +119,7 @@ class RunnerTests(unittest.TestCase):
                            lambda: scanners.run_trivy(Path("."), Path("/tmp/x"), {})):
                 result = runner()
                 self.assertEqual(result["status"], "not_tested")
-                self.assertIn("Docker", result["detail"])
+                self.assertIn("Docker", text(result["detail"]))
                 self.assertEqual(result["findings"], [])
 
 
@@ -141,7 +142,7 @@ class DevDependencyTests(unittest.TestCase):
         self.assertTrue(by_name["postcss"]["package"]["dev"])
         # Crítica sin KEV ni EPSS alto: «atender» en producción, un nivel menos por ser de desarrollo.
         self.assertEqual((by_name["express"]["priority"]["action"], by_name["postcss"]["priority"]["action"]), ("attend", "track"))
-        self.assertIn("desarrollo", " ".join(by_name["postcss"]["priority"]["factors"]))
+        self.assertIn("desarrollo", " ".join(text(item) for item in by_name["postcss"]["priority"]["factors"]))
         self.assertFalse(by_name["express"]["package"]["dev"])
         self.assertTrue(by_name["express"]["package"]["direct"])
         # Con EPSS alto, «actuar ya» baja a «atender»; en CISA KEV no se rebaja aunque sea de desarrollo.

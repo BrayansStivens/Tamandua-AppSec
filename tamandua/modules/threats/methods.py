@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import re
 
+from tamandua.shared.i18n import inline, msg, text
+
 METHODOLOGIES = {
-    "stride": "STRIDE", "linddun": "LINDDUN", "pasta": "PASTA", "attack_trees": "Árboles de ataque",
-    "attack": "MITRE ATT&CK", "custom": "Personalizado",
+    "stride": msg("threats.methods.stride"), "linddun": msg("threats.methods.linddun"), "pasta": msg("threats.methods.pasta"),
+    "attack_trees": msg("threats.methods.attack_trees"), "attack": msg("threats.methods.attack"), "custom": msg("threats.methods.custom"),
 }
 # Enfoques cuyas amenazas se generan con reglas sobre el diagrama.
 RULE_BASED = {"stride": "stride", "pasta": "stride", "linddun": "linddun"}
@@ -31,51 +33,53 @@ ID = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 
 
 class MethodError(ValueError):
-    pass
+    """A validation error; `message` is a language-neutral message, str() renders it in the default locale."""
+
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self) -> str:
+        return text(self.message)
 
 
 # ------------------------------------------------------------------ LINDDUN (privacidad)
 
-LINDDUN = {"L": "Vinculación", "I": "Identificación", "Nr": "No repudio", "D": "Detección",
-           "Dd": "Divulgación de datos", "U": "Desconocimiento", "Nc": "Incumplimiento"}
+LINDDUN = {"L": msg("threats.linddun.l"), "I": msg("threats.linddun.i"), "Nr": msg("threats.linddun.nr"), "D": msg("threats.linddun.d"),
+           "Dd": msg("threats.linddun.dd"), "U": msg("threats.linddun.u"), "Nc": msg("threats.linddun.nc")}
 
-# Misma forma que las reglas STRIDE; «stride» guarda aquí la categoría LINDDUN.
+
+def rule(identifier: str, base: str, category: str, applies: str, cwe: list[int], *, mitigations: int = 2, **extra) -> dict:
+    """A rule whose title, rationale and mitigations live in the catalog under threats.rules.<id>."""
+    key = "threats.rules." + identifier.lower().replace("-", "_")
+    return {"id": identifier, "base": base, "stride": category, "applies": applies, "title": msg(f"{key}.title"),
+            "why": msg(f"{key}.why"), "mitigations": [msg(f"{key}.mitigation_{index}") for index in range(1, mitigations + 1)],
+            "cwe": cwe, **extra}
+
+
+# Same shape as the STRIDE rules; "stride" holds the LINDDUN category here.
 LINDDUN_RULES = [
-    {"id": "PV-L01", "base": "medium", "stride": "L", "applies": "store_personal", "title": "Registros de una persona que se pueden cruzar",
-     "why": "Este almacén guarda datos personales con identificadores estables: se pueden unir registros de la misma persona entre tablas, servicios o exportaciones y reconstruir su perfil.",
-     "mitigations": ["Identificadores distintos por contexto (seudónimos) en lugar de uno global", "Minimizar los identificadores persistentes y separar conjuntos de datos"], "cwe": [359]},
-    {"id": "PV-I01", "base": "medium", "stride": "I", "applies": "store_personal", "title": "Reidentificación de datos «anonimizados»",
-     "why": "Datos personales exportados o agregados pueden volver a identificar a alguien combinándolos con otras fuentes.",
-     "mitigations": ["Agregar o generalizar antes de exportar (k-anonimato)", "No compartir datos brutos para analítica ni pruebas"], "cwe": [359, 200]},
-    {"id": "PV-Nr01", "base": "low", "stride": "Nr", "applies": "process_personal", "title": "Se guarda más de lo necesario sobre lo que hace cada persona",
-     "why": "Un proceso que maneja datos personales puede registrar acciones con tanto detalle que el usuario ya no puede negar ni ocultar lo que hizo cuando debería poder hacerlo.",
-     "mitigations": ["Registrar solo lo necesario para operar y auditar", "Plazos de retención de logs y seudonimizar al usuario en ellos"], "cwe": [532]},
-    {"id": "PV-D01", "base": "medium", "stride": "D", "applies": "process_personal_facing_actor", "title": "Se puede deducir si alguien usa el servicio",
-     "why": "Respuestas distintas (p. ej. «ese email ya está registrado»), tiempos o metadatos revelan a un tercero si una persona tiene cuenta o qué hace.",
-     "mitigations": ["Mensajes y tiempos de respuesta uniformes en registro, login y recuperación", "Minimizar metadatos visibles (URLs, cabeceras, notificaciones)"], "cwe": [203, 204, 208]},
-    {"id": "PV-Dd01", "base": "high", "stride": "Dd", "applies": "flow_personal_to_external", "title": "Datos personales enviados a un tercero",
-     "why": "Este flujo lleva datos personales a un servicio de terceros: se pierde el control sobre su uso, conservación y país de destino.",
-     "mitigations": ["Enviar solo los campos imprescindibles", "Contrato de encargo de tratamiento y revisión de transferencias internacionales"], "cwe": [359, 200]},
-    {"id": "PV-Dd02", "base": "high", "stride": "Dd", "applies": "store_personal_unencrypted", "title": "Datos personales legibles si se filtra el almacén",
-     "why": "Guarda datos personales sin cifrado en reposo: una copia de seguridad o un acceso indebido los expone tal cual.",
-     "mitigations": ["Cifrado en reposo y de las copias", "Cifrar a nivel de campo los datos más sensibles"], "cwe": [311, 312, 359]},
-    {"id": "PV-U01", "base": "medium", "stride": "U", "applies": "process_personal_facing_actor", "title": "La persona no sabe qué se hace con sus datos ni puede decidir",
-     "why": "Un componente recoge datos personales directamente de los usuarios: sin aviso claro, consentimiento cuando aplica y forma de ver, corregir o borrar sus datos, no pueden ejercer control.",
-     "mitigations": ["Aviso de privacidad en el punto de recogida", "Autoservicio para acceder, exportar y borrar los propios datos"], "cwe": []},
-    {"id": "PV-Nc01", "base": "medium", "stride": "Nc", "applies": "store_personal", "title": "Tratamiento sin base legal, plazo ni registro",
-     "why": "Un almacén de datos personales necesita finalidad, base legal y plazo de conservación documentados; sin ellos se incumple la normativa (RGPD, leyes locales).",
-     "mitigations": ["Registro de actividades de tratamiento y política de retención con borrado automático", "Evaluación de impacto (EIPD/DPIA) si el tratamiento es de alto riesgo"], "cwe": []},
+    rule("PV-L01", "medium", "L", "store_personal", [359]),
+    rule("PV-I01", "medium", "I", "store_personal", [359, 200]),
+    rule("PV-Nr01", "low", "Nr", "process_personal", [532]),
+    rule("PV-D01", "medium", "D", "process_personal_facing_actor", [203, 204, 208]),
+    rule("PV-Dd01", "high", "Dd", "flow_personal_to_external", [359, 200]),
+    rule("PV-Dd02", "high", "Dd", "store_personal_unencrypted", [311, 312, 359]),
+    rule("PV-U01", "medium", "U", "process_personal_facing_actor", []),
+    rule("PV-Nc01", "medium", "Nc", "store_personal", []),
 ]
 
 # ------------------------------------------------------------------ MITRE ATT&CK (Enterprise)
 
-# Tácticas (el «por qué» del atacante). Identificadores y nombres de MITRE, con traducción.
-TACTICS = {
-    "TA0043": "Reconocimiento", "TA0042": "Desarrollo de recursos", "TA0001": "Acceso inicial", "TA0002": "Ejecución",
-    "TA0003": "Persistencia", "TA0004": "Escalada de privilegios", "TA0005": "Evasión de defensas", "TA0006": "Acceso a credenciales",
-    "TA0007": "Descubrimiento", "TA0008": "Movimiento lateral", "TA0009": "Recolección", "TA0011": "Mando y control",
-    "TA0010": "Exfiltración", "TA0040": "Impacto",
-}
+# Tactics (the attacker's "why"): MITRE's identifiers and names, with the Spanish interpretation.
+TACTICS = {key: inline({"en": english, "es": spanish}) for key, (english, spanish) in {
+    "TA0043": ("Reconnaissance", "Reconocimiento"), "TA0042": ("Resource Development", "Desarrollo de recursos"),
+    "TA0001": ("Initial Access", "Acceso inicial"), "TA0002": ("Execution", "Ejecución"), "TA0003": ("Persistence", "Persistencia"),
+    "TA0004": ("Privilege Escalation", "Escalada de privilegios"), "TA0005": ("Defense Evasion", "Evasión de defensas"),
+    "TA0006": ("Credential Access", "Acceso a credenciales"), "TA0007": ("Discovery", "Descubrimiento"),
+    "TA0008": ("Lateral Movement", "Movimiento lateral"), "TA0009": ("Collection", "Recolección"),
+    "TA0011": ("Command and Control", "Mando y control"), "TA0010": ("Exfiltration", "Exfiltración"), "TA0040": ("Impact", "Impacto"),
+}.items()}
 # Técnicas (el «cómo») más útiles para aplicaciones web, APIs, contenedores y nube. No es el catálogo completo:
 # cada una enlaza a attack.mitre.org.
 TECHNIQUES = {
@@ -147,35 +151,35 @@ SUGGESTIONS = {
 # ------------------------------------------------------------------ PASTA
 
 PASTA_STAGES = [
-    ("objectives", "1 · Objetivos de negocio y de seguridad"),
-    ("scope", "2 · Alcance técnico"),
-    ("decomposition", "3 · Descomposición de la aplicación"),
-    ("threats", "4 · Análisis de amenazas"),
-    ("vulnerabilities", "5 · Análisis de vulnerabilidades"),
-    ("attacks", "6 · Modelado de ataques"),
-    ("risk", "7 · Riesgo e impacto"),
+    ("objectives", msg("threats.pasta.objectives")),
+    ("scope", msg("threats.pasta.scope")),
+    ("decomposition", msg("threats.pasta.decomposition")),
+    ("threats", msg("threats.pasta.threats")),
+    ("vulnerabilities", msg("threats.pasta.vulnerabilities")),
+    ("attacks", msg("threats.pasta.attacks")),
+    ("risk", msg("threats.pasta.risk")),
 ]
 
 
 # ------------------------------------------------------------------ validación
 
-def _text(value, limit: int, field: str, *, required: bool = False, multiline: bool = False) -> str:
+def _text(value, limit: int, field, *, required: bool = False, multiline: bool = False) -> str:
     if value in (None, ""):
         if required:
-            raise MethodError(f"Falta {field}")
+            raise MethodError(msg("threats.errors.field_required", field=field))
         return ""
     if not isinstance(value, str) or len(value) > limit:
-        raise MethodError(f"{field} admite hasta {limit} caracteres")
+        raise MethodError(msg("threats.errors.field_too_long", field=field, limit=limit))
     cleaned = value.strip() if multiline else " ".join(value.split())
     allowed = {"\n", "\t"} if multiline else set()
     if any(ord(character) < 32 and character not in allowed for character in cleaned):
-        raise MethodError(f"{field} contiene caracteres de control")
+        raise MethodError(msg("threats.errors.control_characters", field=field))
     return cleaned
 
 
-def _identifier(value, used: set[str], field: str) -> str:
+def _identifier(value, used: set[str], field) -> str:
     if not isinstance(value, str) or not ID.fullmatch(value) or value in used:
-        raise MethodError(f"{field} necesita un identificador único (minúsculas, números y guiones)")
+        raise MethodError(msg("threats.errors.unique_id", field=field))
     used.add(value)
     return value
 
@@ -184,56 +188,56 @@ def validate(payload: dict, *, elements: set[str]) -> dict:
     """Lo propio de cada enfoque. `elements`: ids de componentes y flujos del modelo, para los enlaces."""
     methodology = payload.get("methodology") or "stride"
     if methodology not in METHODOLOGIES:
-        raise MethodError("Enfoque de modelado desconocido")
+        raise MethodError(msg("threats.errors.unknown_method"))
     result: dict = {"methodology": methodology}
     modules = payload.get("custom_modules", ["manual", "elements"])
     if not isinstance(modules, list) or len(modules) > len(CUSTOM_MODULES) or any(not isinstance(item, str) or item not in CUSTOM_MODULES for item in modules):
-        raise MethodError("Herramientas personalizadas inválidas")
+        raise MethodError(msg("threats.errors.invalid_custom_modules"))
     result["custom_modules"] = list(dict.fromkeys(modules))
 
     manual, used = [], set()
     raw_manual = payload.get("manual_threats") or []
     if not isinstance(raw_manual, list) or len(raw_manual) > LIMITS["manual_threats"]:
-        raise MethodError(f"Como mucho {LIMITS['manual_threats']} amenazas propias")
+        raise MethodError(msg("threats.errors.too_many_manual", limit=LIMITS["manual_threats"]))
     for raw in raw_manual:
         if not isinstance(raw, dict):
-            raise MethodError("Amenaza propia inválida")
+            raise MethodError(msg("threats.errors.invalid_manual"))
         element = raw.get("element") or ""
         if element and element not in elements:
-            raise MethodError("Una amenaza propia apunta a un elemento que no existe")
+            raise MethodError(msg("threats.errors.manual_element"))
         severity = raw.get("severity") or "medium"
         if severity not in SEVERITIES:
-            raise MethodError("Severidad inválida")
-        manual.append({"id": _identifier(raw.get("id"), used, "Cada amenaza propia"),
-                       "title": _text(raw.get("title"), 160, "El título", required=True),
-                       "category": _text(raw.get("category"), 40, "La categoría"),
+            raise MethodError(msg("threats.errors.invalid_severity"))
+        manual.append({"id": _identifier(raw.get("id"), used, msg("threats.fields.each_manual")),
+                       "title": _text(raw.get("title"), 160, msg("threats.fields.title"), required=True),
+                       "category": _text(raw.get("category"), 40, msg("threats.fields.category")),
                        "element": element, "severity": severity,
-                       "scenario": _text(raw.get("scenario"), 1500, "El escenario", multiline=True),
-                       "mitigation": _text(raw.get("mitigation"), 1500, "La mitigación", multiline=True),
+                       "scenario": _text(raw.get("scenario"), 1500, msg("threats.fields.scenario"), multiline=True),
+                       "mitigation": _text(raw.get("mitigation"), 1500, msg("threats.fields.mitigation"), multiline=True),
                        "likelihood": raw.get("likelihood") if raw.get("likelihood") in ("low", "medium", "high") else None,
                        "impact": raw.get("impact") if raw.get("impact") in ("low", "medium", "high") else None,
-                       "owner": _text(raw.get("owner"), 80, "El responsable")})
+                       "owner": _text(raw.get("owner"), 80, msg("threats.fields.owner"))})
     result["manual_threats"] = manual
 
     trees, tree_ids = [], set()
     raw_trees = payload.get("attack_trees") or []
     if not isinstance(raw_trees, list) or len(raw_trees) > LIMITS["attack_trees"]:
-        raise MethodError(f"Como mucho {LIMITS['attack_trees']} árboles de ataque")
+        raise MethodError(msg("threats.errors.too_many_trees", limit=LIMITS["attack_trees"]))
     for raw in raw_trees:
         if not isinstance(raw, dict):
-            raise MethodError("Árbol de ataque inválido")
+            raise MethodError(msg("threats.errors.invalid_tree"))
         nodes, node_ids = [], set()
         raw_nodes = raw.get("nodes") or []
         if not isinstance(raw_nodes, list) or len(raw_nodes) > LIMITS["tree_nodes"]:
-            raise MethodError(f"Un árbol admite hasta {LIMITS['tree_nodes']} pasos")
+            raise MethodError(msg("threats.errors.too_many_nodes", limit=LIMITS["tree_nodes"]))
         for node in raw_nodes:
             if not isinstance(node, dict):
-                raise MethodError("Paso del árbol inválido")
+                raise MethodError(msg("threats.errors.invalid_node"))
             element = node.get("element") or ""
             if element and element not in elements:
-                raise MethodError("Un paso del árbol apunta a un elemento que no existe")
-            nodes.append({"id": _identifier(node.get("id"), node_ids, "Cada paso del árbol"), "parent": node.get("parent") or None,
-                          "text": _text(node.get("text"), 200, "El paso", required=True),
+                raise MethodError(msg("threats.errors.node_element"))
+            nodes.append({"id": _identifier(node.get("id"), node_ids, msg("threats.fields.each_node")), "parent": node.get("parent") or None,
+                          "text": _text(node.get("text"), 200, msg("threats.fields.step"), required=True),
                           "gate": "and" if node.get("gate") == "and" else "or", "element": element,
                           "difficulty": node.get("difficulty") if node.get("difficulty") in ("low", "medium", "high") else None,
                           "mitigated": bool(node.get("mitigated"))})
@@ -241,46 +245,53 @@ def validate(payload: dict, *, elements: set[str]) -> dict:
         parents = {node["id"]: node["parent"] for node in nodes}
         for node in nodes:
             if node["parent"] is not None and node["parent"] not in ids:
-                raise MethodError("Un paso del árbol cuelga de otro que no existe")
+                raise MethodError(msg("threats.errors.node_parent"))
             seen, current = set(), node["id"]
-            while current is not None:  # sin ciclos
+            while current is not None:  # no cycles
                 if current in seen:
-                    raise MethodError("El árbol de ataque tiene un ciclo")
+                    raise MethodError(msg("threats.errors.tree_cycle"))
                 seen.add(current)
                 current = parents.get(current)
-        trees.append({"id": _identifier(raw.get("id"), tree_ids, "Cada árbol"),
-                      "goal": _text(raw.get("goal"), 200, "El objetivo del atacante", required=True), "nodes": nodes})
+        trees.append({"id": _identifier(raw.get("id"), tree_ids, msg("threats.fields.each_tree")),
+                      "goal": _text(raw.get("goal"), 200, msg("threats.fields.goal"), required=True), "nodes": nodes})
     result["attack_trees"] = trees
 
     mappings, seen_pairs = [], set()
     raw_mappings = payload.get("attack_mappings") or []
     if not isinstance(raw_mappings, list) or len(raw_mappings) > LIMITS["attack_mappings"]:
-        raise MethodError(f"Como mucho {LIMITS['attack_mappings']} técnicas mapeadas")
+        raise MethodError(msg("threats.errors.too_many_mappings", limit=LIMITS["attack_mappings"]))
     for raw in raw_mappings:
         if not isinstance(raw, dict) or raw.get("technique") not in TECHNIQUES:
-            raise MethodError("Técnica de ATT&CK desconocida")
+            raise MethodError(msg("threats.errors.unknown_technique"))
         element = raw.get("element") or ""
         if element and element not in elements:
-            raise MethodError("Una técnica apunta a un elemento que no existe")
+            raise MethodError(msg("threats.errors.mapping_element"))
         pair = (raw["technique"], element)
         if pair in seen_pairs:
             continue
         seen_pairs.add(pair)
         mappings.append({"technique": raw["technique"], "element": element,
                          "status": raw.get("status") if raw.get("status") in MAPPING_STATUS else "relevant",
-                         "note": _text(raw.get("note"), 600, "La nota", multiline=True)})
+                         "note": _text(raw.get("note"), 600, msg("threats.fields.note"), multiline=True)})
     result["attack_mappings"] = mappings
 
     raw_pasta = payload.get("pasta") or {}
     if not isinstance(raw_pasta, dict) or not set(raw_pasta) <= {key for key, _ in PASTA_STAGES}:
-        raise MethodError("Etapas de PASTA inválidas")
-    result["pasta"] = {key: _text(raw_pasta.get(key), 4000, f"La etapa «{title}»", multiline=True)
+        raise MethodError(msg("threats.errors.invalid_pasta"))
+    result["pasta"] = {key: _text(raw_pasta.get(key), 4000, msg("threats.fields.pasta_stage", stage=title), multiline=True)
                        for key, title in PASTA_STAGES if raw_pasta.get(key)}
     return result
+
+
+def technique_label(key: str):
+    """A technique's name for the reader: MITRE's official English name, or its Spanish interpretation."""
+    name, spanish, _ = TECHNIQUES[key]
+    return inline({"en": name, "es": spanish})
 
 
 def catalog() -> dict:
     """Lo que el panel necesita para cada enfoque; las guías de uso viven en el panel."""
     return {"methodologies": METHODOLOGIES, "linddun": LINDDUN, "tactics": TACTICS,
-            "techniques": {key: {"name": name, "name_es": spanish, "tactics": tactics} for key, (name, spanish, tactics) in TECHNIQUES.items()},
+            "techniques": {key: {"name": name, "label": technique_label(key), "name_es": technique_label(key), "tactics": tactics}
+                           for key, (name, _, tactics) in TECHNIQUES.items()},
             "suggestions": SUGGESTIONS, "pasta_stages": [{"key": key, "title": title} for key, title in PASTA_STAGES]}

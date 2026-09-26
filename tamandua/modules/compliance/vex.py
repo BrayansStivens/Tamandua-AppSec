@@ -19,23 +19,25 @@ from datetime import datetime, timezone
 
 from tamandua.modules.intel.advisory_watch import purl as build_purl
 from tamandua.modules.compliance.sbom import root_ref
+from tamandua.shared.i18n import default_locale, t, text
 
 CONTEXT = "https://openvex.dev/ns/v0.2.0"
 
 
-def _status(finding: dict) -> tuple[str, dict]:
+def _status(finding: dict, locale: str) -> tuple[str, dict]:
     decision = finding.get("triage") or {}
     manual = decision.get("status", "open")
-    reason = str(decision.get("reason") or "").strip()
+    reason = text(decision.get("reason"), locale).strip()
     if (finding.get("lifecycle") or {}).get("status") == "fixed" or manual == "fixed":
         return "fixed", {}
     if manual == "false_positive":
-        return "not_affected", {"impact_statement": reason or "Descartado en el triage como falso positivo."}
+        return "not_affected", {"impact_statement": reason or t("compliance.vex.false_positive", locale)}
     if manual == "accepted":
-        until = f" (hasta {decision['expires_at']})" if decision.get("expires_at") else ""
-        return "affected", {"action_statement": f"Riesgo aceptado{until}: {reason}".strip()}
+        statement = (t("compliance.vex.accepted_until", locale, date=decision["expires_at"], reason=reason) if decision.get("expires_at")
+                     else t("compliance.vex.accepted", locale, reason=reason))
+        return "affected", {"action_statement": statement.strip()}
     if manual == "in_progress":
-        return "affected", {"action_statement": finding.get("remediation") or "Corrección en curso."}
+        return "affected", {"action_statement": text(finding.get("remediation"), locale) or t("compliance.vex.in_progress", locale)}
     return "under_investigation", {}
 
 
@@ -48,7 +50,8 @@ def _vulnerability(finding: dict) -> dict | None:
     return {"name": main, **({"aliases": aliases} if aliases else {})}
 
 
-def openvex(record: dict, *, version: str, now: datetime | None = None) -> dict:
+def openvex(record: dict, *, version: str, now: datetime | None = None, locale: str | None = None) -> dict:
+    locale = locale or default_locale()
     stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     product = root_ref(record)
     statements = []
@@ -59,11 +62,11 @@ def openvex(record: dict, *, version: str, now: datetime | None = None) -> dict:
         vulnerability = _vulnerability(finding)
         if vulnerability is None:
             continue
-        status, extra = _status(finding)
+        status, extra = _status(finding, locale)
         subcomponent = build_purl(package)
         decided = (finding.get("triage") or {}).get("at")
         statements.append({"vulnerability": vulnerability,
                            "products": [{"@id": product, **({"subcomponents": [{"@id": subcomponent}]} if subcomponent else {})}],
                            "status": status, **extra, **({"timestamp": decided} if decided else {})})
-    return {"@context": CONTEXT, "@id": f"urn:uuid:{uuid.uuid4()}", "author": "Tamandua", "role": "Documento generado a partir del triage",
+    return {"@context": CONTEXT, "@id": f"urn:uuid:{uuid.uuid4()}", "author": "Tamandua", "role": t("compliance.vex.role", locale),
             "timestamp": stamp, "version": 1, "tooling": f"Tamandua {version}", "statements": statements}

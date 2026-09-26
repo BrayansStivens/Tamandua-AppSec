@@ -14,12 +14,23 @@ from sqlalchemy.dialects.postgresql import insert
 from tamandua.modules.runs.tables import runs
 from tamandua.shared import db
 from tamandua.shared.db import TENANT
+from tamandua.shared.i18n import default_locale, localize, msg, t, text
 
+
+class ReportInputError(ValueError):
+    """A report that can't be produced as asked; `message` is a catalog message."""
+
+    def __init__(self, message: dict):
+        super().__init__(message)
+        self.message = message
+
+    def __str__(self) -> str:
+        return text(self.message)
 
 
 def _check_id(run_id: str) -> str:
     if not isinstance(run_id, str) or len(run_id) != 32 or any(ch not in "0123456789abcdef" for ch in run_id):
-        raise ValueError("ID de ejecución inválido")
+        raise ValueError("Invalid run ID")
     return run_id
 
 
@@ -44,7 +55,7 @@ def _persist(data_dir: Path, record: dict, report: str, sarif: dict | None = Non
         if replace:
             connection.execute(statement.on_conflict_do_update(index_elements=[runs.c.tenant_id, runs.c.id], set_={**values, "updated_at": func.now()}))
         elif connection.execute(statement.on_conflict_do_nothing().returning(runs.c.id)).first() is None:
-            raise FileExistsError(f"La ejecución {record['id']} ya existe")
+            raise FileExistsError(f"Run {record['id']} already exists")
     return record
 
 
@@ -79,8 +90,8 @@ def page_runs(data_dir: Path, *, limit: int = 25, offset: int = 0, status: str |
         conditions.append(runs.c.type.in_(kind.split(",")))
     if query:
         needle = f"%{query.strip().lower().replace(chr(92), chr(92) * 2).replace('%', chr(92) + '%').replace('_', chr(92) + '_')}%"
-        text = func.lower(func.concat_ws(" ", runs.c.row["source"]["name"].astext, runs.c.row["target"].astext, runs.c.id, runs.c.row["variant"].astext))
-        conditions.append(text.like(needle, escape="\\"))
+        haystack = func.lower(func.concat_ws(" ", runs.c.row["source"]["name"].astext, runs.c.row["target"].astext, runs.c.id, runs.c.row["variant"].astext))
+        conditions.append(haystack.like(needle, escape="\\"))
     limit = max(1, min(limit, 200))
     offset = max(0, offset)
     with db.transaction(data_dir) as connection:
@@ -132,68 +143,86 @@ def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = Non
     return saved
 
 
-ACTION_LABEL = {"act": "Actuar ya", "attend": "Atender", "track": "Seguimiento"}
 ACTION_ORDER = {"act": 0, "attend": 1, "track": 2}
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+PROFILES = ("soc2", "iso27001", "custom")
+
+
+def _severity(level, locale: str) -> str:
+    return t(f"reports.common.severity.{level}", locale) if level in SEVERITY_ORDER else str(level or "—")
+
+
+def _action_label(action, locale: str) -> str:
+    return t(f"reports.common.action.{action}", locale) if action in ACTION_ORDER else str(action)
+
+
+def _header(locale: str, *columns: str) -> list[str]:
+    """Markdown table header; an empty name leaves a blank spacer column."""
+    names = [t(f"reports.columns.{name}", locale) if name else "" for name in columns]
+    return ["| " + " | ".join(names) + " |", "|" + "---|" * len(names)]
 
 
 def _ordered_findings(record: dict) -> list[dict]:
     return sorted(record.get("findings", []), key=lambda item: (
         ACTION_ORDER.get((item.get("priority") or {}).get("action"), 3),
-        SEVERITY_ORDER.get(item.get("severity"), 5), item.get("title", "")))
+        SEVERITY_ORDER.get(item.get("severity"), 5), str(item.get("title", ""))))
 
 
-def _finding_block(finding: dict) -> list[str]:
+def _finding_block(finding: dict, locale: str) -> list[str]:
+    """One finding in Markdown. `finding` is already localized."""
     package = finding.get("package") or {}
     advisory = finding.get("advisory") or {}
     action = (finding.get("priority") or {}).get("action", "track")
     lines = [f"### {finding['title']}", "",
-             f"**{finding['severity'].upper()}** · {ACTION_LABEL.get(action, action)} · `{finding['scanner']}` · `{finding['rule_id']}`"]
+             f"**{finding['severity'].upper()}** · {_action_label(action, locale)} · `{finding['scanner']}` · `{finding['rule_id']}`"]
     identifiers = [*finding.get("cve", []), *[item for item in finding.get("ghsa", []) if item != finding["rule_id"]]]
     if identifiers:
-        lines.append("Identificadores: " + ", ".join(f"`{item}`" for item in identifiers))
+        lines.append(t("reports.markdown.identifiers", locale, list=", ".join(f"`{item}`" for item in identifiers)))
     if package.get("name"):
         fixed = package.get("fixed_version")
-        lines.append(f"Paquete: `{package['name']}` {package.get('version')} ({package.get('ecosystem')}) · "
-                     + (f"**corregido en {fixed}**" if fixed else "**sin versión corregida**") + f" · declarado en `{finding['path']}`")
+        lines.append(t("reports.markdown.package", locale, name=package["name"], version=package.get("version"), ecosystem=package.get("ecosystem"),
+                       path=finding["path"], fix=msg("reports.markdown.fixed_in", version=fixed) if fixed else msg("reports.markdown.no_fixed_version")))
     else:
-        lines.append(f"Ubicación: `{finding['path']}:{finding['line']}`")
+        lines.append(t("reports.markdown.location", locale, where=f"{finding['path']}:{finding['line']}"))
     source = finding.get("source") or {}
     if source.get("name"):
         name = source["name"].replace("[", "(").replace("]", ")")
         label = f"[{name}]({source['url']})" if str(source.get("url") or "").startswith("https://") else name
-        lines.append(f"Fuente del aviso: {label} · {source.get('license') or 'licencia sin revisar'}")
+        lines.append(t("reports.markdown.advisory_source", locale, source=label,
+                       license=source.get("license") or msg("reports.markdown.license_unreviewed")))
     if advisory.get("cvss_score") is not None:
         lines.append(f"CVSS {advisory['cvss_score']} · `{advisory.get('cvss_vector')}`")
     if finding.get("kev"):
         kev = finding["kev"]
-        lines.append(f"**CISA KEV** desde {kev.get('date_added')}" + (" · usado por ransomware" if kev.get("ransomware") else ""))
+        lines.append(t("reports.markdown.kev_ransomware" if kev.get("ransomware") else "reports.markdown.kev", locale, date=kev.get("date_added")))
     if finding.get("epss"):
-        lines.append(f"EPSS {finding['epss']['score']:.1%} (percentil {finding['epss']['percentile']:.0%})")
+        lines.append(t("reports.markdown.epss", locale, score=f"{finding['epss']['score']:.1%}", percentile=f"{finding['epss']['percentile']:.0%}"))
     if finding.get("cwe"):
         lines.append("CWE: " + ", ".join(f"CWE-{item}" for item in finding["cwe"]))
     triage = finding.get("triage") or {}
     if triage.get("status", "open") != "open" or triage.get("expired"):
-        detail = f"Triage: **{TRIAGE_LABELS.get(triage['status'], triage['status'])}**"
-        if triage.get("by"):
-            detail += f" por {triage['by']} ({(triage.get('at') or '')[:10]})"
+        status = text(TRIAGE_LABELS.get(triage["status"], triage["status"]), locale)
+        parts = [t("reports.markdown.triage_by", locale, status=status, by=triage["by"], date=(triage.get("at") or "")[:10])
+                 if triage.get("by") else t("reports.markdown.triage", locale, status=status)]
         if triage.get("expires_at"):
-            detail += f" · caduca {triage['expires_at']}"
+            parts.append(t("reports.markdown.triage_expires", locale, date=triage["expires_at"]))
         if triage.get("expired"):
-            detail += " · la aceptación anterior caducó"
+            parts.append(t("reports.markdown.triage_expired", locale))
         if triage.get("reason"):
-            detail += f" · motivo: {triage['reason']}"
-        lines.append(detail)
-    lines += ["", "**Por qué esta prioridad:** " + "; ".join((finding.get("priority") or {}).get("factors", [])) or "—",
-              "", f"**Remediación:** {finding['remediation']}"]
+            parts.append(t("reports.markdown.triage_reason", locale, reason=triage["reason"]))
+        lines.append(" · ".join(parts))
+    lines += ["", t("reports.markdown.why_priority", locale, factors="; ".join((finding.get("priority") or {}).get("factors", []))),
+              "", t("reports.markdown.remediation", locale, text=finding["remediation"])]
     from tamandua.modules.findings.fix_guide import guide
-    fix = finding.get("fix") or guide(finding)
+    fix = localize(finding.get("fix") or guide(finding), locale)
     if fix and (fix["commands"] or fix["example"] or len(fix["steps"]) > 1):
-        # Mismo orden que el panel: pasos, la edición (ejemplo) y el comando al final.
-        lines += ["", "**Cómo corregirlo:**", "", *[f"{index}. {step}" for index, step in enumerate([item for item in fix["steps"] if item], 1)]]
+        # Same order as the panel: steps, the edit (example) and the command last.
+        lines += ["", t("reports.markdown.how_to_fix", locale), "",
+                  *[f"{index}. {step}" for index, step in enumerate([item for item in fix["steps"] if item], 1)]]
         example = fix["example"]
         if example and example.get("before"):
-            lines += ["", "Antes:", "", f"```{example['language']}", example["before"], "```", "", "Después:"]
+            lines += ["", t("reports.markdown.before", locale), "", f"```{example['language']}", example["before"], "```", "",
+                      t("reports.markdown.after", locale)]
         if example:
             lines += ["", f"```{example['language']}", example["after"], "```"] + ([example["note"]] if example.get("note") else [])
         for command in fix["commands"]:
@@ -201,172 +230,192 @@ def _finding_block(finding: dict) -> list[str]:
     if advisory.get("details"):
         lines += ["", advisory["details"][:800].replace("\n\n", "\n")]
     if advisory.get("references"):
-        lines += ["", "Referencias: " + " · ".join(advisory["references"][:4])]
+        lines += ["", t("reports.common.references", locale, list=" · ".join(advisory["references"][:4]))]
     return lines + [""]
 
 
-def render_repository_report(record: dict) -> str:
+def render_repository_report(record: dict, *, locale: str | None = None) -> str:
+    locale = locale or default_locale()
+    record = localize(record, locale)
     source = record["source"]
     summary = record["summary"]
     severities = summary.get("severities") or {}
     priorities = summary.get("priorities") or {}
     findings = _ordered_findings(record)
     image = source.get("image") or {}
-    identity = (f"imagen `{image.get('reference')}`" + (f" · digest `{image['resolved_digest']}`" if image.get("resolved_digest") else "")
-                if image else f"snapshot SHA-256 `{source.get('sha256')}`")
-    lines = [f"# {'Análisis de imagen' if image else 'Análisis de código'} · {source['name']}", "",
-             f"Run `{record['id']}` · {record['created_at']} · fuente `{source['provider']}` · {identity}",
-             f"Estado: **{record['status']}** · {summary['files']} archivos · {summary['dependencies']} dependencias examinadas.", "",
-             "## Resumen ejecutivo", "",
-             "| Prioridad | Cantidad | | Severidad | Cantidad |", "|---|---|---|---|---|"]
-    rows = [("Actuar ya", priorities.get("act", 0), "Crítica", severities.get("critical", 0)),
-            ("Atender", priorities.get("attend", 0), "Alta", severities.get("high", 0)),
-            ("Seguimiento", priorities.get("track", 0), "Media", severities.get("medium", 0)),
-            ("", "", "Baja", severities.get("low", 0))]
+    if image:
+        identity = (t("reports.markdown.identity_image_digest", locale, reference=image.get("reference"), digest=image["resolved_digest"])
+                    if image.get("resolved_digest") else t("reports.markdown.identity_image", locale, reference=image.get("reference")))
+    else:
+        identity = t("reports.markdown.identity_snapshot", locale, sha=source.get("sha256"))
+    lines = ["# " + t("reports.markdown.title_image" if image else "reports.markdown.title_code", locale, name=source["name"]), "",
+             t("reports.markdown.run_line", locale, id=record["id"], date=record["created_at"], provider=source["provider"], identity=identity),
+             t("reports.markdown.status_line", locale, status=record["status"], files=summary["files"], dependencies=summary["dependencies"]), "",
+             "## " + t("reports.markdown.executive_summary", locale), "",
+             *_header(locale, "priority", "count", "", "severity", "count")]
+    rows = [(_action_label("act", locale), priorities.get("act", 0), _severity("critical", locale), severities.get("critical", 0)),
+            (_action_label("attend", locale), priorities.get("attend", 0), _severity("high", locale), severities.get("high", 0)),
+            (_action_label("track", locale), priorities.get("track", 0), _severity("medium", locale), severities.get("medium", 0)),
+            ("", "", _severity("low", locale), severities.get("low", 0))]
     lines += [f"| {a} | {b} | | {c} | {d} |" for a, b, c, d in rows]
-    lines += ["", f"- {summary.get('kev', 0)} hallazgos en el catálogo CISA KEV (explotación activa conocida).",
-              f"- {summary.get('fixable', 0)} dependencias con versión corregida publicada.",
-              f"- {len(findings)} hallazgos en total; cada uno lleva una huella estable para no duplicar tickets entre ejecuciones.", ""]
+    lines += ["", "- " + t("reports.markdown.kev_total", locale, count=summary.get("kev", 0)),
+              "- " + t("reports.markdown.fixable_total", locale, count=summary.get("fixable", 0)),
+              "- " + t("reports.markdown.findings_total", locale, count=len(findings)), ""]
     if record.get("context"):
-        lines += ["## Contexto declarado", "", record["context"], "",
-                  "Descripción aportada por el equipo, no una verificación del sistema.", ""]
+        lines += ["## " + t("reports.markdown.declared_context", locale), "", record["context"], "",
+                  t("reports.markdown.context_note", locale), ""]
     active = [item for item in findings if (item.get("triage") or {}).get("status", "open") not in SUPPRESSED]
     suppressed = [item for item in findings if item not in active]
-    lines += _findings_sections([dict(item) for item in active])
+    lines += _findings_sections([dict(item) for item in active], locale)
     if suppressed:
-        # Cada decisión con quién la tomó y por qué: es lo primero que pregunta quien revisa.
-        lines += ["## Descartados en triage", "",
-                  f"{len(suppressed)} hallazgos marcados como falso positivo o riesgo aceptado, con quién lo decidió y por qué.", "",
-                  "| Hallazgo | Decisión | Motivo | Por | Vence |", "|---|---|---|---|---|"]
+        # Each decision with who made it and why: the first thing a reviewer asks.
+        lines += ["## " + t("reports.markdown.dismissed", locale), "",
+                  t("reports.markdown.dismissed_intro", locale, count=len(suppressed)), "",
+                  *_header(locale, "finding", "decision", "reason", "by", "expires")]
         for finding in suppressed:
             triage = finding.get("triage") or {}
             lines.append(f"| {_md(finding['title'], 100)} | {_md(triage.get('status'), 20)} | {_md(triage.get('reason') or '—', 200)} | "
                          f"{_md(triage.get('by') or '—', 40)} | {_md(str(triage.get('expires_at') or '—')[:10], 12)} |")
         lines.append("")
-    lines += ["## Cobertura de esta ejecución", ""]
+    lines += ["## " + t("reports.markdown.coverage", locale), ""]
     for index, step in enumerate(record["steps"], 1):
         lines += [f"{index}. **{step['name']}** · `{step['status']}`. {step['detail']}"]
     lines += ["", "### OWASP Web Top 10:2025", ""]
     for item in record["owasp_coverage"]:
         lines.append(f"- {item['id']} · {item['title']}: `{item['status']}` · {item['reason']}")
-    lines += ["", "### Límites", "", *[f"- {item}" for item in record["limitations"]], ""]
-    return "\n".join(lines + _sources_section(record.get("findings") or []))
+    lines += ["", "### " + t("reports.common.limitations", locale), "", *[f"- {item}" for item in record["limitations"]], ""]
+    return "\n".join(lines + _sources_section(record.get("findings") or [], locale))
 
 
 def _md(value, limit: int = 160) -> str:
-    """Celda de tabla Markdown: una línea, sin romper la tabla y acotada."""
-    text = " ".join(str(value if value is not None else "").split()).replace("|", "\\|")
-    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0] + "…"
+    """Markdown table cell: one line, bounded, without breaking the table."""
+    cell = " ".join(str(value if value is not None else "").split()).replace("|", "\\|")
+    return cell if len(cell) <= limit else cell[:limit].rsplit(" ", 1)[0] + "…"
 
 
-SEVERITY_TEXT = {"critical": "Crítica", "high": "Alta", "medium": "Media", "low": "Baja", "info": "Info"}
 MD_DETAIL_LIMIT, MD_TABLE_LIMIT, MD_ANNEX_LIMIT = 150, 500, 600
 
 
-def _findings_sections(active: list[dict]) -> list[str]:
-    """Hallazgos como en el informe técnico en PDF: qué hacer primero, dependencias agrupadas por paquete con su
-    comando, código con detalle solo de críticos y altos, y un índice compacto. El detalle completo de cada
-    hallazgo sigue en el panel, el JSON, el SARIF y los tickets."""
+def _is_update(command: dict) -> bool:
+    return command.get("action") == "update"
+
+
+def _findings_sections(active: list[dict], locale: str) -> list[str]:
+    """Findings as in the technical PDF: what to do first, dependencies grouped by package with their command, code
+    with detail only for critical and high, and a compact index. Full detail stays in the panel, the JSON, the SARIF
+    and the tickets."""
     from tamandua.modules.findings.fix_guide import attach
     from tamandua.modules.findings.remediation import action, counts_text, fix_groups
-    lines = ["## Hallazgos", ""]
+    lines = ["## " + t("reports.common.findings", locale), ""]
     if not active:
-        return lines + ["No se generaron hallazgos con las reglas y dependencias examinadas. La cobertura se detalla más abajo.", ""]
+        return lines + [t("reports.markdown.no_findings", locale), ""]
     attach(active)
+    updates = {id(item): [command["code"] for command in (item.get("fix") or {}).get("commands") or [] if _is_update(command)] for item in active}
+    for item in active:
+        item["fix"] = localize(item.get("fix"), locale)
     groups = fix_groups(active)
-    lines += [f"{len(active)} hallazgos pendientes que se cierran con {len(groups)} acciones.", "", "### Qué hacer primero", "",
-              "| Severidad | Qué | Dónde | Acción |", "|---|---|---|---|"]
+    lines += [t("reports.markdown.pending_intro", locale, pending=msg("reports.count.pending_findings", count=len(active)),
+                actions=msg("reports.count.actions", count=len(groups))), "",
+              "### " + t("reports.common.what_first", locale), "", *_header(locale, "severity", "what", "where", "action")]
     for entry in groups[:15]:
         item = entry["items"][0]
-        what = (f"{entry['name']} {entry['version']} · {len(entry['items'])} avisos" if entry["kind"] == "package" else item.get("title"))
+        what = (f"{entry['name']} {entry['version']} · {t('reports.count.advisories', locale, count=len(entry['items']))}"
+                if entry["kind"] == "package" else item.get("title"))
         where = entry["path"] if entry["kind"] == "package" else f"{item.get('path')}:{item.get('line')}"
-        lines.append(f"| {SEVERITY_TEXT.get(entry['severity'], entry['severity'])}{' · KEV' if entry['kev'] else ''} | {_md(what, 100)} | "
-                     f"`{_md(where, 90)}` | {_md(action(entry, short=True), 160)} |")
+        lines.append(f"| {_severity(entry['severity'], locale)}{' · KEV' if entry['kev'] else ''} | {_md(what, 100)} | "
+                     f"`{_md(where, 90)}` | {_md(action(entry, short=True, locale=locale), 160)} |")
     packages = [entry for entry in groups if entry["kind"] == "package"]
     if packages:
-        lines += ["", f"### Dependencias ({len(packages)} paquetes · {sum(len(entry['items']) for entry in packages)} avisos)", "",
-                  "| Severidad | Paquete | Manifiesto | Avisos | Actualizar a | Comando |", "|---|---|---|---|---|---|"]
+        lines += ["", "### " + t("reports.markdown.dependencies", locale, packages=msg("reports.count.packages", count=len(packages)),
+                                 advisories=msg("reports.count.advisories", count=sum(len(entry["items"]) for entry in packages))), "",
+                  *_header(locale, "severity", "package", "manifest", "advisories", "update_to", "command")]
         for entry in packages:
-            commands = [command["code"] for command in (entry["items"][0].get("fix") or {}).get("commands") or [] if command.get("label") == "Actualiza"]
-            lines.append(f"| {SEVERITY_TEXT.get(entry['severity'], entry['severity'])}{' · KEV' if entry['kev'] else ''} | "
-                         f"{_md(entry['name'], 60)} {_md(entry['version'], 30)} | `{_md(entry['path'], 80)}` | {_md(counts_text(entry['counts']), 80)} | "
-                         f"{_md(entry['target'] or 'sin corrección', 40)} | {('`' + _md(commands[0], 120) + '`') if commands and '`' not in commands[0] else '—'} |")
+            commands = updates.get(id(entry["items"][0])) or []
+            lines.append(f"| {_severity(entry['severity'], locale)}{' · KEV' if entry['kev'] else ''} | "
+                         f"{_md(entry['name'], 60)} {_md(entry['version'], 30)} | `{_md(entry['path'], 80)}` | {_md(counts_text(entry['counts'], locale=locale), 80)} | "
+                         f"{_md(entry['target'] or t('reports.markdown.no_fix', locale), 40)} | "
+                         f"{('`' + _md(commands[0], 120) + '`') if commands and '`' not in commands[0] else '—'} |")
     code = [item for item in active if not (item.get("scanner") == "sca" and (item.get("package") or {}).get("name"))]
     if code:
         serious = [item for item in code if item.get("severity") in ("critical", "high")]
         rest = [item for item in code if item.get("severity") not in ("critical", "high")]
-        lines += ["", f"### Código, secretos e infraestructura ({len(code)})", ""]
+        lines += ["", "### " + t("reports.common.code_heading", locale, count=len(code)), ""]
         for finding in serious[:MD_DETAIL_LIMIT]:
-            lines += _finding_block(finding)
+            lines += _finding_block(finding, locale)
         if len(serious) > MD_DETAIL_LIMIT:
-            lines += [f"Se detallan {MD_DETAIL_LIMIT} de {len(serious)} críticos y altos; el resto está en el panel, el JSON y el SARIF.", ""]
+            lines += [t("reports.markdown.detail_truncated", locale, shown=MD_DETAIL_LIMIT, total=len(serious)), ""]
         if rest:
-            lines += [f"#### Medios y bajos ({len(rest)})", "", "| Severidad | Hallazgo | Ubicación | Corrección |", "|---|---|---|---|"]
+            lines += ["#### " + t("reports.common.medium_low", locale, count=len(rest)), "",
+                      *_header(locale, "severity", "finding", "location", "fix")]
             for item in rest[:MD_TABLE_LIMIT]:
                 where = f"{item.get('path')}:{item.get('line')}"
-                lines.append(f"| {SEVERITY_TEXT.get(item.get('severity'), item.get('severity'))} | {_md(item.get('title'), 100)} | "
+                lines.append(f"| {_severity(item.get('severity'), locale)} | {_md(item.get('title'), 100)} | "
                              f"`{_md(where, 90)}` | {_md(item.get('remediation'), 160)} |")
             if len(rest) > MD_TABLE_LIMIT:
-                lines.append(f"| | … y {len(rest) - MD_TABLE_LIMIT} más en el panel | | |")
+                lines.append(f"| | {t('reports.markdown.more_in_panel', locale, count=len(rest) - MD_TABLE_LIMIT)} | | |")
             lines.append("")
     advisories = [item for item in active if item.get("scanner") == "sca"]
     if advisories:
-        lines += ["", f"### Anexo · Índice de vulnerabilidades ({len(advisories)})", "",
-                  "| Identificador | Paquete | Severidad | CVSS | EPSS | KEV | Corregida en | Fuente |", "|---|---|---|---|---|---|---|---|"]
-        for item in sorted(advisories, key=lambda entry: (list(SEVERITY_TEXT).index(entry.get("severity")) if entry.get("severity") in SEVERITY_TEXT else 9,
+        lines += ["", "### " + t("reports.common.annex", locale, count=len(advisories)), "",
+                  *_header(locale, "identifier", "package", "severity", "cvss", "epss", "kev", "fixed_in", "source")]
+        for item in sorted(advisories, key=lambda entry: (SEVERITY_ORDER.get(entry.get("severity"), 9),
                                                            str((entry.get("package") or {}).get("name"))))[:MD_ANNEX_LIMIT]:
             package, advisory = item.get("package") or {}, item.get("advisory") or {}
             epss = (item.get("epss") or {}).get("score")
             identifier = ((item.get("cve") or [])[:1] or (item.get("ghsa") or [])[:1] or [item.get("rule_id")])[0]
             lines.append(f"| {_md(identifier, 40)} | {_md(package.get('name'), 60)} {_md(package.get('version'), 30)} | "
-                         f"{SEVERITY_TEXT.get(item.get('severity'), '—')} | {advisory['cvss_score'] if isinstance(advisory.get('cvss_score'), (int, float)) else '—'} | "
-                         f"{f'{epss * 100:.1f} %' if isinstance(epss, (int, float)) else '—'} | {'sí' if item.get('kev') else '—'} | "
+                         f"{_severity(item.get('severity'), locale) if item.get('severity') in SEVERITY_ORDER else '—'} | "
+                         f"{advisory['cvss_score'] if isinstance(advisory.get('cvss_score'), (int, float)) else '—'} | "
+                         f"{f'{epss * 100:.1f} %' if isinstance(epss, (int, float)) else '—'} | {t('reports.common.yes', locale) if item.get('kev') else '—'} | "
                          f"{_md(package.get('fixed_version') or '—', 40)} | {_md((item.get('source') or {}).get('short') or '—', 20)} |")
         if len(advisories) > MD_ANNEX_LIMIT:
-            lines.append(f"| … y {len(advisories) - MD_ANNEX_LIMIT} más en el JSON y el SARIF | | | | | | | |")
+            lines.append(f"| {t('reports.markdown.annex_more', locale, count=len(advisories) - MD_ANNEX_LIMIT)} | | | | | | | |")
     return lines + [""]
 
 
-def _sources_section(findings: list[dict]) -> list[str]:
-    """Atribución de las bases de avisos usadas (licencias en THIRD_PARTY_NOTICES.md)."""
+def _sources_section(findings: list[dict], locale: str | None = None) -> list[str]:
+    """Attribution of the advisory databases used (licenses in THIRD_PARTY_NOTICES.md)."""
     from tamandua.modules.intel.data_sources import attribution
-    lines = attribution(findings)
-    return ["## Fuentes de los avisos", "", *[f"- {line}" for line in lines], ""] if lines else []
+    locale = locale or default_locale()
+    lines = attribution(findings, locale=locale)
+    return ["## " + t("reports.common.sources", locale), "", *[f"- {line}" for line in lines], ""] if lines else []
 
 
-def render_asset_report(record: dict) -> str:
-    """Exporta el registro acumulado sin presentarlo como un escaneo puntual."""
+def render_asset_report(record: dict, *, locale: str | None = None) -> str:
+    """Exports the cumulative registry without presenting it as a point-in-time scan."""
+    locale = locale or default_locale()
+    record = localize(record, locale)
     findings = _ordered_findings(record)
     lifecycle = record.get("summary", {}).get("lifecycle") or {}
-    lines = [f"# Estado actual de hallazgos · {record['source']['name']}", "",
-             f"Activo: `{record['source']['id']}` · corte UTC: `{record.get('created_at') or 'sin fecha'}`",
-             "", "## Alcance", "",
-             "Vista acumulada del registro de hallazgos de este activo. Combina escaneos completos y revisiones de PR; "
-             "no representa una prueba independiente ni demuestra cobertura continua.", "",
-             "## Resumen", "",
-             f"- {len(findings)} hallazgos incluidos en esta vista.",
-             f"- {lifecycle.get('open', 0)} abiertos; {lifecycle.get('fixed', 0)} remediados; "
-             f"{lifecycle.get('suppressed', 0)} descartados en triage; {lifecycle.get('excluded', 0)} excluidos.", "",
-             "## Hallazgos", ""]
+    lines = ["# " + t("reports.asset.title", locale, name=record["source"]["name"]), "",
+             t("reports.asset.asset_line", locale, id=record["source"]["id"], date=record.get("created_at") or msg("reports.common.no_date")),
+             "", "## " + t("reports.common.scope", locale), "",
+             t("reports.asset.scope_text", locale), "",
+             "## " + t("reports.common.summary", locale), "",
+             "- " + t("reports.asset.included", locale, count=len(findings)),
+             "- " + t("reports.asset.lifecycle_counts", locale, open=lifecycle.get("open", 0), fixed=lifecycle.get("fixed", 0),
+                      suppressed=lifecycle.get("suppressed", 0), excluded=lifecycle.get("excluded", 0)), "",
+             "## " + t("reports.common.findings", locale), ""]
     if not findings:
-        lines += ["La vista seleccionada no contiene hallazgos.", ""]
+        lines += [t("reports.asset.empty", locale), ""]
     for finding in findings:
-        lines += _finding_block(finding)
+        lines += _finding_block(finding, locale)
         state = finding.get("lifecycle") or {}
-        lines += [f"Ciclo de vida: **{state.get('status') or 'desconocido'}** · "
-                  f"primera observación `{state.get('first_seen') or '—'}` · "
-                  f"última observación `{state.get('last_seen') or '—'}`.", ""]
-    lines += ["## Límites", "", "- El registro refleja solo las herramientas, rutas y repositorios analizados.",
-              "- Consulta cada ejecución original para sus pasos, versiones y cobertura específica.", ""]
-    return "\n".join(lines + _sources_section(findings))
+        lines += [t("reports.asset.lifecycle_line", locale, status=state.get("status") or msg("reports.common.unknown"),
+                    first=state.get("first_seen") or "—", last=state.get("last_seen") or "—"), ""]
+    lines += ["## " + t("reports.common.limitations", locale), "", "- " + t("reports.asset.limit_tools", locale),
+              "- " + t("reports.asset.limit_runs", locale), ""]
+    return "\n".join(lines + _sources_section(findings, locale))
 
 
-def render_tickets(record: dict) -> list[dict]:
-    """Un ticket por hallazgo, con huella estable: la forma que necesitará el conector de Jira."""
+def render_tickets(record: dict, *, locale: str | None = None) -> list[dict]:
+    """One ticket per finding, with a stable fingerprint: the shape the Jira connector needs."""
+    locale = locale or default_locale()
+    record = localize(record, locale)
     jira_priority = {"act": "Highest", "attend": "High", "track": "Medium"}
     tickets = []
     for finding in _ordered_findings(record):
-        # Lo descartado en triage o ya remediado no genera trabajo.
+        # Dismissed or already fixed findings create no work.
         if (finding.get("triage") or {}).get("status", "open") in SUPPRESSED or (finding.get("lifecycle") or {}).get("status") in ("fixed", "excluded"):
             continue
         package = finding.get("package") or {}
@@ -383,30 +432,31 @@ def render_tickets(record: dict) -> list[dict]:
             "labels": labels, "component": package.get("name") or finding["path"],
             "identifiers": [*finding.get("cve", []), *finding.get("ghsa", [])],
             "package": package or None, "remediation": finding["remediation"],
-            "description": "\n".join(_finding_block(finding)),
+            "description": "\n".join(_finding_block(finding, locale)),
             "references": (finding.get("advisory") or {}).get("references", []),
             "run_id": record["id"], "source": record["source"]["name"], "detected_at": record["created_at"],
         })
     return tickets
 
 
-def _sarif_suppression(finding: dict) -> dict:
-    """SARIF 2.1.0 §3.35: los descartes de triage viajan como supresiones externas aceptadas."""
+def _sarif_suppression(finding: dict, locale: str) -> dict:
+    """SARIF 2.1.0 §3.35: triage dismissals travel as accepted external suppressions."""
     triage = finding.get("triage") or {}
     if triage.get("status") not in SUPPRESSED:
         return {}
-    justification = f"{TRIAGE_LABELS[triage['status']]}: {triage.get('reason') or ''}".strip()
+    justification = f"{text(TRIAGE_LABELS[triage['status']], locale)}: {triage.get('reason') or ''}".strip()
     return {"suppressions": [{"kind": "external", "status": "accepted", "justification": justification[:500]}]}
 
 
-# SARIF 2.1.0: nivel del resultado y `security-severity` (0-10), que GitHub code scanning usa para ordenar y filtrar.
+# SARIF 2.1.0: result level and `security-severity` (0-10), which GitHub code scanning uses to sort and filter.
 SARIF_LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note", "info": "note"}
 SECURITY_SEVERITY = {"critical": "9.5", "high": "8.0", "medium": "5.5", "low": "3.0", "info": "0.0"}
 
 
-def render_repository_sarif(record: dict) -> dict:
+def render_repository_sarif(record: dict, *, locale: str | None = None) -> dict:
     from tamandua.version import VERSION
-    findings = record["findings"]
+    locale = locale or default_locale()
+    findings = localize(record["findings"], locale)
     rules = {item["rule_id"]: {"id": item["rule_id"], "shortDescription": {"text": item["title"]},
                                "properties": {"security-severity": SECURITY_SEVERITY.get(item["severity"], "5.5"),
                                               "tags": ["security", item["scanner"]]}}
@@ -415,7 +465,7 @@ def render_repository_sarif(record: dict) -> dict:
                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": item["path"]},
                                                     "region": {"startLine": item["line"]}}}],
                 "partialFingerprints": {"tamandua/v1": item["fingerprint"]},
-                **_sarif_suppression(item),
+                **_sarif_suppression(item, locale),
                 "properties": {"verdict": "candidate", "scanner": item["scanner"], "cwe": item["cwe"],
                                "owasp": item["owasp"]}} for item in findings]
     return {"$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
@@ -424,64 +474,61 @@ def render_repository_sarif(record: dict) -> dict:
                                                      "rules": list(rules.values())}}, "results": results}]}
 
 
-def render_profile_report(record: dict, profile: str, title: str = "") -> str:
-    """Dossier técnico; no emite una opinión de auditoría ni certificación."""
-    labels = {
-        "soc2": "SOC 2 Tipo II",
-        "iso27001": "ISO/IEC 27001:2022",
-        "custom": "Personalizado",
-    }
-    if profile not in labels or record.get("type") not in ("repository_scan", "image_scan", "pr_review", "asset_state"):
-        raise ValueError("Perfil o ejecución no compatible")
+def profile_pdf_titles(profile: str, *, locale: str | None = None) -> dict:
+    """Title and kind for the PDF cover of a profile report."""
+    locale = locale or default_locale()
+    if profile not in PROFILES:
+        raise ReportInputError(msg("reports.errors.unsupported_profile"))
+    return {"title": t("reports.profile.heading", locale, framework=msg(f"reports.profile.label.{profile}")),
+            "kind": t("reports.profile.pdf_kind", locale)}
+
+
+def render_profile_report(record: dict, profile: str, title: str = "", *, locale: str | None = None) -> str:
+    """Technical dossier; it is not an audit opinion or a certification."""
+    locale = locale or default_locale()
+    if profile not in PROFILES or record.get("type") not in ("repository_scan", "image_scan", "pr_review", "asset_state"):
+        raise ReportInputError(msg("reports.errors.unsupported_profile"))
     if title and (len(title) > 100 or not all(ch.isprintable() and ch not in "#`[]<>" for ch in title)):
-        raise ValueError("Título inválido")
-    heading = title.strip() if title else f"Evidencia técnica para {labels[profile]}"
+        raise ReportInputError(msg("reports.errors.invalid_title"))
+    label = t(f"reports.profile.label.{profile}", locale)
+    heading = title.strip() if title else t("reports.profile.heading", locale, framework=label)
     is_state = record["type"] == "asset_state"
-    technical_report = render_asset_report(record) if is_state else render_repository_report(record)
-    scope = (f"`{record['source']['name']}`, registro acumulado de hallazgos; consultar ejecuciones originales para cobertura."
-             if is_state else
-             f"`{record['source']['name']}`, " + (f"imagen `{record['source']['image'].get('reference')}` leída del registro"
-             if record["source"].get("image") else f"snapshot SHA-256 `{record['source'].get('sha256')}`") + "; análisis estático puntual.")
-    profile_rows = {
-        "soc2": [
-            ("Diseño del control", "Objetivo, responsables y frecuencia", "Descripción aprobada del control y dueño"),
-            ("Operación", "Fecha, fuente, pasos y hallazgos de esta ejecución", "Muestras distribuidas a lo largo del periodo de evaluación"),
-            ("Excepciones", "Hallazgos y decisiones de triage", "Tickets, aprobaciones y prueba de remediación"),
-        ],
-        "iso27001": [
-            ("Alcance del SGSI", "Activo y fuente analizada", "Alcance aprobado y relación con el inventario de activos"),
-            ("Tratamiento de riesgos", "Hallazgos, severidad y triage", "Evaluación de riesgos y plan de tratamiento aprobados"),
-            ("Mejora y seguimiento", "Pasos y límites del análisis puntual", "Declaración de aplicabilidad y evidencias de seguimiento"),
-        ],
-        "custom": [
-            ("Alcance", "Activo, fecha y cobertura técnica", "Definir criterio y periodo de revisión"),
-            ("Resultado", "Hallazgos y decisiones de triage", "Agregar validación y aprobación del responsable"),
-        ],
-    }[profile]
-    lines = [f"# {heading}", "", f"Perfil: **{labels[profile]}** · {'Registro' if is_state else 'Run'}: `{record['id']}` · UTC: `{record['created_at']}`", "",
-             "> Documento de apoyo para el equipo de seguridad. No es una auditoría SOC 2, una certificación ISO 27001 ni una opinión de cumplimiento.", "",
-             "## Contexto para revisión", "",
-             "- Organización y propietario del control: completar por el equipo responsable.",
-             f"- Sistema y alcance: {scope}",
-             "- Evidencia: " + ("estado acumulado, huellas de hallazgos y decisiones de triage; consultar cada ejecución para hash y pasos de prueba."
-                              if is_state else "identificador de run, hash del código, pasos de prueba, observaciones y estado de cobertura."),
-             "- Frecuencia y periodo de observación: " + ("registro acumulado; sus entradas no demuestran por sí solas operación continua del control."
-                                                     if is_state else "una ejecución puntual; no demuestra operación continua del control."),
-             "- Evaluación de aplicabilidad y controles: requiere revisión humana y documentación adicional.", "",
-             "## Matriz de preparación de evidencia", "",
-             "| Aspecto | Evidencia técnica en este dossier | Documentación aún necesaria |",
-             "|---|---|---|",
-             *[f"| {aspect} | {available} | {missing} |" for aspect, available, missing in profile_rows], "",
-             "La matriz es una guía de preparación; no evalúa la eficacia de controles ni sustituye el criterio del auditor.", "",
-             "## Registro técnico adjunto", "", technical_report]
+    technical_report = render_asset_report(record, locale=locale) if is_state else render_repository_report(record, locale=locale)
+    source = localize(record["source"], locale)
+    if is_state:
+        scope = t("reports.profile.scope_state", locale, name=source["name"])
+    elif source.get("image"):
+        scope = t("reports.profile.scope_image", locale, name=source["name"], reference=source["image"].get("reference"))
+    else:
+        scope = t("reports.profile.scope_snapshot", locale, name=source["name"], sha=source.get("sha256"))
+    rows = [(t(f"reports.profile.rows.{profile}.{row}.aspect", locale), t(f"reports.profile.rows.{profile}.{row}.available", locale),
+             t(f"reports.profile.rows.{profile}.{row}.missing", locale)) for row in PROFILE_ROWS[profile]]
+    lines = [f"# {heading}", "",
+             t("reports.profile.profile_line", locale, profile=label, kind=msg("reports.profile.kind_state" if is_state else "reports.profile.kind_run"),
+               id=record["id"], date=record["created_at"]), "",
+             "> " + t("reports.profile.disclaimer", locale), "",
+             "## " + t("reports.profile.review_context", locale), "",
+             "- " + t("reports.profile.owner", locale),
+             "- " + t("reports.profile.system_scope", locale, scope=scope),
+             "- " + t("reports.profile.evidence_state" if is_state else "reports.profile.evidence_run", locale),
+             "- " + t("reports.profile.frequency_state" if is_state else "reports.profile.frequency_run", locale),
+             "- " + t("reports.profile.applicability", locale), "",
+             "## " + t("reports.profile.matrix", locale), "",
+             *_header(locale, "aspect", "evidence_here", "still_needed"),
+             *[f"| {aspect} | {available} | {missing} |" for aspect, available, missing in rows], "",
+             t("reports.profile.matrix_note", locale), "",
+             "## " + t("reports.profile.attached", locale), "", technical_report]
     return "\n".join(lines)
+
+
+PROFILE_ROWS = {"soc2": ("design", "operation", "exceptions"), "iso27001": ("scope", "risk", "improvement"), "custom": ("scope", "result")}
 
 
 def load_run(data_dir: Path, run_id: str) -> dict:
     with db.transaction(data_dir) as connection:
         record = connection.execute(select(runs.c.record).where(runs.c.tenant_id == TENANT, runs.c.id == _check_id(run_id))).scalar_one_or_none()
     if record is None:
-        raise FileNotFoundError(f"Ejecución {run_id} no encontrada")
+        raise FileNotFoundError(f"Run {run_id} not found")
     return record
 
 

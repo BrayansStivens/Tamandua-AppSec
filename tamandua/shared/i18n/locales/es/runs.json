@@ -1,0 +1,50 @@
+{
+  "progress": {
+    "queued": "En cola: esperando al trabajador de escaneos.",
+    "queued_pr": "En cola: revisión del PR #{{number}} ({{sha}}).",
+    "queued_image": "En cola: análisis de la imagen {{image}}.",
+    "downloading_snapshot": "Descargando el snapshot del repositorio en solo lectura…",
+    "snapshot_ready_one": "Snapshot listo: {{count}} archivo analizable.",
+    "snapshot_ready_other": "Snapshot listo: {{count}} archivos analizables.",
+    "snapshot_ready_skipped_one": "Snapshot listo: {{count}} archivo analizable, {{skipped}} descartados por no ser código.",
+    "snapshot_ready_skipped_other": "Snapshot listo: {{count}} archivos analizables, {{skipped}} descartados por no ser código.",
+    "counts_one": "{{count}} hallazgo ({{critical}} críticos, {{high}} altos)",
+    "counts_other": "{{count}} hallazgos ({{critical}} críticos, {{high}} altos)",
+    "finished": "Terminado: {{counts}}.",
+    "finished_incomplete": "Terminado con cobertura incompleta: {{counts}}. Revisa arriba qué no se ejecutó.",
+    "pr_files_one": "El PR cambia {{count}} archivo.",
+    "pr_files_other": "El PR cambia {{count}} archivos.",
+    "downloading_commit": "Descargando el commit {{sha}} en solo lectura…",
+    "pr_excluded_one": "{{count}} hallazgo en rutas excluidas por un administrador queda fuera de la revisión.",
+    "pr_excluded_other": "{{count}} hallazgos en rutas excluidas por un administrador quedan fuera de la revisión.",
+    "pr_summary_one": "{{count}} hallazgo nuevo introducido por el PR; {{preexisting}} ya existían.",
+    "pr_summary_other": "{{count}} hallazgos nuevos introducidos por el PR; {{preexisting}} ya existían.",
+    "pr_summary_no_baseline_one": "{{count}} hallazgo nuevo introducido por el PR; {{preexisting}} ya existían (sin escaneo previo de la rama principal: se cuenta lo que cae en líneas cambiadas).",
+    "pr_summary_no_baseline_other": "{{count}} hallazgos nuevos introducidos por el PR; {{preexisting}} ya existían (sin escaneo previo de la rama principal: se cuenta lo que cae en líneas cambiadas).",
+    "comment_posted": "Comentario publicado en el PR.",
+    "comment_failed": "No se pudo comentar en el PR: {{reason}}",
+    "no_comment_permission": "El resultado no se publicó en GitHub: la App no tiene permiso de escritura en pull requests."
+  },
+  "failure": {
+    "restart": "El servidor se reinició mientras corría esta ejecución y quedó interrumpida. Vuelve a lanzarla.",
+    "source": "No se pudo obtener el repositorio: {{reason}}",
+    "internal": "El análisis falló por un error interno; el equipo puede revisar los logs del servidor con el identificador de la ejecución.",
+    "image_internal": "El análisis de la imagen falló por un error interno; revisa los logs con el identificador de la ejecución.",
+    "pr": "No se pudo revisar el PR: {{reason}}",
+    "pr_internal": "La revisión falló por un error interno; el equipo puede revisar los logs del servidor con el identificador de la ejecución."
+  },
+  "delivery": {
+    "disabled": "desactivado",
+    "error": "error: {{reason}}",
+    "no_comment_permission": "sin permiso: la App necesita Pull requests en escritura",
+    "no_status_permission": "sin permiso: la App necesita Commit statuses en escritura"
+  },
+  "batch": {
+    "invalid": "Lote inválido",
+    "not_found": "Lote no encontrado",
+    "empty": "No hay nada que analizar",
+    "too_many": "Como mucho {{max}} elementos por lote",
+    "already_running": "Ya hay un lote en curso: espera a que termine o cancélalo",
+    "item_failed": "El análisis falló"
+  }
+}

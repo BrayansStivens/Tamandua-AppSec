@@ -1,0 +1,39 @@
+{
+  "title": "Primeros pasos",
+  "progress": "{{done}} de {{total}} hechos. Se tachan solos cuando los completas.",
+  "hide": "Ocultar primeros pasos",
+  "done": "(hecho)",
+  "pending": "(pendiente)",
+  "steps": {
+    "mfa": {
+      "title": "Protege tu cuenta con segundo factor",
+      "hint": "Una app de autenticación (TOTP) además de la contraseña.",
+      "action": "Activar"
+    },
+    "github": {
+      "title": "Conecta GitHub",
+      "hint_admin": "Crea la GitHub App de este servidor; el panel te guía paso a paso.",
+      "hint_member": "Lo configura un administrador en Integraciones.",
+      "action": "Conectar"
+    },
+    "analyzed": {
+      "title": "Lanza tu primer análisis",
+      "hint_demo": "Ya tienes los datos de demostración: ahora analiza un repositorio tuyo.",
+      "hint_admin": "¿Aún sin repositorios? Ejecuta «make demo» en el servidor y verás los ejemplos analizados.",
+      "hint_member": "Elige un repositorio o una imagen y lánzalo.",
+      "action": "Nuevo análisis"
+    },
+    "watching": {
+      "title": "Vigila tus pull requests y la rama principal",
+      "hint_admin": "Cada PR se revisa solo y la rama se reanaliza cuando cambia.",
+      "hint_member": "Lo activa un administrador en Pull requests.",
+      "action": "Vigilar"
+    },
+    "alerts": {
+      "title": "Recibe avisos en Slack o Teams",
+      "hint_admin": "Un mensaje cuando aparece algo nuevo que importa, sin abrir el panel.",
+      "hint_member": "Lo configura un administrador en Integraciones → Avisos.",
+      "action": "Configurar"
+    }
+  }
+}

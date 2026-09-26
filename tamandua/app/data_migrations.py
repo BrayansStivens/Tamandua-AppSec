@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Callable
 
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import msg, text
 
 _log = logging_setup.get("migrations")
 VERSION_FILE = "data-version.json"
@@ -46,7 +47,11 @@ LATEST = len(MIGRATIONS)
 
 
 class DataTooNew(RuntimeError):
-    pass
+    """`message` is what people read; str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 def _path(data_dir: Path) -> Path:
@@ -128,8 +133,7 @@ def upgrade(data_dir: Path) -> list[str]:
             return []
         version = version or 0
         if version > LATEST:
-            raise DataTooNew(f"Los datos de {data_dir} son de una versión más nueva de Tamandua (formato {version}; esta entiende hasta el {LATEST}). "
-                             "Actualiza Tamandua o restaura una copia de seguridad anterior.")
+            raise DataTooNew(msg("cli.migrations.data_too_new", path=str(data_dir), version=version, latest=LATEST))
         pending = [(number, migration) for number, migration in enumerate(MIGRATIONS, start=1) if number > version]
         if not pending:
             return []

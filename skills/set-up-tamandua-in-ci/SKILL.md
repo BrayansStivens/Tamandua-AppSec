@@ -7,54 +7,54 @@ metadata:
   homepage: https://github.com/BrayansStivens/appsec-agent
 ---
 
-# Tamandua en CI y antes de subir
+# Tamandua in CI and before pushing
 
-Un solo paso de CI que analiza lo que introduce el pull request (no lo que ya había) y bloquea desde la severidad que
-elija el equipo. Tamandua corre como contenedor y lanza los motores (Opengrep, Gitleaks, Trivy, OSV-Scanner,
-Checkov, zizmor) como contenedores hermanos: **el runner necesita el socket de Docker**.
+A single CI step that scans what the pull request introduces (not what was already there) and blocks from the
+severity the team chooses. Tamandua runs as a container and starts the engines (Opengrep with the Tamandua rules,
+Gitleaks, Trivy, OSV-Scanner, Checkov, zizmor) as sibling containers: **the runner needs the Docker socket**.
 
-## 1. Partir de la plantilla oficial
+## 1. Start from the official template
 
-Las plantillas completas de GitHub Actions y GitLab CI están en la sección «En CI» de `docs/cli.md` del repositorio
-de Tamandua (`${TAMANDUA_DIR:-$HOME/tamandua}/docs/cli.md` si está clonado). Cópiala en vez de escribirla de memoria y
-adapta solo lo necesario.
+The complete GitHub Actions and GitLab CI templates are in the CI section ("En CI") of `docs/cli.md` in the Tamandua
+repository (`${TAMANDUA_DIR:-$HOME/tamandua}/docs/cli.md` if it is cloned). Copy the template instead of writing it
+from memory, and adapt only what is needed.
 
-Pregunta al usuario, si no está claro:
+Ask the user, if it is not clear:
 
-- **Umbral** (`--fail-on`): `high` por defecto; `critical` para empezar sin fricción; `never` para solo informar.
-- **Rutas con ejemplos vulnerables a propósito** (fixtures, testdata): van en `--exclude`, una por patrón.
+- **Threshold** (`--fail-on`): `high` by default; `critical` to start without friction; `never` to report only.
+- **Paths with deliberately vulnerable examples** (fixtures, testdata): they go in `--exclude`, one per pattern.
 
-## 2. Reglas que no se negocian
+## 2. Non-negotiable rules
 
-- `fetch-depth: 0` en el checkout (GitHub) o `git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"` (GitLab):
-  sin historia no hay comparación con la base y el análisis sale con código 2.
-- Nombres de rama y de repositorio **por `env:`**, nunca interpolados con `${{ … }}` dentro de `run:` (inyección de
-  órdenes desde el nombre de una rama).
-- `permissions` mínimos: `contents: read` y, solo si se sube el SARIF, `security-events: write`.
-  `persist-credentials: false` en el checkout.
-- Acciones fijadas por SHA de commit, no por etiqueta.
-- La carpeta de datos (`/data`) fuera del código analizado; el código montado en solo lectura (`/src:ro`).
-- Nada de `--allow-incomplete` por defecto: un análisis que no terminó no es un «limpio» (código 3).
-- `--exclude` vive en el workflow, que un pull request puede cambiar: propone proteger `.github/workflows/` (o
-  `.gitlab-ci.yml`) con CODEOWNERS y revisión obligatoria.
-- En GitLab, un runner con el socket del host (ejecutor `shell`, o `docker` con `/var/run/docker.sock` montado).
-  Con Docker-in-Docker los motores no ven las carpetas.
+- `fetch-depth: 0` in the checkout (GitHub) or `git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"` (GitLab):
+  without history there is no comparison with the base and the scan exits with code 2.
+- Branch and repository names **through `env:`**, never interpolated with `${{ … }}` inside `run:` (command
+  injection from a branch name).
+- Minimal `permissions`: `contents: read` and, only if the SARIF is uploaded, `security-events: write`.
+  `persist-credentials: false` in the checkout.
+- Actions pinned by commit SHA, not by tag.
+- The data folder (`/data`) outside the scanned code; the code mounted read-only (`/src:ro`).
+- No `--allow-incomplete` by default: a scan that did not finish is not a clean one (code 3).
+- `--exclude` lives in the workflow, which a pull request can change: suggest protecting `.github/workflows/` (or
+  `.gitlab-ci.yml`) with CODEOWNERS and mandatory review.
+- On GitLab, a runner with the host's socket (`shell` executor, or `docker` with `/var/run/docker.sock` mounted).
+  With Docker-in-Docker the engines cannot see the folders.
 
-Códigos de salida del paso: `0` pasa, `1` bloquea, `2` error de uso, `3` incompleto (revisa «Sin analizar» en el log).
+Step exit codes: `0` pass, `1` block, `2` usage error, `3` incomplete (check the not-analyzed lines in the log).
 
-## 3. Antes de subir (opcional)
+## 3. Before pushing (optional)
 
-Un análisis tarda del orden de medio minuto: encaja en `pre-push`, no en `pre-commit`. En `.git/hooks/pre-push`
-(con `chmod +x`), pidiendo antes permiso al usuario porque cambia su flujo local:
+A scan takes around half a minute: it fits `pre-push`, not `pre-commit`. In `.git/hooks/pre-push`
+(with `chmod +x`), asking the user for permission first because it changes their local workflow:
 
 ```sh
 #!/bin/sh
 make -s -C "${TAMANDUA_DIR:-$HOME/tamandua}" scan DIR="$(git rev-parse --show-toplevel)" ARGS="--base origin/main --quiet"
 ```
 
-## 4. Comprobarlo
+## 4. Check that it works
 
-Abre un pull request de prueba (o ejecuta el mismo `docker run` en local) y confirma que: el paso termina con el
-código esperado, el resumen dice «cambios respecto a …» y, con SARIF, los resultados aparecen en *Code scanning*.
-Si falla, el motivo está en la línea «Sin analizar» o en el error de Docker. Para corregir lo que encuentre, usa la
-skill `fix-findings-with-tamandua`.
+Open a test pull request (or run the same `docker run` locally) and confirm that: the step ends with the expected
+code, the summary names the base it compared against and, with SARIF, the results appear in *Code scanning*.
+If it fails, the reason is in the not-analyzed lines of the summary or in the Docker error. To fix what it finds, use the
+`fix-findings-with-tamandua` skill.

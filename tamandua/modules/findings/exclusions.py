@@ -25,8 +25,10 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 
+from tamandua.modules.findings.errors import LocalizedError
 from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import is_msg, msg
 
 _log = logging_setup.get("exclusions")
 MAX_PATTERNS = 50
@@ -37,7 +39,7 @@ ASSET_KEY = re.compile(r"[A-Za-z0-9#:_./@+-]{1,200}")
 HISTORY = 20
 
 
-class ExclusionError(ValueError):
+class ExclusionError(LocalizedError, ValueError):
     pass
 
 
@@ -63,24 +65,24 @@ def patterns(data_dir: Path, key: str) -> list[str]:
 def normalize(raw) -> list[str]:
     """Valida y normaliza. `fixtures/` equivale a `fixtures/**`."""
     if not isinstance(raw, list) or len(raw) > MAX_PATTERNS:
-        raise ExclusionError(f"Indica como mucho {MAX_PATTERNS} rutas.")
+        raise ExclusionError(msg("findings.exclusions.errors.too_many", max=MAX_PATTERNS))
     result = []
     for item in raw:
         if not isinstance(item, str):
-            raise ExclusionError("Cada ruta debe ser texto.")
+            raise ExclusionError(msg("findings.exclusions.errors.not_text"))
         pattern = item.strip()
         if not pattern:
             continue
         if len(pattern) > MAX_LENGTH or not PATTERN.fullmatch(pattern):
-            raise ExclusionError(f"Ruta no válida: «{pattern[:60]}». Usa letras, números, «/», «.», «-», «_», «*» y «?».")
+            raise ExclusionError(msg("findings.exclusions.errors.invalid", pattern=pattern[:60]))
         if pattern.startswith("/") or any(part in ("..", ".") for part in pattern.split("/")):
-            raise ExclusionError(f"«{pattern}» debe ser relativa a la raíz del repositorio y sin «..».")
+            raise ExclusionError(msg("findings.exclusions.errors.not_relative", pattern=pattern))
         if pattern.endswith("/"):
             pattern += "**"
         while "**/**" in pattern or "***" in pattern:  # equivalentes y, repetidos, caros de evaluar
             pattern = pattern.replace("**/**", "**").replace("***", "**")
         if matches_everything(pattern):
-            raise ExclusionError(f"«{pattern}» excluiría todo el repositorio.")
+            raise ExclusionError(msg("findings.exclusions.errors.everything", pattern=pattern))
         if pattern not in result:
             result.append(pattern)
     return result
@@ -129,7 +131,7 @@ def save(data_dir: Path, key: str, raw, *, reason: str | None, user: dict) -> di
     active = normalize(raw)
     note = " ".join(str(reason or "").split())[:300]
     if active and len(note) < 5:
-        raise ExclusionError("Explica en una frase por qué se excluyen estas rutas (queda en el historial).")
+        raise ExclusionError(msg("findings.exclusions.errors.reason_required"))
     stamp = datetime.now(timezone.utc).isoformat()
     with documents.lock(data_dir, "exclusions"):
         payload = _load_all(data_dir)
@@ -153,6 +155,16 @@ def forget(data_dir: Path, key: str) -> None:
 
 
 SUMMARY_SCANNERS = ("sast", "secrets", "sca", "iac", "cicd")
+
+
+def _recount(reason, count: int):
+    """The coverage reason with its finding count updated: legacy Spanish text, or any `findings` param of a message."""
+    if isinstance(reason, str):
+        return re.sub(r"\. (?:\d+ hallazgo\(s\)|Sin hallazgos)\.$", f". {count} hallazgo(s)." if count else ". Sin hallazgos.", reason)
+    if is_msg(reason):
+        params = {name: count if name == "findings" else _recount(value, count) for name, value in (reason.get("params") or {}).items()}
+        return {**reason, "params": params} if params else reason
+    return reason
 
 
 def apply_to_record(data_dir: Path, record: dict, key: str) -> dict:
@@ -188,11 +200,9 @@ def apply_to_record(data_dir: Path, record: dict, key: str) -> dict:
     coverage = []
     for row in record.get("owasp_coverage") or []:
         count = sum(1 for item in kept for category in item.get("owasp", []) if category[:3] == row.get("id"))
-        reason = re.sub(r"\. (?:\d+ hallazgo\(s\)|Sin hallazgos)\.$", f". {count} hallazgo(s)." if count else ". Sin hallazgos.",
-                        str(row.get("reason") or ""))
+        reason = _recount(row.get("reason") or "", count)
         coverage.append({**row, "findings": count, "reason": reason})
-    limitation = (f"Rutas excluidas por un administrador ({', '.join(active)}): {total} hallazgos quedaron fuera "
-                  "de esta ejecución. Se pueden ver en Hallazgos → Excluidos.")
+    limitation = msg("findings.exclusions.limitation", patterns=", ".join(active), count=total)
     return {**record, "findings": kept, "summary": summary, "owasp_coverage": coverage or record.get("owasp_coverage"),
             "excluded": {"patterns": active, "findings": total, "by_pattern": dropped}, "excluded_findings": removed,
             "limitations": [*(record.get("limitations") or []), limitation]}

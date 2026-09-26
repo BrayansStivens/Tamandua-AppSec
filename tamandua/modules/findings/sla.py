@@ -15,7 +15,9 @@ from pathlib import Path
 
 from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import msg
 from tamandua.modules.findings import triage
+from tamandua.modules.findings.errors import LocalizedError
 
 _log = logging_setup.get("sla")
 LEVELS = ("critical", "high", "medium", "low")
@@ -24,7 +26,7 @@ MAX_DAYS = 3650
 SOON_DAYS = 7  # «vence pronto»: dentro de una semana
 
 
-class SlaError(ValueError):
+class SlaError(LocalizedError, ValueError):
     pass
 
 
@@ -32,7 +34,7 @@ def _clean_days(value) -> int | None:
     if value is None:
         return None
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= MAX_DAYS:
-        raise SlaError(f"Cada plazo es un número de días entre 1 y {MAX_DAYS}, o vacío para no fijarlo.")
+        raise SlaError(msg("findings.sla.errors.invalid_days", max=MAX_DAYS))
     return value
 
 
@@ -52,7 +54,7 @@ def policy(data_dir: Path) -> dict:
 
 def save(data_dir: Path, days, *, user: dict) -> dict:
     if not isinstance(days, dict) or set(days) != set(LEVELS):
-        raise SlaError("Indica el plazo de cada severidad: crítica, alta, media y baja.")
+        raise SlaError(msg("findings.sla.errors.missing_levels"))
     clean = {level: _clean_days(days[level]) for level in LEVELS}
     payload = {"days": clean, "updated_by": user["username"], "updated_at": datetime.now(timezone.utc).isoformat()}
     documents.save(data_dir, "sla", payload)

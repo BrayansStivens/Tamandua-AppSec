@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
 
@@ -98,7 +99,21 @@ DOT_FILES = {".gitlab-ci.yml", ".gitlab-ci.yaml", ".pre-commit-config.yaml", ".p
 
 
 class SourceError(ValueError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
+
+
+def _joined(problems: list) -> dict | str:
+    """Several problems in one line; each keeps its own message."""
+    if not problems:
+        return ""
+    result = problems[0]
+    for item in problems[1:]:
+        result = msg("sources.errors.joined", first=result, second=item)
+    return result
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -123,16 +138,16 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
             target = exc.headers.get("Location", "")
             parsed = urlsplit(target)
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
-                raise SourceError("Redirección de archivo no permitida")
+                raise SourceError(msg("sources.errors.redirect_not_allowed"))
             # La URL temporal se consulta sin la credencial original.
             response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=20)
         with response:
             body = response.read(MAX_ARCHIVE + 1)
             if len(body) > MAX_ARCHIVE:
-                raise SourceError("El repositorio supera el límite de descarga")
+                raise SourceError(msg("sources.errors.over_download_limit"))
             return body
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        raise SourceError("No se pudo consultar el proveedor de código") from exc
+        raise SourceError(msg("sources.errors.provider_unreachable")) from exc
 
 
 def _download_timeout() -> int:
@@ -165,7 +180,7 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
             target = exc.headers.get("Location", "")
             parsed = urlsplit(target)
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
-                raise SourceError("Redirección de archivo no permitida")
+                raise SourceError(msg("sources.errors.redirect_not_allowed"))
             # La URL temporal se consulta sin la credencial original.
             response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=180)
         written, reported = 0, time.monotonic()
@@ -176,25 +191,25 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
                     break
                 written += len(chunk)
                 if written > MAX_ARCHIVE:
-                    raise SourceError("El archivo del repositorio supera 1 GB comprimido")
+                    raise SourceError(msg("sources.errors.archive_too_big"))
                 handle.write(chunk)
                 now = time.monotonic()
                 if now > deadline:
-                    raise SourceError(f"La descarga superó {_download_timeout() // 60} min "
-                                      f"({written // 1_048_576} MB recibidos); revisa la conexión con {provider.capitalize()}")
+                    raise SourceError(msg("sources.errors.download_timeout", minutes=_download_timeout() // 60,
+                                          mb=written // 1_048_576, provider=provider.capitalize()))
                 if progress and now - reported >= 10:
-                    progress("info", f"Descargando… {written / 1_048_576:.0f} MB recibidos")
+                    progress("info", msg("sources.progress.downloading", mb=f"{written / 1_048_576:.0f}"))
                     reported = now
         if progress:
-            progress("info", f"Descarga completa ({written / 1_048_576:.1f} MB). Extrayendo archivos analizables…")
+            progress("info", msg("sources.progress.downloaded", mb=f"{written / 1_048_576:.1f}"))
         return written
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        raise SourceError("No se pudo descargar el repositorio") from exc
+        raise SourceError(msg("sources.errors.download_failed")) from exc
 
 
 def list_repositories(provider: str, token: str | None = None) -> list[dict]:
     if provider not in ("github", "gitlab"):
-        raise SourceError("Proveedor de código inválido")
+        raise SourceError(msg("sources.errors.invalid_provider"))
     token = token or os.environ.get("GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN")
     if not token:
         return []
@@ -204,9 +219,9 @@ def list_repositories(provider: str, token: str | None = None) -> list[dict]:
     try:
         rows = json.loads(_request(url, token, provider))
     except (ValueError, UnicodeDecodeError) as exc:
-        raise SourceError("El proveedor respondió con datos inválidos") from exc
+        raise SourceError(msg("sources.errors.invalid_data")) from exc
     if not isinstance(rows, list):
-        raise SourceError("Lista de repositorios inválida")
+        raise SourceError(msg("sources.errors.invalid_list"))
     result = []
     for item in rows[:50]:
         if not isinstance(item, dict):
@@ -240,10 +255,10 @@ def available_sources(tokens: dict[str, str] | None = None, installation_id: int
                         sources.append({**entry, "installation_id": current, "account": entry["name"].split("/", 1)[0]})
                         seen.add(key)
             except GitHubAppError as exc:
-                errors.append(f"Instalación {current}: {exc}")
+                errors.append(msg("sources.errors.installation", id=current, detail=exc.message))
         statuses["github"] = {"configured": True, "origin": "github_app"}
         if errors:
-            statuses["github"]["error"] = " · ".join(errors)
+            statuses["github"]["error"] = _joined(errors)
     for provider, env in (("github", "GITHUB_TOKEN"), ("gitlab", "GITLAB_TOKEN")):
         if provider in statuses:
             continue
@@ -253,7 +268,7 @@ def available_sources(tokens: dict[str, str] | None = None, installation_id: int
             try:
                 sources.extend(list_repositories(provider, tokens.get(provider)))
             except SourceError:
-                statuses[provider]["error"] = "No se pudo listar repositorios; revisa el token y sus permisos"
+                statuses[provider]["error"] = msg("sources.errors.list_failed")
     return {"sources": sources, "providers": statuses}
 
 
@@ -311,7 +326,7 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
                     fetch = lambda number, current=current: repositories_page(current, number, per_page)[0]
                 segments.append((total, _paged(first, fetch, per_page, decorate)))
             except GitHubAppError as exc:
-                errors.append(f"Instalación {current}: {exc}")
+                errors.append(msg("sources.errors.installation", id=current, detail=exc.message))
     for name, env in (("github", "GITHUB_TOKEN"), ("gitlab", "GITLAB_TOKEN")):
         if name in statuses:
             continue
@@ -321,7 +336,7 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
             try:
                 local(list_repositories(name, tokens.get(name)))
             except SourceError:
-                statuses[name]["error"] = "No se pudo listar repositorios; revisa el token y sus permisos"
+                statuses[name]["error"] = msg("sources.errors.list_failed")
     # Solo se piden a cada origen las filas que caen en la página pedida.
     total = sum(count for count, _ in segments)
     offset, remaining, sources = (page - 1) * per_page, per_page, []
@@ -335,11 +350,11 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
         try:
             sources.extend(rows(offset, take))
         except Exception as exc:  # GitHubAppError: una página que falla no tumba el resto
-            errors.append(str(exc))
+            errors.append(getattr(exc, "message", None) or str(exc))
         remaining -= take
         offset = 0
     if errors:
-        statuses.setdefault("github", {"configured": True, "origin": "github_app"})["error"] = " · ".join(errors)
+        statuses.setdefault("github", {"configured": True, "origin": "github_app"})["error"] = _joined(errors)
     return {"sources": sources, "providers": statuses, "total": total, "page": page, "per_page": per_page,
             "partial": partial, "accounts": sorted(set(accounts), key=str.casefold)}
 
@@ -429,8 +444,7 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
                 # declarar teras. Se mira el tamaño anunciado antes de leer nada.
                 expanded += member.size
                 if expanded > MAX_EXPANSION:
-                    raise SourceError("El archivo se expande de forma desproporcionada; "
-                                      "se descarta por posible bomba de descompresión")
+                    raise SourceError(msg("sources.errors.decompression_bomb"))
                 relative = _safe_name(member.name)
                 if relative is None:
                     continue
@@ -451,14 +465,14 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
                     continue
                 content = source.read(limit + 1)
                 if len(content) != member.size:
-                    raise SourceError("Archivo de repositorio inválido")
+                    raise SourceError(msg("sources.errors.invalid_archive_file"))
                 target = root / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(content)
                 total += len(content)
                 count += 1
     except (tarfile.TarError, OSError) as exc:
-        raise SourceError("Archivo comprimido inválido") from exc
+        raise SourceError(msg("sources.errors.invalid_archive")) from exc
     stats["files"] = count
     stats["bytes"] = total
     stats["archive_bytes"] = expanded
@@ -503,9 +517,9 @@ def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | 
                     installation_id: int | None = None, ref: str | None = None, progress=None) -> tuple[Path, dict]:
     """Snapshot de solo lectura. `ref` fija un commit concreto (revisión de un PR); solo GitHub."""
     if ref is not None and (not re.fullmatch(r"[0-9a-f]{40}", ref) or not source_id.startswith("github:")):
-        raise SourceError("Commit inválido")
+        raise SourceError(msg("sources.errors.invalid_commit"))
     if not re.fullmatch(r"(?:github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+|gitlab:[0-9]+)", source_id):
-        raise SourceError("Repositorio inválido")
+        raise SourceError(msg("sources.errors.invalid_repository"))
     provider = source_id.partition(":")[0]
     if provider == "github" and installation_id is not None:
         from tamandua.modules.integrations.github import GitHubAppError, installation_repository, installation_token
@@ -513,15 +527,15 @@ def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | 
             selected = installation_repository(installation_id, source_id)
             token = installation_token(installation_id)
         except GitHubAppError as exc:
-            raise SourceError(str(exc)) from exc
+            raise SourceError(exc.message) from exc
     else:
         token = (tokens or {}).get(provider) or os.environ.get("GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN")
         entries = list_repositories(provider, token)
         selected = next((entry for entry in entries if entry["id"] == source_id), None)
     if selected is None:
-        raise SourceError("Repositorio no disponible para la credencial configurada")
+        raise SourceError(msg("sources.errors.not_available"))
     if not token:
-        raise SourceError("Conecta el proveedor de código antes de analizar")
+        raise SourceError(msg("sources.errors.connect_first"))
     archive_path = destination.parent / "repository.tar.gz"
     if provider == "github":
         name = source_id.removeprefix("github:")

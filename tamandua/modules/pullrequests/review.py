@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import re
 
+from tamandua.shared.i18n import default_locale, msg, t, text
+
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 GATES = ("critical", "high", "medium", "never")
@@ -80,13 +82,12 @@ def verdict(introduced: list[dict], gate: str = "high") -> dict:
     else:
         limit = SEVERITY_ORDER.index(gate)
         blocking = sum(count for level, count in counts.items() if SEVERITY_ORDER.index(level) <= limit)
-    label = {"critical": "crítica", "high": "alta o superior", "medium": "media o superior", "low": "baja o superior"}.get(gate, gate)
     if blocking:
-        description = f"{blocking} {'hallazgo nuevo' if blocking == 1 else 'hallazgos nuevos'} de severidad {label}"
+        description = msg("pulls.verdict.blocking", count=blocking, gate=GATE_LABEL.get(gate, gate))
     elif introduced:
-        description = f"{len(introduced)} {'hallazgo nuevo' if len(introduced) == 1 else 'hallazgos nuevos'} por debajo del umbral"
+        description = msg("pulls.verdict.below", count=len(introduced))
     else:
-        description = "Sin hallazgos nuevos en el código que cambia"
+        description = msg("pulls.verdict.clean")
     return {"state": "failure" if blocking else "success", "description": description, "counts": counts, "blocking": blocking}
 
 
@@ -98,16 +99,15 @@ def _cell(value, limit: int = 120) -> str:
     return text
 
 
-SEVERITY_LABEL = {"critical": "Crítica", "high": "Alta", "medium": "Media", "low": "Baja", "info": "Info"}
-GATE_LABEL = {"critical": "crítica", "high": "alta o superior", "medium": "media o superior", "never": "nunca bloquea"}
+SEVERITY_LABEL = {"critical": msg("pulls.severity.critical"), "high": msg("pulls.severity.high"), "medium": msg("pulls.severity.medium"),
+                  "low": msg("pulls.severity.low"), "info": msg("pulls.severity.info")}
+GATE_LABEL = {"critical": msg("pulls.gate.critical"), "high": msg("pulls.gate.high"), "medium": msg("pulls.gate.medium"),
+              "low": msg("pulls.gate.low"), "never": msg("pulls.gate.never")}
 
 
-def _plural(count: int, one: str, many: str) -> str:
-    return f"{count} {one if count == 1 else many}"
-
-
-def _rows(findings: list[dict], limit: int = 25) -> list[str]:
-    lines = ["| Severidad | Hallazgo | Ubicación | Corrección |", "|---|---|---|---|"]
+def _rows(findings: list[dict], locale: str | None = None, limit: int = 25) -> list[str]:
+    locale = locale or default_locale()
+    lines = [t("pulls.table.header", locale), "|---|---|---|---|"]
     from tamandua.modules.findings.fix_guide import attach
     ordered = attach([dict(item) for item in sorted(findings, key=lambda item: SEVERITY_ORDER.index(item["severity"]) if item["severity"] in SEVERITY_ORDER else 9)])
     for finding in ordered[:limit]:
@@ -116,67 +116,65 @@ def _rows(findings: list[dict], limit: int = 25) -> list[str]:
         where = (f"`{_cell(package.get('name'), 60)}` {_cell(package.get('version'), 30)}" if package.get("name")
                  else f"`{_cell(finding.get('path'), 80)}:{line}`")
         # Solo un comando que actualiza de verdad (con su versión); «reinstala» o «instala -r» no dicen a qué.
-        commands = [item for item in (finding.get("fix") or {}).get("commands") or [] if item.get("label") == "Actualiza"]
+        commands = [item for item in (finding.get("fix") or {}).get("commands") or [] if item.get("action") == "update"]
         fix = (f"`{_cell(commands[0]['code'], 120)}`" if commands and "`" not in commands[0]["code"]
-               else f"Actualizar a `{_cell(package['fixed_version'], 30)}`" if package.get("fixed_version")
-               else _cell(finding.get("remediation"), 140))
-        lines.append(f"| {SEVERITY_LABEL.get(finding['severity'], finding['severity'])} | {_cell(finding['title'], 80)} | {where} | {fix} |")
+               else t("pulls.table.update_to", locale, version=_cell(package["fixed_version"], 30)) if package.get("fixed_version")
+               else _cell(text(finding.get("remediation"), locale), 140))
+        severity = text(SEVERITY_LABEL.get(finding["severity"], finding["severity"]), locale)
+        lines.append(f"| {severity} | {_cell(text(finding['title'], locale), 80)} | {where} | {fix} |")
     if len(ordered) > limit:
-        lines.append(f"| | … y {len(ordered) - limit} más en el panel | | |")
+        lines.append(f"| | {t('pulls.table.more', locale, count=len(ordered) - limit)} | | |")
     return lines
 
 
 def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str | None, panel_url: str | None,
-                   gate: str = "high", tools: list[dict] | None = None) -> str:
-    """Comentario en Markdown de GitHub. Nunca incluye valores de secretos: solo regla, fichero y línea."""
+                   gate: str = "high", tools: list[dict] | None = None, locale: str | None = None) -> str:
+    """Comentario en Markdown de GitHub. Nunca incluye valores de secretos: solo regla, fichero y línea.
+
+    A PR comment is read by the whole team: it speaks TAMANDUA_DEFAULT_LOCALE unless told otherwise."""
+    locale = locale or default_locale()
     introduced, preexisting, state = outcome["introduced"], outcome["preexisting"], outcome["verdict"]
     commit = f"`{pull['head_sha'][:7]}`"
-    lines = ["## Revisión de seguridad", ""]
+    gate_label = text(GATE_LABEL.get(gate, gate), locale)
+    lines = [t("pulls.comment.heading", locale), ""]
     if state["blocking"]:
-        lines += ["> [!CAUTION]",
-                  f"> **{_plural(state['blocking'], 'hallazgo nuevo bloquea', 'hallazgos nuevos bloquean')} este PR** "
-                  f"(severidad {GATE_LABEL.get(gate, gate)}).",
-                  "> Corrígelo antes de mergear: el estado `tamandua` se recalcula en cada push."]
+        lines += ["> [!CAUTION]", "> " + t("pulls.comment.blocking", locale, count=state["blocking"], gate=gate_label),
+                  "> " + t("pulls.comment.blocking_hint", locale)]
     elif introduced:
-        lines += ["> [!WARNING]", f"> **{_plural(len(introduced), 'hallazgo nuevo', 'hallazgos nuevos')}** por debajo del umbral de bloqueo.",
-                  "> Revísalos antes de mergear. No bloquean el PR."]
+        lines += ["> [!WARNING]", "> " + t("pulls.comment.below", locale, count=len(introduced)), "> " + t("pulls.comment.below_hint", locale)]
     else:
-        lines += ["> [!TIP]", f"> **Este PR no introduce hallazgos** en el código que cambia (commit {commit}). No hay nada que hacer aquí."]
+        lines += ["> [!TIP]", "> " + t("pulls.comment.clean", locale, commit=commit)]
     if introduced:
-        lines += ["", f"### Requieren atención ({len(introduced)})", "", *_rows(introduced)]
+        lines += ["", t("pulls.comment.attention", locale, count=len(introduced)), "", *_rows(introduced, locale)]
     if preexisting:
-        lines += ["", "<details>", f"<summary>{_plural(len(preexisting), 'hallazgo preexistente', 'hallazgos preexistentes')} "
-                  "en el código que toca este PR, ya presentes en la rama principal</summary>", "", *_rows(preexisting, 15), "", "</details>"]
+        lines += ["", "<details>", f"<summary>{t('pulls.comment.preexisting', locale, count=len(preexisting))}</summary>", "",
+                  *_rows(preexisting, locale, 15), "", "</details>"]
     engines = ", ".join(f"{item['name'].capitalize()} {item['version']}" for item in (tools or []) if item.get("status") in ("completed", "partial"))
-    basis = ("comparado con el último escaneo de la rama principal" if baseline_run
-             else "sin escaneo previo de la rama principal: cuenta todo lo que cae en líneas cambiadas")
-    where = f"[en el panel]({panel_url})" if panel_url else "en el panel de Tamandua"
-    lines += ["", f"<sub>Commit {commit} · {basis} · bloquea desde severidad {GATE_LABEL.get(gate, gate)}"
-              + (f" · {engines}" if engines else "") + f". Detalle, triage y exportación a Jira {where} (ejecución `{run_id[:12]}`). "
-              "Los secretos se citan por regla y ubicación; su valor nunca se publica.</sub>"]
+    basis = t("pulls.comment.basis_baseline", locale) if baseline_run else t("pulls.comment.basis_none", locale)
+    where = t("pulls.comment.where_link", locale, url=panel_url) if panel_url else t("pulls.comment.where_plain", locale)
+    lines += ["", t("pulls.comment.footer", locale, commit=commit, basis=basis, gate=gate_label, engines=f" · {engines}" if engines else "",
+                    where=where, run=run_id[:12])]
     return "\n".join(lines)
 
 
-def render_unused_comment(new: list[dict], before: list[dict], ecosystems: list[str]) -> str:
+def render_unused_comment(new: list[dict], before: list[dict], ecosystems: list[str], locale: str | None = None) -> str:
     """Informativo: dependencias declaradas que el código no usa, separando las que añade el PR."""
+    locale = locale or default_locale()
+
     def table(items: list[dict]) -> list[str]:
-        rows = ["| Paquete | Ecosistema | Declarada en |", "|---|---|---|"]
+        rows = [t("pulls.unused.header", locale), "|---|---|---|"]
         rows += [f"| `{_cell(item['name'], 60)}` | {item['ecosystem']} | `{_cell(item['manifest'], 80)}:{int(item['line'])}` |" for item in items[:30]]
         if len(items) > 30:
-            rows.append(f"| … y {len(items) - 30} más | | |")
+            rows.append(f"| {t('pulls.unused.more', locale, count=len(items) - 30)} | | |")
         return rows
-    lines = ["## Dependencias no utilizadas", ""]
+    lines = [t("pulls.unused.heading", locale), ""]
     if new:
-        lines += ["> [!WARNING]", f"> **{_plural(len(new), 'dependencia nueva no se usa', 'dependencias nuevas no se usan')}** en el código.",
-                  "> Quítalas si sobran, o ignora el aviso si se cargan de una forma que no se ve en el código.", "",
-                  f"### Añadidas en este PR ({len(new)})", "", *table(new)]
+        lines += ["> [!WARNING]", "> " + t("pulls.unused.new", locale, count=len(new)), "> " + t("pulls.unused.new_hint", locale), "",
+                  t("pulls.unused.added", locale, count=len(new)), "", *table(new)]
     else:
-        lines += ["> [!TIP]", "> **Este PR no agrega dependencias sin usar.** No hay nada que hacer aquí."]
+        lines += ["> [!TIP]", "> " + t("pulls.unused.clean", locale)]
     if before:
-        lines += ["", "<details>", f"<summary>{_plural(len(before), 'dependencia preexistente sin uso', 'dependencias preexistentes sin uso')}, "
-                  "anteriores a este PR</summary>", "", *table(before), "", "</details>"]
-    projects = ", ".join(f"`{item}`" for item in ecosystems) or "sin manifiestos reconocidos"
-    lines += ["", f"<sub>Informativo: no bloquea el merge. Proyecto {projects}, {_plural(len(new), 'dependencia nueva', 'dependencias nuevas')} sin uso en el PR. "
-              "Se revisan las dependencias de ejecución; cuenta como uso un import o una mención en configuración, scripts o Dockerfile. "
-              "Una dependencia declarada y no usada entra igual en el build y en el análisis de vulnerabilidades.</sub>"]
+        lines += ["", "<details>", f"<summary>{t('pulls.unused.before', locale, count=len(before))}</summary>", "", *table(before), "", "</details>"]
+    projects = ", ".join(f"`{item}`" for item in ecosystems) or t("pulls.unused.no_manifests", locale)
+    lines += ["", t("pulls.unused.footer", locale, projects=projects, count=len(new))]
     return "\n".join(lines)

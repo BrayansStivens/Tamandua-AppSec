@@ -20,6 +20,8 @@ from __future__ import annotations
 import html
 import math
 
+from tamandua.shared.i18n import default_locale, localize, msg, t
+
 # Paleta: los tokens del panel (web/src/index.css, modo claro). (tinta ≥ 4,5:1 sobre blanco, relleno suave)
 COLORS = {
     "neutral": ("#525252", "#f7f7f7"),
@@ -30,13 +32,15 @@ COLORS = {
     "attention": ("#a34100", "#fef0e6"),
     "danger": ("#b71824", "#fce9ea"),
 }
-COLOR_NAMES = {"neutral": "Gris", "brand": "Morado", "info": "Azul", "success": "Verde", "warning": "Amarillo",
-               "attention": "Naranja", "danger": "Rojo"}
+COLOR_NAMES = {"neutral": msg("threats.colors.neutral"), "brand": msg("threats.colors.brand"), "info": msg("threats.colors.info"),
+               "success": msg("threats.colors.success"), "warning": msg("threats.colors.warning"),
+               "attention": msg("threats.colors.attention"), "danger": msg("threats.colors.danger")}
 # Sin color elegido, cada componente toma el de su papel; la leyenda lo explica.
 KIND_COLOR = {"actor": "neutral", "external": "neutral", "web_app": "brand", "api": "info", "service": "info", "function": "info",
               "database": "success", "cache": "success", "queue": "success", "storage": "success", "identity": "warning"}
-LEGEND = [("brand", "Aplicaciones cliente"), ("info", "APIs, servicios y tareas"), ("success", "Datos"),
-          ("warning", "Identidad"), ("neutral", "Actores y terceros")]
+LEGEND = [("brand", msg("threats.diagram.legend_clients")), ("info", msg("threats.diagram.legend_services")),
+          ("success", msg("threats.diagram.legend_data")), ("warning", msg("threats.diagram.legend_identity")),
+          ("neutral", msg("threats.diagram.legend_actors"))]
 INK, MUTED, LINE, WHITE = "#171717", "#636363", "#c7c7c7", "#ffffff"
 FONT = "Helvetica, Arial, sans-serif"
 
@@ -376,10 +380,10 @@ def label_spots(edges: list[tuple[str, tuple, str, float]], rects: list[dict]) -
     for key, curve, text, _ in sorted(edges, key=lambda edge: edge[3]):
         width = label_width(text) + 8
         best = (math.inf, _point(curve, 0.5), None)
-        for t in SPOTS:
-            x, y = _point(curve, t)
+        for spot in SPOTS:
+            x, y = _point(curve, spot)
             box = {"x": x - width / 2, "y": y - (LABEL_ROOM + 6) / 2, "width": width, "height": LABEL_ROOM + 6}
-            cost = sum(_overlap(box, item) * 4 for item in rects) + sum(_overlap(box, item) for item in placed) + abs(t - 0.5)
+            cost = sum(_overlap(box, item) * 4 for item in rects) + sum(_overlap(box, item) for item in placed) + abs(spot - 0.5)
             if cost < best[0]:
                 best = (cost, (x, y), box)
             if cost < 1:
@@ -416,8 +420,9 @@ def flow_label(number: int, flow: dict) -> str:
     return f"{number} · {flow['protocol'].upper()}"
 
 
-def scene(model: dict, kinds: dict[str, str] | None = None) -> dict:
+def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | None = None) -> dict:
     """El diagrama como primitivas: {"bounds": (x, y, w, h), "items": [...]}. Lo pintan to_svg y to_drawing."""
+    locale = locale or default_locale()
     kinds = kinds or {}
     geometry = layout(model)
     components = {item["id"]: item for item in model.get("components", [])}
@@ -457,7 +462,7 @@ def scene(model: dict, kinds: dict[str, str] | None = None) -> dict:
         ux, uy = dx / norm, dy / norm
         base = (end[0] - ux * 9, end[1] - uy * 9)
         names = f"{components[flow['source']]['name']} → {components[flow['target']]['name']}"
-        tip = f"{number}. {names} · {flow['protocol'].upper()}" + (f" · {flow['name']}" if flow.get("name") else "") + (" · sin cifrar" if plain else "")
+        tip = f"{number}. {names} · {flow['protocol'].upper()}" + (f" · {flow['name']}" if flow.get("name") else "") + (f" · {t('threats.diagram.unencrypted_flow', locale)}" if plain else "")
         items += [{"t": "curve", "points": (start, c1, c2, base), "stroke": stroke, "sw": 1.4, "dash": (5, 4) if plain else None, "tip": tip},
                   {"t": "poly", "points": (end, (base[0] - uy * 4.5, base[1] + ux * 4.5), (base[0] + uy * 4.5, base[1] - ux * 4.5)), "fill": stroke}]
     for flow, number, curve in curves:
@@ -484,9 +489,9 @@ def scene(model: dict, kinds: dict[str, str] | None = None) -> dict:
                           "stroke": ink, "sw": 1.5, "dash": (5, 3) if role == "external" else None})
         name = _wrap(item["name"], w - 24, 12.5)
         detail = (item.get("technology") or item.get("custom_kind") or kinds.get(item["kind"]) or "")[:60]
-        flags = [label for label, on in (("Internet", item.get("internet_facing")),
-                                         ("datos sensibles", set(item.get("data") or []) & {"pii", "credentials", "payment"}),
-                                         ("cifrado", item.get("encrypted_at_rest") and role in STORES)) if on]
+        flags = [t(key, locale) for key, on in (("threats.diagram.flag_internet", item.get("internet_facing")),
+                                                ("threats.diagram.flag_sensitive", set(item.get("data") or []) & {"pii", "credentials", "payment"}),
+                                                ("threats.diagram.flag_encrypted", item.get("encrypted_at_rest") and role in STORES)) if on]
         block = len(name) * 14 + (13 if detail else 0) + (12 if flags else 0)
         cursor = y + (h - block) / 2 + 11
         for row in name:
@@ -508,9 +513,9 @@ def scene(model: dict, kinds: dict[str, str] | None = None) -> dict:
     width, height = max(560, right - left), max(300, bottom - top)
     # Leyenda: los colores automáticos que se usan y los tipos de línea; si no cabe en una fila, sigue en otra.
     used = {color_of(item) for item in components.values() if not item.get("color")}
-    entries = [("swatch", tone, text) for tone, text in LEGEND if tone in used]
-    entries += [("line", None, "Flujo cifrado"), ("dashed", None, "Sin cifrar"),
-                ("note", None, "«3 · HTTPS»: flujo n.º 3 (qué viaja, en la tabla de flujos del informe)")]
+    entries = [("swatch", tone, localize(label, locale)) for tone, label in LEGEND if tone in used]
+    entries += [("line", None, t("threats.diagram.legend_encrypted", locale)), ("dashed", None, t("threats.diagram.legend_unencrypted", locale)),
+                ("note", None, t("threats.diagram.legend_note", locale))]
     rows, row, used_w = [], [], 0.0
     for kind, tone, text in entries:
         entry_w = (0 if kind == "note" else 38) + len(text) * 6.2 + 24
@@ -552,13 +557,13 @@ def _svg_attrs(item: dict) -> str:
     return stroke + dash
 
 
-def to_svg(model: dict, kinds: dict[str, str] | None = None) -> str:
+def to_svg(model: dict, kinds: dict[str, str] | None = None, *, locale: str | None = None) -> str:
     """El diagrama como SVG autónomo: sin scripts ni recursos externos, con el texto escapado."""
-    drawn = scene(model, kinds)
+    drawn = scene(model, kinds, locale=locale)
     left, top, width, height = drawn["bounds"]
     escape = lambda value: html.escape(str(value), quote=True)
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{left:g} {top:g} {width:g} {height:g}" width="{width:g}" height="{height:g}" '
-             f'role="img" aria-label="Diagrama de {escape(model["name"])}" font-family="{FONT}">']
+             f'role="img" aria-label="{escape(t("threats.diagram.aria_label", locale, name=model["name"]))}" font-family="{FONT}">']
     for item in drawn["items"]:
         kind = item["t"]
         if kind == "rect":
@@ -583,12 +588,12 @@ def to_svg(model: dict, kinds: dict[str, str] | None = None) -> str:
     return "\n".join(parts)
 
 
-def to_drawing(model: dict, max_width: float, max_height: float, kinds: dict[str, str] | None = None):
+def to_drawing(model: dict, max_width: float, max_height: float, kinds: dict[str, str] | None = None, *, locale: str | None = None):
     """El mismo diagrama como dibujo vectorial de ReportLab, escalado para caber en (max_width, max_height)."""
     from reportlab.graphics.shapes import Drawing, Group, Line, Path, Polygon, Rect, String
     from reportlab.lib import colors
 
-    drawn = scene(model, kinds)
+    drawn = scene(model, kinds, locale=locale)
     left, top, width, height = drawn["bounds"]
     scale = min(max_width / width, max_height / height, 1.0)
     flip = lambda y: top + height - y  # SVG crece hacia abajo; ReportLab, hacia arriba (ya queda en [0, alto])

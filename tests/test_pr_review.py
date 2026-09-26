@@ -16,6 +16,7 @@ from tamandua.modules.identity.auth import Users
 from tamandua.modules.integrations.github import GitHubAppError, PULLS_FORBIDDEN
 from tamandua.modules.runs.store import load_run, save_repository_scan, render_profile_report
 from tamandua.modules.reporting.pdf import render_pdf
+from tamandua.shared.i18n import text
 from fake_github import fake_github
 from test_auth import PASSWORD, HttpCase
 
@@ -169,7 +170,7 @@ class JobTests(unittest.TestCase):
         record = self.run_review({"contents": "read", "metadata": "read"})
         self.assertEqual(record["status"], "incomplete")  # sin Docker en las pruebas no corre ningún motor: nunca «completed»
         self.assertEqual(self.posted, [])
-        self.assertIn("sin permiso", record["review"]["delivery"]["comment"])
+        self.assertIn("sin permiso", text(record["review"]["delivery"]["comment"]))
 
     def test_without_baseline_everything_in_the_diff_counts(self):
         record = self.run_review({}, baseline=False)

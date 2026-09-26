@@ -10,6 +10,7 @@ from unittest.mock import patch
 from tamandua.modules.intel import advisories
 from tamandua.modules.intel.advisories import (affected_range, compare_versions, cvss3_base_score, dependency_finding,
                                       fetch_advisory, prioritize, severity_from_score)
+from tamandua.shared.i18n import localize, text
 
 MINIMATCH = {
     "id": "GHSA-23c5-xmqv-rm74", "aliases": ["CVE-2026-27904"],
@@ -79,8 +80,10 @@ class PriorityTests(unittest.TestCase):
     def test_kev_forces_action_and_factors_are_visible(self):
         result = prioritize("medium", 5.0, {"ransomware": True}, (0.01, 0.5), "1.2.3")
         self.assertEqual(result["action"], "act")
-        self.assertTrue(any("KEV" in factor and "ransomware" in factor for factor in result["factors"]))
-        self.assertTrue(any("Corrección publicada: 1.2.3" in factor for factor in result["factors"]))
+        factors = localize(result["factors"])
+        self.assertTrue(any("KEV" in factor and "ransomware" in factor for factor in factors))
+        self.assertTrue(any("Corrección publicada: 1.2.3" in factor for factor in factors))
+        self.assertIn("Fix published: 1.2.3", localize(result["factors"], "en"))
 
     def test_thresholds_without_kev(self):
         self.assertEqual(prioritize("critical", 9.8, None, (0.5, 0.99), None)["action"], "act")
@@ -88,7 +91,7 @@ class PriorityTests(unittest.TestCase):
         self.assertEqual(prioritize("medium", 5.0, None, (0.08, 0.9), "1.0")["action"], "attend")
         result = prioritize("low", 3.1, None, None, None)
         self.assertEqual(result["action"], "track")
-        self.assertIn("Sin versión corregida publicada", result["factors"])
+        self.assertIn("Sin versión corregida publicada", localize(result["factors"]))
 
 
 class FindingTests(unittest.TestCase):
@@ -99,7 +102,7 @@ class FindingTests(unittest.TestCase):
         self.assertEqual(finding["severity"], "high")
         self.assertEqual(finding["package"]["fixed_version"], "9.0.6")
         self.assertIn("minimatch 9.0.5:", finding["title"])
-        self.assertIn("de 9.0.5 a 9.0.6", finding["remediation"])
+        self.assertIn("de 9.0.5 a 9.0.6", text(finding["remediation"]))
         self.assertEqual(finding["cve"], ["CVE-2026-27904"])
         self.assertEqual(finding["ghsa"], ["GHSA-23c5-xmqv-rm74"])
         self.assertEqual(finding["cwe"], [1333])

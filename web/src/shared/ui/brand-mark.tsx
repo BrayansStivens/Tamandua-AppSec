@@ -1,11 +1,13 @@
 import { useId } from 'react'
+import { useTranslation } from 'react-i18next'
 import { BRAND } from '@/shared/lib/brand'
 
 // Tamandúa (oso hormiguero de collar, nativo de Colombia) atrapando un bug con la lengua.
 // Los identificadores del degradado van por instancia: hay varias marcas en la misma página.
 export function BrandMark({ size = 40, className, decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
+  const { t } = useTranslation('ui')
   const id = useId().replace(/:/g, '')
-  return <svg width={size} height={size} viewBox="0 0 64 64" {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': `Marca de ${BRAND.name}` })} className={className}>
+  return <svg width={size} height={size} viewBox="0 0 64 64" {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': t('brand_mark', { name: BRAND.name }) })} className={className}>
     <defs>
       <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#8B5CF6" /><stop offset="1" stopColor="#5B21B6" /></linearGradient>
       <clipPath id={`${id}-clip`}><rect width="64" height="64" rx="16" /></clipPath>

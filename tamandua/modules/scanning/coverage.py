@@ -12,14 +12,16 @@ import re
 from functools import lru_cache
 
 from tamandua.shared import paths
+from tamandua.shared.i18n import msg
+from tamandua.modules.scanning.engines import and_list, joined
 from tamandua.modules.scanning.owasp import WEB_TOP_10_2025
 
 RULES_DIR = paths.RULES_DIR
 RULE_LINE = re.compile(r"^  - id: (?P<id>\S+)|^\s+metadata: \{.*?owasp: \"(?P<owasp>A\d\d):2025\"", re.M)
 UNTESTABLE = {
-    "A06": "Diseño inseguro: requiere modelado de amenazas y revisión de arquitectura, no lo detecta un análisis estático.",
-    "A09": "Registro y alertas: sin reglas estáticas todavía; se evalúa en revisión de diseño y en pruebas dinámicas.",
-    "A10": "Manejo de condiciones excepcionales: sin reglas estáticas todavía; requiere pruebas dinámicas o revisión manual.",
+    "A06": msg("coverage.untestable.a06"),
+    "A09": msg("coverage.untestable.a09"),
+    "A10": msg("coverage.untestable.a10"),
 }
 
 
@@ -38,10 +40,6 @@ def rules_by_category() -> dict[str, int]:
     return counts
 
 
-def _names(tools: tuple[str, ...]) -> str:
-    return " y ".join(tools) if len(tools) <= 2 else ", ".join(tools[:-1]) + f" y {tools[-1]}"
-
-
 def owasp_coverage(findings: list[dict], *, sast_ran: bool, sca_status: str, iac_ran: bool,
                    iac_files: int, secrets_ran: bool, engines: bool, iac_tools: tuple[str, ...] = ("Trivy",),
                    cicd_tools: tuple[str, ...] = (), pipeline_files: int = 0) -> list[dict]:
@@ -57,46 +55,45 @@ def owasp_coverage(findings: list[dict], *, sast_ran: bool, sca_status: str, iac
         if identifier == "A03":
             if sca_status in ("partial", "completed"):
                 status = "partial"
-                parts.append("dependencias resueltas por Trivy con versión corregida, CVSS, CISA KEV y EPSS" if engines
-                             else "dependencias consultadas en OSV")
+                parts.append(msg("coverage.sca.engines") if engines else msg("coverage.sca.osv"))
             elif sca_status == "inconclusive":
                 status = "inconclusive"
-                parts.append("la consulta de dependencias no concluyó")
+                parts.append(msg("coverage.sca.inconclusive"))
             else:
-                parts.append("sin manifiestos de dependencias analizables o sin autorización para consultarlos")
+                parts.append(msg("coverage.sca.none"))
             if cicd_tools and pipeline_files:
                 status = "partial" if status == "not_tested" else status
-                parts.append(f"pipelines de CI/CD revisados por {_names(cicd_tools)} en {pipeline_files} archivo(s)")
+                parts.append(msg("coverage.cicd", tools=and_list(cicd_tools), count=pipeline_files))
         if identifier == "A02":
             if iac_ran and iac_files:
                 status = "partial"
-                parts.append(f"configuración de infraestructura revisada por {_names(iac_tools)} en {iac_files} archivo(s)")
+                parts.append(msg("coverage.iac.reviewed", tools=and_list(iac_tools), count=iac_files))
             elif iac_ran:
-                parts.append(f"{_names(iac_tools)} no encontraron archivos de infraestructura (Dockerfile, Kubernetes, Terraform, CloudFormation) en el snapshot"
-                             if len(iac_tools) > 1 else f"{_names(iac_tools)} no encontró archivos de infraestructura (Dockerfile, Kubernetes, Terraform) en el snapshot")
+                parts.append(msg("coverage.iac.none_many", tools=and_list(iac_tools)) if len(iac_tools) > 1
+                             else msg("coverage.iac.none_one", tools=and_list(iac_tools)))
             if rules.get("A02"):
                 status = "partial"
-                parts.append(f"{rules['A02']} reglas propias de configuración")
+                parts.append(msg("coverage.rules.configuration", count=rules["A02"]))
         if identifier == "A04":
             if secrets_ran:
                 status = "partial"
-                parts.append("secretos con Gitleaks y Trivy" if engines else "secretos por patrones internos")
+                parts.append(msg("coverage.secrets.engines") if engines else msg("coverage.secrets.internal"))
             if rules.get("A04"):
                 status = "partial"
-                parts.append(f"{rules['A04']} reglas propias de criptografía y secretos")
+                parts.append(msg("coverage.rules.crypto", count=rules["A04"]))
         if identifier in ("A01", "A05", "A07", "A08") and rules.get(identifier):
             status = "partial"
-            parts.append(f"{rules[identifier]} reglas propias en Opengrep")
+            parts.append(msg("coverage.rules.opengrep", count=rules[identifier]))
         if identifier == "A05" and not sast_ran and not engines:
             status = "partial"
-            parts.append("reglas AST internas de Python (SQL dinámico, shell, eval)")
+            parts.append(msg("coverage.internal_ast"))
         if identifier in UNTESTABLE and status == "not_tested":
             parts.append(UNTESTABLE[identifier])
         if status == "not_tested" and not parts:
-            parts.append("ningún motor ejecutado cubre esta categoría en este repositorio")
-        reason = "; ".join(parts)
+            parts.append(msg("coverage.no_engine"))
+        reason = joined(parts, "coverage.join")
         if status == "partial":
-            reason += f". {found} hallazgo(s)." if found else ". Sin hallazgos."
+            reason = msg("coverage.with_findings", reason=reason, count=found) if found else msg("coverage.without_findings", reason=reason)
         result.append({"id": identifier, "title": title, "status": status,
                        "rules": rules.get(identifier, 0), "findings": found, "reason": reason})
     return result

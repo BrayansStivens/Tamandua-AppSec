@@ -2,8 +2,11 @@ rules:
   - id: appsec.py.eval-exec-non-literal
     languages: [python]
     severity: ERROR
-    message: "eval()/exec() sobre una expresión no literal ejecuta código arbitrario. Usa ast.literal_eval o una tabla de operaciones permitidas."
-    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL}
+    message: "eval() or exec() on a non-literal expression runs arbitrary code. Use ast.literal_eval, or a lookup table of allowed operations."
+    metadata: {cwe: [95], owasp: "A05:2025", category: injection, confidence: MEDIUM, severity: CRITICAL,
+      title: {en: "Code evaluated from a dynamic expression", es: "Código evaluado desde una expresión dinámica"},
+      fix: {en: "eval() or exec() on a non-literal expression runs arbitrary code. Use ast.literal_eval, or a lookup table of allowed operations.",
+            es: "eval()/exec() sobre una expresión no literal ejecuta código arbitrario. Usa ast.literal_eval o una tabla de operaciones permitidas."}}
     patterns:
       - pattern-either:
           - pattern: eval($X)
@@ -13,8 +16,11 @@ rules:
   - id: appsec.py.shell-command-non-literal
     languages: [python]
     severity: ERROR
-    message: "Comando de sistema construido dinámicamente con shell. Pasa una lista de argumentos sin shell=True y valida la entrada."
-    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: MEDIUM}
+    message: "A shell command is built dynamically. Pass a list of arguments without shell=True and validate the input."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: MEDIUM,
+      title: {en: "Shell command built from dynamic input", es: "Comando de shell construido con datos dinámicos"},
+      fix: {en: "A shell command is built dynamically. Pass a list of arguments without shell=True and validate the input.",
+            es: "Comando de sistema construido dinámicamente con shell. Pasa una lista de argumentos sin shell=True y valida la entrada."}}
     patterns:
       - pattern-either:
           - pattern: subprocess.$F($CMD, ..., shell=True, ...)
@@ -26,8 +32,11 @@ rules:
   - id: appsec.py.sql-string-building
     languages: [python]
     severity: ERROR
-    message: "SQL construido con f-string, %, format o concatenación. Usa parámetros del driver (execute(sql, params)) o el ORM."
-    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "The SQL text is built with an f-string, %, format or concatenation. Use driver parameters (execute(sql, params)) or the ORM."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "SQL query built with string formatting", es: "Consulta SQL construida con formato de cadenas"},
+      fix: {en: "The SQL text is built with an f-string, %, format or concatenation. Use driver parameters (execute(sql, params)) or the ORM.",
+            es: "SQL construido con f-string, %, format o concatenación. Usa parámetros del driver (execute(sql, params)) o el ORM."}}
     pattern-either:
       - pattern: $CUR.execute(f"...", ...)
       - pattern: $CUR.execute("..." % $X, ...)
@@ -40,8 +49,11 @@ rules:
   - id: appsec.py.sql-injection-from-request
     languages: [python]
     severity: ERROR
-    message: "Entrada de la petición llega a una consulta SQL. Usa parámetros del driver o el ORM; nunca la entrada dentro del texto SQL."
-    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "Request input reaches a SQL query. Use driver parameters or the ORM, and never put the input inside the SQL text."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "SQL injection from request input", es: "Inyección SQL desde la petición"},
+      fix: {en: "Request input reaches a SQL query. Use driver parameters or the ORM, and never put the input inside the SQL text.",
+            es: "Entrada de la petición llega a una consulta SQL. Usa parámetros del driver o el ORM; nunca la entrada dentro del texto SQL."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -63,8 +75,11 @@ rules:
   - id: appsec.py.ssti-render-template-string
     languages: [python]
     severity: ERROR
-    message: "Entrada de la petición en render_template_string: inyección de plantillas (SSTI) con ejecución de código. Renderiza plantillas fijas y pasa la entrada como variable."
-    metadata: {cwe: [1336], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL}
+    message: "Request input reaches render_template_string: template injection with code execution. Render fixed templates and pass the input as a variable."
+    metadata: {cwe: [1336], owasp: "A05:2025", category: injection, confidence: HIGH, severity: CRITICAL,
+      title: {en: "Server-side template injection (SSTI)", es: "Inyección de plantillas en el servidor (SSTI)"},
+      fix: {en: "Request input reaches render_template_string: template injection with code execution. Render fixed templates and pass the input as a variable.",
+            es: "Entrada de la petición en render_template_string: inyección de plantillas (SSTI) con ejecución de código. Renderiza plantillas fijas y pasa la entrada como variable."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -79,8 +94,11 @@ rules:
   - id: appsec.py.pickle-load
     languages: [python]
     severity: ERROR
-    message: "pickle deserializa código: con datos no confiables es ejecución remota. Usa JSON o un formato sin ejecución."
-    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: MEDIUM}
+    message: "pickle can run code while loading, so untrusted data means remote code execution. Use JSON or another format that can't run code."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: MEDIUM,
+      title: {en: "Unsafe deserialization with pickle", es: "Deserialización insegura con pickle"},
+      fix: {en: "pickle can run code while loading, so untrusted data means remote code execution. Use JSON or another format that can't run code.",
+            es: "pickle deserializa código: con datos no confiables es ejecución remota. Usa JSON o un formato sin ejecución."}}
     pattern-either:
       - pattern: pickle.loads(...)
       - pattern: pickle.load(...)
@@ -90,8 +108,11 @@ rules:
   - id: appsec.py.yaml-load-unsafe
     languages: [python]
     severity: ERROR
-    message: "yaml.load sin SafeLoader instancia objetos arbitrarios. Usa yaml.safe_load."
-    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH}
+    message: "yaml.load without SafeLoader can build arbitrary objects. Use yaml.safe_load."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH,
+      title: {en: "yaml.load without SafeLoader", es: "yaml.load sin SafeLoader"},
+      fix: {en: "yaml.load without SafeLoader can build arbitrary objects. Use yaml.safe_load.",
+            es: "yaml.load sin SafeLoader instancia objetos arbitrarios. Usa yaml.safe_load."}}
     patterns:
       - pattern: yaml.load($X, ...)
       - pattern-not: yaml.load($X, Loader=yaml.SafeLoader)
@@ -101,14 +122,20 @@ rules:
   - id: appsec.py.flask-debug-true
     languages: [python]
     severity: WARNING
-    message: "Flask con debug=True expone la consola de Werkzeug: ejecución de código si llega a producción. Controla el modo por variable de entorno."
-    metadata: {cwe: [489], owasp: "A02:2025", category: misconfig, confidence: HIGH}
+    message: "debug=True exposes the Werkzeug console, which runs code if it reaches production. Control debug mode with an environment variable."
+    metadata: {cwe: [489], owasp: "A02:2025", category: misconfig, confidence: HIGH,
+      title: {en: "Flask debug mode enabled", es: "Modo debug de Flask activado"},
+      fix: {en: "debug=True exposes the Werkzeug console, which runs code if it reaches production. Control debug mode with an environment variable.",
+            es: "Flask con debug=True expone la consola de Werkzeug: ejecución de código si llega a producción. Controla el modo por variable de entorno."}}
     pattern: $APP.run(..., debug=True, ...)
   - id: appsec.py.requests-verify-false
     languages: [python]
     severity: ERROR
-    message: "Validación TLS desactivada (verify=False): el tráfico puede interceptarse. Usa verify=/ruta/a/ca.pem."
-    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    message: "verify=False turns off TLS validation, so traffic can be intercepted. Point verify to your CA bundle (verify=/path/to/ca.pem)."
+    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH,
+      title: {en: "TLS certificate validation disabled (verify=False)", es: "Validación de certificados TLS desactivada (verify=False)"},
+      fix: {en: "verify=False turns off TLS validation, so traffic can be intercepted. Point verify to your CA bundle (verify=/path/to/ca.pem).",
+            es: "Validación TLS desactivada (verify=False): el tráfico puede interceptarse. Usa verify=/ruta/a/ca.pem."}}
     pattern-either:
       - pattern: requests.$M(..., verify=False, ...)
       - pattern: $S.$M(..., verify=False, ...)
@@ -116,8 +143,11 @@ rules:
   - id: appsec.py.jwt-decode-unverified
     languages: [python]
     severity: ERROR
-    message: "JWT decodificado sin verificar la firma: cualquier token forjado será aceptado. Verifica siempre con algoritmos explícitos."
-    metadata: {cwe: [347], owasp: "A07:2025", category: auth, confidence: HIGH}
+    message: "The JWT is decoded without checking its signature, so forged tokens are accepted. Always verify it with an explicit list of algorithms."
+    metadata: {cwe: [347], owasp: "A07:2025", category: auth, confidence: HIGH,
+      title: {en: "JWT decoded without signature verification", es: "JWT decodificado sin verificar la firma"},
+      fix: {en: "The JWT is decoded without checking its signature, so forged tokens are accepted. Always verify it with an explicit list of algorithms.",
+            es: "JWT decodificado sin verificar la firma: cualquier token forjado será aceptado. Verifica siempre con algoritmos explícitos."}}
     pattern-either:
       - pattern: jwt.decode($T, ..., verify=False, ...)
       - pattern: |
@@ -126,8 +156,11 @@ rules:
   - id: appsec.py.weak-password-hash
     languages: [python]
     severity: WARNING
-    message: "MD5/SHA-1 aplicado a algo que parece una contraseña o secreto. Usa argon2, bcrypt o scrypt (por ejemplo, hashlib.scrypt o passlib)."
-    metadata: {cwe: [916], owasp: "A04:2025", category: crypto, confidence: MEDIUM}
+    message: "MD5 or SHA-1 is applied to what looks like a password or secret. Use argon2, bcrypt or scrypt (for example hashlib.scrypt or passlib)."
+    metadata: {cwe: [916], owasp: "A04:2025", category: crypto, confidence: MEDIUM,
+      title: {en: "Password hashed with MD5/SHA-1", es: "Contraseña con hash MD5/SHA-1"},
+      fix: {en: "MD5 or SHA-1 is applied to what looks like a password or secret. Use argon2, bcrypt or scrypt (for example hashlib.scrypt or passlib).",
+            es: "MD5/SHA-1 aplicado a algo que parece una contraseña o secreto. Usa argon2, bcrypt o scrypt (por ejemplo, hashlib.scrypt o passlib)."}}
     patterns:
       - pattern-either:
           - pattern: hashlib.md5($P, ...)
@@ -140,16 +173,22 @@ rules:
   - id: appsec.py.django-mark-safe-non-literal
     languages: [python]
     severity: WARNING
-    message: "mark_safe sobre un valor dinámico desactiva el escape de Django: XSS si contiene datos externos. Escapa con format_html."
-    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    message: "mark_safe on a dynamic value turns off Django's escaping and allows XSS if it holds external data. Build the HTML with format_html."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM,
+      title: {en: "Unescaped HTML via mark_safe", es: "HTML sin escapar con mark_safe"},
+      fix: {en: "mark_safe on a dynamic value turns off Django's escaping and allows XSS if it holds external data. Build the HTML with format_html.",
+            es: "mark_safe sobre un valor dinámico desactiva el escape de Django: XSS si contiene datos externos. Escapa con format_html."}}
     patterns:
       - pattern: mark_safe($X)
       - pattern-not: mark_safe("...")
   - id: appsec.py.path-traversal-from-request
     languages: [python]
     severity: ERROR
-    message: "Ruta de archivo construida con entrada de la petición. Usa secure_filename / os.path.basename y comprueba que la ruta resuelta quede dentro del directorio permitido."
-    metadata: {cwe: [22], owasp: "A01:2025", category: path-traversal, confidence: HIGH}
+    message: "A file path is built from request input. Use secure_filename or os.path.basename, and check the resolved path stays inside the allowed directory."
+    metadata: {cwe: [22], owasp: "A01:2025", category: path-traversal, confidence: HIGH,
+      title: {en: "File path built from request input", es: "Ruta de archivo construida con datos de la petición"},
+      fix: {en: "A file path is built from request input. Use secure_filename or os.path.basename, and check the resolved path stays inside the allowed directory.",
+            es: "Ruta de archivo construida con entrada de la petición. Usa secure_filename / os.path.basename y comprueba que la ruta resuelta quede dentro del directorio permitido."}}
     mode: taint
     pattern-sources:
       - pattern-either:
@@ -171,8 +210,11 @@ rules:
   - id: appsec.py.ssrf-from-request
     languages: [python]
     severity: WARNING
-    message: "URL de una petición saliente tomada de la entrada del usuario (SSRF). Valida esquema y host contra una lista permitida y bloquea rangos internos."
-    metadata: {cwe: [918], owasp: "A01:2025", category: ssrf, confidence: MEDIUM}
+    message: "The URL of an outgoing request comes from user input. Check the scheme and host against an allowlist and block internal address ranges."
+    metadata: {cwe: [918], owasp: "A01:2025", category: ssrf, confidence: MEDIUM,
+      title: {en: "Server-side request forgery (SSRF)", es: "Falsificación de peticiones del lado del servidor (SSRF)"},
+      fix: {en: "The URL of an outgoing request comes from user input. Check the scheme and host against an allowlist and block internal address ranges.",
+            es: "URL de una petición saliente tomada de la entrada del usuario (SSRF). Valida esquema y host contra una lista permitida y bloquea rangos internos."}}
     mode: taint
     pattern-sources:
       - pattern-either:

@@ -92,6 +92,19 @@ class ReportTests(unittest.TestCase):
         self.assertIn("(org/) Tj (<) Tj (b) Tj (>) Tj (app)", content)  # el nombre es dato: se ve tal cual, no se interpreta
         self.assertLessEqual(pages(pdf), 5)
 
+    def test_markdown_report_renders_in_the_requested_language(self):
+        from tamandua.modules.runs.store import render_repository_report
+        findings = [{**advisory("CVE-1", "high", "12.0.0"), "ghsa": [], "reason": "", "kev": None}, code("a", "critical")]
+        record = {**self.record(findings), "status": "completed", "owasp_coverage": [], "limitations": [],
+                  "steps": [{"name": "Opengrep", "status": "completed", "detail": ""}],
+                  "source": {"name": "org/app", "provider": "github", "sha256": "abc"},
+                  "summary": {"files": 1, "dependencies": 1, "severities": {"high": 1, "critical": 1}, "priorities": {}}}
+        english, spanish = render_repository_report(record, locale="en"), render_repository_report(record, locale="es")
+        self.assertIn("## Executive summary", english)
+        self.assertIn("### What to do first", english)
+        self.assertNotIn("Resumen ejecutivo", english)
+        self.assertIn("## Resumen ejecutivo", spanish)
+
 
 class DiagramTests(unittest.TestCase):
     def test_colors_come_from_the_palette_and_are_validated(self):

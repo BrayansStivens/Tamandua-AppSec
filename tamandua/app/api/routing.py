@@ -41,7 +41,7 @@ PREFIXES: list[Route] = []
 def route(method: str, path: str, **options):
     """Registra un manejador. Un POST sin `action` es un error de programación."""
     if method == "POST" and not options.get("action"):
-        raise ValueError(f"POST {path} necesita cabecera de acción")
+        raise ValueError(f"POST {path} needs an action header")
 
     def register(function):
         entry = Route(method, path, function, **options)
@@ -60,6 +60,15 @@ def _response(status: int, payload: bytes, content_type: str, *, csp: str | None
     if cookie is not None:
         headers["set-cookie"] = cookie
     return Response(payload, status_code=status, headers=headers)
+
+
+def problem(exc: Exception):
+    """What an exception tells the reader: its message (rendered per request) or, failing that, its text."""
+    message = getattr(exc, "message", None)
+    if message:
+        return message
+    first = exc.args[0] if exc.args else None
+    return first if isinstance(first, dict) else str(exc)
 
 
 def error(status: int, message, locale: str, **extra) -> Response:
@@ -119,7 +128,7 @@ def _endpoint(entry: Route):
         user, session = verdict
         response = await run_in_threadpool(entry.handler, Request(http, state, user, session, payload))
         if not isinstance(response, Response):
-            raise TypeError(f"{entry.method} {entry.path} no devolvió una respuesta")
+            raise TypeError(f"{entry.method} {entry.path} did not return a response")
         return response
     endpoint.__name__ = entry.handler.__name__
     return endpoint

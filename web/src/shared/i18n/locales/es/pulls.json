@@ -1,0 +1,90 @@
+{
+  "gate": {
+    "critical": "Crítica",
+    "high": "Alta o superior",
+    "medium": "Media o superior",
+    "never": "Nunca bloquear"
+  },
+  "gate_inline": {
+    "critical": "bloquea desde crítica",
+    "high": "bloquea desde alta o superior",
+    "medium": "bloquea desde media o superior",
+    "never": "nunca bloquea"
+  },
+  "badge": {
+    "not_reviewed": "Sin revisar",
+    "reviewing": "Revisando",
+    "failed": "Falló",
+    "new_commits": "Hay commits nuevos",
+    "clean": "Sin hallazgos nuevos",
+    "new_one": "{{count}} nuevo",
+    "new_other": "{{count}} nuevos",
+    "blocking_one": "{{count}} crítico/alto",
+    "blocking_other": "{{count}} críticos/altos"
+  },
+  "loading": {
+    "watched": "Cargando repositorios vigilados",
+    "repository": "Cargando repositorio",
+    "pulls": "Cargando pull requests"
+  },
+  "connect": {
+    "title": "Conecta GitHub para revisar pull requests",
+    "body": "La revisión usa la GitHub App instalada: elige los repositorios en Integraciones."
+  },
+  "repo": {
+    "choose": "Elige un repositorio",
+    "description": "Cada commit nuevo de un PR se escanea y se compara con la rama principal: solo cuenta lo que el PR introduce. Sus hallazgos entran en el estado del repositorio y se remedian solos cuando un commit posterior los quita o el PR se cierra sin merge.",
+    "watching": "Vigilancia activa",
+    "not_watching": "Sin vigilancia",
+    "post_comment": "Comentar y marcar el commit en GitHub",
+    "branch": "Reanalizar la rama principal cuando cambie",
+    "gate": "Bloquear desde",
+    "gate_label": "Umbral de bloqueo",
+    "admin_only": "Solo un administrador cambia esta configuración.",
+    "enable_hint": "Actívala con su interruptor en la lista para que cada push se revise solo, o usa «Revisar ahora» en un PR.",
+    "branch_scanned": "Rama principal: último análisis por un cambio el {{date}} (commit <code>{{sha}}</code>). Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min.",
+    "branch_pending": "Rama principal: se analizará en la próxima vuelta del vigilante. Tras un merge el estado del repositorio se pone al día solo, como mucho una vez cada {{minutes}} min.",
+    "missing_write": "La GitHub App instalada aún no puede comentar: falta <b>Pull requests</b> y <b>Commit statuses</b> en escritura. Las revisiones se hacen igual y se ven aquí; en cuanto la instalación acepte esos permisos, se publicarán en GitHub."
+  },
+  "list": {
+    "title": "PRs abiertos",
+    "title_count": "PRs abiertos · {{total}}",
+    "empty": "No hay pull requests abiertos en este repositorio.",
+    "draft": "borrador",
+    "reviewed": "revisado {{date}}",
+    "view_result": "Ver resultado",
+    "review_now": "Revisar ahora"
+  },
+  "watch": {
+    "title": "Repositorios vigilados · {{total}}",
+    "description": "Los activados revisan solos cada PR nuevo o cada push y reanalizan la rama principal cuando cambia (se comprueba cada {{minutes}} min).",
+    "admin_hint": "Actívalos uno a uno o en bloque.",
+    "member_hint": "Solo un administrador cambia qué se vigila.",
+    "bulk": "Acciones en bloque",
+    "watch_all": "Vigilar todos los repositorios",
+    "unwatch_all": "Dejar de vigilar todos",
+    "confirm_all": "¿Vigilar todos los repositorios de la GitHub App? Cada push de cualquiera de ellos lanzará una revisión.",
+    "search": "Buscar repositorio",
+    "search_placeholder": "Buscar…",
+    "only_watched": "Solo vigilados",
+    "selected_one": "{{count}} seleccionado",
+    "selected_other": "{{count}} seleccionados",
+    "enable": "Activar",
+    "disable": "Desactivar",
+    "clear_selection": "Quitar selección",
+    "partial": "Resultados parciales: la lista de esta cuenta se está leyendo de GitHub.",
+    "select_page": "Seleccionar esta página",
+    "select_one": "Seleccionar {{name}}",
+    "comments": "comenta en GitHub",
+    "panel_only": "solo en el panel",
+    "branch_current": "rama principal al día",
+    "not_watched": "sin vigilancia",
+    "reviewed_one": "{{count}} PR revisado",
+    "reviewed_other": "{{count}} PR revisados",
+    "on": "Activa",
+    "off": "Inactiva",
+    "toggle": "Vigilar {{name}}",
+    "no_watched_match": "Ningún repositorio vigilado coincide.",
+    "no_match": "Ningún repositorio coincide."
+  }
+}

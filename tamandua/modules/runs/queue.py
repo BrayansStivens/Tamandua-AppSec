@@ -65,7 +65,7 @@ def recover(data_dir: Path) -> list[dict]:
     with db.transaction(data_dir) as connection:
         rows = connection.execute(update(jobs).where(jobs.c.tenant_id == TENANT, jobs.c.status == "running",
                                                      jobs.c.locked_at < func.now() - STALE)
-                                  .values(status="failed", error="Interrumpido: el worker dejó de responder", finished_at=func.now())
+                                  .values(status="failed", error="Interrupted: the worker stopped responding", finished_at=func.now())
                                   .returning(jobs.c.id, jobs.c.kind, jobs.c.run_id)).all()
     return [dict(row._mapping) for row in rows]
 

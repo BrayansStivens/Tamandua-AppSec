@@ -6,6 +6,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Check as CheckIcon, Globe2, LayoutGrid, Lock, Plus, Square, Trash2, Undo2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select'
@@ -92,6 +93,7 @@ function useShiftKey() {
 }
 
 function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'component'>>) {
+  const { t } = useTranslation('threats')
   const keepRatio = useContext(ShiftContext)
   const { component, kindLabel, flagged } = data
   const base = baseKind(component)
@@ -107,9 +109,9 @@ function ComponentNode({ data, selected }: NodeProps<Node<ComponentData, 'compon
     <span className="line-clamp-2 text-[13px] leading-4 font-semibold text-app-fg">{component.name}</span>
     <span className={`mt-0.5 line-clamp-1 text-[11px] ${TEXT_TONE[tone]}`}>{component.technology || kindLabel}</span>
     {(component.internet_facing || sensitive || component.encrypted_at_rest) && <span className="mt-1 flex items-center gap-1.5 text-app-subtle">
-      {component.internet_facing && <Globe2 className="size-3" aria-label="Expuesto a Internet" />}
-      {component.encrypted_at_rest && <Lock className="size-3" aria-label="Cifrado en reposo" />}
-      {sensitive && <span className="rounded bg-app-soft px-1 text-[11px] font-medium tracking-wide uppercase">datos sensibles</span>}
+      {component.internet_facing && <Globe2 className="size-3" aria-label={t('canvas.internet_facing')} />}
+      {component.encrypted_at_rest && <Lock className="size-3" aria-label={t('canvas.encrypted_at_rest')} />}
+      {sensitive && <span className="rounded bg-app-soft px-1 text-[11px] font-medium tracking-wide uppercase">{t('canvas.sensitive_data')}</span>}
     </span>}
   </div>
 }
@@ -123,6 +125,7 @@ function BoundaryNode({ data, selected }: NodeProps<Node<BoundaryData, 'boundary
 }
 
 function FlowEdge({ id, sourceX: rawSourceX, sourceY: rawSourceY, targetX: rawTargetX, targetY: rawTargetY, sourcePosition, targetPosition, data, selected, markerEnd }: EdgeProps<Edge<FlowData, 'flow'>>) {
+  const { t } = useTranslation('threats')
   // Carril propio si hay más flujos entre los mismos dos componentes (no se pintan uno encima del otro).
   const [sourceX, sourceY] = shift(sourcePosition as Side, rawSourceX, rawSourceY, data?.offset ?? 0)
   const [targetX, targetY] = shift(targetPosition as Side, rawTargetX, rawTargetY, data?.offset ?? 0)
@@ -133,7 +136,7 @@ function FlowEdge({ id, sourceX: rawSourceX, sourceY: rawSourceY, targetX: rawTa
   const flow = data?.flow
   // En el lienzo, corta: número y protocolo (lo mismo que el SVG y el informe). Completa al seleccionarla y en el título.
   const short = flow ? `${data?.number} · ${flow.protocol.toUpperCase()}` : ''
-  const label = flow ? `${short}${flow.name ? ` · ${flow.name}` : ''}${flow.encrypted ? '' : ' · sin cifrar'}` : ''
+  const label = flow ? `${short}${flow.name ? ` · ${flow.name}` : ''}${flow.encrypted ? '' : ` · ${t('canvas.unencrypted_flow')}`}` : ''
   return <>
     <BaseEdge id={id} path={path} markerEnd={markerEnd} className={`tm-flow ${flow?.encrypted ? '' : 'tm-flow--plain'} ${data?.flagged ? 'tm-flow--flagged' : ''} ${selected ? 'tm-flow--selected' : ''}`} />
     {flow && label && <EdgeLabelRenderer>
@@ -166,22 +169,31 @@ export function ThreatCanvas(props: Props) {
   return <ReactFlowProvider><Canvas {...props} /></ReactFlowProvider>
 }
 
-// El lienzo en español (3.1.2): la página es lang="es" y React Flow trae sus textos accesibles en inglés.
-const ARIA_ES = {
-  'node.a11yDescription.default': 'Pulsa Intro o Espacio para seleccionar el componente. Supr para quitarlo, Escape para cancelar.',
-  'node.a11yDescription.keyboardDisabled': 'Pulsa Intro o Espacio para seleccionar el componente.',
-  'node.a11yDescription.ariaLiveMessage': ({ direction, x, y }: { direction: string; x: number; y: number }) => `Componente movido hacia ${direction === 'left' ? 'la izquierda' : direction === 'right' ? 'la derecha' : direction === 'up' ? 'arriba' : 'abajo'}, a ${Math.round(x)}, ${Math.round(y)}`,
-  'edge.a11yDescription.default': 'Pulsa Intro o Espacio para seleccionar el flujo. Supr para quitarlo, Escape para cancelar.',
-  'controls.ariaLabel': 'Controles del diagrama',
-  'controls.zoomIn.ariaLabel': 'Acercar',
-  'controls.zoomOut.ariaLabel': 'Alejar',
-  'controls.fitView.ariaLabel': 'Ajustar a la vista',
-  'controls.interactive.ariaLabel': 'Bloquear o desbloquear el diagrama',
-  'minimap.ariaLabel': 'Minimapa',
-  'handle.ariaLabel': 'Punto de conexión',
+// React Flow ships its accessible texts in English only; give it the reader's language (WCAG 3.1.2).
+function useAriaLabels() {
+  const { t } = useTranslation('threats')
+  return useMemo(() => ({
+    'node.a11yDescription.default': t('canvas.aria.node'),
+    'node.a11yDescription.keyboardDisabled': t('canvas.aria.node_keyboard_disabled'),
+    'node.a11yDescription.ariaLiveMessage': ({ direction, x, y }: { direction: string; x: number; y: number }) => {
+      const at = { x: Math.round(x), y: Math.round(y) }
+      return direction === 'left' ? t('canvas.aria.moved_left', at) : direction === 'right' ? t('canvas.aria.moved_right', at)
+        : direction === 'up' ? t('canvas.aria.moved_up', at) : t('canvas.aria.moved_down', at)
+    },
+    'edge.a11yDescription.default': t('canvas.aria.edge'),
+    'controls.ariaLabel': t('canvas.aria.controls'),
+    'controls.zoomIn.ariaLabel': t('canvas.aria.zoom_in'),
+    'controls.zoomOut.ariaLabel': t('canvas.aria.zoom_out'),
+    'controls.fitView.ariaLabel': t('canvas.aria.fit_view'),
+    'controls.interactive.ariaLabel': t('canvas.aria.interactive'),
+    'minimap.ariaLabel': t('canvas.aria.minimap'),
+    'handle.ariaLabel': t('canvas.aria.handle'),
+  }), [t])
 }
 
 function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
+  const { t } = useTranslation('threats')
+  const ariaLabels = useAriaLabels()
   const dark = useDarkMode()
   const shift = useShiftKey()
   const flow = useReactFlow()
@@ -287,14 +299,14 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
     const at = center()
     const id = newId(kind === 'custom' ? 'componente' : catalog.kinds[kind] ?? 'componente', current.components.map(item => item.id))
     pendingSelect.current = componentId(id)
-    setModel({ ...current, components: [...current.components, { id, name: kind === 'custom' ? 'Nuevo componente' : catalog.kinds[kind] ?? 'Componente', kind, custom_kind: kind === 'custom' ? 'Tipo propio' : '', custom_base: kind === 'custom' ? 'service' : undefined, data: [], internet_facing: kind === 'actor',
+    setModel({ ...current, components: [...current.components, { id, name: kind === 'custom' ? t('canvas.new_component') : catalog.kinds[kind] ?? t('canvas.component'), kind, custom_kind: kind === 'custom' ? t('canvas.custom_kind_default') : '', custom_base: kind === 'custom' ? 'service' : undefined, data: [], internet_facing: kind === 'actor',
       authenticates: PROCESSES.includes(kind), encrypted_at_rest: false, position: { x: Math.round(at.x - NODE_W / 2), y: Math.round(at.y - NODE_H / 2) }, size: null }] })
   }
   const addBoundary = () => {
     const current = modelRef.current
     const at = center()
     const id = newId('frontera', current.boundaries.map(item => item.id))
-    setModel({ ...current, boundaries: [...current.boundaries, { id, name: 'Nueva frontera', components: [], box: { x: Math.round(at.x - 170), y: Math.round(at.y - 120), width: 340, height: 240 } }] })
+    setModel({ ...current, boundaries: [...current.boundaries, { id, name: t('canvas.new_boundary'), components: [], box: { x: Math.round(at.x - 170), y: Math.round(at.y - 120), width: 340, height: 240 } }] })
   }
   // Ordenar: todo se recoloca de una vez (componentes y cajas con la misma geometría) y queda guardable.
   const tidy = () => {
@@ -309,7 +321,7 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
   // Con la guía abierta el panel de edición baja bajo el lienzo: el diagrama necesita el ancho.
   return <div className={`grid gap-4 ${compact ? '' : 'xl:grid-cols-[minmax(0,1fr)_320px]'}`}>
     <ShiftContext.Provider value={shift}><div className="tm-canvas h-[640px] overflow-hidden rounded-2xl border border-app-line bg-inset">
-      <ReactFlow<CanvasNode, Edge<FlowData, 'flow'>> ariaLabelConfig={ARIA_ES} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
+      <ReactFlow<CanvasNode, Edge<FlowData, 'flow'>> ariaLabelConfig={ariaLabels} nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
         onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
         onDelete={({ nodes: removed, edges: gone }) => remove(removed.map(node => node.id), gone.map(edge => edge.id))}
         connectionMode={ConnectionMode.Loose} deleteKeyCode={['Backspace', 'Delete']}
@@ -321,9 +333,9 @@ function Canvas({ model, setModel, threats, catalog, compact = false }: Props) {
         <Controls showInteractive={false} />
         <Panel position="bottom-right"><Legend /></Panel>
         <Panel position="top-left" className="flex flex-wrap gap-1.5">
-          <Select value={null} onValueChange={value => { if (value) addComponent(value as Kind) }}><SelectTrigger aria-label="Añadir componente" className="h-8 border-app-line bg-panel text-xs shadow-sm"><Plus className="size-3.5" /><SelectValue placeholder="Componente…" /></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}<SelectItem value="custom">Otro tipo (lo nombras tú)…</SelectItem></SelectContent></Select>
-          <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={addBoundary}><Square />Frontera</Button>
-          <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={tidy} title="Colocar en columnas por frontera"><LayoutGrid />Ordenar</Button>
+          <Select value={null} onValueChange={value => { if (value) addComponent(value as Kind) }}><SelectTrigger aria-label={t('canvas.add_component')} className="h-8 border-app-line bg-panel text-xs shadow-sm"><Plus className="size-3.5" /><SelectValue placeholder={t('canvas.component_placeholder')} /></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}<SelectItem value="custom">{t('canvas.other_kind')}</SelectItem></SelectContent></Select>
+          <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={addBoundary}><Square />{t('canvas.boundary')}</Button>
+          <Button size="sm" variant="outline" className="h-8 border-app-line bg-panel shadow-sm" onClick={tidy} title={t('canvas.tidy_hint')}><LayoutGrid />{t('canvas.tidy')}</Button>
         </Panel>
       </ReactFlow>
     </div></ShiftContext.Provider>
@@ -342,6 +354,7 @@ function Check({ checked, onChange, children }: { checked: boolean; onChange: (v
 }
 
 function Inspector({ model, setModel, catalog, node, flowId: selected, onRemove }: { model: Model; setModel: (model: Model) => void; catalog: Catalog; node?: CanvasNode; flowId: string | null; onRemove: () => void }) {
+  const { t } = useTranslation('threats')
   const field = 'block space-y-1'
   const label = 'text-[11px] font-medium text-app-muted'
   if (selected) {
@@ -350,24 +363,24 @@ function Inspector({ model, setModel, catalog, node, flowId: selected, onRemove 
     const names = Object.fromEntries(model.components.map(entry => [entry.id, entry.name]))
     const update = (change: Partial<Flow>) => setModel({ ...model, flows: model.flows.map(entry => entry.id === item.id ? { ...entry, ...change } : entry) })
     return <aside className="space-y-4 rounded-2xl border border-app-line bg-panel p-4">
-      <div><p className="text-xs text-app-subtle">Flujo de datos</p><p className="text-sm font-semibold">{names[item.source]} → {names[item.target]}</p></div>
-      <label className={field}><span className={label}>Qué viaja</span><Input value={item.name ?? ''} maxLength={80} placeholder="p. ej. consultas de pedidos" onChange={event => update({ name: event.target.value })} className="h-8 border-app-line bg-app-soft" /></label>
-      <label className={field}><span className={label}>Protocolo</span><select value={item.protocol} onChange={event => update({ protocol: event.target.value })} className={select}>{catalog.protocols.map(protocol => <option key={protocol} value={protocol}>{protocol.toUpperCase()}</option>)}</select></label>
-      <div className={field} role="group" aria-label="Datos"><span aria-hidden className={label}>Datos</span><Chips value={item.data} options={catalog.classifications} onChange={data => update({ data })} /></div>
-      <div className="space-y-1.5"><Check checked={item.authenticated} onChange={authenticated => update({ authenticated })}>Autenticado</Check><Check checked={item.encrypted} onChange={encrypted => update({ encrypted })}>Cifrado en tránsito</Check></div>
-      <div className="flex gap-2"><Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => update({ source: item.target, target: item.source })}><Undo2 />Invertir</Button>
-        <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 />Quitar</Button></div>
+      <div><p className="text-xs text-app-subtle">{t('inspector.flow')}</p><p className="text-sm font-semibold">{names[item.source]} → {names[item.target]}</p></div>
+      <label className={field}><span className={label}>{t('inspector.flow_name')}</span><Input value={item.name ?? ''} maxLength={80} placeholder={t('inspector.flow_name_placeholder')} onChange={event => update({ name: event.target.value })} className="h-8 border-app-line bg-app-soft" /></label>
+      <label className={field}><span className={label}>{t('inspector.protocol')}</span><select value={item.protocol} onChange={event => update({ protocol: event.target.value })} className={select}>{catalog.protocols.map(protocol => <option key={protocol} value={protocol}>{protocol.toUpperCase()}</option>)}</select></label>
+      <div className={field} role="group" aria-label={t('inspector.data')}><span aria-hidden className={label}>{t('inspector.data')}</span><Chips value={item.data} options={catalog.classifications} onChange={data => update({ data })} /></div>
+      <div className="space-y-1.5"><Check checked={item.authenticated} onChange={authenticated => update({ authenticated })}>{t('inspector.authenticated')}</Check><Check checked={item.encrypted} onChange={encrypted => update({ encrypted })}>{t('inspector.encrypted_in_transit')}</Check></div>
+      <div className="flex gap-2"><Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => update({ source: item.target, target: item.source })}><Undo2 />{t('inspector.reverse')}</Button>
+        <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 />{t('common:actions.remove')}</Button></div>
     </aside>
   }
   if (node?.type === 'boundary') {
     const item = model.boundaries.find(entry => boundaryId(entry.id) === node.id)
     if (!item) return <Help />
     return <aside className="space-y-4 rounded-2xl border border-app-line bg-panel p-4">
-      <p className="text-xs text-app-subtle">Frontera de confianza · {item.components.length} componentes</p>
-      <label className={field}><span className={label}>Nombre</span><Input value={item.name} maxLength={80} onChange={event => setModel({ ...model, boundaries: model.boundaries.map(entry => entry.id === item.id ? { ...entry, name: event.target.value } : entry) })} className="h-8 border-app-line bg-app-soft" /></label>
-      <ColorPicker label="Color de la frontera" value={item.color} automatic="Gris (por defecto)" onChange={color => setModel({ ...model, boundaries: model.boundaries.map(entry => entry.id === item.id ? { ...entry, color } : entry) })} />
-      <p className="text-xs leading-5 text-app-subtle">Arrástrala por su nombre (se lleva sus componentes) y ajústala desde las esquinas. Un componente pertenece a la frontera en la que está su centro.</p>
-      <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 />Quitar frontera</Button>
+      <p className="text-xs text-app-subtle">{t('inspector.boundary_heading', { components: t('count.components', { count: item.components.length }) })}</p>
+      <label className={field}><span className={label}>{t('inspector.name')}</span><Input value={item.name} maxLength={80} onChange={event => setModel({ ...model, boundaries: model.boundaries.map(entry => entry.id === item.id ? { ...entry, name: event.target.value } : entry) })} className="h-8 border-app-line bg-app-soft" /></label>
+      <ColorPicker label={t('inspector.boundary_color')} value={item.color} automatic={t('inspector.boundary_color_default')} onChange={color => setModel({ ...model, boundaries: model.boundaries.map(entry => entry.id === item.id ? { ...entry, color } : entry) })} />
+      <p className="text-xs leading-5 text-app-subtle">{t('inspector.boundary_help')}</p>
+      <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 />{t('inspector.remove_boundary')}</Button>
     </aside>
   }
   if (node?.type === 'component') {
@@ -375,41 +388,43 @@ function Inspector({ model, setModel, catalog, node, flowId: selected, onRemove 
     if (!item) return <Help />
     const update = (change: Partial<Component>) => setModel({ ...model, components: model.components.map(entry => entry.id === item.id ? { ...entry, ...change } : entry) })
     return <aside className="space-y-4 rounded-2xl border border-app-line bg-panel p-4">
-      <label className={field}><span className={label}>Nombre</span><Input value={item.name} maxLength={80} onChange={event => update({ name: event.target.value })} className="h-8 border-app-line bg-app-soft" /></label>
+      <label className={field}><span className={label}>{t('inspector.name')}</span><Input value={item.name} maxLength={80} onChange={event => update({ name: event.target.value })} className="h-8 border-app-line bg-app-soft" /></label>
       <div className="grid grid-cols-2 gap-2">
-        <label className={field}><span className={label}>Tipo</span><Select value={item.kind} onValueChange={value => { if (value) update({ kind: value as Kind, custom_kind: value === 'custom' ? item.custom_kind || 'Tipo propio' : '' }) }}><SelectTrigger aria-label="Tipo de componente" className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.kind]}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select></label>
-        <label className={field}><span className={label}>Tecnología</span><Input value={item.technology ?? ''} maxLength={80} placeholder="p. ej. Django" onChange={event => update({ technology: event.target.value })} className="h-8 border-app-line bg-app-soft" /></label>
+        <label className={field}><span className={label}>{t('inspector.kind')}</span><Select value={item.kind} onValueChange={value => { if (value) update({ kind: value as Kind, custom_kind: value === 'custom' ? item.custom_kind || t('canvas.custom_kind_default') : '' }) }}><SelectTrigger aria-label={t('inspector.kind_label')} className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.kind]}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select></label>
+        <label className={field}><span className={label}>{t('inspector.technology')}</span><Input value={item.technology ?? ''} maxLength={80} placeholder={t('inspector.technology_placeholder')} onChange={event => update({ technology: event.target.value })} className="h-8 border-app-line bg-app-soft" /></label>
       </div>
-      {item.kind === 'custom' && <label className={field}><span className={label}>Nombre del tipo propio</span><Input value={item.custom_kind ?? ''} maxLength={80} onChange={event => update({ custom_kind: event.target.value })} placeholder="p. ej. Motor de reglas" className="h-8 border-app-line bg-app-soft" /></label>}
-      {item.kind === 'custom' && <label className={field}><span className={label}>Rol base para el análisis</span><Select value={item.custom_base || 'service'} onValueChange={value => { if (value) update({ custom_base: value as Exclude<Kind, 'custom'> }) }}><SelectTrigger aria-label="Rol base para el análisis" className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.custom_base || 'service']}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-[11px] text-app-subtle">El nombre es libre; este rol determina qué reglas STRIDE y LINDDUN se aplican.</p></label>}
-      <ColorPicker label="Color" value={item.color} automatic={`Según el tipo (${TONE_NAMES[toneOf({ ...item, color: '' })].toLowerCase()})`} onChange={color => update({ color })} />
-      <label className={field}><span className={label}>Descripción</span><textarea value={item.description ?? ''} maxLength={400} rows={2} onChange={event => update({ description: event.target.value })} placeholder="Qué hace y qué datos maneja" className="w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-fg" /></label>
-      <label className={field}><span className={label}>Código (repositorio)</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, asset_ref: event.target.value ? '' : item.asset_ref })} className={select}><option value="">Sin enlazar</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select>{item.asset_ref && !item.asset && <p className="mt-1 text-xs text-warning">Referencia importada: {item.asset_ref} · pendiente de vincular</p>}</label>
-      {item.asset && <div className={field}><label htmlFor="tm-component-path" className={label}>Carpeta dentro del repositorio</label><Input id="tm-component-path" aria-describedby="tm-component-path-hint" value={item.path ?? ''} maxLength={200} placeholder="vacío = todo el repositorio · p. ej. frontend/" onChange={event => update({ path: event.target.value })} className="h-8 border-app-line bg-app-soft font-mono text-xs" />
-        <p id="tm-component-path-hint" className="text-[11px] leading-4 text-app-subtle">Solo los hallazgos de esa carpeta cuentan como indicios de sus amenazas. En un monorepo evita que el backend «evidencie» amenazas del frontend.</p></div>}
-      <div className={field} role="group" aria-label="Datos que guarda o maneja"><span aria-hidden className={label}>Datos que guarda o maneja</span><Chips value={item.data} options={catalog.classifications} onChange={data => update({ data })} /></div>
-      <div className="space-y-1.5"><Check checked={item.internet_facing} onChange={internet_facing => update({ internet_facing })}>Expuesto a Internet</Check><Check checked={item.authenticates} onChange={authenticates => update({ authenticates })}>Autentica</Check>
-        {STORES.includes(item.kind === 'custom' ? item.custom_base ?? 'service' : item.kind) && <Check checked={item.encrypted_at_rest} onChange={encrypted_at_rest => update({ encrypted_at_rest })}>Cifrado en reposo</Check>}</div>
-      <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 />Quitar componente</Button>
+      {item.kind === 'custom' && <label className={field}><span className={label}>{t('inspector.custom_kind')}</span><Input value={item.custom_kind ?? ''} maxLength={80} onChange={event => update({ custom_kind: event.target.value })} placeholder={t('inspector.custom_kind_placeholder')} className="h-8 border-app-line bg-app-soft" /></label>}
+      {item.kind === 'custom' && <label className={field}><span className={label}>{t('inspector.custom_base')}</span><Select value={item.custom_base || 'service'} onValueChange={value => { if (value) update({ custom_base: value as Exclude<Kind, 'custom'> }) }}><SelectTrigger aria-label={t('inspector.custom_base')} className="h-8 w-full border-app-line bg-app-soft text-xs"><SelectValue>{catalog.kinds[item.custom_base || 'service']}</SelectValue></SelectTrigger><SelectContent>{Object.entries(catalog.kinds).filter(([key]) => key !== 'custom').map(([key, text]) => <SelectItem key={key} value={key}>{text}</SelectItem>)}</SelectContent></Select><p className="mt-1 text-[11px] text-app-subtle">{t('inspector.custom_base_hint')}</p></label>}
+      <ColorPicker label={t('inspector.color')} value={item.color} automatic={t('inspector.color_by_kind', { color: t(TONE_NAMES[toneOf({ ...item, color: '' })]).toLowerCase() })} onChange={color => update({ color })} />
+      <label className={field}><span className={label}>{t('inspector.description')}</span><textarea value={item.description ?? ''} maxLength={400} rows={2} onChange={event => update({ description: event.target.value })} placeholder={t('inspector.description_placeholder')} className="w-full rounded-lg border border-app-line bg-app-soft px-3 py-2 text-xs text-app-fg" /></label>
+      <label className={field}><span className={label}>{t('inspector.code')}</span><select value={item.asset ?? ''} onChange={event => update({ asset: event.target.value || null, asset_ref: event.target.value ? '' : item.asset_ref })} className={select}><option value="">{t('inspector.not_linked')}</option>{assetGroups(catalog, model).map(group => <optgroup key={group.label} label={group.label}>{group.items.map(asset => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</optgroup>)}</select>{item.asset_ref && !item.asset && <p className="mt-1 text-xs text-warning">{t('inspector.imported_ref', { ref: item.asset_ref })}</p>}</label>
+      {item.asset && <div className={field}><label htmlFor="tm-component-path" className={label}>{t('inspector.path')}</label><Input id="tm-component-path" aria-describedby="tm-component-path-hint" value={item.path ?? ''} maxLength={200} placeholder={t('inspector.path_placeholder')} onChange={event => update({ path: event.target.value })} className="h-8 border-app-line bg-app-soft font-mono text-xs" />
+        <p id="tm-component-path-hint" className="text-[11px] leading-4 text-app-subtle">{t('inspector.path_hint')}</p></div>}
+      <div className={field} role="group" aria-label={t('inspector.component_data')}><span aria-hidden className={label}>{t('inspector.component_data')}</span><Chips value={item.data} options={catalog.classifications} onChange={data => update({ data })} /></div>
+      <div className="space-y-1.5"><Check checked={item.internet_facing} onChange={internet_facing => update({ internet_facing })}>{t('canvas.internet_facing')}</Check><Check checked={item.authenticates} onChange={authenticates => update({ authenticates })}>{t('inspector.authenticates')}</Check>
+        {STORES.includes(item.kind === 'custom' ? item.custom_base ?? 'service' : item.kind) && <Check checked={item.encrypted_at_rest} onChange={encrypted_at_rest => update({ encrypted_at_rest })}>{t('canvas.encrypted_at_rest')}</Check>}</div>
+      <Button size="sm" variant="ghost" onClick={onRemove}><Trash2 />{t('inspector.remove_component')}</Button>
     </aside>
   }
   return <Help />
 }
 
 function Help() {
+  const { t } = useTranslation('threats')
   return <aside className="space-y-3 rounded-2xl border border-dashed border-app-line p-4 text-xs leading-5 text-app-subtle">
-    <p className="text-sm font-medium text-app-secondary">Cómo se usa</p>
-    <p><Plus className="mr-1 inline size-3" />Añade componentes y fronteras desde la barra del lienzo.</p>
-    <p>Para crear un flujo, arrastra desde uno de los puntos de un componente hasta otro. La flecha indica hacia dónde viajan los datos.</p>
-    <p>Pulsa un componente, un flujo o el nombre de una frontera para editarlo aquí. Suprimir borra lo seleccionado.</p>
-    <p>Color: el del papel de cada componente (leyenda abajo a la derecha); cámbialo al seleccionarlo. Anillo naranja: amenazas con indicios en los análisis. Línea roja discontinua: flujo sin cifrar.</p>
-    <p>Cada flujo lleva un número: es el mismo del SVG y de la tabla de flujos del informe.</p>
+    <p className="text-sm font-medium text-app-secondary">{t('help.title')}</p>
+    <p><Plus className="mr-1 inline size-3" />{t('help.add')}</p>
+    <p>{t('help.flows')}</p>
+    <p>{t('help.select')}</p>
+    <p>{t('help.colors')}</p>
+    <p>{t('help.numbers')}</p>
   </aside>
 }
 
 // Paleta de tokens como grupo de opciones (patrón radiogroup de WAI-ARIA): Tab entra en la opción elegida y las
 // flechas cambian de color.
 function ColorPicker({ label, value, automatic, onChange }: { label: string; value?: string; automatic: string; onChange: (color: string) => void }) {
+  const { t } = useTranslation('threats')
   const current = TONES.includes(value as Tone) ? value as Tone : ''
   const options: ('' | Tone)[] = ['', ...TONES]
   const move = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -424,9 +439,9 @@ function ColorPicker({ label, value, automatic, onChange }: { label: string; val
     <span id={`${label}-label`} className="text-[11px] font-medium text-app-muted">{label}</span>
     <div role="radiogroup" aria-labelledby={`${label}-label`} onKeyDown={move} className="flex flex-wrap items-center gap-1.5">
       <button type="button" role="radio" data-tone="auto" aria-checked={current === ''} tabIndex={current === '' ? 0 : -1} onClick={() => onChange('')}
-        className={`min-h-6 rounded border px-2 text-[11px] ${current === '' ? 'border-brand/60 bg-brand/10 text-brand' : 'border-app-line text-app-subtle'}`}>Automático</button>
+        className={`min-h-6 rounded border px-2 text-[11px] ${current === '' ? 'border-brand/60 bg-brand/10 text-brand' : 'border-app-line text-app-subtle'}`}>{t('inspector.automatic')}</button>
       {TONES.map(tone => <button key={tone} type="button" role="radio" data-tone={tone} aria-checked={current === tone} tabIndex={current === tone ? 0 : -1}
-        aria-label={TONE_NAMES[tone]} title={TONE_NAMES[tone]} onClick={() => onChange(tone)}
+        aria-label={t(TONE_NAMES[tone])} title={t(TONE_NAMES[tone])} onClick={() => onChange(tone)}
         className={`grid size-6 place-items-center rounded-md border-[1.5px] ${NODE_TONE[tone]} ${current === tone ? 'outline-2 outline-offset-1 outline-brand' : ''}`}>
         {current === tone && <CheckIcon aria-hidden className={`size-3.5 ${TEXT_TONE[tone]}`} />}</button>)}
     </div>
@@ -435,8 +450,9 @@ function ColorPicker({ label, value, automatic, onChange }: { label: string; val
 }
 
 function Legend() {
-  return <div role="group" aria-label="Leyenda del diagrama" className="hidden max-w-[420px] flex-wrap md:flex items-center gap-x-3 gap-y-1 rounded-lg border border-app-line bg-panel/95 px-2.5 py-1.5 text-[11px] text-app-muted shadow-sm">
-    {LEGEND.map(([tone, text]) => <span key={tone} className="flex items-center gap-1"><span aria-hidden className={`inline-block h-2.5 w-4 rounded-sm border ${NODE_TONE[tone]}`} />{text}</span>)}
-    <span className="flex items-center gap-1"><span aria-hidden className="inline-block w-4 border-t-[1.5px] border-dashed border-danger" />Sin cifrar</span>
+  const { t } = useTranslation('threats')
+  return <div role="group" aria-label={t('canvas.legend')} className="hidden max-w-[420px] flex-wrap md:flex items-center gap-x-3 gap-y-1 rounded-lg border border-app-line bg-panel/95 px-2.5 py-1.5 text-[11px] text-app-muted shadow-sm">
+    {LEGEND.map(([tone, text]) => <span key={tone} className="flex items-center gap-1"><span aria-hidden className={`inline-block h-2.5 w-4 rounded-sm border ${NODE_TONE[tone]}`} />{t(text)}</span>)}
+    <span className="flex items-center gap-1"><span aria-hidden className="inline-block w-4 border-t-[1.5px] border-dashed border-danger" />{t('canvas.unencrypted')}</span>
   </div>
 }

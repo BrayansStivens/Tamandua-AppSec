@@ -9,6 +9,7 @@ from tamandua.modules.findings import registry
 from tamandua.modules.findings import triage
 from tamandua.modules.runs.store import save_repository_scan
 from test_dashboard import _finding, _scan
+from tamandua.shared.i18n import text
 
 KEY = "github#7"
 A, B, C = "a" * 64, "b" * 64, "c" * 64
@@ -41,7 +42,7 @@ class RegistryTests(unittest.TestCase):
         self.run_([_finding(A)])
         self.assertEqual(self.status(), {A: "open", B: "fixed"})
         fixed = registry.load(self.data_dir, KEY)["findings"][B]["fixed"]
-        self.assertTrue(fixed["auto"] and "escaneo completo" in fixed["how"])
+        self.assertTrue(fixed["auto"] and "escaneo completo" in text(fixed["how"]))
         self.run_([_finding(A), _finding(B)])
         self.assertEqual(self.status(), {A: "open", B: "open"})
         self.assertEqual(registry.summarize(self.data_dir, KEY)["open"], 2)
@@ -76,7 +77,7 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(self.status()[C], "open")
         self.run_([], pr=4, head="2" * 40)         # nuevo commit del PR sin el hallazgo
         self.assertEqual(self.status()[C], "fixed")
-        self.assertIn("2222222", registry.load(self.data_dir, KEY)["findings"][C]["fixed"]["how"])
+        self.assertIn("2222222", text(registry.load(self.data_dir, KEY)["findings"][C]["fixed"]["how"]))
 
     def test_closed_and_merged_pull_requests(self):
         self.run_([_finding(B)], pr=5)

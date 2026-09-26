@@ -14,6 +14,7 @@ from tamandua.modules.sources.domains import DomainError, check_reachability, re
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, _analyzable, _extract_limited, available_sources, list_repositories, snapshot_source
 from tamandua.modules.runs.store import save_repository_scan
+from tamandua.shared.i18n import localize, text
 
 
 class RepositoryWorkflowTests(unittest.TestCase):
@@ -141,7 +142,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
                 patch("tamandua.modules.sources.repositories.MAX_EXPANSION", 500_000):
             with self.assertRaises(SourceError) as caught:
                 _extract_limited(blob, Path(temporary))
-        self.assertIn("bomba de descompresión", str(caught.exception))
+        self.assertIn("bomba de descompresión", text(caught.exception.message))
 
     def test_a_big_repository_is_truncated_and_declared_instead_of_failing(self):
         archive = io.BytesIO()
@@ -177,6 +178,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
             scan = scan_repository(root, {"id": "local:demo", "name": "demo", "provider": "local",
                                           "snapshot": {"files": 1, "bytes": 11, "skipped_over_budget": 900,
                                                        "skipped_not_analyzable": 5, "truncated": True}})
+        scan = localize(scan)
         snapshot_step = next(step for step in scan["steps"] if step["id"] == "snapshot")
         self.assertEqual(snapshot_step["status"], "partial")
         self.assertIn("900", snapshot_step["detail"])
@@ -275,14 +277,14 @@ class DownloadTests(unittest.TestCase):
     def test_progress_is_reported_while_downloading(self):
         written, messages = self.run_download([b"x" * 1_048_576] * 3)
         self.assertEqual(written, 3 * 1_048_576)
-        self.assertTrue(any("MB recibidos" in message for message in messages))
-        self.assertIn("Extrayendo", messages[-1])
+        self.assertTrue(any("MB recibidos" in text(message) for message in messages))
+        self.assertIn("Extrayendo", text(messages[-1]))
 
     def test_a_download_that_never_ends_fails_with_a_clear_message(self):
         from tamandua.modules.sources.repositories import SourceError
         with self.assertRaises(SourceError) as caught:
             self.run_download([b"x"] * 1000, timeout="60")
-        self.assertIn("superó 1 min", str(caught.exception))
+        self.assertIn("superó 1 min", text(caught.exception.message))
 
 
 if __name__ == "__main__":
@@ -310,7 +312,7 @@ class EnginesDownTests(unittest.TestCase):
             scan = repository_scan.scan_repository(root, {"id": "github:org/app", "name": "org/app", "provider": "github", "files": 1},
                                                    data_dir=root, progress=lambda level, message: messages.append((level, message)))
         self.assertEqual(scan["status"], "incomplete")
-        self.assertTrue(any(level == "warn" and "no equivale" in message for level, message in messages))
+        self.assertTrue(any(level == "warn" and "no equivale" in text(message) for level, message in messages))
 
 
 class EngineCauseTests(unittest.TestCase):
@@ -320,9 +322,9 @@ class EngineCauseTests(unittest.TestCase):
         failed = subprocess.CompletedProcess([], 125, "", "\x1b[31mdocker: Error response from daemon: invalid mount /c/Users/yo/tamandua/data/work/x "
                                                              "token ghp_abcdefghijklmnopqrstuvwxyz123456\x1b[0m\n")
         with patch.dict("os.environ", {"TAMANDUA_HOST_DATA_DIR": "/c/Users/yo/tamandua/data"}):
-            text = with_cause("Gitleaks terminó con error.", failed)
-        self.assertTrue(text.startswith("Gitleaks terminó con error: docker: Error response from daemon: invalid mount <datos>/work/x"))
-        self.assertNotIn("ghp_", text)
+            rendered = text(with_cause("Gitleaks terminó con error.", failed))
+        self.assertTrue(rendered.startswith("Gitleaks terminó con error: docker: Error response from daemon: invalid mount <datos>/work/x"))
+        self.assertNotIn("ghp_", rendered)
         self.assertEqual(with_cause("Sin causa.", subprocess.CompletedProcess([], 1, "", "")), "Sin causa.")
 
     def test_the_host_path_is_asked_to_docker_on_any_platform(self):
@@ -346,7 +348,7 @@ class EngineCauseTests(unittest.TestCase):
         scanners._own_mounts.update(at=None, mounts={})
         with patch.dict("os.environ", {"TAMANDUA_DATA_DIR": "/data", "TAMANDUA_HOST_DATA_DIR": "/data", "HOSTNAME": "x"}), \
                 patch.object(scanners, "in_container", return_value=True):
-            self.assertIn("TAMANDUA_HOST_DATA_DIR", scanners.host_mount_problem())
+            self.assertIn("TAMANDUA_HOST_DATA_DIR", text(scanners.host_mount_problem()))
         with patch.dict("os.environ", {"TAMANDUA_DATA_DIR": "/data", "TAMANDUA_HOST_DATA_DIR": "/home/yo/tamandua/data", "HOSTNAME": "x"}), \
                 patch.object(scanners, "in_container", return_value=True):
             self.assertIsNone(scanners.host_mount_problem())
@@ -367,8 +369,8 @@ class DockerAccessTests(unittest.TestCase):
             socket.write_text("")
             with patch.object(scanners, "DOCKER_SOCKET", socket), patch.object(scanners.os, "access", return_value=False):
                 message = scanners.socket_problem()
-            self.assertIn(f"grupo {socket.stat().st_gid}", message)
-            self.assertIn("DOCKER_SOCKET_GID", message)
+            self.assertIn(f"grupo {socket.stat().st_gid}", text(message))
+            self.assertIn("DOCKER_SOCKET_GID", text(message))
             with patch.object(scanners, "DOCKER_SOCKET", socket), patch.object(scanners.os, "access", return_value=True):
                 self.assertIsNone(scanners.socket_problem())
 

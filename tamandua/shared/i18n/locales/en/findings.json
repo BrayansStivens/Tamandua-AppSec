@@ -1,0 +1,127 @@
+{
+  "fix": {
+    "commands": {
+      "update": "Update",
+      "reinstall": "Reinstall",
+      "install": "Install"
+    },
+    "verify": "Then push the change to the main branch and click “Re-verify” (or wait for the branch's automatic analysis).",
+    "verify_dependency": "Then regenerate the lockfile, push the change to the main branch and click “Re-verify” (or wait for the branch's automatic analysis).",
+    "verify_image": "Then rebuild and push the image with the same tag and click “Re-verify”.",
+    "no_fix": {
+      "none_published": "No fixed version of {{package}} has been published.",
+      "check_usage": "Check whether your code uses the vulnerable part (the advisory usually names the function or format).",
+      "mitigate": "If it does: mitigate (validate the input, disable the feature) or replace the dependency.",
+      "accept": "If it doesn't: record it as an accepted risk with its reason and a review date."
+    },
+    "manual_update": "Update {{package}} to {{version}} or later in {{path}} and regenerate the lockfile.",
+    "closes_all": "Version {{version}} closes every advisory for {{package}} (this one only needs {{fixed}}).",
+    "npm_transitive": "{{package}} is a transitive dependency: force the version with “{{field}}” in package.json and reinstall.",
+    "override_note": "Better still: update the direct dependency that pulls it in.",
+    "pip_line": "In {{path}}, change the {{package}} line to “{{package}}>={{version}}” (or pin “=={{version}}”).",
+    "go_stdlib": "This is the Go standard library: build with Go {{version}} or later (update the build image and CI too).",
+    "bundler_pin": "If the Gemfile pins a version of {{package}}, raise it to “>= {{version}}”.",
+    "maven_direct": "Change the <version> of {{artifact}} in the pom.xml <dependencies>.",
+    "maven_managed": "Pin the version in the pom.xml dependencyManagement: that also applies it to the transitive dependency.",
+    "gradle_constraint": "Pin the version with a Gradle constraint (it works for transitive dependencies too).",
+    "os_rebuild": "This is an OS package in the image: the best fix is to rebuild it on an updated base image (docker build --pull).",
+    "os_dockerfile": "If the base image doesn't include the fix yet, upgrade the package in the Dockerfile:",
+    "generic_update": "Update {{package}} from {{installed}} to {{version}} or later in {{path}} and regenerate the lockfile.",
+    "transitive_other": "{{package}} comes in through another dependency: if the command doesn't upgrade it, update the direct dependency that pulls it in.",
+    "malicious_sibling": "{{package}} {{version}} is a malicious package: remove it instead of updating it (see its MAL- advisory). Updating isn't enough.",
+    "secret": {
+      "revoke": "Revoke or rotate the credential with its provider now: deleting it from the code isn't enough, it's already in the Git history.",
+      "review_use": "Check with the provider whether it was used from a source you don't recognize.",
+      "vault": "Move it to a secrets manager or an environment variable and read it from there.",
+      "remove": "Remove it from {{path}} and commit.",
+      "history": "If the repository is or was public, consider rewriting the history (git filter-repo); rotating is what protects you.",
+      "verify": "Then click “Re-verify”."
+    }
+  },
+  "fix_examples": {
+    "py_eval_exec_non_literal": "If you need operations, use a table of allowed functions instead of evaluating text.",
+    "py_shell_command_non_literal": "Validate `name` against an allowlist or a strict pattern.",
+    "py_pickle_load": "pickle runs code while deserializing: never use it on data you didn't produce yourself.",
+    "py_flask_debug_true": "The Flask debugger lets anyone run code from the browser.",
+    "py_requests_verify_false": "For an internal CA, pass its bundle: verify=\"/path/ca.pem\".",
+    "py_weak_password_hash": "For passwords: Argon2id, scrypt or bcrypt, never a fast hash.",
+    "py_ssrf_from_request": "If the destination isn't fixed, resolve the name and reject private or metadata addresses.",
+    "js_command_injection": "Validate `branch` against an allowlist or a strict pattern.",
+    "js_dom_xss_sink": "If you need HTML, sanitize it with DOMPurify.",
+    "js_react_dangerously_set_inner_html": "If you really need the HTML: DOMPurify.sanitize(comment) before inserting it.",
+    "js_jwt_hardcoded_secret": "Rotate the secret that was in the code: it's already in the history.",
+    "java_runtime_exec_concatenation": "Validate `host` against an allowlist.",
+    "java_objectinputstream_readobject": "Better still: a data format (JSON) instead of Java serialization.",
+    "java_hardcoded_password": "Rotate the password: it's already in the repository history.",
+    "cs_insecure_deserialization": "BinaryFormatter is obsolete and unsafe.",
+    "php_command_injection": "Better: validate $host against an allowlist first."
+  },
+  "exclusions": {
+    "errors": {
+      "too_many": "Enter at most {{max}} paths.",
+      "not_text": "Each path must be text.",
+      "invalid": "Invalid path: “{{pattern}}”. Use letters, numbers, “/”, “.”, “-”, “_”, “*” and “?”.",
+      "not_relative": "“{{pattern}}” must be relative to the repository root and can't contain “..”.",
+      "everything": "“{{pattern}}” would exclude the whole repository.",
+      "reason_required": "Explain in one sentence why these paths are excluded (it's kept in the history)."
+    },
+    "limitation_one": "Paths excluded by an administrator ({{patterns}}): {{count}} finding was left out of this run. You can see it in Findings → Excluded.",
+    "limitation_other": "Paths excluded by an administrator ({{patterns}}): {{count}} findings were left out of this run. You can see them in Findings → Excluded."
+  },
+  "registry": {
+    "reappeared": "Reappeared in run {{run}}",
+    "gone_from_scan": "No longer found in the full scan of {{date}}",
+    "fixed_in_pr": "Fixed in commit {{commit}} of PR #{{number}}",
+    "pr_closed": "PR #{{number}} was closed without merging"
+  },
+  "triage": {
+    "status": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "false_positive": "False positive",
+      "accepted": "Accepted risk",
+      "fixed": "Fixed"
+    },
+    "errors": {
+      "reason_too_long": "The reason can be at most {{limit}} characters",
+      "note_too_long": "The note can be at most {{limit}} characters",
+      "reason_control_characters": "The reason contains control characters",
+      "note_control_characters": "The note contains control characters",
+      "invalid_status": "Invalid triage status",
+      "invalid_fingerprints": "Provide between 1 and {{max}} valid finding fingerprints",
+      "unknown_fingerprints": "Some fingerprints don't belong to this run",
+      "reason_required": "Explain the reason (at least {{min}} characters): it's kept in the history",
+      "accept_admin_only": "Only an administrator can accept a risk",
+      "invalid_expiry": "Invalid expiry date (YYYY-MM-DD)",
+      "expiry_range": "The acceptance must expire between tomorrow and {{max}} days from now"
+    }
+  },
+  "sla": {
+    "errors": {
+      "invalid_days": "Each due date is a number of days between 1 and {{max}}, or empty to set none.",
+      "missing_levels": "Set the due date for each severity: critical, high, medium and low."
+    }
+  },
+  "remediation": {
+    "remove_malicious": "Remove {{package}} {{version}} and rotate the credentials wherever it was installed",
+    "remove_malicious_unnamed": "Remove the package {{version}} and rotate the credentials wherever it was installed",
+    "update": "Update {{package}} to {{version}}",
+    "update_all": "Update {{package}} to {{version}} (closes all {{total}} advisories)",
+    "update_partial": "Update {{package}} to {{version}}: closes {{fixed}} of {{total}}; the rest have no published fix",
+    "no_fix_short": "No fixed version: assess reachability, mitigate or replace",
+    "no_fix": "No fixed version of {{package}}: assess reachability, mitigate or replace the dependency",
+    "review": "Review and fix following the finding's guide",
+    "severity_count": {
+      "critical_one": "{{count}} critical",
+      "critical_other": "{{count}} critical",
+      "high_one": "{{count}} high",
+      "high_other": "{{count}} high",
+      "medium_one": "{{count}} medium",
+      "medium_other": "{{count}} medium",
+      "low_one": "{{count}} low",
+      "low_other": "{{count}} low",
+      "info_one": "{{count}} informational",
+      "info_other": "{{count}} informational"
+    }
+  }
+}

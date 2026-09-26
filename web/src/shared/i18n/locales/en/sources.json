@@ -1,0 +1,280 @@
+{
+  "new_tab": "(opens in a new tab)",
+  "copied_to_clipboard": "Copied to clipboard",
+  "asset": {
+    "label": "Repository",
+    "placeholder": "Search for a repository…",
+    "open_one": "{{count}} open",
+    "open_other": "{{count}} open",
+    "critical_one": "{{count}} critical",
+    "critical_other": "{{count}} critical",
+    "no_findings": "no findings",
+    "scans_one": "{{count}} scan",
+    "scans_other": "{{count}} scans",
+    "pr_reviews_one": "{{count}} PR",
+    "pr_reviews_other": "{{count}} PRs",
+    "removed": "removed"
+  },
+  "providers": {
+    "title": "Code providers",
+    "description": "Connect the GitHub App to one or more organizations, then pick in GitHub which repositories get scanned.",
+    "github_tagline": "GitHub App · reads the code and comments on pull requests",
+    "status": {
+      "connected": "Connected",
+      "not_connected": "Not connected",
+      "not_configured": "Not set up"
+    },
+    "loading": "Loading the GitHub connection",
+    "accounts_connected_one": "{{count}} connected account",
+    "accounts_connected_other": "{{count}} connected accounts",
+    "field": {
+      "account": "Account",
+      "scope": "Scope",
+      "connected_by": "Connected by",
+      "installation": "Installation"
+    },
+    "organization_account": "{{account}} (organization)",
+    "scope": {
+      "selected": "Selected repositories only",
+      "all": "Every repository in the account"
+    },
+    "unknown_person": "unknown",
+    "change_repositories": "Change repositories",
+    "disconnect_account": "Disconnect account",
+    "key_note": "The App's private key is encrypted on the server. Each scan mints a one-hour token that lives only in memory.",
+    "forget_confirm": "This removes the key and the connection from this server. The App still exists on GitHub: delete it there if you no longer need it.",
+    "forget": "Forget the App",
+    "use_other_app": "Use a different GitHub App…",
+    "coming_soon": "Coming soon: {{names}}",
+    "pending": {
+      "gitlab": "With a read-only project token, so access is limited to the projects you choose.",
+      "bitbucket": "With a read-only repository access token.",
+      "azure": "Through Microsoft Entra ID, the method Microsoft supports since 2025."
+    },
+    "manage_github": "Manage the GitHub integration"
+  },
+  "repositories": {
+    "title": "Repositories",
+    "description": "Repositories granted across every connected organization.",
+    "refresh": "Refresh list",
+    "scan_organization": "Scan organization",
+    "organization_report": "Organization report",
+    "search": "Search repositories",
+    "search_placeholder": "Search repositories…",
+    "partial": "partial results, filling in automatically",
+    "filter_by_organization": "Filter by organization",
+    "all_organizations": "All",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "scan_selected": "Scan selected",
+    "batch_running": "A batch is already running: wait for it or cancel it.",
+    "batch_limit": "Up to 100; for more, scan the whole organization.",
+    "clear_selection": "Clear selection",
+    "select_page": "Select this page",
+    "select_one": "Select {{name}}",
+    "columns": {
+      "repository": "Repository",
+      "origin": "Source",
+      "last_scan": "Last scan",
+      "action": "Action"
+    },
+    "loading": "Loading repositories",
+    "not_scanned": "Not scanned",
+    "scan": "Scan",
+    "no_match": "No repositories match."
+  },
+  "search": {
+    "label": "Search for a repository",
+    "placeholder": "Search by name…",
+    "partial": "Partial results: this account's repository list is still being read from GitHub."
+  },
+  "pager": {
+    "range": "{{from}}–{{to}} of {{total}}",
+    "previous": "Previous"
+  },
+  "github": {
+    "copy_value": "Copy {{value}}",
+    "pem_too_large": "That file is too large to be a .pem key",
+    "pem_invalid": "That file doesn't look like a GitHub App private key (.pem)",
+    "steps": {
+      "open": {
+        "title": "Open the new GitHub App form",
+        "body": "Under your personal account or an organization you administer (enter its name):",
+        "organization": "Organization (optional)",
+        "organization_placeholder": "organization (optional)",
+        "open_github": "Open on GitHub"
+      },
+      "name": {
+        "title": "Name and homepage",
+        "app_name": "<b>GitHub App name:</b> anything you like, e.g. <copy/> (it must be unique on GitHub; add your team's name if it's taken).",
+        "app_name_example": "{{brand}} for my team",
+        "homepage": "<b>Homepage URL:</b> any URL of yours, e.g. <copy/>",
+        "your_user": "your-username"
+      },
+      "hooks": {
+        "title": "No OAuth or webhooks",
+        "callback": "Leave <b>Callback URL</b> empty and \"Request user authorization (OAuth) during installation\" <b>unchecked</b>.",
+        "setup": "<b>Setup URL</b> (optional, brings you back here after installing): <copy/> and check \"Redirect on update\".",
+        "webhook": "Under <b>Webhook</b>, uncheck \"Active\": the panel polls pull requests itself, so it doesn't need to be reachable from the internet."
+      },
+      "permissions": {
+        "title": "Permissions: only these four",
+        "intro": "Under <i>Repository permissions</i>:",
+        "outro": "Nothing under <i>Organization</i> or <i>Account permissions</i>, and no events. The less access the App has, the less damage a leaked key can do."
+      },
+      "install_scope": {
+        "title": "Where it can be installed",
+        "body": "Under \"Where can this GitHub App be installed?\" choose <b>Any account</b> if you'll connect several organizations. Then click <b>Create GitHub App</b>."
+      },
+      "key": {
+        "title": "Copy the App ID and generate the private key",
+        "body": "The <b>App ID</b> is at the top, under \"About\". Scroll down to <b>Private keys</b> and click \"Generate a private key\": a <code>.pem</code> file downloads."
+      }
+    },
+    "form": {
+      "title": "7 · Connect it here",
+      "description": "The panel checks with GitHub that the key belongs to that App before saving anything.",
+      "admin_only": "Only an administrator can connect the GitHub App.",
+      "env_missing": "The server has <code>GITHUB_APP_ID</code> in its environment, but it's missing: {{missing}}.",
+      "app_id": "App ID",
+      "private_key": "Private key (.pem)",
+      "key_loaded": "Key loaded",
+      "choose_file": "Choose the downloaded .pem file",
+      "paste": "or paste it as text",
+      "paste_label": "Private key as text",
+      "submit": "Verify and save",
+      "key_note": "The key is stored encrypted (AES-256-GCM) on the server; it never comes back to the browser or shows up in logs. Afterwards, delete the .pem from your downloads folder."
+    },
+    "install": {
+      "verified": "App <b>{{name}}</b> verified.",
+      "verified_owner": "App <b>{{name}}</b> from <b>{{owner}}</b> verified.",
+      "next_connected": "You can add another organization and choose its repositories.",
+      "next_first": "Install it on the organizations you need and choose their repositories.",
+      "step_install": "Click <b>Install on GitHub</b> and choose <b>Only select repositories</b>, picking the ones you want to scan.",
+      "step_detect": "Come back and click <b>Find installations</b>, then select the organizations you want to use in this workspace.",
+      "install": "Install on GitHub",
+      "detect": "Find installations",
+      "installed_on": "Accounts where the App is installed",
+      "installation": "Installation #{{id}}",
+      "organization": "Organization",
+      "personal": "Personal account",
+      "selected_repositories": "Selected repositories",
+      "all_repositories": "All repositories",
+      "connected": "Connected",
+      "connect": "Connect account"
+    },
+    "permission_warning": {
+      "excess_one": "The App requests {{count}} extra permission.",
+      "excess_other": "The App requests {{count}} extra permissions.",
+      "excess_body": "Review the GitHub App's permissions; installed repositories keep the scope you chose.",
+      "show": "Show permissions",
+      "missing": "Missing permissions: {{permissions}}. Without them, pull requests aren't reviewed.",
+      "missing_pending": "Missing permissions: {{permissions}} (a permission update is waiting to be accepted on the installation). Without them, pull requests aren't reviewed."
+    }
+  },
+  "registries": {
+    "title": "Container registries",
+    "description": "For scanning private images (New scan → Container image). Public images need nothing. Always use a <b>read-only</b> token.",
+    "loading": "Loading registries",
+    "token_last4": "token ····{{last4}}",
+    "saved_by": "by {{name}}",
+    "saved_on_by": "{{date}} by {{name}}",
+    "empty": "No private registries configured.",
+    "host": "Registry (host)",
+    "username": "Username",
+    "token": "Read-only token",
+    "stored_note": "Encrypted on the server; it never comes back to the browser or shows up in logs. Saving again for the same registry replaces it.",
+    "admin_only": "Only an administrator can save registry credentials.",
+    "help": "What to enter for each registry",
+    "columns": {
+      "registry": "Registry",
+      "username": "Username",
+      "token": "Token"
+    },
+    "hints": {
+      "ghcr": {
+        "host": "ghcr.io",
+        "user": "your GitHub username",
+        "token": "classic token with only read:packages"
+      },
+      "docker": {
+        "host": "docker.io",
+        "user": "your Docker Hub username",
+        "token": "read-only access token (Account settings → Personal access tokens)"
+      },
+      "ecr": {
+        "host": "<account>.dkr.ecr.<region>.amazonaws.com",
+        "user": "AWS",
+        "token": "output of aws ecr get-login-password (expires after 12 h)"
+      },
+      "gar": {
+        "host": "<region>-docker.pkg.dev",
+        "user": "_json_key_base64",
+        "token": "key for a service account with Artifact Registry Reader"
+      }
+    },
+    "private_blocked": "Registries on your internal network (private IPs) are blocked so nobody can use the panel to reach internal services. To allow them, start the server with <code>TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1</code>."
+  },
+  "domains": {
+    "kind": {
+      "web": "Web application",
+      "api": "API",
+      "surface": "Attack surface"
+    },
+    "kind_hint": {
+      "web": "An interface with user sessions.",
+      "api": "REST or GraphQL with no interface.",
+      "surface": "A host you only want to inventory."
+    },
+    "list": {
+      "title": "Domains and APIs",
+      "description": "Register HTTPS targets you own and prove ownership with a DNS TXT record. Registering or verifying doesn't start any test.",
+      "search": "Search domains",
+      "search_placeholder": "Search domains…",
+      "columns": {
+        "domain": "Domain",
+        "kind": "Type",
+        "verification": "Verification",
+        "last_test": "Last test"
+      },
+      "verified": "Verified",
+      "unverified": "Not verified",
+      "not_tested": "Not tested",
+      "verify_dns": "Verify DNS",
+      "show_txt": "Show TXT record",
+      "no_match": "No domains match your search.",
+      "empty": "No domains registered yet.",
+      "showing_one": "Showing {{visible}} of {{count}} domain",
+      "showing_other": "Showing {{visible}} of {{count}} domains",
+      "configure": "Set up dynamic testing"
+    },
+    "add": {
+      "title": "Add domain",
+      "description": "Register a domain or API you own so you can pick it as a target.",
+      "domain": "Domain",
+      "placeholder": "app.yourdomain.com",
+      "checking": "Checking whether it responds over HTTPS…",
+      "reachable": "Domain reachable",
+      "more": "More details",
+      "kind": "Type",
+      "context": "Context",
+      "optional": "(optional)",
+      "context_placeholder": "What does this app do? Stack, authentication, sensitive data it handles…",
+      "context_note": "{{length}}/400 · kept with the asset as a team note; the system doesn't verify it."
+    },
+    "verify": {
+      "title": "Domain added",
+      "description": "Prove ownership with a DNS TXT record before any active testing.",
+      "pending": "<b>{{host}}</b> added — verification pending",
+      "instructions": "Add this <b>TXT</b> record at your DNS provider:",
+      "record_name": "Record name",
+      "record_value": "Record value",
+      "copy_name": "Copy record name",
+      "copy_value": "Copy record value",
+      "propagation": "Propagation can take 2 to 10 minutes.",
+      "no_tests": "Verifying ownership doesn't launch any test: it makes the domain an eligible target.",
+      "skip": "Skip",
+      "submit": "Verify now"
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "fix": {
+    "commands": {
+      "update": "Actualiza",
+      "reinstall": "Reinstala",
+      "install": "Instala"
+    },
+    "verify": "Después: sube el cambio a la rama principal y pulsa «Reverificar» (o espera al análisis automático de la rama).",
+    "verify_dependency": "Después: regenera el lockfile, sube el cambio a la rama principal y pulsa «Reverificar» (o espera al análisis automático de la rama).",
+    "verify_image": "Después: reconstruye y publica la imagen con la misma etiqueta y pulsa «Reverificar».",
+    "no_fix": {
+      "none_published": "No hay versión corregida publicada de {{package}}.",
+      "check_usage": "Comprueba si tu código usa la parte vulnerable (el aviso suele decir qué función o formato).",
+      "mitigate": "Si la usa: mitiga (valida la entrada, desactiva la función) o sustituye la dependencia.",
+      "accept": "Si no la usa: regístralo como riesgo aceptado con su motivo y una fecha de revisión."
+    },
+    "manual_update": "Actualiza {{package}} a {{version}} o superior en {{path}} y regenera el lockfile.",
+    "closes_all": "La versión {{version}} cierra todos los avisos de {{package}} (este aviso solo pide {{fixed}}).",
+    "npm_transitive": "{{package}} es una dependencia transitiva: fuerza la versión con «{{field}}» en package.json y reinstala.",
+    "override_note": "Mejor aún: actualiza la dependencia directa que la trae.",
+    "pip_line": "En {{path}}, cambia la línea de {{package}} a «{{package}}>={{version}}» (o fija «=={{version}}»).",
+    "go_stdlib": "Es la librería estándar de Go: compila con Go {{version}} o superior (actualiza también la imagen de build y la CI).",
+    "bundler_pin": "Si el Gemfile fija una versión de {{package}}, súbela a «>= {{version}}».",
+    "maven_direct": "Cambia la <version> de {{artifact}} en las <dependencies> del pom.xml.",
+    "maven_managed": "Fija la versión en dependencyManagement del pom.xml: así se impone también a la dependencia transitiva.",
+    "gradle_constraint": "Fija la versión con una restricción de Gradle (sirve también si es transitiva).",
+    "os_rebuild": "Es un paquete del sistema de la imagen: lo mejor es reconstruirla sobre una base actualizada (docker build --pull).",
+    "os_dockerfile": "Si la base aún no trae la corrección, actualiza el paquete en el Dockerfile:",
+    "generic_update": "Actualiza {{package}} de {{installed}} a {{version}} o superior en {{path}} y regenera el lockfile.",
+    "transitive_other": "{{package}} llega como dependencia de otra: si el comando no la sube, actualiza la dependencia directa que la trae.",
+    "malicious_sibling": "{{package}} {{version}} es un paquete malicioso: elimínalo en lugar de actualizarlo (ver su aviso MAL-). Actualizar no basta.",
+    "secret": {
+      "revoke": "Revoca o rota la credencial ahora en su proveedor: borrarla del código no basta, ya está en el historial de Git.",
+      "review_use": "Revisa en el proveedor si se usó desde un origen que no reconoces.",
+      "vault": "Muévela a un gestor de secretos o a una variable de entorno y léela desde ahí.",
+      "remove": "Quítala de {{path}} y haz commit.",
+      "history": "Si el repositorio es o fue público, considera reescribir el historial (git filter-repo); rotar es lo que te protege.",
+      "verify": "Después pulsa «Reverificar»."
+    }
+  },
+  "fix_examples": {
+    "py_eval_exec_non_literal": "Si necesitas operaciones, usa una tabla de funciones permitidas en vez de evaluar texto.",
+    "py_shell_command_non_literal": "Valida `name` contra una lista permitida o una expresión estricta.",
+    "py_pickle_load": "pickle ejecuta código al deserializar: nunca sobre datos que no generaste tú.",
+    "py_flask_debug_true": "El depurador de Flask permite ejecutar código desde el navegador.",
+    "py_requests_verify_false": "Si es una CA interna, pasa su bundle: verify=\"/ruta/ca.pem\".",
+    "py_weak_password_hash": "Para contraseñas: Argon2id, scrypt o bcrypt, nunca un hash rápido.",
+    "py_ssrf_from_request": "Resuelve el nombre y rechaza direcciones privadas o de metadatos si el destino no es fijo.",
+    "js_command_injection": "Valida `branch` contra una lista permitida o un patrón estricto.",
+    "js_dom_xss_sink": "Si necesitas HTML, sanéalo con DOMPurify.",
+    "js_react_dangerously_set_inner_html": "Si el HTML es necesario: DOMPurify.sanitize(comment) antes de insertarlo.",
+    "js_jwt_hardcoded_secret": "Rota el secreto que estaba en el código: ya está en el historial.",
+    "java_runtime_exec_concatenation": "Valida `host` contra una lista permitida.",
+    "java_objectinputstream_readobject": "Mejor aún: un formato de datos (JSON) en lugar de serialización Java.",
+    "java_hardcoded_password": "Rota la contraseña: ya está en el historial del repositorio.",
+    "cs_insecure_deserialization": "BinaryFormatter está obsoleto y no es seguro.",
+    "php_command_injection": "Mejor: valida $host contra una lista permitida antes."
+  },
+  "exclusions": {
+    "errors": {
+      "too_many": "Indica como mucho {{max}} rutas.",
+      "not_text": "Cada ruta debe ser texto.",
+      "invalid": "Ruta no válida: «{{pattern}}». Usa letras, números, «/», «.», «-», «_», «*» y «?».",
+      "not_relative": "«{{pattern}}» debe ser relativa a la raíz del repositorio y sin «..».",
+      "everything": "«{{pattern}}» excluiría todo el repositorio.",
+      "reason_required": "Explica en una frase por qué se excluyen estas rutas (queda en el historial)."
+    },
+    "limitation_one": "Rutas excluidas por un administrador ({{patterns}}): {{count}} hallazgo quedó fuera de esta ejecución. Se puede ver en Hallazgos → Excluidos.",
+    "limitation_other": "Rutas excluidas por un administrador ({{patterns}}): {{count}} hallazgos quedaron fuera de esta ejecución. Se pueden ver en Hallazgos → Excluidos."
+  },
+  "registry": {
+    "reappeared": "Reapareció en la ejecución {{run}}",
+    "gone_from_scan": "Ya no aparece en el escaneo completo del {{date}}",
+    "fixed_in_pr": "Corregido en el commit {{commit}} del PR #{{number}}",
+    "pr_closed": "El PR #{{number}} se cerró sin merge"
+  },
+  "triage": {
+    "status": {
+      "open": "Abierto",
+      "in_progress": "En curso",
+      "false_positive": "Falso positivo",
+      "accepted": "Riesgo aceptado",
+      "fixed": "Remediado"
+    },
+    "errors": {
+      "reason_too_long": "El motivo admite hasta {{limit}} caracteres",
+      "note_too_long": "La nota admite hasta {{limit}} caracteres",
+      "reason_control_characters": "El motivo contiene caracteres de control",
+      "note_control_characters": "La nota contiene caracteres de control",
+      "invalid_status": "Estado de triage inválido",
+      "invalid_fingerprints": "Indica entre 1 y {{max}} huellas de hallazgo válidas",
+      "unknown_fingerprints": "Hay huellas que no pertenecen a esta ejecución",
+      "reason_required": "Explica el motivo (mínimo {{min}} caracteres): queda en el historial",
+      "accept_admin_only": "Aceptar un riesgo lo decide un administrador",
+      "invalid_expiry": "Fecha de caducidad inválida (AAAA-MM-DD)",
+      "expiry_range": "La aceptación caduca entre mañana y {{max}} días"
+    }
+  },
+  "sla": {
+    "errors": {
+      "invalid_days": "Cada plazo es un número de días entre 1 y {{max}}, o vacío para no fijarlo.",
+      "missing_levels": "Indica el plazo de cada severidad: crítica, alta, media y baja."
+    }
+  },
+  "remediation": {
+    "remove_malicious": "Eliminar {{package}} {{version}} y rotar las credenciales de donde se instaló",
+    "remove_malicious_unnamed": "Eliminar el paquete {{version}} y rotar las credenciales de donde se instaló",
+    "update": "Actualizar {{package}} a {{version}}",
+    "update_all": "Actualizar {{package}} a {{version}} (cierra los {{total}})",
+    "update_partial": "Actualizar {{package}} a {{version}}: cierra {{fixed}} de {{total}}; el resto no tiene corrección publicada",
+    "no_fix_short": "Sin versión corregida: evaluar alcanzabilidad, mitigar o sustituir",
+    "no_fix": "No hay versión corregida de {{package}}: evalúa alcanzabilidad, mitiga o sustituye la dependencia",
+    "review": "Revisar y corregir según la guía del hallazgo",
+    "severity_count": {
+      "critical_one": "{{count}} crítica",
+      "critical_other": "{{count}} críticas",
+      "high_one": "{{count}} alta",
+      "high_other": "{{count}} altas",
+      "medium_one": "{{count}} media",
+      "medium_other": "{{count}} medias",
+      "low_one": "{{count}} baja",
+      "low_other": "{{count}} bajas",
+      "info_one": "{{count}} informativa",
+      "info_other": "{{count}} informativas"
+    }
+  }
+}

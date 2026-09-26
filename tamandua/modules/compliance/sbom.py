@@ -19,6 +19,7 @@ from pathlib import Path
 
 from tamandua.modules.intel.advisory_watch import purl as build_purl
 from tamandua.modules.reporting.design import coverage_gaps
+from tamandua.shared.i18n import default_locale, t
 
 SPEC = "1.6"
 TOOL_URL = "https://github.com/BrayansStivens/appsec-agent"
@@ -75,21 +76,22 @@ def _inventory(record: dict):
                    str(package.get("ecosystem") or "").lower().split(":")[0] in OS_PURL)
 
 
-def _component(package: dict, reference: str, system: bool) -> dict:
+def _component(package: dict, reference: str, system: bool, locale: str) -> dict:
     component = {"type": "library", "bom-ref": reference, "name": package["name"], "version": package["version"], "purl": reference}
     licenses = [{"license": {"name": name}} for name in package.get("licenses") or [] if name]
     if licenses:
         component["licenses"] = licenses
     properties = [{"name": "tamandua:manifest", "value": str(package.get("path") or "")}] if package.get("path") else []
     if system:
-        properties.append({"name": "tamandua:package-kind", "value": "sistema operativo"})
+        properties.append({"name": "tamandua:package-kind", "value": t("compliance.sbom.os_package", locale)})
     if properties:
         component["properties"] = properties
     return component
 
 
-def cyclonedx(record: dict, *, version: str, now: datetime | None = None) -> dict:
+def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale: str | None = None) -> dict:
     """El SBOM de un análisis completo. Un análisis sin inventario da un SBOM sin componentes, nunca un error."""
+    locale = locale or default_locale()
     root = _root(record)
     components: dict[str, dict] = {}
     direct: list[str] = []
@@ -100,14 +102,14 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None) -> dic
         reference = _purl(package)
         if not reference or reference in components:
             continue
-        components[reference] = _component(package, reference, system)
+        components[reference] = _component(package, reference, system, locale)
         if isinstance(package.get("direct"), bool):
             known_relation = True
         if package.get("direct", True) is not False:
             direct.append(reference)
     # Sin información de relación (análisis antiguos o imágenes), el producto depende de todo lo inventariado.
     depends_on = direct if known_relation else list(components)
-    gaps = coverage_gaps(record.get("steps") or [])
+    gaps = coverage_gaps(record.get("steps") or [], locale=locale)
     stamp = (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     scanned = record.get("finished_at") or record.get("created_at")
     return {
@@ -124,9 +126,8 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None) -> dic
                 {"name": "tamandua:run", "value": str(record.get("id") or "")},
                 {"name": "tamandua:analizado", "value": str(scanned or "")},
                 *([{"name": "tamandua:sin-completar", "value": ", ".join(gaps)}] if gaps else []),
-                {"name": "tamandua:origen", "value": "Inventario de Trivy sobre los manifiestos y lockfiles analizados"
-                                                    + (" y los paquetes del sistema de la imagen" if root["type"] == "container" else "")
-                                                    + ". Sin proveedor ni hash por componente: no se infieren."},
+                {"name": "tamandua:origen", "value": t("compliance.sbom.origin_image" if root["type"] == "container"
+                                                       else "compliance.sbom.origin", locale)},
             ],
         },
         "components": list(components.values()),

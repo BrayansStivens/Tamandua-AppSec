@@ -19,6 +19,7 @@ from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer,
 # Los tokens del sistema de diseño de informes (report_design); este renderizador queda para los
 # informes que aún son Markdown (dossiers heredados, revisiones de PR).
 from tamandua.modules.reporting.design import BRAND as TEAL, INK, LINE, MUTED, SOFT
+from tamandua.shared.i18n import t
 
 AMBER = colors.HexColor("#8a4c00")
 
@@ -64,10 +65,10 @@ def _table(lines: list[str]) -> Table:
     return table
 
 
-def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "") -> bytes:
+def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "", locale: str | None = None) -> bytes:
     """Convierte un informe técnico en un PDF paginado; nunca afirma certificación."""
     if len(markdown) > 2_000_000:
-        raise ValueError("Informe demasiado grande para exportar")
+        raise ValueError("Report too large to export")
     output = io.BytesIO()
     doc = SimpleDocTemplate(output, pagesize=A4, rightMargin=20 * mm, leftMargin=20 * mm,
                             topMargin=24 * mm, bottomMargin=20 * mm,
@@ -116,7 +117,7 @@ def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "") -> 
         canvas.line(20 * mm, 14 * mm, width - 20 * mm, 14 * mm)
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
-        canvas.drawString(20 * mm, 9 * mm, "Tamandua  ·  Evidencia técnica; revisión humana requerida")
+        canvas.drawString(20 * mm, 9 * mm, t("reports.pdf.footer", locale))
         canvas.drawRightString(width - 20 * mm, 9 * mm, f"{document.page}")
         canvas.restoreState()
 

@@ -25,6 +25,7 @@ from urllib.parse import quote
 
 from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import INLINE, MARK, msg
 from tamandua.modules.scanning.dependency_merge import family, identifiers, package_name
 
 _log = logging_setup.get("advisory_watch")
@@ -123,6 +124,17 @@ def fresh(findings: list[dict], seen: set[tuple[str, str, str, str]]) -> list[di
     return new
 
 
+def _repath(value, old: str, new: str):
+    """Replaces a path inside plain text, a message's parameters or inline text, keeping the value's shape."""
+    if isinstance(value, str):
+        return value.replace(old, new)
+    if isinstance(value, dict) and isinstance(value.get(MARK), str):
+        return {**value, "params": {name: _repath(item, old, new) for name, item in (value.get("params") or {}).items()}}
+    if isinstance(value, dict) and isinstance(value.get(INLINE), dict):
+        return {INLINE: {locale: _repath(item, old, new) for locale, item in value[INLINE].items()}}
+    return value
+
+
 def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] | None:
     """Avisos de OSV-Scanner (sin conexión) para las dependencias guardadas de un análisis. None si no se pudo."""
     from tamandua.modules.scanning.engines import _run, docker_available, host_path, parse_osv_scanner, writable_cache
@@ -163,7 +175,7 @@ def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] 
             original = str(finding.get("path") or "")
             finding["path"] = path
             if original:
-                finding["remediation"] = str(finding.get("remediation") or "").replace(original, path)
+                finding["remediation"] = _repath(finding.get("remediation") or "", original, path)
         finding["tool"] = "osv-scanner"
     return findings
 
@@ -194,12 +206,11 @@ def check(data_dir: Path, *, run=None, now: datetime | None = None) -> dict:
             "variant": "advisories", "context": "", "requested_by": "vigilante",
             "trigger": {"kind": "advisories", "base_run": record["id"], "base_at": record.get("created_at")},
             "started_at": now.isoformat(timespec="seconds"), "finished_at": now.isoformat(timespec="seconds"),
-            "steps": [{"id": "advisory-watch", "name": "Avisos nuevos (OSV-Scanner sin conexión)", "status": "completed",
-                       "detail": f"{len(record.get('dependencies') or [])} paquetes del análisis del {str(record.get('created_at'))[:10]} "
-                                 f"contrastados con la base OSV actualizada: {len(new)} avisos que no estaban."}],
+            "steps": [{"id": "advisory-watch", "name": msg("intel.watch.step"), "status": "completed",
+                       "detail": msg("intel.watch.detail", packages=len(record.get("dependencies") or []),
+                                     date=str(record.get("created_at"))[:10], count=len(new))}],
             "findings": new, "owasp_coverage": [],
-            "limitations": ["Solo dependencias de aplicación; los paquetes del sistema operativo de una imagen se revisan al reanalizarla.",
-                            "No es un análisis completo: añade avisos y no da nada por corregido."],
+            "limitations": [msg("intel.watch.limitations.os_packages"), msg("intel.watch.limitations.not_full")],
             "summary": {"candidates": len(new), "sca": len(new), "files": 0, "dependencies": len(record.get("dependencies") or []),
                         "severities": severities, "kev": sum(1 for item in new if item.get("kev"))}})
         _log.info("advisory_watch_new", extra={"reason": f"{source.get('name')}: {len(new)} avisos nuevos"})

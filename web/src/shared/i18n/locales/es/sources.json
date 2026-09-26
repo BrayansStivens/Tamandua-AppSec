@@ -1,0 +1,280 @@
+{
+  "new_tab": "(se abre en otra pestaña)",
+  "copied_to_clipboard": "Copiado al portapapeles",
+  "asset": {
+    "label": "Repositorio",
+    "placeholder": "Busca un repositorio…",
+    "open_one": "{{count}} pendiente",
+    "open_other": "{{count}} pendientes",
+    "critical_one": "{{count}} crítico",
+    "critical_other": "{{count}} críticos",
+    "no_findings": "sin hallazgos",
+    "scans_one": "{{count}} escaneo",
+    "scans_other": "{{count}} escaneos",
+    "pr_reviews_one": "{{count}} PR",
+    "pr_reviews_other": "{{count}} PR",
+    "removed": "retirado"
+  },
+  "providers": {
+    "title": "Proveedores de código",
+    "description": "Conecta la GitHub App a una o varias organizaciones y elige en GitHub los repositorios que se analizan.",
+    "github_tagline": "GitHub App · lee el código y comenta en los pull requests",
+    "status": {
+      "connected": "Conectado",
+      "not_connected": "Sin conectar",
+      "not_configured": "Sin configurar"
+    },
+    "loading": "Cargando la conexión con GitHub",
+    "accounts_connected_one": "{{count}} cuenta conectada",
+    "accounts_connected_other": "{{count}} cuentas conectadas",
+    "field": {
+      "account": "Cuenta",
+      "scope": "Alcance",
+      "connected_by": "Conectó",
+      "installation": "Instalación"
+    },
+    "organization_account": "{{account}} (organización)",
+    "scope": {
+      "selected": "Solo repositorios seleccionados",
+      "all": "Todos los repositorios de la cuenta"
+    },
+    "unknown_person": "sin identificar",
+    "change_repositories": "Cambiar repositorios",
+    "disconnect_account": "Desconectar cuenta",
+    "key_note": "La clave privada de la App está cifrada en el servidor. Cada análisis acuña un token de una hora que vive solo en memoria.",
+    "forget_confirm": "Se borran de este servidor la clave y la conexión. En GitHub la App sigue existiendo: bórrala allí si ya no la usas.",
+    "forget": "Olvidar la App",
+    "use_other_app": "Usar otra GitHub App…",
+    "coming_soon": "Próximamente: {{names}}",
+    "pending": {
+      "gitlab": "Con un token de proyecto de solo lectura, para limitar el acceso a los proyectos que elijas.",
+      "bitbucket": "Con un token de acceso de repositorio de solo lectura.",
+      "azure": "Mediante Microsoft Entra ID, que es la vía que Microsoft admite desde 2025."
+    },
+    "manage_github": "Gestionar integración de GitHub"
+  },
+  "repositories": {
+    "title": "Repositorios",
+    "description": "Repositorios concedidos en todas las organizaciones conectadas.",
+    "refresh": "Actualizar lista",
+    "scan_organization": "Analizar organización",
+    "organization_report": "Informe de organización",
+    "search": "Buscar repositorios",
+    "search_placeholder": "Buscar repositorios…",
+    "partial": "resultados parciales, se completan solos",
+    "filter_by_organization": "Filtrar por organización",
+    "all_organizations": "Todas",
+    "selected_one": "{{count}} seleccionado",
+    "selected_other": "{{count}} seleccionados",
+    "scan_selected": "Analizar seleccionados",
+    "batch_running": "Hay un lote en curso: espera o cancélalo.",
+    "batch_limit": "Hasta 100; para más, analiza la organización.",
+    "clear_selection": "Quitar selección",
+    "select_page": "Seleccionar la página",
+    "select_one": "Seleccionar {{name}}",
+    "columns": {
+      "repository": "Repositorio",
+      "origin": "Origen",
+      "last_scan": "Último análisis",
+      "action": "Acción"
+    },
+    "loading": "Cargando repositorios",
+    "not_scanned": "No probado",
+    "scan": "Analizar",
+    "no_match": "No hay repositorios que coincidan."
+  },
+  "search": {
+    "label": "Buscar repositorio",
+    "placeholder": "Buscar por nombre…",
+    "partial": "Resultados parciales: la lista de esta cuenta se está leyendo de GitHub."
+  },
+  "pager": {
+    "range": "{{from}}–{{to}} de {{total}}",
+    "previous": "Anterior"
+  },
+  "github": {
+    "copy_value": "Copiar {{value}}",
+    "pem_too_large": "Ese fichero es demasiado grande para ser una clave .pem",
+    "pem_invalid": "Ese fichero no parece una clave privada (.pem) de GitHub App",
+    "steps": {
+      "open": {
+        "title": "Abre el formulario de nueva GitHub App",
+        "body": "En tu cuenta personal o en una organización que administres (escribe su nombre):",
+        "organization": "Organización (opcional)",
+        "organization_placeholder": "organización (opcional)",
+        "open_github": "Abrir en GitHub"
+      },
+      "name": {
+        "title": "Nombre y página de inicio",
+        "app_name": "<b>GitHub App name:</b> el que quieras, p. ej. <copy/> (debe ser único en GitHub; añade tu equipo si ya existe).",
+        "app_name_example": "{{brand}} de mi equipo",
+        "homepage": "<b>Homepage URL:</b> cualquier URL tuya, p. ej. <copy/>",
+        "your_user": "tu-usuario"
+      },
+      "hooks": {
+        "title": "Sin OAuth ni webhooks",
+        "callback": "Deja <b>Callback URL</b> vacío y <b>sin marcar</b> «Request user authorization (OAuth) during installation».",
+        "setup": "<b>Setup URL</b> (opcional, te devuelve aquí al instalar): <copy/> y marca «Redirect on update».",
+        "webhook": "En <b>Webhook</b>, desmarca «Active»: el panel consulta los PRs por su cuenta, así no necesita estar publicado en internet."
+      },
+      "permissions": {
+        "title": "Permisos: solo estos cuatro",
+        "intro": "En <i>Repository permissions</i>:",
+        "outro": "Nada en <i>Organization</i> ni <i>Account permissions</i>, y ningún evento. Cuanto menos permiso, menos daño si la clave se filtrara."
+      },
+      "install_scope": {
+        "title": "Cuentas donde se puede instalar",
+        "body": "En «Where can this GitHub App be installed?» elige <b>Any account</b> si vas a conectar varias organizaciones. Después pulsa <b>Create GitHub App</b>."
+      },
+      "key": {
+        "title": "Copia el App ID y genera la clave privada",
+        "body": "El <b>App ID</b> aparece arriba, en «About». Baja hasta <b>Private keys</b> y pulsa «Generate a private key»: se descarga un fichero <code>.pem</code>."
+      }
+    },
+    "form": {
+      "title": "7 · Conéctala aquí",
+      "description": "El panel comprueba con GitHub que la clave es de esa App antes de guardar nada.",
+      "admin_only": "Solo un administrador puede conectar la GitHub App.",
+      "env_missing": "El servidor tiene <code>GITHUB_APP_ID</code> en su entorno, pero le falta: {{missing}}.",
+      "app_id": "App ID",
+      "private_key": "Clave privada (.pem)",
+      "key_loaded": "Clave cargada",
+      "choose_file": "Elige el fichero .pem descargado",
+      "paste": "o pégala como texto",
+      "paste_label": "Clave privada en texto",
+      "submit": "Verificar y guardar",
+      "key_note": "La clave se guarda cifrada (AES-256-GCM) en el servidor, nunca vuelve al navegador ni aparece en los logs. Después, borra el .pem de tu carpeta de descargas."
+    },
+    "install": {
+      "verified": "App <b>{{name}}</b> verificada.",
+      "verified_owner": "App <b>{{name}}</b> de <b>{{owner}}</b> verificada.",
+      "next_connected": "Puedes añadir otra organización y elegir sus repositorios.",
+      "next_first": "Instálala en las organizaciones que necesites y elige sus repositorios.",
+      "step_install": "Pulsa <b>Instalar en GitHub</b> y elige <b>Only select repositories</b> con los que quieras analizar.",
+      "step_detect": "Vuelve y pulsa <b>Buscar instalaciones</b>; selecciona las organizaciones que quieres usar en este workspace.",
+      "install": "Instalar en GitHub",
+      "detect": "Buscar instalaciones",
+      "installed_on": "Cuentas donde la App está instalada",
+      "installation": "Instalación #{{id}}",
+      "organization": "Organización",
+      "personal": "Cuenta personal",
+      "selected_repositories": "Repositorios seleccionados",
+      "all_repositories": "Todos los repositorios",
+      "connected": "Conectada",
+      "connect": "Conectar cuenta"
+    },
+    "permission_warning": {
+      "excess_one": "La App pide {{count}} permiso adicional.",
+      "excess_other": "La App pide {{count}} permisos adicionales.",
+      "excess_body": "Revisa los permisos de la GitHub App; los repositorios instalados siguen teniendo el alcance que elegiste.",
+      "show": "Ver permisos",
+      "missing": "Faltan permisos: {{permissions}}. Sin ellos no se revisan pull requests.",
+      "missing_pending": "Faltan permisos: {{permissions}} (hay una actualización de permisos pendiente de aceptar en la instalación). Sin ellos no se revisan pull requests."
+    }
+  },
+  "registries": {
+    "title": "Registros de contenedores",
+    "description": "Para analizar imágenes privadas (Nuevo análisis → Imagen de contenedor). Las públicas no necesitan nada. Usa siempre un token de <b>solo lectura</b>.",
+    "loading": "Cargando registros",
+    "token_last4": "token ····{{last4}}",
+    "saved_by": "por {{name}}",
+    "saved_on_by": "{{date}} por {{name}}",
+    "empty": "Ningún registro privado configurado.",
+    "host": "Registro (host)",
+    "username": "Usuario",
+    "token": "Token de solo lectura",
+    "stored_note": "Cifrado en el servidor; nunca vuelve al navegador ni aparece en los logs. Si ya había uno para ese registro, se reemplaza.",
+    "admin_only": "Solo un administrador puede guardar credenciales de registros.",
+    "help": "Qué poner en cada registro",
+    "columns": {
+      "registry": "Registro",
+      "username": "Usuario",
+      "token": "Token"
+    },
+    "hints": {
+      "ghcr": {
+        "host": "ghcr.io",
+        "user": "tu usuario de GitHub",
+        "token": "token clásico con solo read:packages"
+      },
+      "docker": {
+        "host": "docker.io",
+        "user": "tu usuario de Docker Hub",
+        "token": "access token de solo lectura (Account settings → Personal access tokens)"
+      },
+      "ecr": {
+        "host": "<cuenta>.dkr.ecr.<región>.amazonaws.com",
+        "user": "AWS",
+        "token": "salida de aws ecr get-login-password (caduca a las 12 h)"
+      },
+      "gar": {
+        "host": "<región>-docker.pkg.dev",
+        "user": "_json_key_base64",
+        "token": "clave de una cuenta de servicio con Artifact Registry Reader"
+      }
+    },
+    "private_blocked": "Los registros de tu red interna (IP privada) están bloqueados para que nadie use el panel para llegar a servicios internos. Para permitirlos, arranca con <code>TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1</code>."
+  },
+  "domains": {
+    "kind": {
+      "web": "Aplicación web",
+      "api": "API",
+      "surface": "Superficie de ataque"
+    },
+    "kind_hint": {
+      "web": "Interfaz con sesión de usuario.",
+      "api": "REST o GraphQL sin interfaz.",
+      "surface": "Host que solo quieres inventariar."
+    },
+    "list": {
+      "title": "Dominios y API",
+      "description": "Registra objetivos HTTPS propios y demuestra su propiedad por DNS TXT. Registrar o verificar no inicia pruebas.",
+      "search": "Buscar dominios",
+      "search_placeholder": "Buscar dominios…",
+      "columns": {
+        "domain": "Dominio",
+        "kind": "Tipo",
+        "verification": "Verificación",
+        "last_test": "Última prueba"
+      },
+      "verified": "Verificado",
+      "unverified": "Sin verificar",
+      "not_tested": "No probado",
+      "verify_dns": "Verificar DNS",
+      "show_txt": "Ver registro TXT",
+      "no_match": "Ningún dominio coincide con la búsqueda.",
+      "empty": "Aún no hay dominios registrados.",
+      "showing_one": "Mostrando {{visible}} de {{count}} dominio",
+      "showing_other": "Mostrando {{visible}} de {{count}} dominios",
+      "configure": "Configurar pruebas dinámicas"
+    },
+    "add": {
+      "title": "Añadir dominio",
+      "description": "Registra un dominio o API propio para poder elegirlo como objetivo.",
+      "domain": "Dominio",
+      "placeholder": "app.tudominio.com",
+      "checking": "Comprobando si responde por HTTPS…",
+      "reachable": "Dominio alcanzable",
+      "more": "Más detalles",
+      "kind": "Tipo",
+      "context": "Contexto",
+      "optional": "(opcional)",
+      "context_placeholder": "¿Qué hace esta app? Stack, autenticación, datos sensibles que maneja…",
+      "context_note": "{{length}}/400 · queda junto al activo como nota del equipo; no la verifica el sistema."
+    },
+    "verify": {
+      "title": "Dominio añadido",
+      "description": "Demuestra la propiedad con un registro DNS TXT antes de cualquier prueba activa.",
+      "pending": "<b>{{host}}</b> añadido — verificación pendiente",
+      "instructions": "Añade este registro <b>TXT</b> en tu proveedor DNS:",
+      "record_name": "Nombre del registro",
+      "record_value": "Valor del registro",
+      "copy_name": "Copiar nombre del registro",
+      "copy_value": "Copiar valor del registro",
+      "propagation": "La propagación puede tardar entre 2 y 10 minutos.",
+      "no_tests": "Verificar la propiedad no lanza ninguna prueba: habilita el dominio como objetivo elegible.",
+      "skip": "Omitir",
+      "submit": "Verificar ahora"
+    }
+  }
+}

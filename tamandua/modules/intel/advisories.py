@@ -26,6 +26,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from tamandua.modules.intel import data_sources
+from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
 OSV_VULN = "https://api.osv.dev/v1/vulns/"
@@ -187,7 +188,7 @@ def _feed(name: str, url: str, data_dir: Path, parse) -> dict:
             with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=60) as response:
                 body = response.read(60_000_001)
             if len(body) > 60_000_000:
-                raise ValueError("feed demasiado grande")
+                raise ValueError("feed too large")
             temporary = path.with_suffix(path.suffix + ".tmp")
             temporary.write_bytes(body)
             os.replace(temporary, path)
@@ -263,7 +264,7 @@ def _nvd_get(params: dict) -> bytes:
     with urlopen(request, timeout=60) as response:
         body = response.read(40_000_001)
     if len(body) > 40_000_000:
-        raise ValueError("feed demasiado grande")
+        raise ValueError("feed too large")
     return body
 
 
@@ -348,21 +349,25 @@ def load_recent_cves(data_dir: Path, days: int = 7) -> dict:
 
 # --- prioridad explicable ------------------------------------------------------------
 
+SEVERITY = {"critical": msg("intel.severity.critical"), "high": msg("intel.severity.high"), "medium": msg("intel.severity.medium"),
+            "low": msg("intel.severity.low"), "info": msg("intel.severity.info")}
+
+
 def prioritize(severity: str, cvss_score: float | None, kev: dict | None, epss: tuple | None, fixed: str | None) -> dict:
     """Acción SSVC-like con factores visibles: no es una nota mágica."""
     factors = []
     score = cvss_score or 0.0
     probability = epss[0] if epss else None
     if kev:
-        factors.append("En el catálogo CISA KEV: explotación activa conocida" + (" y usada por ransomware" if kev.get("ransomware") else ""))
+        factors.append(msg("intel.priority.kev_ransomware") if kev.get("ransomware") else msg("intel.priority.kev"))
     if probability is not None:
-        factors.append(f"EPSS {probability:.1%} (percentil {epss[1]:.0%}) de explotación en 30 días")
+        factors.append(msg("intel.priority.epss", probability=f"{probability:.1%}", percentile=f"{epss[1]:.0%}"))
     if cvss_score is not None:
-        factors.append(f"CVSS {cvss_score} ({severity})")
+        factors.append(msg("intel.priority.cvss", score=cvss_score, severity=SEVERITY.get(severity, severity)))
     if fixed:
-        factors.append(f"Corrección publicada: {fixed}")
+        factors.append(msg("intel.priority.fixed", version=fixed))
     else:
-        factors.append("Sin versión corregida publicada")
+        factors.append(msg("intel.priority.no_fix"))
     if kev or (score >= 9 and (probability or 0) >= 0.1):
         action = "act"
     elif score >= 7 or (probability or 0) >= 0.1 or (score >= 4 and (probability or 0) >= 0.05):
@@ -384,18 +389,16 @@ def malicious_finding(dependency: dict, summary: dict) -> dict:
     name, installed, path = dependency["name"], dependency["version"], dependency["path"]
     digest = fingerprint("sca", summary["id"], dependency["ecosystem"], name, installed)
     return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "rule_id": summary["id"],
-            "title": f"Paquete malicioso: {name} {installed}"[:200], "path": path, "line": 1, "severity": "critical",
+            "title": msg("intel.malicious.title", package=name[:150], version=installed[:40]), "path": path, "line": 1, "severity": "critical",
             "confidence": 9, "verdict": "candidate", "malicious": True, "cwe": [506], "owasp": ["A03:2025"],
             "cve": [], "ghsa": sorted({alias for alias in summary["aliases"] if alias.startswith("GHSA-")}),
             "package": {"ecosystem": dependency["ecosystem"], "name": name, "version": installed, "fixed_version": None, "introduced": None},
             "advisory": {key: summary[key] for key in ("id", "aliases", "summary", "details", "cvss_vector", "cvss_score", "published",
                                                         "modified", "references")},
             "kev": None, "epss": None, "source": data_sources.from_osv(summary["id"]),
-            "priority": {"action": "act", "factors": ["Paquete malicioso conocido (OpenSSF Malicious Packages): código hostil, no un fallo"]},
-            "reason": summary["summary"] or f"{summary['id']} marca {name} {installed} como malicioso.",
-            "remediation": (f"Elimina {name} {installed} de {path}, borra la caché del gestor y vuelve a generar el lockfile sin él. "
-                            "Trata como comprometidas las máquinas y pipelines de CI que lo instalaron: rota sus tokens y claves "
-                            "(registro de paquetes, GitHub, nube) y revisa si publicaron algo en tu nombre.")}
+            "priority": {"action": "act", "factors": [msg("intel.priority.malicious")]},
+            "reason": summary["summary"] or msg("intel.malicious.reason", id=summary["id"], package=name, version=installed),
+            "remediation": msg("intel.malicious.remediation", package=name, version=installed, path=path)}
 
 def fingerprint(scanner: str, rule: str, ecosystem: str, name: str, version: str) -> str:
     """Estable entre ejecuciones e independiente de la ruta: la clave para no duplicar tickets."""
@@ -415,9 +418,9 @@ def dependency_finding(dependency: dict, advisory: dict, feeds: dict) -> dict:
     if is_malicious(summary):
         return malicious_finding(dependency, summary)
     if fixed:
-        remediation = f"Actualiza {name} de {installed} a {fixed} o superior en {path} y vuelve a generar el lockfile."
+        remediation = msg("intel.dependency.update", package=name, installed=installed, version=fixed, path=path)
     else:
-        remediation = f"No hay versión corregida publicada para {name}. Evalúa si el código vulnerable es alcanzable, aplica mitigación o sustituye la dependencia."
+        remediation = msg("intel.dependency.no_fix", package=name)
     digest = fingerprint("sca", summary["id"], dependency["ecosystem"], name, installed)
     title = f"{name} {installed}: {summary['summary']}" if summary["summary"] else f"{name} {installed}: {summary['id']}"
     return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "rule_id": summary["id"],
@@ -431,5 +434,5 @@ def dependency_finding(dependency: dict, advisory: dict, feeds: dict) -> dict:
             "kev": kev, "epss": {"score": epss[0], "percentile": epss[1]} if epss else None,
             "source": data_sources.from_osv(summary["id"]),
             "priority": priority,
-            "reason": summary["summary"] or f"OSV asocia {summary['id']} a {name} {installed}.",
+            "reason": summary["summary"] or msg("intel.dependency.reason", id=summary["id"], package=name, version=installed),
             "remediation": remediation}

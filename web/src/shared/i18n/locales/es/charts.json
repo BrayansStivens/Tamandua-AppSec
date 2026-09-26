@@ -1,0 +1,27 @@
+{
+  "new_per_day": "Hallazgos nuevos por día: {{total}} en total",
+  "open_by_severity": "Abiertos por severidad, {{total}} en total",
+  "found_vs_fixed": "Hallados frente a corregidos, acumulado",
+  "found": "Hallados",
+  "fixed": "Corregidos",
+  "found_count_one": "{{count}} hallado",
+  "found_count_other": "{{count}} hallados",
+  "fixed_count_one": "{{count}} corregido",
+  "fixed_count_other": "{{count}} corregidos",
+  "found_cumulative": "Hallados (acumulado)",
+  "fixed_cumulative": "Corregidos (acumulado)",
+  "activity_label": "Ejecuciones por día en las últimas {{weeks}} semanas: {{total}} en total",
+  "weekday": {
+    "mon": "L", "wed": "X", "fri": "V", "sun": "D"
+  },
+  "today_day": "Hoy · {{day}}",
+  "runs_one": "{{count}} ejecución",
+  "runs_other": "{{count}} ejecuciones",
+  "activity_summary_one": "{{count}} ejecución en {{weeks}} semanas · recuadro = hoy",
+  "activity_summary_other": "{{count}} ejecuciones en {{weeks}} semanas · recuadro = hoy",
+  "less": "Menos",
+  "more": "Más",
+  "unscored": "Sin puntuar",
+  "today": "hoy",
+  "skyline_label": "CVE publicados en los últimos {{days}} días por severidad: {{total}} en total; {{breakdown}}."
+}

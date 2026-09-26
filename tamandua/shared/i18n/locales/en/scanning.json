@@ -1,0 +1,459 @@
+{
+  "join": {
+    "comma": "{{first}}, {{second}}",
+    "and": "{{rest}} and {{last}}",
+    "sentences": "{{first}} {{second}}"
+  },
+  "severity": {
+    "critical": "critical",
+    "high": "high",
+    "medium": "medium",
+    "low": "low",
+    "info": "informational"
+  },
+  "steps": {
+    "review": "Human triage"
+  },
+  "priority": {
+    "static_severity": "Static finding, {{severity}} severity",
+    "confirm_reachability": "Confirm it is reachable in the context of the application",
+    "internal_pattern": "Static pattern, {{severity}} severity; confirm it is reachable",
+    "dev_dependency": "Development dependency: it doesn't reach production, but it runs on your machine and in CI"
+  },
+  "progress": {
+    "engine": "{{engine}}: {{detail}}",
+    "opengrep": "Opengrep {{version}}: multi-language SAST with Tamandua rules…",
+    "gitleaks": "Gitleaks {{version}}: looking for secrets…",
+    "trivy": "Trivy {{version}}: dependencies, infrastructure and secrets…",
+    "osv": "OSV-Scanner {{version}}: dependencies against the OSV database (the first run downloads the advisory databases)…",
+    "checkov": "Checkov {{version}}: infrastructure as code and pipelines…",
+    "zizmor": "zizmor {{version}}: GitHub Actions security…",
+    "engines_failed": "Couldn't run: {{engines}}. This result doesn't mean «no findings»; check on the server that the images are built (docker compose build).",
+    "no_docker": "Docker isn't available: using the internal rules (Python only) and secret patterns.",
+    "feeds": "Matching advisories against CISA KEV and EPSS to prioritize…"
+  },
+  "engines": {
+    "with_cause": "{{message}}: {{cause}}",
+    "host_mount_problem": "Couldn't work out the host path of ./data, so the engines can't read the code. Set TAMANDUA_HOST_DATA_DIR in .env to the absolute path of ./data and restart (make up).",
+    "socket_problem": "No permission on the Docker socket (group {{gid}}): the engines can't start. Restart with `make up`, which detects that group, or add DOCKER_SOCKET_GID={{gid}} to .env and restart.",
+    "docker_unresponsive": "Docker isn't responding.",
+    "pulling": "Downloading {{name}} {{version}}… (this can take several minutes)",
+    "action": {
+      "none": "none",
+      "build": "build it with make build",
+      "no_docker": "Docker not available",
+      "pulled": "downloaded",
+      "pull_failed": "download failed"
+    },
+    "unreadable": "{{engine}} didn't return readable output.",
+    "timeout": "{{engine}} exceeded the time limit.",
+    "failed": "{{engine}} ended with an error",
+    "failed_early": "{{engine}} ended with an error before producing results"
+  },
+  "opengrep": {
+    "no_docker": "Docker isn't available: multi-language SAST didn't run. {{problem}}",
+    "image_missing": "The Opengrep image isn't built: run make build (or docker compose build).",
+    "image_error": "Docker couldn't inspect the Opengrep image: {{cause}}",
+    "exit_code": "Opengrep ended with an error (code {{code}}); SAST didn't finish",
+    "timeout": "Opengrep exceeded the time limit; SAST didn't finish.",
+    "no_covered_language": "none with rules",
+    "detail": "{{rulesets}} sets of Tamandua rules over {{languages}}; {{candidates}} candidates.",
+    "uncovered": "No rules yet for: {{languages}}.",
+    "minified": "{{files}} compiled or minified files were left out of SAST (they're still searched for secrets).",
+    "errors": "{{files}} files couldn't be analyzed (syntax or size).",
+    "reason": "`{{snippet}}` in {{path}}:{{line}}."
+  },
+  "sca": {
+    "upgrade": "Update {{package}} from {{installed}} to {{fixed}} or later in {{target}} and regenerate the lockfile.",
+    "no_fix": "No fixed version of {{package}} has been published. Assess reachability, mitigate or replace the dependency.",
+    "dev_remediation": "{{remediation}} It's a development dependency: the risk is on your team's machines and in CI, not in production."
+  },
+  "iac": {
+    "review_reference": "Review the configuration against the advisory's reference."
+  },
+  "secrets": {
+    "exposed_titled": "Exposed secret: {{title}}",
+    "exposed_rule": "Exposed secret ({{rule}})",
+    "trivy_reason": "{{category}} pattern in {{path}}:{{line}}; value redacted.",
+    "trivy_reason_generic": "Secret pattern in {{path}}:{{line}}; value redacted.",
+    "gitleaks_reason": "Rule {{rule}} in {{path}}:{{line}} (entropy {{entropy}}); value redacted.",
+    "rotate": "Rotate the credential now and move it to a secrets manager. If the repository is public, consider rewriting its history.",
+    "titles": {
+      "jwt": "Exposed JSON Web Token",
+      "generic_api_key": "Exposed API key",
+      "private_key": "Exposed private key",
+      "aws_access_token": "Exposed AWS access key",
+      "aws_secret_access_key": "Exposed AWS secret key",
+      "github_pat": "Exposed GitHub personal access token",
+      "github_fine_grained_pat": "Exposed GitHub token",
+      "github_app_token": "Exposed GitHub App token",
+      "github_oauth": "Exposed GitHub OAuth token",
+      "gitlab_pat": "Exposed GitLab token",
+      "slack_bot_token": "Exposed Slack token",
+      "slack_webhook_url": "Exposed Slack webhook",
+      "stripe_access_token": "Exposed Stripe key",
+      "gcp_api_key": "Exposed Google API key",
+      "openai_api_key": "Exposed OpenAI API key",
+      "anthropic_api_key": "Exposed Anthropic API key",
+      "twilio_api_key": "Exposed Twilio API key",
+      "sendgrid_api_token": "Exposed SendGrid token",
+      "npm_access_token": "Exposed npm token",
+      "pypi_upload_token": "Exposed PyPI token",
+      "azure_ad_client_secret": "Exposed Azure AD client secret",
+      "heroku_api_key": "Exposed Heroku API key"
+    }
+  },
+  "trivy": {
+    "no_docker": "Docker isn't available: dependencies, IaC and secrets with Trivy didn't run.",
+    "failed_download": "Trivy ended with an error before producing results (no access to its vulnerability database)",
+    "timeout": "Trivy exceeded the time limit; dependencies and IaC didn't finish.",
+    "detail": "Examined {{manifests}} dependency manifests and {{configs}} infrastructure files: {{sca}} dependency advisories, {{iac}} misconfigurations, {{secrets}} secrets.",
+    "detail_dev": "Examined {{manifests}} dependency manifests and {{configs}} infrastructure files: {{sca}} dependency advisories ({{dev}} in development dependencies, with lower priority), {{iac}} misconfigurations, {{secrets}} secrets.",
+    "no_feeds": "KEV/EPSS unavailable; priority uses CVSS only."
+  },
+  "osv": {
+    "no_docker": "Docker isn't available: dependencies with OSV-Scanner didn't run.",
+    "no_manifests": "There are no dependency manifests that OSV-Scanner recognizes.",
+    "timeout": "OSV-Scanner exceeded the time limit (the first run downloads the advisory databases).",
+    "detail": "{{manifests}} manifests with {{packages}} vulnerable packages: {{advisories}} advisories, matched locally against the OSV database (transitive dependencies not resolved: the dependency list isn't sent).",
+    "detail_resolved": "{{manifests}} manifests with {{packages}} vulnerable packages: {{advisories}} advisories, matched locally against the OSV database."
+  },
+  "gitleaks": {
+    "no_docker": "Docker isn't available: secret detection with Gitleaks didn't run.",
+    "unreadable": "Gitleaks didn't return a readable report.",
+    "detail": "Gitleaks rules over the snapshot: {{secrets}} secrets; values redacted."
+  },
+  "checkov": {
+    "image_reason": "Checkov ({{rule}}) on the Dockerfile rebuilt from the image history.",
+    "image_reason_step": "Checkov ({{rule}}) on the Dockerfile rebuilt from the image history, step {{step}}.",
+    "image_remediation": "Fix the Dockerfile that builds the image so it meets «{{check}}». Policy index: {{index}}",
+    "reason": "{{framework}}: {{resource}} fails Checkov rule {{rule}} (lines {{start}}–{{end}}).",
+    "remediation": "Adjust {{resource}} so it meets «{{check}}». Policy index: {{index}}",
+    "remediation_generic": "Adjust the resource so it meets «{{check}}». Policy index: {{index}}",
+    "no_docker": "Docker isn't available: infrastructure and pipelines with Checkov didn't run.",
+    "timeout": "Checkov exceeded the time limit; infrastructure and pipelines didn't finish.",
+    "detail": "{{failures}} misconfigurations in {{frameworks}}.",
+    "clean": "No failures in the repository's infrastructure as code or pipelines.",
+    "image_no_docker": "Docker isn't available: Checkov didn't review the image configuration.",
+    "image_no_history": "The image keeps no build history: Checkov has no Dockerfile to review.",
+    "image_timeout": "Checkov exceeded the time limit with the image history.",
+    "image_detail": "{{failures}} failures in the Dockerfile rebuilt from {{steps}} history steps."
+  },
+  "zizmor": {
+    "audits": {
+      "template_injection": "Code injection in a GitHub Actions template",
+      "dangerous_triggers": "Dangerous trigger: the workflow runs with repository permissions on third-party code",
+      "excessive_permissions": "GITHUB_TOKEN permissions broader than needed",
+      "unpinned_uses": "Third-party action not pinned to a SHA",
+      "artipacked": "Git credentials persist after actions/checkout",
+      "cache_poisoning": "Cache poisoning risk in a release workflow",
+      "archived_uses": "Action from an archived repository (no longer patched)",
+      "insecure_commands": "Insecure workflow commands enabled (ACTIONS_ALLOW_UNSECURE_COMMANDS)",
+      "github_env": "Dangerous write to GITHUB_ENV or GITHUB_PATH",
+      "hardcoded_container_credentials": "Hard-coded container or service credentials in the workflow",
+      "self_hosted_runner": "Self-hosted runner exposed to untrusted code",
+      "secrets_inherit": "A reusable workflow inherits every secret",
+      "overprovisioned_secrets": "More secrets exposed than needed",
+      "unredacted_secrets": "Secrets that can reach the logs unredacted",
+      "bot_conditions": "Spoofable bot condition",
+      "unsound_condition": "Condition that is always true",
+      "unsound_contains": "contains() check that can be bypassed",
+      "unpinned_images": "Container image not pinned to a digest",
+      "use_trusted_publishing": "Publishing with a token when trusted publishing is available",
+      "obfuscation": "Obfuscated expression in the workflow",
+      "forbidden_uses": "Action not allowed by policy",
+      "ref_version_mismatch": "Version comment doesn't match the pinned SHA",
+      "anonymous_definition": "Workflow or job without a name",
+      "dependabot_cooldown": "Dependabot updates without a cooldown period",
+      "dependabot_execution": "Dependabot can run external code while updating",
+      "concurrency_limits": "Workflow without a concurrency limit",
+      "undocumented_permissions": "Permissions without a justifying comment"
+    },
+    "reason": "{{description}} ({{path}}:{{line}}).",
+    "reason_annotated": "{{description}}: {{annotation}} ({{path}}:{{line}}).",
+    "remediation": "zizmor guidance and fix: {{url}}",
+    "no_docker": "Docker isn't available: GitHub Actions workflows weren't audited with zizmor.",
+    "nothing_to_audit": "The repository has no GitHub workflows or actions to audit.",
+    "detail": "{{audited}} GitHub workflows or actions audited offline: {{problems}} problems in {{affected}} of them.",
+    "clean": "{{audited}} GitHub workflows or actions audited offline: no problems."
+  },
+  "image": {
+    "errors": {
+      "invalid_reference": "Invalid image reference: use registry/repository:tag, e.g. ghcr.io/acme/api:1.4",
+      "unresolvable": "Couldn't resolve the registry {{registry}}",
+      "private_address": "The registry {{registry}} resolves to a private address. If it's a registry on your own network, start the server with TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.",
+      "invalid_registry": "Invalid registry: host only, e.g. ghcr.io or 123456789.dkr.ecr.us-east-1.amazonaws.com",
+      "invalid_username": "Invalid username",
+      "invalid_token": "Invalid token: paste the registry's read-only access token"
+    },
+    "no_docker": "Docker isn't available: the image wasn't analyzed with {{engine}}.",
+    "timeout": "{{engine}} exceeded the time limit with this image.",
+    "trivy_detail": "{{sca}} package advisories, {{iac}} image configuration problems and {{secrets}} secrets in layers, environment variables or history.",
+    "grype_detail": "{{advisories}} package advisories.",
+    "registry": {
+      "denied": "The registry denied access: check that the image exists and that the credentials saved for that registry have read permission.",
+      "credentials_needed": "The registry requires credentials: save them in Integrations → Container registries.",
+      "not_found": "The registry doesn't have that image or tag.",
+      "unreadable": "Couldn't read the image from the registry."
+    },
+    "rules": {
+      "root": {
+        "title": "The image runs as root",
+        "reason": "It declares no USER (or declares root): a flaw in the application gives root control inside the container and makes escaping it easier.",
+        "remediation": "Add an unprivileged user in the Dockerfile (RUN adduser … && USER app) or run it with --user."
+      },
+      "env_secret": {
+        "title": "Possible credential in the environment variable {{name}}",
+        "reason": "The image sets {{name}} to a fixed value (redacted): anyone who can pull the image can read it with docker inspect.",
+        "remediation": "Rotate the credential. Don't put it in ENV: pass it at runtime (a Docker/Kubernetes secret or an orchestrator variable) or, if it's only needed at build time, with BuildKit's RUN --mount=type=secret."
+      },
+      "build_secret": {
+        "title": "Credential in the build history ({{name}})",
+        "reason": "History step {{step}} contains {{name}} with a value (redacted). ARGs and variables in a RUN are stored in the image and can be read with docker history.",
+        "remediation": "Rotate the credential now. Rebuild using BuildKit secrets (RUN --mount=type=secret,id=npm …) instead of ARG or ENV, and delete the published tags that carry the credential."
+      },
+      "build_url_credential": {
+        "title": "Credential in a URL or header in the build history",
+        "reason": "History step {{step}} uses a URL with a username and password or an Authorization header with a fixed value (redacted).",
+        "remediation": "Rotate the credential and use BuildKit secrets or a .netrc file mounted as a secret during the build."
+      },
+      "add_url": {
+        "title": "ADD downloads files from a URL",
+        "reason": "Step {{step}} uses ADD with a URL: the content isn't verified and can change between builds.",
+        "remediation": "Download with curl and check the SHA-256 (or use ADD --checksum=sha256:… with BuildKit)."
+      },
+      "ssh": {
+        "title": "The image exposes SSH (22/tcp)",
+        "reason": "An SSH server in a container widens the attack surface and often means there are credentials inside the image.",
+        "remediation": "Remove the SSH server; to debug, use docker exec or kubectl exec."
+      },
+      "no_healthcheck": {
+        "title": "The image defines no HEALTHCHECK",
+        "reason": "Without a HEALTHCHECK, the orchestrator can't detect a hung or degraded process.",
+        "remediation": "Add a HEALTHCHECK to the Dockerfile or define the probe in the orchestrator."
+      },
+      "latest": {
+        "title": "The latest tag is being analyzed",
+        "reason": "latest changes without notice: what you analyze today may not be what you deploy tomorrow.",
+        "remediation": "Deploy and analyze immutable tags (a version or @sha256:…)."
+      },
+      "stale": {
+        "title": "The image was built {{months}} months ago",
+        "reason": "An old image piles up unapplied security patches in its base.",
+        "remediation": "Rebuild the image regularly (e.g. every week) to pick up the base image's patches."
+      }
+    },
+    "remediation": {
+      "os_upgrade": "Rebuild the image on an updated base or upgrade {{package}} to {{fixed}} in the Dockerfile (apt/apk/dnf upgrade).",
+      "os_no_fix": "The distribution hasn't published a fixed version of {{package}} yet. Consider another base image (slim, distroless) or whether the package is actually used.",
+      "app_upgrade": "Update {{package}} to {{fixed}} in the packaged application and rebuild the image.",
+      "app_no_fix": "There's no fixed version of {{package}}: consider replacing it or mitigating."
+    },
+    "progress": {
+      "reading_credentials": "Reading {{reference}} from the registry with the saved credentials…",
+      "reading_public": "Reading {{reference}} from the registry without credentials (public image)…",
+      "grype": "Second opinion on the packages with Grype…",
+      "checkov": "Checkov on the Dockerfile rebuilt from the image history…"
+    },
+    "checkov_without_config": "Without the image configuration (Trivy couldn't read it), Checkov has nothing to review.",
+    "steps": {
+      "image": {
+        "name": "Image",
+        "detail": "{{where}} · user {{user}}. Read from the registry, never run."
+      },
+      "sca": {
+        "name": "Packages · Trivy + Grype",
+        "detail": "{{advisories}} advisories: {{both}} seen by both engines, {{only_trivy}} only by Trivy and {{only_grype}} only by Grype. Prioritized with CVSS, KEV and EPSS.",
+        "single_engine": "{{advisories}} advisories from a single engine: Trivy: {{trivy}} · Grype: {{grype}}"
+      },
+      "config": {
+        "name": "Image configuration · Tamandua rules + Checkov",
+        "detail": "{{problems}} problems (root user, HEALTHCHECK, insecure instructions) in the configuration and history. {{checkov}}",
+        "detail_checkov": "{{problems}} problems (root user, HEALTHCHECK, insecure instructions) in the configuration and history. Checkov reviewed the rebuilt Dockerfile: {{failures}} failures, {{joined}} already covered by another rule."
+      },
+      "secrets": {
+        "name": "Secrets in layers, ENV and history",
+        "detail": "{{secrets}} secrets; values redacted. Includes environment variables and build arguments left in the image."
+      },
+      "review": {
+        "detail": "Confirm the packages are used and prioritize by how exposed the image is."
+      }
+    },
+    "limitations": {
+      "read_only": "The image was read from the registry: it was never run or built",
+      "no_source": "The source code that built the image wasn't analyzed (analyze its repository for that)",
+      "backports": "The engines may disagree on packages with patches backported by the distribution",
+      "system_package": "An advisory in a system package doesn't prove the application uses it"
+    }
+  },
+  "internal": {
+    "remediation": "Review the flow and the affected version; confirm it is reachable before prioritizing.",
+    "sql": {
+      "title": "Dynamically built SQL",
+      "reason": "Query built with interpolation or concatenation; check whether it takes untrusted input."
+    },
+    "shell": {
+      "title": "Command with shell=True",
+      "reason": "The call goes through a shell interpreter; check where its arguments come from."
+    },
+    "dynamic_code": {
+      "title": "Dynamic code execution",
+      "reason": "eval/exec needs a review of where the input comes from and validation of its content."
+    },
+    "secret_reason": "Credential pattern detected. The value was left out of the report and never sent to the browser.",
+    "secret_titles": {
+      "github_token": "Possible GitHub token",
+      "openai_api_key": "Possible OpenAI API key",
+      "aws_access_key_id": "Possible AWS access key ID",
+      "jwt": "Possible JSON Web Token",
+      "private_key": "Possible private key",
+      "stripe_secret_key": "Possible Stripe secret key",
+      "slack_token": "Possible Slack token",
+      "google_api_key": "Possible Google API key"
+    }
+  },
+  "repository": {
+    "snapshot": {
+      "copied": "{{files}} files copied read-only, without installing dependencies or running scripts.",
+      "skipped": "{{detail}} {{skipped}} were left out: {{not_analyzable}} not analyzable (binaries, images, bundles), {{too_large}} because of file size.",
+      "skipped_budget": "{{detail}} {{skipped}} were left out: {{not_analyzable}} not analyzable (binaries, images, bundles), {{too_large}} because of file size and {{over_budget}} when the snapshot budget ran out."
+    },
+    "steps": {
+      "snapshot": "Code snapshot",
+      "internal_sast": {
+        "name": "Internal SAST (Python)",
+        "detail": "{{candidates}} candidates with internal AST rules. Docker isn't available: without Opengrep, only Python is covered."
+      },
+      "internal_secrets": {
+        "name": "Secrets (internal patterns)",
+        "detail": "{{candidates}} candidates; values redacted. Docker isn't available: without Gitleaks or Trivy."
+      },
+      "sca": "Dependencies · {{engines}}",
+      "review": "Static results are candidates; review flow, reachability and applicability."
+    },
+    "osv_merged": "{{detail}} {{joined}} match Trivy and were merged into the same finding; {{new}} are new.",
+    "checkov_merged": "{{detail}} {{joined}} match Trivy or zizmor and were merged into the same finding; {{new}} are new.",
+    "sca": {
+      "scope_first": "the first {{versions}} pinned versions",
+      "scope": "{{versions}} pinned versions",
+      "engines": "Dependencies in every ecosystem of the snapshot with {{engines}}: {{advisories}} unique advisories with fixed version, CVSS, KEV and EPSS.",
+      "engines_confirmed": "Dependencies in every ecosystem of the snapshot with {{engines}}: {{advisories}} unique advisories with fixed version, CVSS, KEV and EPSS; {{confirmed}} confirmed by both engines.",
+      "no_manifests": "No package-lock.json or requirements.txt with pinned versions was found.",
+      "no_versions": "There are manifests, but no compatible pinned versions could be extracted.",
+      "osv_not_allowed": "Found {{scope}}. OSV lookup not authorized; sending package names and versions to api.osv.dev requires your consent.",
+      "osv_without_detail": "OSV links {{advisory}} to this version; the advisory details couldn't be retrieved.",
+      "osv_detail": "Looked up {{scope}} in OSV; {{advisories}} advisories in {{packages}} packages, {{fixed}} with a published fixed version, {{kev}} in CISA KEV.",
+      "no_feeds": "KEV/EPSS unavailable in this run; priority was computed with CVSS only.",
+      "detailed_subset": "Advisory details were fetched for {{detailed}} of {{total}} identifiers.",
+      "osv_failed": "The OSV lookup couldn't be completed. This doesn't mean zero vulnerabilities."
+    },
+    "limitations": {
+      "truncated": "The snapshot was truncated: {{files}} files weren't analyzed because of the total size limit. Coverage of this repository is partial.",
+      "no_execution": "No repository code was run",
+      "sast_rules": "SAST with Tamandua rules: coverage limited to languages with rules and no cross-file analysis",
+      "no_docker": "Without Docker: Python-only SAST with internal rules and pattern-based secrets",
+      "sca_cap": "SCA caps the lookup at 250 versions per run",
+      "osv_not_exploit": "OSV advisories don't prove exploitation",
+      "no_ai_dast": "AI and DAST weren't part of this run"
+    }
+  },
+  "plan": {
+    "rules_one": "{{count}} rule",
+    "rules_other": "{{count}} rules",
+    "files_one": "{{count}} file",
+    "files_other": "{{count}} files",
+    "manifests_one": "{{count}} manifest",
+    "manifests_other": "{{count}} manifests",
+    "workflows_one": "{{count}} workflow",
+    "workflows_other": "{{count}} workflows",
+    "language_rules": "{{name}} ({{rules}}, {{files}})",
+    "language": "{{name}} ({{files}})",
+    "runs": {
+      "snapshot": "Read-only snapshot of the repository and SHA-256 hash of its content",
+      "sast": "SAST with {{engine}} {{version}}: {{languages}}",
+      "internal_sast": "Internal SAST for Python only (Opengrep isn't available on this server)",
+      "secrets": "Secrets with {{engine}} {{version}} across the whole snapshot; the value is never stored",
+      "internal_secrets": "Secrets with internal patterns (Gitleaks isn't available)",
+      "dependencies": "Dependencies with {{engine}} {{version}}, with its advisory databases stored locally: {{manifests}} ({{sample}}), matched against CISA KEV and EPSS",
+      "dependencies_osv": "Dependencies with {{engine}} {{version}} and {{osv}} {{osv_version}} (OSV database, Dependabot's included), with their advisory databases stored locally: {{manifests}} ({{sample}}), matched against CISA KEV and EPSS; an advisory both detect counts once",
+      "iac": "Infrastructure as code with {{engine}}: {{sample}}",
+      "osv_only": "Dependencies with OSV only if you authorize it (Trivy isn't available)",
+      "checkov": "Infrastructure and pipelines with {{engine}} {{version}} (Terraform, CloudFormation, Kubernetes, Helm, Dockerfile, GitHub Actions, GitLab CI…), offline; whatever Trivy also sees is merged into the same finding",
+      "zizmor": "GitHub Actions with {{engine}} {{version}}: template injection, dangerous triggers, permissions and unpinned actions",
+      "zizmor_workflows": "GitHub Actions with {{engine}} {{version}}: template injection, dangerous triggers, permissions and unpinned actions ({{workflows}})",
+      "languages_later": "Languages will be known once the snapshot is downloaded (this provider doesn't let us list them beforehand)"
+    },
+    "skips": {
+      "no_execution": "The repository's code is never installed or run: the analysis is static",
+      "sast_no_files": "SAST: there are no files in the languages covered by Tamandua rules",
+      "no_rules": "No Tamandua SAST rules for {{languages}}: only their secrets and dependencies are reviewed",
+      "no_manifests": "Dependencies: there are no lockfiles or manifests with versions to resolve",
+      "iac_without_trivy": "Infrastructure as code: there are {{files}}, but Trivy isn't available",
+      "no_checkov": "Checkov isn't available: infrastructure is reviewed with Trivy only",
+      "no_zizmor": "zizmor isn't available: GitHub Actions workflows are reviewed by Checkov only",
+      "no_dast": "No dynamic testing: no traffic is sent to any application",
+      "no_ai": "No AI: no source code is sent to OpenAI or Anthropic"
+    }
+  },
+  "local": {
+    "errors": {
+      "no_git": "Comparing with --base requires git to be installed",
+      "git_timeout": "git {{command}} took too long",
+      "git_failed": "git {{command}}: {{detail}}",
+      "git_failed_silently": "git {{command}}: failed",
+      "invalid_ref": "Invalid git reference: {{ref}}",
+      "unknown_ref": "The reference {{ref}} doesn't exist in this repository (missing `git fetch`?)",
+      "exclude": "--exclude: {{error}}",
+      "not_a_folder": "Not a folder: {{path}}",
+      "fail_on": "--fail-on must be one of: {{options}}"
+    },
+    "progress": {
+      "copied": "Read-only copy: {{files}} files to analyze.",
+      "comparing": "Comparing with {{base}} (merge-base {{commit}}): {{files}} files changed.",
+      "baseline": "Analyzing the starting point so what was already there doesn't count ({{files}} files)…"
+    },
+    "no_docker": "Docker isn't available: the engines didn't run.",
+    "not_analyzed_step": "{{step}}: {{detail}}"
+  },
+  "cli": {
+    "severity": {
+      "critical": "critical",
+      "high": "high",
+      "medium": "medium",
+      "low": "low",
+      "info": "info"
+    },
+    "fail_on": {
+      "critical": "critical",
+      "high": "high or above",
+      "medium": "medium or above",
+      "low": "low or above",
+      "never": "never (report only)"
+    },
+    "verdict": {
+      "pass": "PASS",
+      "blocked": "BLOCKED",
+      "incomplete": "INCOMPLETE"
+    },
+    "advisories_one": "{{count}} advisory",
+    "advisories_other": "{{count}} advisories",
+    "upgrade": "update to {{version}}",
+    "upgrade_partial": "update to {{version}} (some advisories have no fixed version)",
+    "no_fix": "no fixed version published",
+    "package_row": "{{package}} {{version}}: {{advisories}} ({{counts}}) → {{advice}}",
+    "scope_changes": "changes since {{base}} (merge-base {{commit}}, {{files}} files)",
+    "scope_all": "whole folder",
+    "no_baseline": "Starting point not analyzed (--no-baseline): everything on changed lines counts.",
+    "more": "… and {{count}} more (use --format json or sarif to see them all)",
+    "no_new_findings": "No new findings.",
+    "no_findings": "No findings.",
+    "preexisting": "{{count}} already existed in the code you're touching: they don't block.",
+    "excluded": "{{count}} in excluded paths ({{patterns}}): they don't count.",
+    "engines": "Engines: {{ran}}",
+    "engines_failed": "Engines: {{ran}} · didn't run: {{failed}}",
+    "no_engines": "none",
+    "not_analyzed": "Not analyzed: {{item}}",
+    "incomplete": "the analysis didn't finish: this doesn't mean «no findings»",
+    "verdict_line": "{{verdict}} · threshold: {{threshold}} · {{detail}}"
+  }
+}

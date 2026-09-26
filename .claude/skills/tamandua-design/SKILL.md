@@ -1,68 +1,68 @@
 ---
 name: tamandua-design
-description: Reglas de diseño de Tamandua para la interfaz (web/src), los informes PDF/Markdown y el diagrama de amenazas. Úsala SIEMPRE antes de crear o cambiar una vista, un componente, un informe, una exportación o el diagrama, y para revisar un diff que toque cualquiera de ellos.
+description: Tamandua's design rules for the panel (web/src), the PDF/Markdown reports and the threat diagram. Use ALWAYS before creating or changing a view, a component, a report, an export or the diagram, and when reviewing a diff that touches any of them.
 ---
 
-# Diseño de Tamandua
+# Tamandua design
 
-Tres superficies, las mismas ideas: **primero la conclusión, después el detalle; agrupar por acción; solo tokens; accesible (WCAG 2.2 AA); nada de texto sin escapar.**
-Si una regla choca con lo que pide el usuario, pregunta; no la rompas en silencio.
+Three surfaces, one set of ideas: **conclusion first, detail after; group by action; tokens only; accessible (WCAG 2.2 AA); no unescaped text.**
+If a rule conflicts with what the user asks for, ask; never break it silently.
 
-## 1. Interfaz (web/src)
+## 1. Panel (web/src)
 
-- **Color: solo tokens** de `web/src/index.css` (`text-danger`, `bg-warning-soft`, `border-info-line`, `bg-brand/10`, `text-app-muted`…). Nunca paleta suelta de Tailwind (`bg-red-500`) ni hexadecimal. `tests/test_ui_tokens.py` lo hace cumplir.
-  - Semánticos: `danger`, `attention`, `warning`, `info`, `success` con `-soft` (fondo) y `-line` (borde); `danger-solid` + `on-solid` para lo sólido; `brand`; neutros `app-*`, `panel`, `inset`.
-  - `app-faint` solo para bordes y adornos, nunca texto.
-- **Contraste**: texto ≥ 4,5:1, bordes que identifican algo ≥ 3:1. Si añades un token, compruébalo en claro y en oscuro.
-- **Foco visible** en todo control (ya global: `:focus-visible` con `--brand`). No lo quites con `outline-none` sin alternativa.
-- **Movimiento**: animaciones con `motion-safe:`; `prefers-reduced-motion` las apaga.
-- **Tamaños**: texto ≥ 11 px; objetivos de clic ≥ 24 px (`min-h-6`, `size-6`).
-- **Semántica y ARIA en español**: `aria-pressed` (conmutadores), `aria-expanded`, `aria-current`, `role="radiogroup"`/`radio` con `aria-checked`, `role="status"`/`alert`/`progressbar`; cada input con su `<label htmlFor>`; `CardTitle` es un encabezado real.
-- **Carga**: esqueletos con la forma del contenido (`Bone`, `SkeletonList`, `SkeletonTable`, `SkeletonTiles`, `SkeletonCard` de `shared/ui/loading.tsx`), anunciados una vez ("Cargando …"). Nunca un estado vacío falso mientras carga.
-- **Ley de Hick**: una acción principal y el resto en un menú (`shared/ui/menu.tsx`); navegación agrupada; lo avanzado tras «Más opciones»/«Más filtros». Formularios con valores por defecto: se puede generar sin tocar nada.
-- **Listas largas**: paginación o búsqueda en el servidor; nunca cargar todo.
+- **Color: tokens only** from `web/src/index.css` (`text-danger`, `bg-warning-soft`, `border-info-line`, `bg-brand/10`, `text-app-muted`…). Never raw Tailwind palette classes (`bg-red-500`) or hex values. `tests/test_ui_tokens.py` enforces it.
+  - Semantic: `danger`, `attention`, `warning`, `info`, `success`, each with `-soft` (background) and `-line` (border); `danger-solid` + `on-solid` for solid fills; `brand`; neutrals `app-*`, `panel`, `inset`.
+  - `app-faint` is for borders and decoration only, never text.
+- **Contrast**: text ≥ 4.5:1, borders that identify something ≥ 3:1. If you add a token, check it in both light and dark mode.
+- **Visible focus** on every control (already global: `:focus-visible` with `--brand`). Never remove it with `outline-none` without an alternative.
+- **Motion**: animations behind `motion-safe:`; `prefers-reduced-motion` turns them off.
+- **Sizes**: text ≥ 11 px; click targets ≥ 24 px (`min-h-6`, `size-6`).
+- **Semantics and ARIA**: `aria-pressed` (toggles), `aria-expanded`, `aria-current`, `role="radiogroup"`/`radio` with `aria-checked`, `role="status"`/`alert`/`progressbar`; every input has its `<label htmlFor>`; `CardTitle` is a real heading. ARIA labels are user-facing text: they come from the i18n catalogs (`.claude/skills/tamandua-i18n/SKILL.md`), in English and Spanish.
+- **Loading**: skeletons shaped like the content (`Bone`, `SkeletonList`, `SkeletonTable`, `SkeletonTiles`, `SkeletonCard` from `shared/ui/loading.tsx`), announced once ("Loading…"). Never show a fake empty state while loading.
+- **Hick's law**: one primary action, the rest in a menu (`shared/ui/menu.tsx`); grouped navigation; advanced options behind "More options"/"More filters". Forms have defaults: the user can generate without touching anything.
+- **Long lists**: server-side pagination or search; never load everything.
 
-## 2. Informes (PDF y Markdown)
+## 2. Reports (PDF and Markdown)
 
-Todo PDF se construye con `tamandua/modules/reporting/design.py` (tokens, `header`, `meta`, `kpis`, `chip`, `table`, `h2`, `build`, `wide_page`). No crees estilos ni colores propios.
+Every PDF is built with `tamandua/modules/reporting/design.py` (tokens, `header`, `meta`, `kpis`, `chip`, `table`, `h2`, `build`, `wide_page`). Do not create your own styles or colors.
 
-**Estructura, en este orden:**
-1. Cabecera: antetítulo (qué tipo de informe), título (el sistema), subtítulo (periodo o descripción) y `meta` (quién, qué, cuándo, referencia).
-2. **Cifras clave** (`kpis`, como mucho 6) y una frase de resumen con los números.
-3. **Qué hacer primero**: tabla corta (≤ 15 filas) con severidad, qué, dónde y la acción en una frase.
-4. El cuerpo agrupado **por acción**, no por aviso:
-   - dependencias: una fila por paquete (manifiesto + versión) con la versión que cierra todos sus avisos → `remediation.fix_groups` y `remediation.action`;
-   - amenazas de reglas: una fila por patrón con los componentes afectados (`threat_report.digest`);
-   - código: detalle solo de críticos y altos; medios y bajos en tabla.
-5. Método y **cobertura: lo que no se analizó se dice** ("no equivale a «sin hallazgos»"). Nunca presentes un análisis incompleto como limpio.
-6. Anexos compactos (una fila por elemento, sin descripciones largas) y con tope; lo íntegro queda en JSON/SARIF/panel.
-7. Aviso final: evidencia técnica, revisión humana, no es certificación. Firmas solo en los de auditoría.
+**Structure, in this order:**
+1. Header: kicker (which kind of report), title (the system), subtitle (period or description) and `meta` (who, what, when, reference).
+2. **Key figures** (`kpis`, at most 6) and one summary sentence with the numbers.
+3. **What to do first**: a short table (≤ 15 rows) with severity, what, where and the action in one sentence.
+4. The body grouped **by action**, not by advisory:
+   - dependencies: one row per package (manifest + version) with the version that closes all its advisories → `remediation.fix_groups` and `remediation.action`;
+   - rule-based threats: one row per pattern with the affected components (`threat_report.digest`);
+   - code: full detail only for critical and high; medium and low in a table.
+5. Method and **coverage: say what was not analyzed** ("this is not the same as 'no findings'"). Never present an incomplete analysis as clean.
+6. Compact appendices (one row per item, no long descriptions), with a cap; the full data stays in JSON/SARIF/the panel.
+7. Closing notice: technical evidence, human review required, not a certification. Signatures only on audit reports.
 
-**Reglas de forma:**
-- Severidad siempre con `chip` (colores fijos). KEV marcado en rojo junto al hallazgo.
-- Celdas cortas: acción con `action(entry, short=True)`; listas con `listing(items, n)` («a, b y 4 más»).
-- Todo texto que venga de un repositorio, modelo o formulario pasa por `t()` (escapa y acota). En Markdown, `|` escapado en celdas.
-- Títulos de sección con `h2()` (el salto condicional evita huérfanos). Nada de `keepWithNext` en tablas grandes.
-- Tono: español, concreto, sin exagerar (no «explotable» sin prueba; un indicio es una señal, no una confirmación).
-- Presupuesto orientativo: técnico de un repositorio ≤ 15 páginas sin anexo; modelo de amenazas ≤ 15. Si te pasas, agrupa más o mueve a anexo.
-- **Excepción: evidencia para auditoría** (SOC 2, ISO, consolidado). El lector es un auditor: alcance, controles y método van antes de los
-  hallazgos, sin «Qué hacer primero»; la tabla de hallazgos agrupada es la evidencia y va completa; el detalle lleva tope (`DETAIL_LIMIT`).
-- Cobertura: usa `coverage_gaps(steps)` (parcial, no ejecutado, no concluyente, falló). «Todos los motores se completaron» solo si todos
-  están en `completed`. En amenazas, di si se buscaron indicios (componentes con repositorio enlazado).
+**Form rules:**
+- Severity always with `chip` (fixed colors). KEV flagged in red next to the finding.
+- Short cells: action with `action(entry, short=True)`; lists with `listing(items, n)` ("a, b and 4 more").
+- All text coming from a repository, a model or a form goes through `t()` (escapes and truncates). In Markdown, escape `|` inside cells.
+- Section titles with `h2()` (its conditional page break avoids orphans). No `keepWithNext` on large tables.
+- Tone: concrete, no overstatement (never "exploitable" without proof; an indicator is a signal, not a confirmation). Wording in the reader's language through the i18n catalogs, English and Spanish.
+- Rough budget: a single-repository technical report ≤ 15 pages without appendix; a threat model ≤ 15. If you exceed it, group more or move content to an appendix.
+- **Exception: audit evidence** (SOC 2, ISO, consolidated). The reader is an auditor: scope, controls and method come before the
+  findings, with no "What to do first"; the grouped findings table is the evidence and is complete; detail is capped (`DETAIL_LIMIT`).
+- Coverage: use `coverage_gaps(steps)` (partial, not run, inconclusive, failed). Say "all engines completed" only if every step
+  is `completed`. For threats, say whether indicators were searched (components with a linked repository).
 
-## 3. Diagrama de amenazas
+## 3. Threat diagram
 
-- Colocación: `tamandua/modules/threats/diagram.py` y `web/src/features/threats/threat-layout.ts` son **el mismo algoritmo**; si cambias uno, cambia el otro. `tests/test_threat_layout_parity.py` lo comprueba.
-- Columnas por recorrido de los datos (distancia a los actores), bloques por frontera sin solapes, reordenados por vecinos, rejilla de 8 px, pilas ≤ 5.
-- Colores: paleta de tokens (`COLORS` en Python, `threat-colors.ts` en el panel): `neutral, brand, info, success, warning, attention, danger`. Sin elegir, el del papel del componente; siempre con leyenda. Nunca hexadecimal libre del usuario.
-- Formas: proceso redondeado, almacén entre dos líneas, tercero discontinuo. Flujo sin cifrar: rojo discontinuo.
-- Etiquetas cortas: «n.º · PROTOCOLO». Lo que viaja, en la tabla de flujos del informe con el mismo número.
-- El SVG y el PDF salen de la misma `scene()`: no dibujes en uno lo que no esté en el otro.
+- Placement: `tamandua/modules/threats/diagram.py` and `web/src/features/threats/threat-layout.ts` are **the same algorithm**; if you change one, change the other. `tests/test_threat_layout_parity.py` checks it.
+- Columns follow the data path (distance from the actors), one block per boundary without overlaps, reordered by neighbors, 8 px grid, stacks ≤ 5.
+- Colors: the token palette (`COLORS` in Python, `threat-colors.ts` in the panel): `neutral, brand, info, success, warning, attention, danger`. If none is chosen, use the component role's color; always with a legend. Never free-form hex from the user.
+- Shapes: process rounded, data store between two lines, third party dashed. Unencrypted flow: dashed red.
+- Short labels: "n · PROTOCOL" (e.g. `3 · HTTPS`). What travels goes in the report's flow table under the same number.
+- The SVG and the PDF come from the same `scene()`: never draw in one what is not in the other.
 
-## Cómo verificar antes de dar algo por terminado
+## How to verify before calling it done
 
-1. `make test` (incluye `test_ui_tokens`, `test_report_design`, `test_threat_layout_parity`) y `cd web && npx tsc -b && npx oxlint src`.
-2. **Míralo**: genera el PDF con datos reales (`data/runs/*/run.json`) y conviértelo con `pdftoppm -r 60 -png`; el SVG con `rsvg-convert`; la UI con una página de vista previa temporal (bórrala después). Revisa páginas, huecos, textos cortados y contraste.
-3. Compara páginas antes/después cuando cambies un informe.
+1. `make test` (includes `test_ui_tokens`, `test_report_design`, `test_threat_layout_parity`) and `cd web && npx tsc -b && npx oxlint src`.
+2. **Look at it**: generate the PDF with real data (`data/runs/*/run.json`) and convert it with `pdftoppm -r 60 -png`; the SVG with `rsvg-convert`; the panel with a temporary preview page (delete it afterwards). Check pages, gaps, clipped text and contrast.
+3. Compare pages before/after whenever you change a report.
 
-Para revisar un diff contra estas reglas, usa el agente `design-reviewer`.
+To review a diff against these rules, use the `design-reviewer` agent.

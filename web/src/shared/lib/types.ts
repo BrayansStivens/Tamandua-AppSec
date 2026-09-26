@@ -1,3 +1,5 @@
+import i18n from '@/shared/i18n'
+
 // Plazo de corrección de un hallazgo (tamandua/modules/findings/sla.py); lo reexporta features/findings/sla.
 export type Sla = { days: number; due: string; days_left: number; state: 'overdue' | 'soon' | 'ok' }
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
@@ -24,10 +26,20 @@ export type Dashboard = {
   cve_news: { published_7d: number; published_30d: number | null; per_day: { day: string; count: number }[]; fetched_at: string | null; refreshing: boolean; sample: number; by_severity: Record<string, number>; total_reported: number | null; items: { cve: string; published: string | null; score: number | null; severity: string | null; description: string; affects: boolean }[] }
   tools: { name: string; version: string; status: string }[]
 }
-export const severityLabel: Record<string, string> = { critical: 'Crítica', high: 'Alta', medium: 'Media', low: 'Baja', info: 'Info' }
-export const actionLabel: Record<string, string> = { act: 'Actuar ya', attend: 'Atender', track: 'Seguimiento' }
-export const statusLabel = (status: string) => ({ completed: 'Completada', incomplete: 'Incompleta', failed: 'Fallida', queued: 'En cola', running: 'Analizando…' }[status] ?? status)
+// Getters so each read follows the current language.
+export const severityLabel: Record<string, string> = {
+  get critical() { return i18n.t('common:severity.critical') }, get high() { return i18n.t('common:severity.high') },
+  get medium() { return i18n.t('common:severity.medium') }, get low() { return i18n.t('common:severity.low') }, get info() { return i18n.t('common:severity.info') },
+}
+export const actionLabel: Record<string, string> = {
+  get act() { return i18n.t('common:priority.act') }, get attend() { return i18n.t('common:priority.attend') }, get track() { return i18n.t('common:priority.track') },
+}
+const RUN_STATUS: Record<string, string> = {
+  completed: 'common:run_status.completed', incomplete: 'common:run_status.incomplete', failed: 'common:run_status.failed',
+  queued: 'common:run_status.queued', running: 'common:run_status.running',
+}
+export const statusLabel = (status: string) => RUN_STATUS[status] ? i18n.t(RUN_STATUS[status]) : status
 export { formatDate } from '@/shared/i18n/format'
 
-// «1 hallazgo», «2 hallazgos»: el número siempre concuerda con el sustantivo.
+// Deprecated: use i18next plurals (`key_one` / `key_other` with `count`). Kept while other screens still call it.
 export const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`

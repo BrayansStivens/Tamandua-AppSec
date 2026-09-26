@@ -24,11 +24,20 @@ from pathlib import Path
 from tamandua.shared import documents
 from tamandua.shared import log as logging_setup
 from tamandua.modules.pullrequests.review import GATES
+from tamandua.shared.i18n import msg, text
 
 _log = logging_setup.get("pr_watch")
 DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": True}
 BRANCH_PER_POLL = 3     # reanálisis de rama principal encolados por vuelta, como mucho
 BRANCH_QUEUE_LIMIT = 2  # solo si en la cola hay menos que esto
+
+
+class WatchError(ValueError):
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 def load(data_dir: Path) -> dict:
@@ -56,7 +65,7 @@ def configure(data_dir: Path, source_id: str, *, enabled=None, post_comment=None
 def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_comment=None, gate=None, branch=None, by: str) -> list[dict]:
     """Varios repositorios con una sola escritura: activar cientos no reescribe el archivo cientos de veces."""
     if gate is not None and gate not in GATES:
-        raise ValueError("Umbral inválido")
+        raise WatchError(msg("pulls.watch.invalid_gate"))
     results = []
     with documents.lock(data_dir, "pr-watch"):
         payload = load(data_dir)

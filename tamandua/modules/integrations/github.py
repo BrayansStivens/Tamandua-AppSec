@@ -27,6 +27,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from tamandua.shared.i18n import default_locale, msg, text
 from tamandua.version import USER_AGENT
 
 API = "https://api.github.com"
@@ -42,7 +43,11 @@ TOKEN_MARGIN = 300
 
 
 class GitHubAppError(RuntimeError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -82,9 +87,9 @@ def config() -> dict:
     if not values["app_id"]:
         missing.append("App ID")
     if values["key_file"] and not os.path.isfile(values["key_file"]):
-        missing.append("GITHUB_APP_PRIVATE_KEY_FILE (la ruta no existe)")
+        missing.append(msg("integrations.github.missing.key_file"))
     elif not values["key_file"] and not values["pem"]:
-        missing.append("clave privada")
+        missing.append(msg("integrations.github.missing.private_key"))
     if not values["slug"]:
         missing.append("GITHUB_APP_SLUG")
     return {"configured": not missing, "missing": missing, "slug": values["slug"], "app_id": values["app_id"],
@@ -93,7 +98,7 @@ def config() -> dict:
 
 def _settings() -> dict:
     if not config()["configured"]:
-        raise GitHubAppError("La GitHub App no está configurada en el servidor")
+        raise GitHubAppError(msg("integrations.github.not_configured"))
     return _resolved()
 
 
@@ -110,9 +115,9 @@ def _load_key(material: bytes):
     try:
         key = serialization.load_pem_private_key(material, password=None)
     except (ValueError, TypeError) as exc:
-        raise GitHubAppError("La clave privada no es un .pem válido de GitHub App") from exc
+        raise GitHubAppError(msg("integrations.github.invalid_pem")) from exc
     if not isinstance(key, rsa.RSAPrivateKey) or key.key_size < 2048:
-        raise GitHubAppError("La clave privada debe ser RSA de al menos 2048 bits (la que genera GitHub)")
+        raise GitHubAppError(msg("integrations.github.weak_key"))
     return key
 
 
@@ -136,17 +141,17 @@ def verify_app(app_id, private_key) -> dict:
     """
     app_id = str(app_id or "").strip()
     if not APP_ID.fullmatch(app_id):
-        raise GitHubAppError("El App ID es un número: lo ves arriba en la página de tu GitHub App")
+        raise GitHubAppError(msg("integrations.github.app_id_number"))
     if not isinstance(private_key, str) or not private_key.strip() or len(private_key) > PEM_MAX:
-        raise GitHubAppError("Falta la clave privada (.pem)")
+        raise GitHubAppError(msg("integrations.github.missing_key"))
     pem = private_key.strip() + "\n"
     key = _load_key(pem.encode())
     try:
         app = _get(f"{API}/app", _jwt(app_id, key), jwt=True)
     except GitHubAppError as exc:
-        raise GitHubAppError("GitHub no reconoce ese App ID con esa clave privada: revisa que la clave sea de esta App") from exc
+        raise GitHubAppError(msg("integrations.github.key_mismatch")) from exc
     if not isinstance(app, dict) or str(app.get("id")) != app_id or not re.fullmatch(r"[a-z0-9-]{1,100}", str(app.get("slug") or "")):
-        raise GitHubAppError("GitHub devolvió una App inesperada")
+        raise GitHubAppError(msg("integrations.github.unexpected_app"))
     return {"app_id": app_id, "pem": pem, "slug": app["slug"], "name": app.get("name"),
             "owner": (app.get("owner") or {}).get("login"), "owner_type": (app.get("owner") or {}).get("type"),
             "html_url": app.get("html_url"), "permissions": app.get("permissions") or {}, "events": app.get("events") or []}
@@ -170,11 +175,11 @@ def install_url() -> str:
     """Pantalla de GitHub donde eliges la cuenta y los repositorios concretos que se analizan."""
     settings = _settings()
     if not re.fullmatch(r"[a-z0-9-]{1,100}", settings["slug"]):
-        raise GitHubAppError("GITHUB_APP_SLUG inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_slug"))
     return f"{WEB}/apps/{settings['slug']}/installations/new"
 
 
-def _get(url: str, token: str, *, jwt: bool = False, forbidden: str | None = None) -> dict | list:
+def _get(url: str, token: str, *, jwt: bool = False, forbidden: dict | None = None) -> dict | list:
     request = Request(url, headers={
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}",
         "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
@@ -184,10 +189,10 @@ def _get(url: str, token: str, *, jwt: bool = False, forbidden: str | None = Non
     except HTTPError as exc:
         if forbidden and exc.code in (403, 404):
             raise GitHubAppError(forbidden) from exc
-        kind = "la App" if jwt else "el token"
-        raise GitHubAppError(f"GitHub rechazó {kind} (HTTP {exc.code})") from exc
+        raise GitHubAppError(msg("integrations.github.rejected_app", code=exc.code) if jwt
+                             else msg("integrations.github.rejected_token", code=exc.code)) from exc
     except (URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError) as exc:
-        raise GitHubAppError("No se pudo contactar con GitHub") from exc
+        raise GitHubAppError(msg("integrations.github.unreachable")) from exc
 
 
 def _app_jwt() -> str:
@@ -199,7 +204,7 @@ def _app_jwt() -> str:
         else:
             material = settings["pem"].encode()
     except OSError as exc:
-        raise GitHubAppError("No se pudo leer la clave privada de la GitHub App") from exc
+        raise GitHubAppError(msg("integrations.github.key_unreadable")) from exc
     return _jwt(settings["app_id"], _load_key(material))
 
 
@@ -210,14 +215,14 @@ def app_installations() -> list[dict]:
     for page in range(1, 101):
         rows = _get(f"{API}/app/installations?per_page=100&page={page}", token, jwt=True)
         if not isinstance(rows, list):
-            raise GitHubAppError("GitHub devolvió una lista de instalaciones inválida")
+            raise GitHubAppError(msg("integrations.github.invalid_installations"))
         result.extend({"installation_id": item["id"], "account": (item.get("account") or {}).get("login"),
                        "account_type": (item.get("account") or {}).get("type"),
                        "repository_selection": item.get("repository_selection")}
                       for item in rows if isinstance(item, dict) and isinstance(item.get("id"), int))
         if len(rows) < 100:
             return result
-    raise GitHubAppError("La App tiene más instalaciones de las que se pueden listar")
+    raise GitHubAppError(msg("integrations.github.too_many_installations"))
 
 
 _tokens: dict[int, tuple[str, float]] = {}
@@ -226,7 +231,7 @@ _tokens: dict[int, tuple[str, float]] = {}
 def installation_token(installation_id: int) -> str:
     """Token de instalación de 1 h, cacheado en memoria y renovado antes de caducar."""
     if not isinstance(installation_id, int) or not 0 < installation_id < 2**63:
-        raise GitHubAppError("Identificador de instalación inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_installation_id"))
     cached = _tokens.get(installation_id)
     if cached and cached[1] - TOKEN_MARGIN > time.time():
         return cached[0]
@@ -239,13 +244,13 @@ def installation_token(installation_id: int) -> str:
     except HTTPError as exc:
         if exc.code in (401, 404):
             _tokens.pop(installation_id, None)
-            raise GitHubAppError("La instalación ya no es válida; vuelve a conectar GitHub") from exc
-        raise GitHubAppError(f"GitHub no emitió el token de instalación (HTTP {exc.code})") from exc
+            raise GitHubAppError(msg("integrations.github.installation_gone")) from exc
+        raise GitHubAppError(msg("integrations.github.token_refused", code=exc.code)) from exc
     except (URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError) as exc:
-        raise GitHubAppError("No se pudo contactar con GitHub") from exc
+        raise GitHubAppError(msg("integrations.github.unreachable")) from exc
     token = payload.get("token") if isinstance(payload, dict) else None
     if not isinstance(token, str) or not token:
-        raise GitHubAppError("GitHub no emitió el token de instalación")
+        raise GitHubAppError(msg("integrations.github.no_token"))
     expires = time.time() + 3600
     if isinstance(payload.get("expires_at"), str):
         try:
@@ -280,7 +285,7 @@ def installation_details(installation_id: int) -> dict:
     """Cuenta y alcance de la instalación, para mostrar qué se concedió."""
     payload = _get(f"{API}/app/installations/{installation_id}", _app_jwt(), jwt=True)
     if not isinstance(payload, dict):
-        raise GitHubAppError("GitHub devolvió una instalación inválida")
+        raise GitHubAppError(msg("integrations.github.invalid_installation"))
     account = payload.get("account") if isinstance(payload.get("account"), dict) else {}
     return {"account": account.get("login") if isinstance(account.get("login"), str) else None,
             "account_type": account.get("type") if isinstance(account.get("type"), str) else None,
@@ -294,7 +299,7 @@ _repos_cache: dict[int, tuple[float, list[dict]]] = {}
 _repos_guard = threading.Lock()
 _repos_fetch_locks: dict[int, threading.Lock] = {}
 _repos_loading: dict[int, dict] = {}
-_repos_errors: dict[int, tuple[float, str]] = {}
+_repos_errors: dict[int, tuple[float, dict]] = {}
 _repos_generation: dict[int, int] = {}
 REPOS_TTL = 300
 MAX_REPO_PAGES = 100  # 10 000 repositorios
@@ -304,7 +309,7 @@ REPOS_RETRY_AFTER = 30
 def _repo_rows(payload: dict | list) -> list[dict]:
     rows = payload.get("repositories") if isinstance(payload, dict) else None
     if not isinstance(rows, list) or len(rows) > 100:
-        raise GitHubAppError("GitHub devolvió una lista de repositorios inválida")
+        raise GitHubAppError(msg("integrations.github.invalid_repositories"))
     result = []
     for item in rows:
         if not isinstance(item, dict) or not isinstance(item.get("full_name"), str) or not isinstance(item.get("id"), int):
@@ -321,20 +326,20 @@ def _fetch_repositories(installation_id: int, progress=None) -> list[dict]:
     def fetch(page: int) -> dict:
         payload = _get(f"{API}/installation/repositories?per_page=100&page={page}", token)
         if not isinstance(payload, dict):
-            raise GitHubAppError("GitHub devolvió una lista de repositorios inválida")
+            raise GitHubAppError(msg("integrations.github.invalid_repositories"))
         return payload
 
     first = fetch(1)
     result = _repo_rows(first)
     expected = first.get("total_count")
     if expected is not None and (not isinstance(expected, int) or isinstance(expected, bool) or expected < 0 or expected > MAX_REPO_PAGES * 100):
-        raise GitHubAppError("GitHub devolvió un total de repositorios inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_total"))
     if progress:
         progress(result, expected)
     if expected is not None:
         pages = max(1, (expected + 99) // 100)
         if expected != len(result) and len(result) < 100:
-            raise GitHubAppError("GitHub devolvió una página incompleta de repositorios")
+            raise GitHubAppError(msg("integrations.github.incomplete_page"))
         if pages > 1:
             pending: dict[int, list[dict]] = {}
             next_page = 2
@@ -348,7 +353,7 @@ def _fetch_repositories(installation_id: int, progress=None) -> list[dict]:
                         if progress:
                             progress(result, expected)
         if len(result) != expected:
-            raise GitHubAppError("La lista de repositorios cambió durante la lectura; vuelve a actualizarla")
+            raise GitHubAppError(msg("integrations.github.list_changed"))
         return result
     # Compatibilidad con respuestas sin total_count: aquí no se puede anticipar el número de páginas.
     for page in range(2, MAX_REPO_PAGES + 1):
@@ -360,7 +365,7 @@ def _fetch_repositories(installation_id: int, progress=None) -> list[dict]:
             progress(result, None)
         if len(rows) < 100:
             return result
-    raise GitHubAppError("La instalación tiene más repositorios de los que se pueden listar")
+    raise GitHubAppError(msg("integrations.github.too_many_repositories"))
 
 
 def installation_repositories(installation_id: int, *, fresh: bool = False, progress=None) -> list[dict]:
@@ -387,7 +392,7 @@ def installation_repositories(installation_id: int, *, fresh: bool = False, prog
         return result
 
 
-def installation_repositories_snapshot(installation_id: int, *, fresh: bool = False) -> tuple[list[dict], bool, int | None, str | None]:
+def installation_repositories_snapshot(installation_id: int, *, fresh: bool = False) -> tuple[list[dict], bool, int | None, dict | None]:
     """Devuelve lo disponible ya y sincroniza el resto fuera del hilo HTTP."""
     start = False
     with _repos_guard:
@@ -417,11 +422,11 @@ def installation_repositories_snapshot(installation_id: int, *, fresh: bool = Fa
                 installation_repositories(installation_id, fresh=True, progress=update)
             except GitHubAppError as exc:
                 with _repos_guard:
-                    _repos_errors[installation_id] = (time.time(), str(exc))
+                    _repos_errors[installation_id] = (time.time(), exc.message)
             except Exception:
                 logging.getLogger("tamandua.github").exception("repository_catalog_sync_failed")
                 with _repos_guard:
-                    _repos_errors[installation_id] = (time.time(), "No se pudo sincronizar el catálogo de repositorios")
+                    _repos_errors[installation_id] = (time.time(), msg("integrations.github.catalog_sync_failed"))
             finally:
                 with _repos_guard:
                     _repos_loading.pop(installation_id, None)
@@ -443,7 +448,7 @@ _known: dict[tuple[int, str], tuple[float, dict | None]] = {}
 _info: dict[int, tuple[float, dict]] = {}
 _MISSING = object()
 UID = re.compile(r"github#([1-9][0-9]{0,15})")
-NOT_FOUND = "Repositorio no disponible para la instalación"
+NOT_FOUND = msg("integrations.github.not_in_installation")
 
 
 def _cached(store: dict, key, ttl: int):
@@ -483,7 +488,7 @@ def installation_info(installation_id: int) -> dict:
 
 def _check_page(page: int, per_page: int) -> None:
     if not 1 <= per_page <= 100 or not 1 <= page or page * per_page > MAX_REPO_PAGES * 100:
-        raise GitHubAppError("Página de repositorios inválida")
+        raise GitHubAppError(msg("integrations.github.invalid_page"))
 
 
 def _total(payload: dict, fallback: int) -> int:
@@ -572,9 +577,9 @@ def _scoped_repository(installation_id: int, name: str) -> dict | None:
     except HTTPError as exc:
         if exc.code in (404, 422):
             return None
-        raise GitHubAppError(f"GitHub no pudo comprobar el repositorio (HTTP {exc.code})") from exc
+        raise GitHubAppError(msg("integrations.github.check_failed", code=exc.code)) from exc
     except (URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError) as exc:
-        raise GitHubAppError("No se pudo contactar con GitHub") from exc
+        raise GitHubAppError(msg("integrations.github.unreachable")) from exc
     rows = _repo_rows({"repositories": payload.get("repositories") if isinstance(payload, dict) else None})
     return rows[0] if len(rows) == 1 else None
 
@@ -619,7 +624,7 @@ def installation_repository_by_uid(installation_id: int, uid: str) -> dict | Non
     try:
         payload = _get(f"{API}/repositories/{match.group(1)}", installation_token(installation_id), forbidden=NOT_FOUND)
     except GitHubAppError as exc:
-        if str(exc) != NOT_FOUND:
+        if exc.message != NOT_FOUND:
             raise
         payload = None
     name = payload.get("full_name") if isinstance(payload, dict) else None
@@ -636,8 +641,7 @@ def installation_repository_by_uid(installation_id: int, uid: str) -> dict | Non
 REPO_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")
 COMMENT_MARKER = "<!-- tamandua:pr-review -->"
 UNUSED_MARKER = "<!-- tamandua:unused-dependencies -->"
-PULLS_FORBIDDEN = ("La GitHub App no puede leer los pull requests de este repositorio: su instalación necesita el "
-                   "permiso «Pull requests». El operador lo añade en la configuración de la App y la cuenta acepta la actualización.")
+PULLS_FORBIDDEN = msg("integrations.github.pulls_forbidden")
 
 
 def _send_json(method: str, url: str, token: str, body: dict) -> dict:
@@ -649,17 +653,16 @@ def _send_json(method: str, url: str, token: str, body: dict) -> dict:
             payload = json.loads(response.read(2_000_000) or b"{}")
     except HTTPError as exc:
         if exc.code in (403, 404):
-            raise GitHubAppError("La GitHub App no tiene permiso para escribir en este repositorio "
-                                 "(hace falta Pull requests y Commit statuses en escritura)") from exc
-        raise GitHubAppError(f"GitHub rechazó la petición (HTTP {exc.code})") from exc
+            raise GitHubAppError(msg("integrations.github.write_forbidden")) from exc
+        raise GitHubAppError(msg("integrations.github.request_rejected", code=exc.code)) from exc
     except (URLError, TimeoutError, OSError, ValueError, UnicodeDecodeError) as exc:
-        raise GitHubAppError("No se pudo contactar con GitHub") from exc
+        raise GitHubAppError(msg("integrations.github.unreachable")) from exc
     return payload if isinstance(payload, dict) else {}
 
 
 def _repo(repository: str) -> str:
     if not isinstance(repository, str) or not REPO_PATTERN.fullmatch(repository) or ".." in repository:
-        raise GitHubAppError("Repositorio inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_repository"))
     return repository
 
 
@@ -668,7 +671,7 @@ def open_pull_requests(installation_id: int, repository: str) -> list[dict]:
     rows = _get(f"{API}/repos/{_repo(repository)}/pulls?state=open&per_page=50&sort=updated&direction=desc", token,
                 forbidden=PULLS_FORBIDDEN)
     if not isinstance(rows, list):
-        raise GitHubAppError("GitHub devolvió una lista de pull requests inválida")
+        raise GitHubAppError(msg("integrations.github.invalid_pulls"))
     return [_pull(item) for item in rows if isinstance(item, dict)]
 
 
@@ -676,20 +679,20 @@ def branch_head(installation_id: int, repository: str, branch: str) -> str:
     """Último commit de una rama (la predeterminada, para saber si hay cambios que reanalizar)."""
     from urllib.parse import quote
     if not isinstance(branch, str) or not branch or len(branch) > 255 or ".." in branch:
-        raise GitHubAppError("Rama inválida")
+        raise GitHubAppError(msg("integrations.github.invalid_branch"))
     payload = _get(f"{API}/repos/{_repo(repository)}/branches/{quote(branch, safe='')}", installation_token(installation_id))
     sha = ((payload.get("commit") or {}).get("sha") if isinstance(payload, dict) else None)
     if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{40}", sha):
-        raise GitHubAppError("GitHub no devolvió el último commit de la rama")
+        raise GitHubAppError(msg("integrations.github.no_branch_head"))
     return sha
 
 
 def pull_request(installation_id: int, repository: str, number: int) -> dict:
     if not isinstance(number, int) or not 0 < number < 10**9:
-        raise GitHubAppError("Número de pull request inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_pr_number"))
     payload = _get(f"{API}/repos/{_repo(repository)}/pulls/{number}", installation_token(installation_id), forbidden=PULLS_FORBIDDEN)
     if not isinstance(payload, dict):
-        raise GitHubAppError("GitHub devolvió un pull request inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_pull"))
     return _pull(payload)
 
 
@@ -709,7 +712,7 @@ def pull_files(installation_id: int, repository: str, number: int) -> list[dict]
     for page in range(1, 31):
         rows = _get(f"{API}/repos/{_repo(repository)}/pulls/{number}/files?per_page=100&page={page}", token, forbidden=PULLS_FORBIDDEN)
         if not isinstance(rows, list):
-            raise GitHubAppError("GitHub devolvió los ficheros del PR en un formato inválido")
+            raise GitHubAppError(msg("integrations.github.invalid_files"))
         files.extend({"filename": item.get("filename"), "status": item.get("status"), "patch": item.get("patch")}
                      for item in rows if isinstance(item, dict) and isinstance(item.get("filename"), str))
         if len(rows) < 100:
@@ -717,11 +720,11 @@ def pull_files(installation_id: int, repository: str, number: int) -> list[dict]
     return files
 
 
-def upsert_pr_comment(installation_id: int, repository: str, number: int, body: str, marker: str = COMMENT_MARKER) -> str:
+def upsert_pr_comment(installation_id: int, repository: str, number: int, body, marker: str = COMMENT_MARKER) -> str:
     """Un solo comentario por PR, que se reescribe en cada revisión en lugar de acumular ruido."""
     token = installation_token(installation_id)
     repository = _repo(repository)
-    body = f"{marker}\n{body}"[:65_000]
+    body = f"{marker}\n{text(body, default_locale())}"[:65_000]  # GitHub caps comment bodies at 65 536 characters
     comments = _get(f"{API}/repos/{repository}/issues/{number}/comments?per_page=100", token)
     # Solo se reescribe un comentario creado por esta App: el marcador solo no basta, cualquiera puede pegarlo.
     app_id = str(_settings()["app_id"])
@@ -734,11 +737,12 @@ def upsert_pr_comment(installation_id: int, repository: str, number: int, body: 
     return "created"
 
 
-def set_commit_status(installation_id: int, repository: str, sha: str, state: str, description: str) -> None:
+def set_commit_status(installation_id: int, repository: str, sha: str, state: str, description) -> None:
+    """`description` may be a message: GitHub shows one language, so it renders in TAMANDUA_DEFAULT_LOCALE."""
     if state not in ("success", "failure", "error", "pending") or not re.fullmatch(r"[0-9a-f]{40}", sha):
-        raise GitHubAppError("Estado de commit inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_status"))
     _send_json("POST", f"{API}/repos/{_repo(repository)}/statuses/{sha}", installation_token(installation_id),
-               {"state": state, "context": "tamandua", "description": description[:140]})
+               {"state": state, "context": "tamandua", "description": text(description, default_locale())[:140]})
 
 
 # ------------------------------------------------------------ mínimo privilegio
@@ -784,11 +788,11 @@ def repository_tree(installation_id: int, repository: str, branch: str) -> list[
     token = installation_token(installation_id)
     repository = _repo(repository)
     if not isinstance(branch, str) or not re.fullmatch(r"[A-Za-z0-9._/-]{1,200}", branch) or ".." in branch:
-        raise GitHubAppError("Rama inválida")
+        raise GitHubAppError(msg("integrations.github.invalid_branch"))
     tree = _get(f"{API}/repos/{repository}/git/trees/{quote(branch, safe='')}?recursive=1", token)
     entries = tree.get("tree") if isinstance(tree, dict) else None
     if not isinstance(entries, list):
-        raise GitHubAppError("GitHub devolvió el árbol del repositorio en un formato inválido")
+        raise GitHubAppError(msg("integrations.github.invalid_tree"))
     return [entry for entry in entries if isinstance(entry, dict)]
 
 

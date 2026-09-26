@@ -32,6 +32,7 @@ import time
 from pathlib import Path
 
 from tamandua.shared import paths
+from tamandua.shared.i18n import msg
 from tamandua.modules.intel import data_sources
 from tamandua.modules.intel.advisories import compare_versions, cvss3_base_score, prioritize, severity_from_score
 from tamandua.modules.intel.advisories import fingerprint as sca_fingerprint
@@ -158,12 +159,33 @@ def cause(completed: subprocess.CompletedProcess | None) -> str:
     return " ".join(text.split())[:240]
 
 
-def with_cause(message: str, completed: subprocess.CompletedProcess | None) -> str:
+def with_cause(message, completed: subprocess.CompletedProcess | None):
     reason = cause(completed)
-    return f"{message.rstrip('.')}: {reason}" if reason else message
+    if not reason:
+        return message
+    return msg("scanning.engines.with_cause", message=message.rstrip(".") if isinstance(message, str) else message, cause=reason)
 
 
-def host_mount_problem() -> str | None:
+def joined(items, key: str = "scanning.join.comma"):
+    """Folds strings or messages into one message, two at a time, with `key` ({{first}} and {{second}})."""
+    items = [item for item in items if item]
+    if all(isinstance(item, str) for item in items) and key == "scanning.join.comma":
+        return ", ".join(items)
+    result = items[0] if items else ""
+    for item in items[1:]:
+        result = msg(key, first=result, second=item)
+    return result
+
+
+def and_list(items):
+    """«A», «A and B», «A, B and C», in the reader's language."""
+    items = list(items)
+    if len(items) <= 1:
+        return items[0] if items else ""
+    return msg("scanning.join.and", rest=joined(items[:-1]), last=items[-1])
+
+
+def host_mount_problem() -> dict | None:
     """Dentro del contenedor, los motores montan la carpeta de datos *del host*. Si no se pudo
     averiguar (ni preguntando a Docker ni por el entorno), los motores fallarían sin explicación."""
     inside = os.environ.get("TAMANDUA_DATA_DIR")
@@ -171,8 +193,7 @@ def host_mount_problem() -> str | None:
         return None
     if any(pair[0] == inside for pair in _host_pairs()):
         return None
-    return ("No se pudo averiguar la ruta de ./data en el host, así que los motores no pueden leer el código. "
-            "Define TAMANDUA_HOST_DATA_DIR en .env con la ruta absoluta de ./data y reinicia (make up).")
+    return msg("scanning.engines.host_mount_problem")
 
 
 _last_image_error: dict[str, str] = {}
@@ -181,7 +202,7 @@ _last_image_error: dict[str, str] = {}
 DOCKER_SOCKET = Path("/var/run/docker.sock")
 
 
-def socket_problem() -> str | None:
+def socket_problem() -> dict | None:
     """El caso típico en Linux y WSL: el socket es del grupo `docker`, no de root, y el contenedor no está en él."""
     try:
         if not DOCKER_SOCKET.exists() or os.access(DOCKER_SOCKET, os.R_OK | os.W_OK):
@@ -189,8 +210,7 @@ def socket_problem() -> str | None:
         gid = DOCKER_SOCKET.stat().st_gid
     except OSError:
         return None
-    return (f"Sin permiso sobre el socket de Docker (grupo {gid}): los motores no pueden arrancar. "
-            f"Reinicia con `make up`, que detecta ese grupo, o añade DOCKER_SOCKET_GID={gid} a .env y reinicia.")
+    return msg("scanning.engines.socket_problem", gid=gid)
 
 
 def docker_available() -> bool:
@@ -207,9 +227,9 @@ def docker_available() -> bool:
     return _docker_state["ok"]
 
 
-def docker_problem() -> str:
+def docker_problem():
     """Por qué Docker no está disponible, en una frase; vacío si lo está."""
-    return "" if docker_available() else (_docker_state.get("why") or "Docker no responde.")
+    return "" if docker_available() else (_docker_state.get("why") or msg("scanning.engines.docker_unresponsive"))
 
 
 def image_available(key: str) -> bool:
@@ -237,20 +257,22 @@ def pull_engines(report=None) -> list[dict]:
     results = []
     for row in engine_status():
         if report and not (row["ready"] or row["built_locally"] or not binary):
-            report(f"Descargando {row['name']} {row['version']}… (puede tardar varios minutos)")
+            report(msg("scanning.engines.pulling", name=row["name"], version=row["version"]))
         if row["ready"] or row["built_locally"] or not binary:
-            results.append({**row, "action": "ninguna" if row["ready"] else "construir con make build" if row["built_locally"] else "docker no disponible"})
+            results.append({**row, "action": msg("scanning.engines.action.none") if row["ready"]
+                            else msg("scanning.engines.action.build") if row["built_locally"] else msg("scanning.engines.action.no_docker")})
             continue
         try:
             completed = subprocess.run([binary, "pull", "--quiet", row["image"]], capture_output=True, text=True, timeout=3600)
         except (OSError, subprocess.TimeoutExpired):
             completed = None
         done = bool(completed) and completed.returncode == 0
-        results.append({**row, "ready": done, "action": "descargada" if done else with_cause("falló la descarga", completed)})
+        results.append({**row, "ready": done, "action": msg("scanning.engines.action.pulled") if done
+                        else with_cause(msg("scanning.engines.action.pull_failed"), completed)})
     return results
 
 
-def _result(key: str, status: str, detail: str, findings: list | None = None, started: float | None = None) -> dict:
+def _result(key: str, status: str, detail, findings: list | None = None, started: float | None = None) -> dict:
     meta = IMAGES[key]
     return {"tool": key, "name": meta["name"], "version": meta["version"], "image": meta["image"],
             "status": status, "detail": detail, "findings": findings or [],
@@ -301,15 +323,20 @@ def _stable(*parts: str) -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
 
-def _base(scanner: str, rule: str, title: str, path: str, line: int, severity: str, *, reason: str,
-          remediation: str, cwe: list[int], owasp: str, confidence: int, digest: str, tool: str) -> dict:
+SEVERITY_NAME = {"critical": msg("scanning.severity.critical"), "high": msg("scanning.severity.high"),
+                 "medium": msg("scanning.severity.medium"), "low": msg("scanning.severity.low"), "info": msg("scanning.severity.info")}
+
+
+def _base(scanner: str, rule: str, title, path: str, line: int, severity: str, *, reason,
+          remediation, cwe: list[int], owasp: str, confidence: int, digest: str, tool: str) -> dict:
     action = "act" if severity == "critical" else "attend" if severity == "high" else "track"
     return {"finding_id": digest[:16], "fingerprint": digest, "scanner": scanner, "tool": tool, "rule_id": rule,
-            "title": title[:200], "path": path, "line": line, "severity": severity, "confidence": confidence,
-            "verdict": "candidate", "cwe": cwe, "owasp": [owasp], "cve": [], "ghsa": [],
+            "title": title[:200] if isinstance(title, str) else title, "path": path, "line": line, "severity": severity,
+            "confidence": confidence, "verdict": "candidate", "cwe": cwe, "owasp": [owasp], "cve": [], "ghsa": [],
             "package": None, "advisory": None, "kev": None, "epss": None,
-            "priority": {"action": action, "factors": [f"Hallazgo estático de severidad {severity}",
-                                                       "Requiere confirmar alcanzabilidad en el contexto de la aplicación"]},
+            "priority": {"action": action, "factors": [
+                msg("scanning.priority.static_severity", severity=SEVERITY_NAME.get(severity, severity)),
+                msg("scanning.priority.confirm_reachability")]},
             "reason": reason, "remediation": remediation}
 
 
@@ -329,6 +356,14 @@ def snapshot_languages(snapshot: Path) -> dict:
             "uncovered": {name: count for name, count in present.items() if name not in RULE_LANGUAGES}}
 
 
+def _rule_texts(value, limit: int = 2000) -> dict | str:
+    """A Tamandua rule text in its own languages (`metadata.title` / `metadata.fix` as {en, es}), or "" if absent."""
+    from tamandua.shared.i18n import inline
+    if not isinstance(value, dict):
+        return ""
+    return inline({locale: text[:limit] for locale, text in value.items() if isinstance(text, str)})
+
+
 def parse_opengrep(payload: dict) -> list[dict]:
     findings, seen = [], set()
     for result in payload.get("results", []):
@@ -342,10 +377,12 @@ def parse_opengrep(payload: dict) -> list[dict]:
             else SEVERITY_LABEL.get(str(extra.get("severity", "")).upper(), "medium")
         cwe = [int(item) for item in metadata.get("cwe", []) if str(item).isdigit()]
         message = str(extra.get("message", "")).strip()
-        title = f"{metadata.get('category', 'sast').capitalize()}: {rule.rsplit('.', 1)[-1].replace('-', ' ')}"
+        title = _rule_texts(metadata.get("title"), 200) \
+            or f"{metadata.get('category', 'sast').capitalize()}: {rule.rsplit('.', 1)[-1].replace('-', ' ')}"
+        remediation = _rule_texts(metadata.get("fix")) or _rule_texts({"en": message})
         finding = _base(
             "sast", rule, title, path, line, severity, tool="opengrep",
-            reason=f"`{snippet}` en {path}:{line}.", remediation=message,
+            reason=msg("scanning.opengrep.reason", snippet=snippet, path=path, line=line), remediation=remediation,
             cwe=cwe, owasp=str(metadata.get("owasp", "A05:2025")),
             confidence=CONFIDENCE.get(str(metadata.get("confidence", "MEDIUM")).upper(), 6),
             # La huella usa el fragmento, no la línea: mover código no debe reabrir tickets.
@@ -398,13 +435,13 @@ def _rules_for(snapshot: Path) -> Path:
 def run_opengrep(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():
-        return _result("opengrep", "not_tested", f"Docker no disponible: el SAST multi-lenguaje no se ejecutó. {docker_problem()}".strip())
+        return _result("opengrep", "not_tested", msg("scanning.opengrep.no_docker", problem=docker_problem()))
     if not image_available("opengrep"):
         reason = _last_image_error.get("opengrep", "")
         # «No such image» es que falta construirla; cualquier otra cosa es un problema con Docker.
         if not reason or "no such image" in reason.lower():
-            return _result("opengrep", "not_tested", "Imagen de Opengrep no construida: ejecuta make build (o docker compose build).")
-        return _result("opengrep", "not_tested", f"Docker no pudo consultar la imagen de Opengrep: {reason}")
+            return _result("opengrep", "not_tested", msg("scanning.opengrep.image_missing"))
+        return _result("opengrep", "not_tested", msg("scanning.opengrep.image_error", cause=reason))
     languages = snapshot_languages(snapshot)
     compiled = minified_files(snapshot)
     excludes = [part for path in compiled for part in ("--exclude", path)]
@@ -414,25 +451,26 @@ def run_opengrep(snapshot: Path) -> dict:
         # 0: sin hallazgos · 1: con hallazgos. Otro código (2 fatal, 7 configuración inválida…) es que no analizó:
         # contarlo como «0 candidatos» sería un falso limpio.
         if completed.returncode not in (0, 1):
-            return _result("opengrep", "inconclusive", with_cause(f"Opengrep terminó con error (código {completed.returncode}); el SAST no concluyó", completed), started=started)
+            return _result("opengrep", "inconclusive", with_cause(msg("scanning.opengrep.exit_code", code=completed.returncode), completed), started=started)
         payload = json.loads(completed.stdout or "{}")
     except subprocess.TimeoutExpired:
-        return _result("opengrep", "inconclusive", "Opengrep superó el tiempo máximo; el SAST no concluyó.", started=started)
+        return _result("opengrep", "inconclusive", msg("scanning.opengrep.timeout"), started=started)
     except (OSError, ValueError):
-        return _result("opengrep", "inconclusive", "Opengrep no devolvió una salida legible.", started=started)
+        return _result("opengrep", "inconclusive", msg("scanning.engines.unreadable", engine="Opengrep"), started=started)
     findings = parse_opengrep(payload)
     errors = [item for item in payload.get("errors", []) if isinstance(item, dict)]
-    covered = ", ".join(f"{name} ({count})" for name, count in sorted(languages["covered"].items())) or "ninguno con reglas"
+    covered = ", ".join(f"{name} ({count})" for name, count in sorted(languages["covered"].items())) \
+        or msg("scanning.opengrep.no_covered_language")
     uncovered = ", ".join(sorted(languages["uncovered"]))
-    detail = (f"{sum(1 for _ in RULES_DIR.glob('*.yml'))} conjuntos de reglas propias sobre {covered}; "
-              f"{len(findings)} candidatos.")
+    parts = [msg("scanning.opengrep.detail", rulesets=sum(1 for _ in RULES_DIR.glob("*.yml")), languages=covered,
+                 candidates=len(findings))]
     if uncovered:
-        detail += f" Sin reglas todavía para: {uncovered}."
+        parts.append(msg("scanning.opengrep.uncovered", languages=uncovered))
     if compiled:
-        detail += (f" {len(compiled)} archivos compilados o minificados quedaron fuera del SAST"
-                   " (siguen en la búsqueda de secretos).")
+        parts.append(msg("scanning.opengrep.minified", files=len(compiled)))
     if errors:
-        detail += f" {len(errors)} archivos no se pudieron analizar (sintaxis o tamaño)."
+        parts.append(msg("scanning.opengrep.errors", files=len(errors)))
+    detail = joined(parts, "scanning.join.sentences")
     status = "partial" if (errors or uncovered) else "completed"
     return _result("opengrep", status, detail, findings, started)
 
@@ -465,18 +503,18 @@ def _trivy_vulnerability(entry: dict, target: str, ecosystem: str, feeds: dict, 
     summary = str(entry.get("Title") or "").strip() or identifier
     cwe = [int(match.group(1)) for item in entry.get("CweIDs", []) or [] if (match := re.fullmatch(r"CWE-(\d+)", str(item)))]
     references = [url for url in entry.get("References", []) or [] if isinstance(url, str) and url.startswith("https://")][:8]
-    remediation = (f"Actualiza {name} de {installed} a {fixed} o superior en {target} y regenera el lockfile."
-                   if fixed else f"No hay versión corregida publicada para {name}. Evalúa alcanzabilidad, mitiga o sustituye la dependencia.")
+    remediation = (msg("scanning.sca.upgrade", package=name, installed=installed, fixed=fixed, target=target)
+                   if fixed else msg("scanning.sca.no_fix", package=name))
     meta = (packages or {}).get(entry.get("PkgID")) or {}
     dev = bool(meta.get("Dev"))
     if dev:
         # De desarrollo: no llega a producción, pero corre en los equipos y en la CI (cadena de suministro).
-        priority["factors"].append("Dependencia de desarrollo: no llega a producción, pero se ejecuta en tu equipo y en la CI")
+        priority["factors"].append(msg("scanning.priority.dev_dependency"))
         if not kev and priority["action"] == "act":
             priority["action"] = "attend"
         elif not kev:
             priority["action"] = "track"
-        remediation += " Es una dependencia de desarrollo: el riesgo está en los equipos del equipo y en la CI, no en producción."
+        remediation = msg("scanning.sca.dev_remediation", remediation=remediation)
     relationship = meta.get("Relationship")
     digest = sca_fingerprint("sca", identifier, ecosystem, name, installed)
     return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "tool": "trivy", "rule_id": identifier,
@@ -502,7 +540,7 @@ def _trivy_misconfiguration(entry: dict, target: str) -> dict:
     resource = str(cause.get("Resource") or cause.get("Provider") or "")
     finding = _base("iac", rule, f"{entry.get('Title', rule)}", target, line, severity, tool="trivy",
                     reason=str(entry.get("Message") or entry.get("Description") or "").strip(),
-                    remediation=str(entry.get("Resolution") or "Revisa la configuración según la referencia del aviso.").strip(),
+                    remediation=str(entry.get("Resolution") or "").strip() or msg("scanning.iac.review_reference"),
                     cwe=[], owasp="A02:2025", confidence=8,
                     digest=_stable("iac", rule, target, resource or str(line)))
     # Rango de líneas: con él se reconoce el mismo fallo cuando Checkov lo señala en el bloque del recurso.
@@ -515,9 +553,12 @@ def _trivy_secret(entry: dict, target: str) -> dict:
     rule = str(entry.get("RuleID") or "secret")
     severity = SEVERITY_LABEL.get(str(entry.get("Severity", "")).upper(), "high")
     # Nunca se guarda el valor: Trivy ya lo redacta, y aquí ni siquiera se lee.
-    return _base("secrets", rule, (SECRET_TITLES.get(rule) or f"Secreto expuesto: {entry.get('Title', rule)}"), target, line, severity, tool="trivy",
-                 reason=f"Patrón {entry.get('Category', 'secreto')} en {target}:{line}; valor redactado.",
-                 remediation="Rota la credencial ahora y muévela a un gestor de secretos. Si el repositorio es público, considera reescribir el historial.",
+    category = entry.get("Category")
+    return _base("secrets", rule, (SECRET_TITLES.get(rule) or msg("scanning.secrets.exposed_titled", title=str(entry.get("Title") or rule))),
+                 target, line, severity, tool="trivy",
+                 reason=msg("scanning.secrets.trivy_reason", category=str(category), path=target, line=line) if category
+                 else msg("scanning.secrets.trivy_reason_generic", path=target, line=line),
+                 remediation=msg("scanning.secrets.rotate"),
                  cwe=[798], owasp="A04:2025", confidence=8, digest=_stable("secrets", rule, target, str(line)))
 
 
@@ -583,7 +624,7 @@ def parse_trivy(payload: dict, feeds: dict) -> list[dict]:
 def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
     started = time.time()
     if not docker_available():
-        return _result("trivy", "not_tested", "Docker no disponible: dependencias, IaC y secretos con Trivy no se ejecutaron.")
+        return _result("trivy", "not_tested", msg("scanning.trivy.no_docker"))
     cache_dir = writable_cache(cache_dir)
     try:
         # Con las dependencias de desarrollo (marcadas como tales) y la lista de paquetes para saber cuáles son.
@@ -592,13 +633,14 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
                                    "--timeout", "14m", "/src"], snapshot, network=True,
                          mounts=["-v", f"{host_path(cache_dir)}:/cache"])
         if completed.returncode != 0 and not completed.stdout.strip():
-            return _result("trivy", "inconclusive", with_cause("Trivy terminó con error antes de producir resultados"
-                           + (" (sin acceso a su base de vulnerabilidades)" if "download" in completed.stderr.lower() else ""), completed), started=started)
+            failure = msg("scanning.trivy.failed_download") if "download" in completed.stderr.lower() \
+                else msg("scanning.engines.failed_early", engine="Trivy")
+            return _result("trivy", "inconclusive", with_cause(failure, completed), started=started)
         payload = json.loads(completed.stdout or "{}")
     except subprocess.TimeoutExpired:
-        return _result("trivy", "inconclusive", "Trivy superó el tiempo máximo; dependencias e IaC no concluyeron.", started=started)
+        return _result("trivy", "inconclusive", msg("scanning.trivy.timeout"), started=started)
     except (OSError, ValueError):
-        return _result("trivy", "inconclusive", "Trivy no devolvió una salida legible.", started=started)
+        return _result("trivy", "inconclusive", msg("scanning.engines.unreadable", engine="Trivy"), started=started)
     findings = parse_trivy(payload, feeds)
     kinds = {"sca": 0, "iac": 0, "secrets": 0}
     for finding in findings:
@@ -607,11 +649,10 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict) -> dict:
     manifests = [target for result, target in zip(payload.get("Results", []) or [], targets) if result.get("Class") == "lang-pkgs"]
     configs = [target for result, target in zip(payload.get("Results", []) or [], targets) if result.get("Class") == "config"]
     dev = sum(1 for finding in findings if (finding.get("package") or {}).get("dev"))
-    detail = (f"{len(manifests)} manifiestos de dependencias y {len(configs)} archivos de infraestructura examinados: "
-              f"{kinds['sca']} avisos de dependencias" + (f" ({dev} en dependencias de desarrollo, con menos prioridad)" if dev else "")
-              + f", {kinds['iac']} fallos de configuración, {kinds['secrets']} secretos.")
+    counts = {"manifests": len(manifests), "configs": len(configs), "sca": kinds["sca"], "iac": kinds["iac"], "secrets": kinds["secrets"]}
+    detail = msg("scanning.trivy.detail_dev", dev=dev, **counts) if dev else msg("scanning.trivy.detail", **counts)
     if not feeds.get("kev") or not feeds.get("epss"):
-        detail += " KEV/EPSS no disponibles; la prioridad usa solo CVSS."
+        detail = joined([detail, msg("scanning.trivy.no_feeds")], "scanning.join.sentences")
     return {**_result("trivy", "completed", detail, findings, started), "packages": trivy_packages(payload)}
 
 
@@ -659,7 +700,7 @@ def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bo
     ejecutaría scripts de compilación del repositorio."""
     started = time.time()
     if not docker_available():
-        return _result("osv-scanner", "not_tested", "Docker no disponible: dependencias con OSV-Scanner no se ejecutaron.")
+        return _result("osv-scanner", "not_tested", msg("scanning.osv.no_docker"))
     cache_dir = writable_cache(cache_dir)
     arguments = ["scan", "source", "-r", "--format", "json", "--offline-vulnerabilities", "--download-offline-databases",
                  "--allow-no-lockfiles", "--no-call-analysis=go", "--no-call-analysis=rust", *([] if resolve else ["--no-resolve"]), "/src"]
@@ -669,40 +710,43 @@ def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bo
         # 0: sin avisos · 1: con avisos. Cualquier otro código es un error del motor.
         if completed.returncode not in (0, 1) or not completed.stdout.strip():
             if completed.returncode == 0:
-                return _result("osv-scanner", "completed", "No hay manifiestos de dependencias que OSV-Scanner reconozca.", started=started)
-            return _result("osv-scanner", "inconclusive", with_cause("OSV-Scanner terminó con error antes de producir resultados", completed), started=started)
+                return _result("osv-scanner", "completed", msg("scanning.osv.no_manifests"), started=started)
+            return _result("osv-scanner", "inconclusive", with_cause(msg("scanning.engines.failed_early", engine="OSV-Scanner"), completed), started=started)
         payload = json.loads(completed.stdout)
     except subprocess.TimeoutExpired:
-        return _result("osv-scanner", "inconclusive", "OSV-Scanner superó el tiempo máximo (la primera vez descarga las bases de avisos).", started=started)
+        return _result("osv-scanner", "inconclusive", msg("scanning.osv.timeout"), started=started)
     except (OSError, ValueError):
-        return _result("osv-scanner", "inconclusive", "OSV-Scanner no devolvió una salida legible.", started=started)
+        return _result("osv-scanner", "inconclusive", msg("scanning.engines.unreadable", engine="OSV-Scanner"), started=started)
     findings = parse_osv_scanner(payload, feeds)
     manifests = {str((result.get("source") or {}).get("path") or "") for result in payload.get("results") or []}
     packages = sum(len(result.get("packages") or []) for result in payload.get("results") or [])
-    detail = (f"{len(manifests)} manifiestos con {packages} paquetes vulnerables: {len(findings)} avisos, "
-              f"comparados en local con la base OSV" + ("" if resolve else " (sin resolver transitivas: no se envía la lista de dependencias)") + ".")
+    detail = msg("scanning.osv.detail_resolved" if resolve else "scanning.osv.detail",
+                 manifests=len(manifests), packages=packages, advisories=len(findings))
     return _result("osv-scanner", "completed", detail, findings, started)
 
 
 # --- Gitleaks -------------------------------------------------------------------------
 
-# Nombre en español de las reglas de Gitleaks más comunes; el resto usa su identificador.
+# Names of the most common Gitleaks rules; the rest use their identifier.
 SECRET_TITLES = {
-    "jwt": "JSON Web Token expuesto", "generic-api-key": "Clave de API expuesta", "private-key": "Clave privada expuesta",
-    "aws-access-token": "Clave de acceso de AWS expuesta", "aws-secret-access-key": "Clave secreta de AWS expuesta",
-    "github-pat": "Token personal de GitHub expuesto", "github-fine-grained-pat": "Token de GitHub expuesto",
-    "github-app-token": "Token de GitHub App expuesto", "github-oauth": "Token OAuth de GitHub expuesto",
-    "gitlab-pat": "Token de GitLab expuesto", "slack-bot-token": "Token de Slack expuesto", "slack-webhook-url": "Webhook de Slack expuesto",
-    "stripe-access-token": "Clave de Stripe expuesta", "gcp-api-key": "Clave de API de Google expuesta",
-    "openai-api-key": "Clave de API de OpenAI expuesta", "anthropic-api-key": "Clave de API de Anthropic expuesta",
-    "twilio-api-key": "Clave de API de Twilio expuesta", "sendgrid-api-token": "Token de SendGrid expuesto",
-    "npm-access-token": "Token de npm expuesto", "pypi-upload-token": "Token de PyPI expuesto",
-    "azure-ad-client-secret": "Secreto de cliente de Azure AD expuesto", "heroku-api-key": "Clave de API de Heroku expuesta",
+    "jwt": msg("scanning.secrets.titles.jwt"), "generic-api-key": msg("scanning.secrets.titles.generic_api_key"),
+    "private-key": msg("scanning.secrets.titles.private_key"), "aws-access-token": msg("scanning.secrets.titles.aws_access_token"),
+    "aws-secret-access-key": msg("scanning.secrets.titles.aws_secret_access_key"), "github-pat": msg("scanning.secrets.titles.github_pat"),
+    "github-fine-grained-pat": msg("scanning.secrets.titles.github_fine_grained_pat"),
+    "github-app-token": msg("scanning.secrets.titles.github_app_token"), "github-oauth": msg("scanning.secrets.titles.github_oauth"),
+    "gitlab-pat": msg("scanning.secrets.titles.gitlab_pat"), "slack-bot-token": msg("scanning.secrets.titles.slack_bot_token"),
+    "slack-webhook-url": msg("scanning.secrets.titles.slack_webhook_url"),
+    "stripe-access-token": msg("scanning.secrets.titles.stripe_access_token"), "gcp-api-key": msg("scanning.secrets.titles.gcp_api_key"),
+    "openai-api-key": msg("scanning.secrets.titles.openai_api_key"), "anthropic-api-key": msg("scanning.secrets.titles.anthropic_api_key"),
+    "twilio-api-key": msg("scanning.secrets.titles.twilio_api_key"), "sendgrid-api-token": msg("scanning.secrets.titles.sendgrid_api_token"),
+    "npm-access-token": msg("scanning.secrets.titles.npm_access_token"), "pypi-upload-token": msg("scanning.secrets.titles.pypi_upload_token"),
+    "azure-ad-client-secret": msg("scanning.secrets.titles.azure_ad_client_secret"),
+    "heroku-api-key": msg("scanning.secrets.titles.heroku_api_key"),
 }
 
 
-def secret_title(rule: str) -> str:
-    return SECRET_TITLES.get(rule) or f"Secreto expuesto ({rule})"
+def secret_title(rule: str) -> dict:
+    return SECRET_TITLES.get(rule) or msg("scanning.secrets.exposed_rule", rule=rule)
 
 
 def parse_gitleaks(payload: list) -> list[dict]:
@@ -717,8 +761,8 @@ def parse_gitleaks(payload: list) -> list[dict]:
         severity = "medium" if rule.startswith("generic") else "high"
         # El valor nunca se lee: gitleaks corre con --redact y aquí solo se toman regla, archivo y línea.
         findings.append(_base("secrets", rule, secret_title(rule), path, line, severity, tool="gitleaks",
-                              reason=f"Regla {rule} en {path}:{line} (entropía {entropy:.1f}); valor redactado.",
-                              remediation="Rota la credencial ahora y muévela a un gestor de secretos. Si el repositorio es público, considera reescribir el historial.",
+                              reason=msg("scanning.secrets.gitleaks_reason", rule=rule, path=path, line=line, entropy=f"{entropy:.1f}"),
+                              remediation=msg("scanning.secrets.rotate"),
                               cwe=[798], owasp="A04:2025", confidence=8 if entropy >= 3.5 else 6,
                               digest=_stable("secrets", rule, path, str(line))))
     return findings
@@ -727,7 +771,7 @@ def parse_gitleaks(payload: list) -> list[dict]:
 def run_gitleaks(snapshot: Path) -> dict:
     started = time.time()
     if not docker_available():
-        return _result("gitleaks", "not_tested", "Docker no disponible: la detección de secretos con Gitleaks no se ejecutó.")
+        return _result("gitleaks", "not_tested", msg("scanning.gitleaks.no_docker"))
     # El reporte se escribe junto al snapshot: es la única carpeta que ambos contenedores ven.
     with tempfile.TemporaryDirectory(prefix="gitleaks-", dir=snapshot.parent) as output:
         try:
@@ -737,13 +781,13 @@ def run_gitleaks(snapshot: Path) -> dict:
             report = Path(output) / "report.json"
             payload = json.loads(report.read_text(encoding="utf-8") or "[]") if report.is_file() else []
         except subprocess.TimeoutExpired:
-            return _result("gitleaks", "inconclusive", "Gitleaks superó el tiempo máximo.", started=started)
+            return _result("gitleaks", "inconclusive", msg("scanning.engines.timeout", engine="Gitleaks"), started=started)
         except (OSError, ValueError):
-            return _result("gitleaks", "inconclusive", "Gitleaks no devolvió un reporte legible.", started=started)
+            return _result("gitleaks", "inconclusive", msg("scanning.gitleaks.unreadable"), started=started)
     if completed.returncode not in (0, 1):
-        return _result("gitleaks", "inconclusive", with_cause("Gitleaks terminó con error", completed), started=started)
+        return _result("gitleaks", "inconclusive", with_cause(msg("scanning.engines.failed", engine="Gitleaks"), completed), started=started)
     findings = parse_gitleaks(payload)
-    return _result("gitleaks", "completed", f"Reglas de Gitleaks sobre el snapshot: {len(findings)} secretos; valores redactados.", findings, started)
+    return _result("gitleaks", "completed", msg("scanning.gitleaks.detail", secrets=len(findings)), findings, started)
 
 
 def merge_secrets(*groups: list[dict]) -> list[dict]:

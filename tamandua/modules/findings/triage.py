@@ -25,21 +25,30 @@ from pathlib import Path
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
+from tamandua.modules.findings.errors import LocalizedError
 from tamandua.modules.findings.tables import triage_decisions
 from tamandua.shared import db
 from tamandua.shared.db import TENANT
+from tamandua.shared.i18n import is_msg, msg
 
 from tamandua.modules.runs.kinds import FINDING_RUNS
 from tamandua.modules.sources.assets import asset_key
 
 
-class TriageError(ValueError):
+class TriageError(LocalizedError, ValueError):
+    pass
+
+
+class TriageForbidden(LocalizedError, PermissionError):
     pass
 
 
 STATUSES = ("open", "in_progress", "false_positive", "accepted", "fixed")
-LABELS = {"open": "Abierto", "in_progress": "En curso", "false_positive": "Falso positivo", "accepted": "Riesgo aceptado",
-          "fixed": "Remediado"}
+LABELS = {"open": msg("findings.triage.status.open"), "in_progress": msg("findings.triage.status.in_progress"),
+          "false_positive": msg("findings.triage.status.false_positive"), "accepted": msg("findings.triage.status.accepted"),
+          "fixed": msg("findings.triage.status.fixed")}
+TOO_LONG = {"reason": "findings.triage.errors.reason_too_long", "note": "findings.triage.errors.note_too_long"}
+CONTROL = {"reason": "findings.triage.errors.reason_control_characters", "note": "findings.triage.errors.note_control_characters"}
 # Lo que deja de contar como trabajo pendiente en paneles, tickets y SARIF. «Remediado» a mano exige
 # justificación y se reabre solo si el hallazgo vuelve a aparecer.
 SUPPRESSED = ("false_positive", "accepted", "fixed")
@@ -99,10 +108,10 @@ def _clean_text(value, *, limit: int, field: str) -> str:
     if value is None:
         return ""
     if not isinstance(value, str) or len(value) > limit:
-        raise TriageError(f"{field} admite hasta {limit} caracteres")
+        raise TriageError(msg(TOO_LONG[field], limit=limit))
     cleaned = " ".join(value.split())
     if any(ord(character) < 32 or ord(character) == 127 for character in cleaned):
-        raise TriageError(f"{field} contiene caracteres de control")
+        raise TriageError(msg(CONTROL[field]))
     return cleaned
 
 
@@ -149,31 +158,33 @@ def is_active(finding: dict) -> bool:
 
 
 def decide(data_dir: Path, record: dict, fingerprints, status, *, reason=None, note=None, expires_at=None,
-           user: dict) -> dict:
-    """Aplica una decisión a varios hallazgos de una ejecución. Solo huellas que la ejecución contiene."""
+           user: dict, system_note: dict | None = None) -> dict:
+    """Aplica una decisión a varios hallazgos de una ejecución. Solo huellas que la ejecución contiene.
+
+    `system_note`: a message written by Tamandua itself (never from a request), stored instead of `note`."""
     if status not in STATUSES:
-        raise TriageError("Estado de triage inválido")
+        raise TriageError(msg("findings.triage.errors.invalid_status"))
     if (not isinstance(fingerprints, list) or not 1 <= len(fingerprints) <= MAX_BATCH
             or not all(isinstance(item, str) and re.fullmatch(r"[0-9a-f]{64}", item) for item in fingerprints)):
-        raise TriageError(f"Indica entre 1 y {MAX_BATCH} huellas de hallazgo válidas")
+        raise TriageError(msg("findings.triage.errors.invalid_fingerprints", max=MAX_BATCH))
     known = {finding["fingerprint"] for finding in record.get("findings", [])}
     unknown = set(fingerprints) - known
     if unknown:
-        raise TriageError("Hay huellas que no pertenecen a esta ejecución")
-    reason = _clean_text(reason, limit=REASON_MAX, field="El motivo")
-    note = _clean_text(note, limit=NOTE_MAX, field="La nota")
+        raise TriageError(msg("findings.triage.errors.unknown_fingerprints"))
+    reason = _clean_text(reason, limit=REASON_MAX, field="reason")
+    note = system_note if is_msg(system_note) else _clean_text(note, limit=NOTE_MAX, field="note")
     if status in SUPPRESSED and len(reason) < REASON_MIN:
-        raise TriageError(f"Explica el motivo (mínimo {REASON_MIN} caracteres): queda en el historial")
+        raise TriageError(msg("findings.triage.errors.reason_required", min=REASON_MIN))
     if status == "accepted":
         if user.get("role") != "admin":
-            raise PermissionError("Aceptar un riesgo lo decide un administrador")
+            raise TriageForbidden(msg("findings.triage.errors.accept_admin_only"))
         today = datetime.now(timezone.utc).date()
         try:
             expiry = date.fromisoformat(expires_at) if expires_at else today + timedelta(days=ACCEPT_DEFAULT_DAYS)
         except (TypeError, ValueError) as exc:
-            raise TriageError("Fecha de caducidad inválida (AAAA-MM-DD)") from exc
+            raise TriageError(msg("findings.triage.errors.invalid_expiry")) from exc
         if not today < expiry <= today + timedelta(days=ACCEPT_MAX_DAYS):
-            raise TriageError(f"La aceptación caduca entre mañana y {ACCEPT_MAX_DAYS} días")
+            raise TriageError(msg("findings.triage.errors.expiry_range", max=ACCEPT_MAX_DAYS))
         expires_at = expiry.isoformat()
     else:
         expires_at = None

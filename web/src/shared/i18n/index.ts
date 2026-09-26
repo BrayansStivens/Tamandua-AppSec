@@ -33,8 +33,9 @@ void i18n.use(initReactI18next).init({
   resources, lng: detect(), fallbackLng: 'en', supportedLngs: [...LOCALES], defaultNS: 'common',
   ns: Object.keys(resources.en ?? {}), interpolation: { escapeValue: false }, returnNull: false,
 })
-document.documentElement.lang = i18n.language
-i18n.on('languageChanged', language => { document.documentElement.lang = language })
+const applyDocument = () => { document.documentElement.lang = i18n.language; document.title = i18n.t('common:app_title') }
+applyDocument()
+i18n.on('languageChanged', applyDocument)
 
 export const currentLocale = (): Locale => isLocale(i18n.language) ? i18n.language : 'en'
 export const intlLocale = () => INTL[currentLocale()]

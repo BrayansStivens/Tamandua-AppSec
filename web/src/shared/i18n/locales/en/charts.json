@@ -1,0 +1,27 @@
+{
+  "new_per_day": "New findings per day: {{total}} in total",
+  "open_by_severity": "Open by severity, {{total}} in total",
+  "found_vs_fixed": "Found vs. fixed, cumulative",
+  "found": "Found",
+  "fixed": "Fixed",
+  "found_count_one": "{{count}} found",
+  "found_count_other": "{{count}} found",
+  "fixed_count_one": "{{count}} fixed",
+  "fixed_count_other": "{{count}} fixed",
+  "found_cumulative": "Found (cumulative)",
+  "fixed_cumulative": "Fixed (cumulative)",
+  "activity_label": "Runs per day over the last {{weeks}} weeks: {{total}} in total",
+  "weekday": {
+    "mon": "M", "wed": "W", "fri": "F", "sun": "S"
+  },
+  "today_day": "Today · {{day}}",
+  "runs_one": "{{count}} run",
+  "runs_other": "{{count}} runs",
+  "activity_summary_one": "{{count}} run in {{weeks}} weeks · outlined square = today",
+  "activity_summary_other": "{{count}} runs in {{weeks}} weeks · outlined square = today",
+  "less": "Less",
+  "more": "More",
+  "unscored": "Unscored",
+  "today": "today",
+  "skyline_label": "CVEs published in the last {{days}} days by severity: {{total}} in total; {{breakdown}}."
+}

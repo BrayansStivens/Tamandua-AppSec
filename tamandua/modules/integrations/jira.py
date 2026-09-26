@@ -31,6 +31,7 @@ from tamandua.modules.runs.kinds import FINDING_RUNS
 from tamandua.shared import log as logging_setup
 from tamandua.modules.intel.advisories import compare_versions
 from tamandua.modules.findings.triage import asset_key
+from tamandua.shared.i18n import default_locale, msg, t, text
 from tamandua.version import USER_AGENT
 
 SITE_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.atlassian\.net")
@@ -41,7 +42,11 @@ _log = logging_setup.get("jira")
 
 
 class JiraError(ValueError):
-    pass
+    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+
+    def __init__(self, message):
+        super().__init__(text(message, "en"))
+        self.message = message
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -69,7 +74,7 @@ def _write(data: dict) -> None:
 
 def normalize_site(value) -> str:
     if not isinstance(value, str) or len(value) > 120:
-        raise JiraError("Sitio de Jira inválido")
+        raise JiraError(msg("integrations.jira.invalid_site"))
     text = value.strip().lower()
     if "://" not in text:
         text = "https://" + text
@@ -77,10 +82,10 @@ def normalize_site(value) -> str:
         parts = urlsplit(text)
         host, port = (parts.hostname or "").rstrip("."), parts.port
     except ValueError:
-        raise JiraError("Usa la dirección de tu Jira Cloud: https://tu-sitio.atlassian.net") from None
+        raise JiraError(msg("integrations.jira.use_cloud_url")) from None
     if (parts.scheme != "https" or parts.username or parts.password or port or parts.query or parts.fragment
             or parts.path not in ("", "/") or not SITE_PATTERN.fullmatch(host)):
-        raise JiraError("Usa la dirección de tu Jira Cloud: https://tu-sitio.atlassian.net")
+        raise JiraError(msg("integrations.jira.use_cloud_url"))
     return host
 
 
@@ -97,13 +102,13 @@ def configure(site, email, token, project, issue_type, *, by: str, http=None) ->
     """Valida contra Jira (identidad, proyecto y tipo de incidencia) y solo entonces guarda."""
     host = normalize_site(site)
     if not isinstance(email, str) or not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,190}", email.strip()):
-        raise JiraError("Email inválido")
+        raise JiraError(msg("integrations.jira.invalid_email"))
     if (not isinstance(token, str) or not 16 <= len(token) <= 400
             or any(character.isspace() or ord(character) < 33 or ord(character) > 126 for character in token)):
-        raise JiraError("API token inválido")
+        raise JiraError(msg("integrations.jira.invalid_token"))
     project = (project or "").strip().upper() if isinstance(project, str) else ""
     if not PROJECT_PATTERN.fullmatch(project):
-        raise JiraError("Clave de proyecto inválida (p. ej. SEC)")
+        raise JiraError(msg("integrations.jira.invalid_project"))
     issue_type = " ".join(issue_type.split())[:60] if isinstance(issue_type, str) and issue_type.strip() else "Task"
     credentials = {"site": host, "email": email.strip(), "token": token}
     client = http or _http
@@ -111,7 +116,7 @@ def configure(site, email, token, project, issue_type, *, by: str, http=None) ->
     found = client(credentials, "GET", f"/rest/api/3/project/{quote(project)}")
     types = [item.get("name") for item in found.get("issueTypes", []) if isinstance(item, dict)]
     if types and issue_type not in types:
-        raise JiraError(f"El proyecto {project} no tiene el tipo «{issue_type}». Disponibles: {', '.join(types[:8])}")
+        raise JiraError(msg("integrations.jira.missing_issue_type", project=project, type=issue_type, available=", ".join(str(item) for item in types[:8])))
     _write({**credentials, "project": project, "project_name": found.get("name"), "issue_type": issue_type,
             "account": me.get("accountId"), "saved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "saved_by": by})
@@ -147,18 +152,19 @@ def _http(credentials: dict, method: str, path: str, body: dict | None = None) -
         finally:
             exc.close()
         if exc.code in (401, 403):
-            raise JiraError("Jira rechazó la credencial o no da permiso sobre el proyecto") from None
+            raise JiraError(msg("integrations.jira.rejected_credential")) from None
         if exc.code == 404:
-            raise JiraError("Jira no encuentra el recurso (revisa el sitio y la clave del proyecto)") from None
-        raise JiraError(f"Jira respondió {exc.code}" + (f": {detail[:300]}" if detail else "")) from None
+            raise JiraError(msg("integrations.jira.not_found")) from None
+        raise JiraError(msg("integrations.jira.http_error_detail", code=exc.code, detail=detail[:300]) if detail
+                        else msg("integrations.jira.http_error", code=exc.code)) from None
     except (URLError, TimeoutError, OSError):
-        raise JiraError("No se pudo contactar con Jira") from None
+        raise JiraError(msg("integrations.jira.unreachable")) from None
     if len(raw) > RESPONSE_LIMIT:
-        raise JiraError("Respuesta de Jira demasiado grande")
+        raise JiraError(msg("integrations.jira.too_large"))
     try:
         payload = json.loads(raw or b"{}")
     except ValueError:
-        raise JiraError("Jira devolvió una respuesta ilegible") from None
+        raise JiraError(msg("integrations.jira.unreadable")) from None
     return payload if isinstance(payload, dict) else {}
 
 
@@ -207,18 +213,21 @@ def label_for(fingerprint: str) -> str:
     return f"appsec-{fingerprint[:16]}"
 
 
-def export(data_dir: Path, record: dict, tickets: list[dict], fingerprints: list, *, by: str, http=None) -> dict:
-    """Crea en Jira las incidencias de los tickets pedidos. Devuelve creadas, existentes y fallos."""
+def export(data_dir: Path, record: dict, tickets: list[dict], fingerprints: list, *, by: str, http=None, locale: str | None = None) -> dict:
+    """Crea en Jira las incidencias de los tickets pedidos. Devuelve creadas, existentes y fallos.
+
+    The issues are read by the whole team, so they speak TAMANDUA_DEFAULT_LOCALE unless told otherwise."""
+    locale = locale or default_locale()
     credentials = _load()
     if not credentials:
-        raise JiraError("Configura Jira en Integraciones antes de exportar")
+        raise JiraError(msg("integrations.jira.not_configured"))
     if (not isinstance(fingerprints, list) or not 1 <= len(fingerprints) <= MAX_BATCH
             or not all(isinstance(item, str) and re.fullmatch(r"[0-9a-f]{64}", item) for item in fingerprints)):
-        raise JiraError(f"Indica entre 1 y {MAX_BATCH} hallazgos")
+        raise JiraError(msg("integrations.jira.batch_size", max=MAX_BATCH))
     by_fingerprint = {ticket["fingerprint"]: ticket for ticket in tickets}
     missing = [item for item in fingerprints if item not in by_fingerprint]
     if missing:
-        raise JiraError("Hay hallazgos que no están pendientes en esta ejecución (descartados en triage o ajenos)")
+        raise JiraError(msg("integrations.jira.not_pending"))
     client = http or _http
     asset = asset_key(record)
     known = load_links(data_dir).get(asset, {})
@@ -243,13 +252,13 @@ def export(data_dir: Path, record: dict, tickets: list[dict], fingerprints: list
                         _remember(data_dir, asset, item, link)
                 existing.extend({"fingerprint": item, **link} for item in prints)
                 continue
-            result = _create(client, credentials, _issue_fields(credentials, group), state)
+            result = _create(client, credentials, _issue_fields(credentials, group, locale), state)
             link = {"key": result["key"], "url": base + result["key"], "linked_at": _stamp(), "by": by}
             for item in prints:
                 _remember(data_dir, asset, item, link)
             created.extend({"fingerprint": item, **link} for item in prints)
         except (JiraError, KeyError, TypeError) as exc:
-            message = str(exc) if isinstance(exc, JiraError) else "Respuesta inesperada de Jira"
+            message = exc.message if isinstance(exc, JiraError) else msg("integrations.jira.unexpected")
             failed.extend({"fingerprint": item, "error": message} for item in prints)
     _log.info("jira_export", extra={"user": by, "run_id": record["id"],
                                     "reason": f"{len(created)} creadas, {len(existing)} ya existían, {len(failed)} fallos"})
@@ -270,7 +279,7 @@ def _work_items(tickets: list[dict]) -> list[list[dict]]:
     return list(groups.values())
 
 
-def _issue_fields(credentials: dict, group: list[dict]) -> dict:
+def _issue_fields(credentials: dict, group: list[dict], locale: str) -> dict:
     first = group[0]
     severity = min((ticket["severity"] for ticket in group), key=lambda item: SEVERITY_ORDER.index(item) if item in SEVERITY_ORDER else 9)
     priority = min((ticket["priority"] for ticket in group), key=lambda item: PRIORITY_ORDER.index(item) if item in PRIORITY_ORDER else 9)
@@ -281,21 +290,23 @@ def _issue_fields(credentials: dict, group: list[dict]) -> dict:
         for version in fixes:
             if target is None or compare_versions(version, target) > 0:
                 target = version
-        summary = (f"[{severity.upper()}] Actualizar {package['name']} {package.get('version')}"
-                   + (f" a {target}" if target else " (sin corrección publicada)") + f" · {len(group)} avisos")
-        header = [f"Paquete {package['name']} {package.get('version')} ({package.get('ecosystem')}).",
-                  f"Actualizar a {target} cierra los {len(fixes)} avisos con corrección publicada." if target else
-                  "Ninguno de los avisos tiene todavía versión corregida publicada.", ""]
-        description = "\n".join(header) + "\n\n".join(ticket["description"] for ticket in group)
+        names = {"severity": severity.upper(), "package": package["name"], "version": package.get("version"), "count": len(group)}
+        summary = (t("integrations.jira.issue.group_summary", locale, target=target, **names) if target
+                   else t("integrations.jira.issue.group_summary_unfixed", locale, **names))
+        header = [t("integrations.jira.issue.package", locale, package=package["name"], version=package.get("version"),
+                    ecosystem=package.get("ecosystem")),
+                  t("integrations.jira.issue.fix_closes", locale, target=target, count=len(fixes)) if target else
+                  t("integrations.jira.issue.no_fix", locale), ""]
+        description = "\n".join(header) + "\n\n".join(text(ticket["description"], locale) for ticket in group)
     else:
-        summary, description = first["summary"], first["description"]
+        summary, description = text(first["summary"], locale), text(first["description"], locale)
     labels = {label_for(ticket["fingerprint"]) for ticket in group}
     for ticket in group:
         labels.update(re.sub(r"[^A-Za-z0-9_.-]", "-", item)[:60] for item in ticket["labels"])
-    trace = "\n".join(f"Huella: {ticket['fingerprint']}" for ticket in group)
+    trace = "\n".join(t("integrations.jira.issue.fingerprint", locale, fingerprint=ticket["fingerprint"]) for ticket in group)
     return {"project": {"key": credentials["project"]}, "issuetype": {"name": credentials["issue_type"]},
             "summary": summary[:255], "priority": {"name": priority},
-            "description": _adf(f"{description}\n\nOrigen: {first['source']} · ejecución {first['run_id']}\n{trace}"),
+            "description": _adf(f"{description}\n\n{t('integrations.jira.issue.origin', locale, source=text(first['source'], locale), run_id=first['run_id'])}\n{trace}"),
             "labels": sorted(labels)}
 
 

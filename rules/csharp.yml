@@ -2,8 +2,11 @@ rules:
   - id: appsec.cs.sql-string-building
     languages: [csharp]
     severity: ERROR
-    message: "SQL construido por concatenación o interpolación. Usa parámetros (SqlParameter) o FromSqlInterpolated, que parametriza."
-    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "The SQL text is built by concatenation or interpolation. Pass values as parameters (SqlParameter) or use FromSqlInterpolated, which parameterizes them."
+    metadata: {cwe: [89], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "SQL query built by string concatenation", es: "Consulta SQL construida por concatenación"},
+      fix: {en: "The SQL text is built by concatenation or interpolation. Pass values as parameters (SqlParameter) or use FromSqlInterpolated, which parameterizes them.",
+            es: "SQL construido por concatenación o interpolación. Usa parámetros (SqlParameter) o FromSqlInterpolated, que parametriza."}}
     patterns:
       - pattern-either:
           - pattern: new SqlCommand($Q, ...)
@@ -19,8 +22,11 @@ rules:
   - id: appsec.cs.process-start-concatenation
     languages: [csharp]
     severity: ERROR
-    message: "Comando del sistema con argumentos construidos por concatenación. Usa ArgumentList con cada argumento separado."
-    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH}
+    message: "The command's arguments are built by concatenation. Pass each argument separately through ArgumentList."
+    metadata: {cwe: [78], owasp: "A05:2025", category: injection, confidence: HIGH,
+      title: {en: "Process started with a concatenated command line", es: "Proceso lanzado con una línea de comandos concatenada"},
+      fix: {en: "The command's arguments are built by concatenation. Pass each argument separately through ArgumentList.",
+            es: "Comando del sistema con argumentos construidos por concatenación. Usa ArgumentList con cada argumento separado."}}
     patterns:
       - pattern-either:
           - pattern: Process.Start("...", $A)
@@ -34,8 +40,11 @@ rules:
   - id: appsec.cs.insecure-deserialization
     languages: [csharp]
     severity: ERROR
-    message: "Deserializador que instancia tipos arbitrarios (BinaryFormatter, TypeNameHandling.All): ejecución remota con datos no confiables. Usa System.Text.Json sin tipos polimórficos."
-    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH}
+    message: "BinaryFormatter and TypeNameHandling.All let the payload choose which types to create: remote code execution on untrusted data. Use System.Text.Json without polymorphic types."
+    metadata: {cwe: [502], owasp: "A08:2025", category: deserialization, confidence: HIGH,
+      title: {en: "Deserializer that instantiates arbitrary types", es: "Deserializador que instancia tipos arbitrarios"},
+      fix: {en: "BinaryFormatter and TypeNameHandling.All let the payload choose which types to create: remote code execution on untrusted data. Use System.Text.Json without polymorphic types.",
+            es: "Deserializador que instancia tipos arbitrarios (BinaryFormatter, TypeNameHandling.All): ejecución remota con datos no confiables. Usa System.Text.Json sin tipos polimórficos."}}
     pattern-either:
       - pattern: new BinaryFormatter()
       - pattern: new NetDataContractSerializer()
@@ -46,8 +55,11 @@ rules:
   - id: appsec.cs.certificate-validation-bypass
     languages: [csharp]
     severity: ERROR
-    message: "Callback de validación de certificado que devuelve true siempre: el TLS deja de proteger."
-    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH}
+    message: "The certificate validation callback always returns true, so TLS no longer protects the connection. Remove the callback, or trust a specific CA or certificate."
+    metadata: {cwe: [295], owasp: "A04:2025", category: crypto, confidence: HIGH,
+      title: {en: "TLS certificate validation disabled", es: "Validación de certificados TLS desactivada"},
+      fix: {en: "The certificate validation callback always returns true, so TLS no longer protects the connection. Remove the callback, or trust a specific CA or certificate.",
+            es: "El callback de validación de certificados devuelve true siempre: el TLS deja de proteger. Elimina el callback o confía en una CA o un certificado concretos."}}
     pattern-either:
       - pattern: ServicePointManager.ServerCertificateValidationCallback = (...) => true;
       - pattern: ServicePointManager.ServerCertificateValidationCallback += (...) => true;
@@ -56,16 +68,22 @@ rules:
   - id: appsec.cs.razor-html-raw-non-literal
     languages: [csharp]
     severity: WARNING
-    message: "Html.Raw sobre un valor dinámico desactiva el escape de Razor: XSS si contiene datos externos."
-    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM}
+    message: "Html.Raw on a dynamic value turns off Razor's escaping and allows XSS if it holds external data. Let Razor escape the value, or sanitize it first."
+    metadata: {cwe: [79], owasp: "A05:2025", category: xss, confidence: MEDIUM,
+      title: {en: "Unescaped HTML rendered with Html.Raw", es: "HTML sin escapar con Html.Raw"},
+      fix: {en: "Html.Raw on a dynamic value turns off Razor's escaping and allows XSS if it holds external data. Let Razor escape the value, or sanitize it first.",
+            es: "Html.Raw sobre un valor dinámico desactiva el escape de Razor: XSS si contiene datos externos. Deja que Razor escape el valor o sanitízalo antes."}}
     patterns:
       - pattern: Html.Raw($X)
       - pattern-not: Html.Raw("...")
   - id: appsec.cs.weak-hash
     languages: [csharp]
     severity: INFO
-    message: "MD5/SHA-1 no sirven para contraseñas ni firmas. Para contraseñas usa PBKDF2/Argon2; para integridad, SHA-256."
-    metadata: {cwe: [328], owasp: "A04:2025", category: crypto, confidence: LOW}
+    message: "MD5 and SHA-1 are unsafe for passwords and signatures. Use PBKDF2 or Argon2 for passwords and SHA-256 for integrity."
+    metadata: {cwe: [328], owasp: "A04:2025", category: crypto, confidence: LOW,
+      title: {en: "Weak hash algorithm (MD5/SHA-1)", es: "Algoritmo de hash débil (MD5/SHA-1)"},
+      fix: {en: "MD5 and SHA-1 are unsafe for passwords and signatures. Use PBKDF2 or Argon2 for passwords and SHA-256 for integrity.",
+            es: "MD5/SHA-1 no sirven para contraseñas ni firmas. Para contraseñas usa PBKDF2/Argon2; para integridad, SHA-256."}}
     pattern-either:
       - pattern: MD5.Create()
       - pattern: SHA1.Create()

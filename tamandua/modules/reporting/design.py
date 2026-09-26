@@ -22,6 +22,8 @@ from reportlab.lib.units import mm
 from reportlab.platypus import (BaseDocTemplate, CondPageBreak, Frame, NextPageTemplate, PageBreak, PageTemplate,
                                 Paragraph, Spacer, Table, TableStyle)
 
+from tamandua.shared import i18n
+
 # Tokens del panel en modo claro (web/src/index.css), en hexadecimal para el PDF y el SVG.
 BRAND, BRAND_BG = colors.HexColor("#7342d3"), colors.HexColor("#f4f1ff")
 INK, MUTED, LINE, SOFT = colors.HexColor("#171717"), colors.HexColor("#636363"), colors.HexColor("#e5e5e5"), colors.HexColor("#f5f5f5")
@@ -35,7 +37,6 @@ SEVERITY = {  # texto, fondo
     "low": (colors.HexColor("#00649e"), colors.HexColor("#ebf5fd")),
     "info": (MUTED, SOFT),
 }
-SEVERITY_LABEL = {"critical": "Crítica", "high": "Alta", "medium": "Media", "low": "Baja", "info": "Info"}
 ORDER = {level: index for index, level in enumerate(("critical", "high", "medium", "low", "info"))}
 
 STYLE = {
@@ -78,16 +79,27 @@ def day(value) -> str:
     return text[:10] if re.match(r"\d{4}-\d{2}-\d{2}", text) else "—"
 
 
+def severity_label(level, locale: str | None = None) -> str:
+    return i18n.t(f"reports.common.severity.{level}", locale) if level in SEVERITY else str(level or "—")
+
+
+def count(key: str, value: int, locale: str | None = None) -> str:
+    """«3 findings»: a `reports.count.*` phrase with its plural."""
+    return i18n.t(f"reports.count.{key}", locale, count=value)
+
+
 def n(count: int, one: str, many: str) -> str:
     return f"{count} {one if count == 1 else many}"
 
 
-def listing(items: list[str], limit: int = 6) -> str:
-    """«a, b, c y 4 más»: una enumeración acotada que no llena media página."""
+def listing(items: list[str], limit: int = 6, *, locale: str | None = None) -> str:
+    """«a, b, c and 4 more»: a bounded enumeration that doesn't fill half a page."""
     items = [item for item in items if item]
-    if len(items) <= limit:
-        return ", ".join(items[:-1]) + (" y " if len(items) > 1 else "") + (items[-1] if items else "")
-    return ", ".join(items[:limit]) + f" y {len(items) - limit} más"
+    if len(items) > limit:
+        return i18n.t("reports.design.listing_more", locale, items=", ".join(items[:limit]), count=len(items) - limit)
+    if len(items) > 1:
+        return i18n.t("reports.design.listing_last", locale, items=", ".join(items[:-1]), last=items[-1])
+    return items[0] if items else ""
 
 
 def grid(rows, widths, *, header=True, zebra=False) -> Table:
@@ -108,9 +120,9 @@ def table(headers: list[str], rows: list[list], widths: list[float], *, zebra=Tr
     return grid([[Paragraph(label, STYLE["head"]) for label in headers], *body], widths, zebra=zebra)
 
 
-def chip(severity: str, label: str | None = None) -> Table:
+def chip(severity: str, label: str | None = None, *, locale: str | None = None) -> Table:
     ink, fill = SEVERITY.get(severity, SEVERITY["info"])
-    cell = Table([[Paragraph(f'<font color="{hexval(ink)}">{label or SEVERITY_LABEL.get(severity, severity)}</font>', STYLE["chip"])]],
+    cell = Table([[Paragraph(f'<font color="{hexval(ink)}">{label or severity_label(severity, locale)}</font>', STYLE["chip"])]],
                  colWidths=[15 * mm], rowHeights=[4.6 * mm])
     cell.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fill), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                               ("LEFTPADDING", (0, 0), (-1, -1), 1), ("RIGHTPADDING", (0, 0), (-1, -1), 1),
@@ -156,11 +168,14 @@ def bullets(items: list[str], style: str = "body") -> list:
     return [Paragraph("•&nbsp;&nbsp;" + item, STYLE[style]) for item in items]
 
 
-def signoff(prepared_by: str = "") -> list:
-    return [Spacer(1, 8), h2("Revisión y aprobación"),
-            grid([[Paragraph(label, STYLE["head"]) for label in ("Rol", "Nombre", "Firma", "Fecha")]]
-                 + [[Paragraph(role, STYLE["cell"]), Paragraph(t(name, 60), STYLE["cell"]), Paragraph("", STYLE["cell"]), Paragraph("", STYLE["cell"])]
-                    for role, name in (("Preparado por", prepared_by), ("Revisado por", ""), ("Aprobado por", ""))],
+def signoff(prepared_by: str = "", *, locale: str | None = None) -> list:
+    columns = [i18n.t(f"reports.columns.{name}", locale) for name in ("role", "name", "signature", "date")]
+    roles = [(i18n.t("reports.design.prepared_by", locale), prepared_by), (i18n.t("reports.design.reviewed_by", locale), ""),
+             (i18n.t("reports.design.approved_by", locale), "")]
+    return [Spacer(1, 8), h2(i18n.t("reports.design.signoff", locale)),
+            grid([[Paragraph(html.escape(label), STYLE["head"]) for label in columns]]
+                 + [[Paragraph(html.escape(role), STYLE["cell"]), Paragraph(t(name, 60), STYLE["cell"]), Paragraph("", STYLE["cell"]), Paragraph("", STYLE["cell"])]
+                    for role, name in roles],
                  [32 * mm, 50 * mm, WIDTH - 112 * mm, 30 * mm])]
 
 
@@ -176,7 +191,8 @@ def _guard_headings(story: list) -> list:
                                                     if isinstance(flowable, Paragraph) and flowable.style.name in room else (flowable,))]
 
 
-def build(story: list, *, title: str, footer: str, version: str, author: str = "Tamandua", subject: str = "") -> bytes:
+def build(story: list, *, title: str, footer: str, version: str, author: str = "Tamandua", subject: str = "",
+          locale: str | None = None) -> bytes:
     """PDF A4 con la barra de marca, pie con título y página, y páginas apaisadas cuando se piden."""
     output = io.BytesIO()
 
@@ -190,7 +206,7 @@ def build(story: list, *, title: str, footer: str, version: str, author: str = "
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor(MUTED)
         canvas.drawString(MARGIN, 8.5 * mm, footer[:120])
-        canvas.drawRightString(width - MARGIN, 8.5 * mm, f"Tamandua {version}  ·  página {document.page}")
+        canvas.drawRightString(width - MARGIN, 8.5 * mm, i18n.t("reports.design.page_footer", locale, version=version, page=document.page))
         canvas.restoreState()
 
     def template(name: str, size) -> PageTemplate:
@@ -210,16 +226,26 @@ def wide_size(name: str | None) -> tuple[float, float]:
     return width - 2 * MARGIN, height - 34 * mm
 
 
-STEP_STATUS = {"completed": "completado", "partial": "parcial", "not_tested": "no ejecutado", "inconclusive": "no concluyente",
-               "failed": "falló", "pending": "pendiente", "skipped": "omitido"}
+STEP_STATES = ("completed", "partial", "not_tested", "inconclusive", "failed", "pending", "skipped")
 GAP_STATES = ("partial", "not_tested", "inconclusive", "failed")
 
 
-def coverage_gaps(steps: list[dict]) -> list[str]:
-    """Motores que no terminaron del todo, con su estado: lo que no se analizó no equivale a «sin hallazgos»."""
-    return [f"{step.get('name')} ({STEP_STATUS.get(step.get('status'), step.get('status'))})" for step in steps
+def step_status(status, locale: str | None = None) -> str:
+    return i18n.t(f"reports.common.step_status.{status}", locale) if status in STEP_STATES else str(status or "—")
+
+
+def coverage_gaps(steps: list[dict], *, locale: str | None = None) -> list[str]:
+    """Engines that didn't fully finish, with their state: what wasn't analyzed doesn't mean «no findings»."""
+    return [f"{i18n.text(step.get('name'), locale)} ({step_status(step.get('status'), locale)})" for step in steps
             if step.get("status") in GAP_STATES and (step.get("tool") or step.get("status") != "partial" or step.get("detail"))]
 
 
-DISCLAIMER = ("Evidencia técnica generada con herramientas automatizadas y revisada por el equipo. No constituye una opinión de "
-              "auditoría, una certificación ni una declaración de cumplimiento.")
+def disclaimer(locale: str | None = None) -> str:
+    return i18n.t("reports.design.disclaimer", locale)
+
+
+def __getattr__(name: str):
+    # DISCLAIMER stays importable for reports that don't pass a locale yet.
+    if name == "DISCLAIMER":
+        return disclaimer()
+    raise AttributeError(name)

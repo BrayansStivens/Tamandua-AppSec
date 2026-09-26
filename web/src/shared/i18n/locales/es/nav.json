@@ -1,0 +1,60 @@
+{
+  "tagline": "Se come tus bugs",
+  "main": "Principal",
+  "workspace": "Workspace",
+  "eyebrow": "Security workspace / 01",
+  "open_navigation": "Abrir navegación",
+  "last_run": "Última ejecución {{date}}",
+  "role_without_2fa": "{{role}} · sin 2FA",
+  "two_factor_off": "Segundo factor sin activar",
+  "groups": {
+    "risk": "Riesgo", "scanning": "Escaneo", "settings": "Ajustes"
+  },
+  "items": {
+    "overview": "Resumen", "findings": "Hallazgos", "threats": "Amenazas", "coverage": "Cobertura", "cves": "CVE tracker",
+    "compliance": "Cumplimiento", "analyses": "Análisis", "repositories": "Repositorios", "pulls": "Pull requests",
+    "integrations": "Integraciones", "users": "Usuarios", "new": "Nuevo análisis", "account": "Cuenta", "domains": "Pruebas web"
+  },
+  "descriptions": {
+    "overview": "Qué riesgos tiene tu código, sus dependencias y tus imágenes, por qué importan y cómo se corrigen.",
+    "analyses": "Historial de análisis de este workspace, con su tipo, estado y resultados.",
+    "new": "Define el objetivo, declara el alcance y revisa qué se ejecuta antes de lanzar.",
+    "repositories": "Conecta tus repositorios y elige el código que quieres analizar.",
+    "domains": "Esta parte todavía no da resultados reales: la verás aquí cuando esté lista.",
+    "integrations": "Administra los proveedores de código y consulta el estado de la IA.",
+    "account": "Tu acceso: contraseña y segundo factor.",
+    "users": "Invita a tu equipo, asigna roles y retira accesos.",
+    "pulls": "Cada PR se revisa por lo que introduce, no por lo que ya había.",
+    "cves": "Todas las vulnerabilidades publicadas en NVD, con explotación activa (KEV) y probabilidad de explotación (EPSS), buscables en local.",
+    "compliance": "Plazos de notificación del Reglamento de Ciberresiliencia de la UE para tus productos, con el borrador listo. El SBOM y el VEX se exportan desde Hallazgos.",
+    "threats": "Modela el sistema con el enfoque que prefieras (STRIDE, LINDDUN, PASTA, árboles de ataque, ATT&CK) y contrasta las amenazas con los análisis.",
+    "default": "Resultados del objetivo seleccionado, con pasos y límites de cobertura visibles."
+  },
+  "theme": {
+    "label": "Apariencia", "system": "Sistema", "light": "Claro", "dark": "Oscuro"
+  },
+  "toast": {
+    "repository": "repositorio",
+    "image": "imagen",
+    "failed": "El escaneo de {{name}} falló.",
+    "done_one": "Escaneo de {{name}} terminado: {{count}} hallazgo.",
+    "done_other": "Escaneo de {{name}} terminado: {{count}} hallazgos.",
+    "done_severities_one": "Escaneo de {{name}} terminado: {{count}} hallazgo ({{critical}} críticos, {{high}} altos).",
+    "done_severities_other": "Escaneo de {{name}} terminado: {{count}} hallazgos ({{critical}} críticos, {{high}} altos)."
+  },
+  "dast": {
+    "title": "Pruebas dinámicas de aplicaciones web y API (DAST)",
+    "description": "Pruebas dinámicas (DAST) contra tus aplicaciones en marcha, solo sobre dominios cuya propiedad hayas demostrado.",
+    "plan": {
+      "dns": "Verificación de propiedad del dominio por DNS TXT (ya implementada, se activará con el resto)",
+      "scan": "Escaneo activo con ZAP o Nuclei en un contenedor aislado, con límites de velocidad y de alcance",
+      "auth": "Autenticación en la aplicación con una cuenta de prueba que tú declares",
+      "evidence": "Hallazgos con la petición y la respuesta que los demuestran, en el mismo ciclo de vida que los del código"
+    }
+  },
+  "footer": "{{name}} · software libre bajo <license>AGPL-3.0</license> · <source>código fuente</source> · los resultados negativos no prueban ausencia de vulnerabilidades.",
+  "update": {
+    "message": "Hay una versión nueva del panel. Recarga para usarla; guarda antes lo que tengas sin guardar.",
+    "reload": "Recargar"
+  }
+}

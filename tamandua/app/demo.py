@@ -14,6 +14,8 @@ import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from tamandua.shared.i18n import t, text
+
 DEMO_SOURCE = {"id": "local:demo-ejemplos", "name": "demo · ejemplos vulnerables", "provider": "local"}
 DEMO_CONTEXT = "Ejemplos vulnerables a propósito que trae Tamandua para probarlo: código, dependencias, secretos y un Dockerfile."
 MODEL_NAME = "Demo · Portal de clientes (STRIDE)"
@@ -32,31 +34,31 @@ def seed(data_dir: Path, *, fixtures: Path, models: Path | None = None, image: s
             if (fixtures / folder).is_dir():
                 shutil.copytree(fixtures / folder, combined / folder)
         if not combined.is_dir():
-            raise FileNotFoundError(f"No encuentro los ejemplos en {fixtures}")
+            raise FileNotFoundError(t("cli.demo.no_fixtures", path=str(fixtures)))
         stats = snapshot_directory(combined, head)
-        report(f"Analizando {stats['files']} archivos de ejemplo con los motores de Tamandua…")
+        report(t("cli.demo.analyzing", count=stats["files"]))
         scan = scan_repository(head, {**DEMO_SOURCE, "files": stats["files"], "snapshot": stats}, context=DEMO_CONTEXT, data_dir=data_dir,
-                               progress=lambda level, message: report(f"  {message}"))
+                               progress=lambda level, message: report(f"  {text(message)}"))
         record = save_repository_scan(data_dir, {**scan, "requested_by": "demo"})
         result["code"] = {"id": record["id"], "status": record["status"], "findings": record["summary"].get("candidates", 0)}
-        report(f"Código: {result['code']['findings']} hallazgos ({record['status']}).")
+        report(t("cli.demo.code_done", count=result["code"]["findings"], status=record["status"]))
     example = (models / "stride.json") if models else None
     if example and example.is_file():
         if any(item["name"] == MODEL_NAME for item in tm.list_models(data_dir)):
-            report("Modelo de amenazas de ejemplo: ya estaba importado.")
+            report(t("cli.demo.model_exists"))
         else:
             model = tm.from_portable(json.loads(example.read_text(encoding="utf-8")))
             model = {**model, "name": MODEL_NAME}
             model.pop("relayout", None)
             saved = tm.save(data_dir, model, by="demo")
             result["threat_model"] = saved["id"]
-            report(f"Modelo de amenazas de ejemplo importado: «{MODEL_NAME}».")
+            report(t("cli.demo.model_imported", name=MODEL_NAME))
     if image:
         from tamandua.modules.scanning.image import check_registry_address, parse_reference, scan_image
         target = parse_reference(image)
         check_registry_address(target["registry"])
-        report(f"Analizando la imagen {target['reference']} (se lee del registro; puede tardar un par de minutos)…")
+        report(t("cli.demo.analyzing_image", reference=target["reference"]))
         record = save_repository_scan(data_dir, {**scan_image(target, data_dir=data_dir), "requested_by": "demo"})
         result["image"] = {"id": record["id"], "status": record["status"], "findings": record["summary"].get("candidates", 0)}
-        report(f"Imagen: {result['image']['findings']} hallazgos ({record['status']}).")
+        report(t("cli.demo.image_done", count=result["image"]["findings"], status=record["status"]))
     return result

@@ -93,5 +93,18 @@ class RenderTests(unittest.TestCase):
             self.assertEqual(i18n.negotiate("en;q=0.2, es;q=0.9"), "es")
 
 
+class ApiLocaleTests(unittest.TestCase):
+    def test_api_errors_follow_accept_language(self):
+        import tempfile
+
+        import asgi
+        from tamandua.app.api.server import build_state
+        with tempfile.TemporaryDirectory() as folder, patch("tamandua.shared.paths.CONFIG_DIR", Path(folder) / "config"):
+            client = asgi.client_for(Path(folder), build_state(Path(folder)))
+            for language, expected in (("en", "Not found"), ("es", "Ruta no encontrada")):
+                response = asgi.request(client, "GET", "/api/no-such-route", headers={"Accept-Language": language})
+                self.assertEqual((response.status_code, response.json()), (404, {"error": expected}), language)
+
+
 if __name__ == "__main__":
     unittest.main()

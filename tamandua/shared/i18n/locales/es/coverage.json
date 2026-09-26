@@ -1,0 +1,39 @@
+{
+  "join": "{{first}}; {{second}}",
+  "untestable": {
+    "a06": "Diseño inseguro: requiere modelado de amenazas y revisión de arquitectura, no lo detecta un análisis estático.",
+    "a09": "Registro y alertas: sin reglas estáticas todavía; se evalúa en revisión de diseño y en pruebas dinámicas.",
+    "a10": "Manejo de condiciones excepcionales: sin reglas estáticas todavía; requiere pruebas dinámicas o revisión manual."
+  },
+  "sca": {
+    "engines": "dependencias resueltas por Trivy con versión corregida, CVSS, CISA KEV y EPSS",
+    "osv": "dependencias consultadas en OSV",
+    "inconclusive": "la consulta de dependencias no concluyó",
+    "none": "sin manifiestos de dependencias analizables o sin autorización para consultarlos"
+  },
+  "cicd_one": "pipelines de CI/CD revisados por {{tools}} en {{count}} archivo",
+  "cicd_other": "pipelines de CI/CD revisados por {{tools}} en {{count}} archivos",
+  "iac": {
+    "reviewed_one": "configuración de infraestructura revisada por {{tools}} en {{count}} archivo",
+    "reviewed_other": "configuración de infraestructura revisada por {{tools}} en {{count}} archivos",
+    "none_many": "{{tools}} no encontraron archivos de infraestructura (Dockerfile, Kubernetes, Terraform, CloudFormation) en el snapshot",
+    "none_one": "{{tools}} no encontró archivos de infraestructura (Dockerfile, Kubernetes, Terraform) en el snapshot"
+  },
+  "rules": {
+    "configuration_one": "{{count}} regla propia de configuración",
+    "configuration_other": "{{count}} reglas propias de configuración",
+    "crypto_one": "{{count}} regla propia de criptografía y secretos",
+    "crypto_other": "{{count}} reglas propias de criptografía y secretos",
+    "opengrep_one": "{{count}} regla propia en Opengrep",
+    "opengrep_other": "{{count}} reglas propias en Opengrep"
+  },
+  "secrets": {
+    "engines": "secretos con Gitleaks y Trivy",
+    "internal": "secretos por patrones internos"
+  },
+  "internal_ast": "reglas AST internas de Python (SQL dinámico, shell, eval)",
+  "no_engine": "ningún motor ejecutado cubre esta categoría en este repositorio",
+  "with_findings_one": "{{reason}}. {{count}} hallazgo.",
+  "with_findings_other": "{{reason}}. {{count}} hallazgos.",
+  "without_findings": "{{reason}}. Sin hallazgos."
+}

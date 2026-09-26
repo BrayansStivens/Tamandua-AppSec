@@ -1,0 +1,18 @@
+{
+  "tested": "{{tested}}/{{total}} with at least one check",
+  "description": "Each category shows which engine or how many rules covered it and how many findings it produced. Untested categories say why.",
+  "rules_one": "{{count}} rule", "rules_other": "{{count}} rules",
+  "step_status": { "completed": "Completed", "partial": "Partial", "not_tested": "Not tested", "inconclusive": "Inconclusive", "pending": "Pending" },
+  "run": { "title": "Run evaluated", "none": "No run selected", "pick": "Pick a run in Findings to see its coverage." },
+  "not_covered": {
+    "title": "What static analysis doesn't cover",
+    "plan": "These categories are covered by threat modeling and dynamic testing, both on the roadmap."
+  },
+  "no_full_scan": "No full scan of this repository",
+  "repository": "Repository",
+  "loading": "Loading coverage",
+  "empty": {
+    "no_repositories": "No repositories scanned yet. OWASP coverage shows up after the first full scan.",
+    "no_full_scan": "This repository has no finished full scan yet, and OWASP coverage is measured on one. Start one from “New analysis”."
+  }
+}

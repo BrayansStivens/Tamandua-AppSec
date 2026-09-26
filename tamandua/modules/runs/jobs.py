@@ -28,13 +28,30 @@ from tamandua.modules.sources.assets import asset_key
 from tamandua.modules.runs import queue
 from tamandua.modules.runs.store import list_runs, load_run, save_record, save_repository_scan
 from tamandua.shared import vault
+from tamandua.shared.i18n import msg, text
 
 log = logging_setup.get("jobs")
-Progress = Callable[[str, str], None]
+Progress = Callable[[str, object], None]
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _event(level: str, message) -> dict:
+    # Plain strings (older callers) are capped; catalog messages are stored whole.
+    return {"at": _now(), "level": level, "message": message[:300] if isinstance(message, str) else message}
+
+
+def _reason(exc: Exception):
+    """The error's own message (a catalog message or plain text), to embed in ours."""
+    value = getattr(exc, "message", None) or (exc.args[0] if exc.args else "")
+    return value if isinstance(value, dict) else str(exc)[:300]
+
+
+def _counts(summary: dict) -> dict:
+    severities = summary.get("severities") or {}
+    return msg("runs.progress.counts", count=summary["candidates"], critical=severities.get("critical", 0), high=severities.get("high", 0))
 
 
 class ScanJobs:
@@ -78,7 +95,7 @@ class ScanJobs:
         with db.transaction(self.data_dir) as connection:
             if everything:
                 rows = connection.execute(update(jobs).where(jobs.c.tenant_id == db.TENANT, jobs.c.status == "running")
-                                          .values(status="failed", error="Interrumpido por un reinicio").returning(jobs.c.run_id)).all()
+                                          .values(status="failed", error="Interrupted by a restart").returning(jobs.c.run_id)).all()
                 interrupted |= {row.run_id for row in rows if row.run_id}
             active = set(connection.execute(select(jobs.c.run_id).where(jobs.c.tenant_id == db.TENANT,
                                                                        jobs.c.status.in_(("queued", "running")))).scalars())
@@ -88,7 +105,7 @@ class ScanJobs:
                     record = load_run(self.data_dir, row["id"])
                 except (ValueError, OSError):
                     continue
-                self._fail(record, "El servidor se reinició mientras corría esta ejecución y quedó interrumpida. Vuelve a lanzarla.")
+                self._fail(record, msg("runs.failure.restart"))
                 log.warning("ejecución interrumpida por reinicio", extra={"run_id": row["id"]})
 
     # --- API pública ---------------------------------------------------------------
@@ -102,7 +119,7 @@ class ScanJobs:
                   "source": {"id": source_id, "uid": uid, "name": source_name, "provider": source_id.partition(":")[0]},
                   "context": " ".join(context.split())[:400], "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
-                  "progress": [{"at": _now(), "level": "info", "message": "En cola: esperando al trabajador de escaneos."}]}
+                  "progress": [_event("info", msg("runs.progress.queued"))]}
         if requested_by:
             record["requested_by"] = requested_by
         if trigger:
@@ -127,7 +144,7 @@ class ScanJobs:
                   "pull_request": {key: pull.get(key) for key in ("number", "title", "url", "author", "head_sha", "head_ref", "base_ref")},
                   "requested_by": requested_by, "context": "", "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
-                  "progress": [{"at": _now(), "level": "info", "message": f"En cola: revisión del PR #{pull['number']} ({pull['head_sha'][:7]})."}]}
+                  "progress": [_event("info", msg("runs.progress.queued_pr", number=pull["number"], sha=pull["head_sha"][:7]))]}
         self._save(record)
         pr_watch.mark(self.data_dir, uid or source_id, pull["number"], pull["head_sha"], run_id)
         queue.enqueue(self.data_dir, "pr_review", {"source_id": source_id, "pull": pull, "installation_id": installation_id}, run_id=run_id)
@@ -143,7 +160,7 @@ class ScanJobs:
                   "requested_by": requested_by, "context": " ".join(context.split())[:400],
                   "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
-                  "progress": [{"at": _now(), "level": "info", "message": f"En cola: análisis de la imagen {image['reference']}."}]}
+                  "progress": [_event("info", msg("runs.progress.queued_image", image=image["reference"]))]}
         self._save(record)
         queue.enqueue(self.data_dir, "image_scan", {"image": image, "context": context}, run_id=run_id)
         log.info("análisis de imagen encolado", extra={"run_id": run_id, "path": image["reference"]})
@@ -172,7 +189,7 @@ class ScanJobs:
                                                       tokens={}, installation_id=item.get("installation_id"), uid=item.get("uid"))
             batches.attach(self.data_dir, batch["id"], index, run_id=queued["id"])
         except Exception as exc:  # noqa: BLE001 — un repositorio que falla no detiene el lote
-            batches.attach(self.data_dir, batch["id"], index, error=str(exc))
+            batches.attach(self.data_dir, batch["id"], index, error=_reason(exc))
 
     # --- trabajador ----------------------------------------------------------------
 
@@ -222,39 +239,38 @@ class ScanJobs:
         record["status"] = "running"
         record["started_at"] = _now()
 
-        def progress(level: str, message: str) -> None:
-            record["progress"].append({"at": _now(), "level": level, "message": message[:300]})
+        def progress(level: str, message) -> None:
+            record["progress"].append(_event(level, message))
             self._save(record)
-            log.info(message, extra={"run_id": run_id, "step": level})
+            log.info(text(message, "en"), extra={"run_id": run_id, "step": level})
 
-        progress("info", "Descargando el snapshot del repositorio en solo lectura…")
+        progress("info", msg("runs.progress.downloading_snapshot"))
         work = self.data_dir / "work"
         work.mkdir(parents=True, exist_ok=True)
         try:
             with TemporaryDirectory(prefix="snapshot-", dir=work) as temporary:
                 root, source = snapshot_source(job["source_id"], Path(temporary), tokens, job["installation_id"], progress=progress)
                 snapshot = source.get("snapshot") or {}
-                progress("ok", f"Snapshot listo: {source.get('files', 0)} archivos analizables"
-                               + (f", {snapshot.get('skipped_not_analyzable', 0)} descartados por no ser código" if snapshot.get("skipped_not_analyzable") else "") + ".")
+                skipped = snapshot.get("skipped_not_analyzable")
+                progress("ok", msg("runs.progress.snapshot_ready_skipped", count=source.get("files", 0), skipped=skipped) if skipped
+                         else msg("runs.progress.snapshot_ready", count=source.get("files", 0)))
                 scan = scan_repository(root, source, allow_osv_upload=job["allow_osv_upload"],
                                        context=job["context"], data_dir=self.data_dir, progress=progress)
-            summary = scan["summary"]
-            counts = (f"{summary['candidates']} hallazgos ({summary['severities'].get('critical', 0)} críticos, "
-                      f"{summary['severities'].get('high', 0)} altos)")
+            counts = _counts(scan["summary"])
             if scan["status"] == "incomplete":
-                progress("warn", f"Terminado con cobertura incompleta: {counts}. Revisa arriba qué no se ejecutó.")
+                progress("warn", msg("runs.progress.finished_incomplete", counts=counts))
             else:
-                progress("ok", f"Terminado: {counts}.")
+                progress("ok", msg("runs.progress.finished", counts=counts))
             final = save_repository_scan(self.data_dir, {**scan, "progress": record["progress"],
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
             log.info("escaneo terminado", extra={"run_id": run_id, "status": final["status"]})
         except SourceError as exc:
-            self._fail(record, f"No se pudo obtener el repositorio: {exc}")
+            self._fail(record, msg("runs.failure.source", reason=_reason(exc)))
         except Exception as exc:  # noqa: BLE001
             log.error("escaneo fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
             # Al usuario se le dice que falló y en qué fase, nunca la traza ni rutas del servidor.
-            self._fail(record, "El análisis falló por un error interno; el equipo puede revisar los logs del servidor con el identificador de la ejecución.")
+            self._fail(record, msg("runs.failure.internal"))
             del exc
 
     def _execute_image(self, job: dict) -> None:
@@ -264,27 +280,25 @@ class ScanJobs:
         record["status"] = "running"
         record["started_at"] = _now()
 
-        def progress(level: str, message: str) -> None:
-            record["progress"].append({"at": _now(), "level": level, "message": message[:300]})
+        def progress(level: str, message) -> None:
+            record["progress"].append(_event(level, message))
             self._save(record)
-            log.info(message, extra={"run_id": run_id, "step": level})
+            log.info(text(message, "en"), extra={"run_id": run_id, "step": level})
 
         try:
             scan = scan_image(job["image"], data_dir=self.data_dir, context=job["context"], progress=progress)
-            summary = scan["summary"]
-            counts = (f"{summary['candidates']} hallazgos ({summary['severities'].get('critical', 0)} críticos, "
-                      f"{summary['severities'].get('high', 0)} altos)")
+            counts = _counts(scan["summary"])
             if scan["status"] == "incomplete":
-                progress("warn", f"Terminado con cobertura incompleta: {counts}. Revisa arriba qué no se ejecutó.")
+                progress("warn", msg("runs.progress.finished_incomplete", counts=counts))
             else:
-                progress("ok", f"Terminado: {counts}.")
+                progress("ok", msg("runs.progress.finished", counts=counts))
             final = save_repository_scan(self.data_dir, {**scan, "requested_by": record.get("requested_by"), "progress": record["progress"],
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
             log.info("análisis de imagen terminado", extra={"run_id": run_id, "status": final["status"]})
         except Exception as exc:  # noqa: BLE001
             log.error("análisis de imagen fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
-            self._fail(record, "El análisis de la imagen falló por un error interno; revisa los logs con el identificador de la ejecución.")
+            self._fail(record, msg("runs.failure.image_internal"))
             del exc
 
     def _baseline(self, source_id: str, uid: str | None = None) -> dict | None:
@@ -307,18 +321,18 @@ class ScanJobs:
         record = load_run(self.data_dir, run_id)
         record["status"], record["started_at"] = "running", _now()
 
-        def progress(level: str, message: str) -> None:
-            record["progress"].append({"at": _now(), "level": level, "message": message[:300]})
+        def progress(level: str, message) -> None:
+            record["progress"].append(_event(level, message))
             self._save(record)
-            log.info(message, extra={"run_id": run_id, "step": level})
+            log.info(text(message, "en"), extra={"run_id": run_id, "step": level})
 
         config = pr_watch.settings(self.data_dir, (record.get("source") or {}).get("uid") or source_id)
         installation = job["installation_id"]
         try:
             files = pull_files(installation, repository, pull["number"])
             changed = pr_review.changed_lines(files)
-            progress("ok", f"El PR cambia {len(changed)} ficheros.")
-            progress("info", f"Descargando el commit {pull['head_sha'][:7]} en solo lectura…")
+            progress("ok", msg("runs.progress.pr_files", count=len(changed)))
+            progress("info", msg("runs.progress.downloading_commit", sha=pull["head_sha"][:7]))
             work = self.data_dir / "work"
             work.mkdir(parents=True, exist_ok=True)
             with TemporaryDirectory(prefix="pr-", dir=work) as temporary:
@@ -328,7 +342,7 @@ class ScanJobs:
             from tamandua.modules.findings.exclusions import apply_to_record
             scan = apply_to_record(self.data_dir, scan, asset_key(record))
             if (scan.get("excluded") or {}).get("findings"):
-                progress("info", f"{scan['excluded']['findings']} hallazgos en rutas excluidas por un administrador quedan fuera de la revisión.")
+                progress("info", msg("runs.progress.pr_excluded", count=scan["excluded"]["findings"]))
             baseline = self._baseline(source_id, (record.get("source") or {}).get("uid"))
             prints = {item["fingerprint"] for item in baseline["findings"]} if baseline else None
             outcome = pr_review.classify(scan["findings"], changed, prints)
@@ -347,8 +361,8 @@ class ScanJobs:
                        "fixable": sum(1 for item in introduced if (item.get("package") or {}).get("fixed_version")),
                        "preexisting": len(outcome["preexisting"]), "changed_files": len(changed)}
             progress("ok" if outcome["verdict"]["state"] == "success" else "warn",
-                     f"{len(introduced)} hallazgos nuevos introducidos por el PR; {len(outcome['preexisting'])} ya existían"
-                     + ("" if baseline else " (sin escaneo previo de la rama principal: se cuenta lo que cae en líneas cambiadas)") + ".")
+                     msg("runs.progress.pr_summary" if baseline else "runs.progress.pr_summary_no_baseline",
+                         count=len(introduced), preexisting=len(outcome["preexisting"])))
             delivery = self._deliver(installation, repository, pull, outcome, run_id, baseline, config, progress)
             save_repository_scan(self.data_dir, {**scan, "type": "pr_review", "target": record["target"], "variant": "pull_request",
                                                  "pull_request": record["pull_request"], "requested_by": record.get("requested_by"),
@@ -360,10 +374,10 @@ class ScanJobs:
                                                  "progress": record["progress"], "started_at": record["started_at"], "finished_at": _now()},
                                  run_id=run_id, created_at=record["created_at"])
         except (SourceError, GitHubAppError) as exc:
-            self._fail(record, f"No se pudo revisar el PR: {exc}")
+            self._fail(record, msg("runs.failure.pr", reason=_reason(exc)))
         except Exception:  # noqa: BLE001
             log.error("revisión de PR fallida: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
-            self._fail(record, "La revisión falló por un error interno; el equipo puede revisar los logs del servidor con el identificador de la ejecución.")
+            self._fail(record, msg("runs.failure.pr_internal"))
 
     def _deliver(self, installation, repository, pull, outcome, run_id, baseline, config, progress) -> dict:
         """Publica el resultado en GitHub si el repositorio lo tiene activado y la App tiene permiso."""
@@ -371,7 +385,7 @@ class ScanJobs:
         import os
         from tamandua.modules.integrations.github import GitHubAppError, installation_details, set_commit_status, upsert_pr_comment
         if not config.get("post_comment"):
-            return {"comment": "desactivado", "status": "desactivado"}
+            return {"comment": msg("runs.delivery.disabled"), "status": msg("runs.delivery.disabled")}
         try:
             permissions = installation_details(installation).get("permissions", {})
         except GitHubAppError:
@@ -385,32 +399,32 @@ class ScanJobs:
                                                 panel_url=(lambda url: url if url.startswith("https://") else None)(
                                                     os.environ.get("TAMANDUA_PUBLIC_URL", "").strip()))
                 delivery["comment"] = upsert_pr_comment(installation, repository, pull["number"], body)
-                progress("ok", "Comentario publicado en el PR.")
+                progress("ok", msg("runs.progress.comment_posted"))
                 unused = outcome.get("unused") or {}
                 if unused.get("ecosystems"):
                     from tamandua.modules.integrations.github import UNUSED_MARKER
                     upsert_pr_comment(installation, repository, pull["number"],
                                       pr_review.render_unused_comment(unused["new"], unused["before"], unused["ecosystems"]), UNUSED_MARKER)
             except GitHubAppError as exc:
-                delivery["comment"] = f"error: {exc}"
-                progress("warn", f"No se pudo comentar en el PR: {exc}")
+                delivery["comment"] = msg("runs.delivery.error", reason=_reason(exc))
+                progress("warn", msg("runs.progress.comment_failed", reason=_reason(exc)))
         else:
-            delivery["comment"] = "sin permiso: la App necesita Pull requests en escritura"
-            progress("warn", "El resultado no se publicó en GitHub: la App no tiene permiso de escritura en pull requests.")
+            delivery["comment"] = msg("runs.delivery.no_comment_permission")
+            progress("warn", msg("runs.progress.no_comment_permission"))
         if permissions.get("statuses") == "write":
             try:
                 set_commit_status(installation, repository, pull["head_sha"], outcome["verdict"]["state"], outcome["verdict"]["description"])
                 delivery["status"] = outcome["verdict"]["state"]
             except GitHubAppError as exc:
-                delivery["status"] = f"error: {exc}"
+                delivery["status"] = msg("runs.delivery.error", reason=_reason(exc))
         else:
-            delivery["status"] = "sin permiso: la App necesita Commit statuses en escritura"
+            delivery["status"] = msg("runs.delivery.no_status_permission")
         return delivery
 
-    def _fail(self, record: dict, message: str) -> None:
+    def _fail(self, record: dict, message: dict) -> None:
         record["status"] = "failed"
         record["finished_at"] = _now()
-        record["progress"].append({"at": _now(), "level": "error", "message": message[:300]})
+        record["progress"].append(_event("error", message))
         record["limitations"] = [message]
         self._save(record)
 

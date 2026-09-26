@@ -18,15 +18,18 @@ import re
 
 from tamandua.modules.intel.advisories import compare_versions
 from tamandua.modules.findings.fix_examples import EXAMPLES
+from tamandua.shared.i18n import msg
 
 # Lo que entra en una orden: sin metacaracteres de shell y sin empezar por «-» (se leería como una opción del gestor).
 SAFE_NAME = re.compile(r"[A-Za-z0-9@._][A-Za-z0-9@/._:+-]{0,199}")
 SAFE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+~:-]{0,99}")
 # «Reverificar» analiza la rama principal remota (o la imagen publicada), no la copia local.
-VERIFY = "Después: sube el cambio a la rama principal y pulsa «Reverificar» (o espera al análisis automático de la rama)."
-VERIFY_DEPENDENCY = ("Después: regenera el lockfile, sube el cambio a la rama principal y pulsa «Reverificar» "
-                     "(o espera al análisis automático de la rama).")
-VERIFY_IMAGE = "Después: reconstruye y publica la imagen con la misma etiqueta y pulsa «Reverificar»."
+VERIFY = msg("findings.fix.verify")
+VERIFY_DEPENDENCY = msg("findings.fix.verify_dependency")
+VERIFY_IMAGE = msg("findings.fix.verify_image")
+# `action` is the language-neutral code for consumers that filter commands; `label` is what people read.
+COMMAND_LABELS = {"update": msg("findings.fix.commands.update"), "reinstall": msg("findings.fix.commands.reinstall"),
+                  "install": msg("findings.fix.commands.install")}
 
 # Archivo de dependencias → gestor.
 MANAGERS = {"package-lock.json": "npm", "npm-shrinkwrap.json": "npm", "package.json": "npm", "yarn.lock": "yarn",
@@ -61,99 +64,94 @@ def _dependency(finding: dict, target: str | None) -> dict:
     direct = package.get("direct")
     steps, commands, example = [], [], None
     if not target:
-        steps = [f"No hay versión corregida publicada de {name}.",
-                 "Comprueba si tu código usa la parte vulnerable (el aviso suele decir qué función o formato).",
-                 "Si la usa: mitiga (valida la entrada, desactiva la función) o sustituye la dependencia.",
-                 "Si no la usa: regístralo como riesgo aceptado con su motivo y una fecha de revisión."]
+        steps = [msg("findings.fix.no_fix.none_published", package=name), msg("findings.fix.no_fix.check_usage"),
+                 msg("findings.fix.no_fix.mitigate"), msg("findings.fix.no_fix.accept")]
         return {"kind": "dependency", "steps": steps, "commands": [], "example": None}
     if not SAFE_NAME.fullmatch(name) or not SAFE_VERSION.fullmatch(target):
-        return {"kind": "dependency", "steps": [f"Actualiza {name} a {target} o superior en {path} y regenera el lockfile.", VERIFY_DEPENDENCY],
+        return {"kind": "dependency", "steps": [msg("findings.fix.manual_update", package=name, version=target, path=path), VERIFY_DEPENDENCY],
                 "commands": [], "example": None}
-    add = lambda label, code: commands.append({"label": label, "code": code})
+    add = lambda action, code: commands.append({"label": COMMAND_LABELS[action], "action": action, "code": code})
     transitive = direct is False
     dev = bool(package.get("dev"))  # de desarrollo: el comando no debe moverla a producción
     fixed = package.get("fixed_version")
     if fixed and fixed != target:
-        steps.append(f"La versión {target} cierra todos los avisos de {name} (este aviso solo pide {fixed}).")
+        steps.append(msg("findings.fix.closes_all", version=target, package=name, fixed=fixed))
     if tool in ("npm", "yarn", "pnpm", "bun"):
         if transitive:
             key = {"npm": "overrides", "yarn": "resolutions", "pnpm": "pnpm.overrides", "bun": "overrides"}[tool]
-            steps.append(f"{name} es una dependencia transitiva: fuerza la versión con «{key}» en package.json y reinstala.")
+            steps.append(msg("findings.fix.npm_transitive", package=name, field=key))
             example = {"language": "json", "before": "", "after": ("{\n  \"pnpm\": {\n    \"overrides\": {\n      \"" + name + "\": \">=" + target + "\"\n    }\n  }\n}"
                                                                    if tool == "pnpm" else
-                                                                   "{\n  \"" + key + "\": {\n    \"" + name + "\": \">=" + target + "\"\n  }\n}"), "note": "Mejor aún: actualiza la dependencia directa que la trae."}
-            add("Reinstala", {"npm": "npm install", "yarn": "yarn install", "pnpm": "pnpm install", "bun": "bun install"}[tool])
+                                                                   "{\n  \"" + key + "\": {\n    \"" + name + "\": \">=" + target + "\"\n  }\n}"), "note": msg("findings.fix.override_note")}
+            add("reinstall", {"npm": "npm install", "yarn": "yarn install", "pnpm": "pnpm install", "bun": "bun install"}[tool])
         else:
             flag = " -D" if dev else ""
-            add("Actualiza", {"npm": f"npm install{flag} {name}@{target}", "yarn": f"yarn add{flag} {name}@{target}",
+            add("update", {"npm": f"npm install{flag} {name}@{target}", "yarn": f"yarn add{flag} {name}@{target}",
                               "pnpm": f"pnpm add{flag} {name}@{target}", "bun": f"bun add{' -d' if dev else ''} {name}@{target}"}[tool])
     elif tool == "pip":
-        steps.append(f"En {path}, cambia la línea de {name} a «{name}>={target}» (o fija «=={target}»).")
-        add("Instala", f"pip install -r {path}" if SAFE_NAME.fullmatch(path) else f'pip install "{name}>={target}"')
+        steps.append(msg("findings.fix.pip_line", path=path, package=name, version=target))
+        add("install", f"pip install -r {path}" if SAFE_NAME.fullmatch(path) else f'pip install "{name}>={target}"')
     elif tool == "poetry":
-        add("Actualiza", f"poetry update {name}" if transitive else f'poetry add{" --group dev" if dev else ""} "{name}>={target}"')
+        add("update", f"poetry update {name}" if transitive else f'poetry add{" --group dev" if dev else ""} "{name}>={target}"')
     elif tool == "uv":
-        add("Actualiza", f"uv lock --upgrade-package {name}" if transitive else f'uv add{" --dev" if dev else ""} "{name}>={target}"')
+        add("update", f"uv lock --upgrade-package {name}" if transitive else f'uv add{" --dev" if dev else ""} "{name}>={target}"')
     elif tool == "pipenv":
-        add("Actualiza", f'pipenv install "{name}>={target}"')
+        add("update", f'pipenv install "{name}>={target}"')
     elif tool == "pdm":
-        add("Actualiza", f"pdm update {name}" if transitive else f'pdm add{" -d" if dev else ""} "{name}>={target}"')
+        add("update", f"pdm update {name}" if transitive else f'pdm add{" -d" if dev else ""} "{name}>={target}"')
     elif tool == "go" and name in ("stdlib", "toolchain"):
         # La librería estándar de Go no se actualiza con go get: se compila con una versión de Go corregida.
-        steps.append(f"Es la librería estándar de Go: compila con Go {target.lstrip('v')} o superior (actualiza también la imagen de build y la CI).")
-        add("Actualiza", f"go mod edit -toolchain=go{target.lstrip('v')}")
+        steps.append(msg("findings.fix.go_stdlib", version=target.lstrip("v")))
+        add("update", f"go mod edit -toolchain=go{target.lstrip('v')}")
     elif tool == "go":
-        add("Actualiza", f"go get {name}@{target if target.startswith('v') else 'v' + target} && go mod tidy")
+        add("update", f"go get {name}@{target if target.startswith('v') else 'v' + target} && go mod tidy")
     elif tool == "cargo":
-        add("Actualiza", f"cargo update -p {name}@{version} --precise {target}" if SAFE_VERSION.fullmatch(version) else f"cargo update -p {name} --precise {target}")
+        add("update", f"cargo update -p {name}@{version} --precise {target}" if SAFE_VERSION.fullmatch(version) else f"cargo update -p {name} --precise {target}")
     elif tool == "composer":
-        add("Actualiza", f"composer update {name} --with-dependencies" if transitive else f'composer require{" --dev" if dev else ""} "{name}:^{target}"')
+        add("update", f"composer update {name} --with-dependencies" if transitive else f'composer require{" --dev" if dev else ""} "{name}:^{target}"')
     elif tool == "bundler":
-        steps.append(f"Si el Gemfile fija una versión de {name}, súbela a «>= {target}».")
-        add("Actualiza", f"bundle update {name}")
+        steps.append(msg("findings.fix.bundler_pin", package=name, version=target))
+        add("update", f"bundle update {name}")
     elif tool in ("maven", "gradle") and ":" in name:
         group, artifact = name.split(":", 1)
         if tool == "maven" and direct:
-            steps.append(f"Cambia la <version> de {artifact} en las <dependencies> del pom.xml.")
+            steps.append(msg("findings.fix.maven_direct", artifact=artifact))
             example = {"language": "xml", "before": "", "note": "", "after":
                        f"<dependency>\n  <groupId>{group}</groupId>\n  <artifactId>{artifact}</artifactId>\n  <version>{target}</version>\n</dependency>"}
         elif tool == "maven":
-            steps.append("Fija la versión en dependencyManagement del pom.xml: así se impone también a la dependencia transitiva.")
+            steps.append(msg("findings.fix.maven_managed"))
             example = {"language": "xml", "before": "", "note": "", "after":
                        f"<dependencyManagement>\n  <dependencies>\n    <dependency>\n      <groupId>{group}</groupId>\n"
                        f"      <artifactId>{artifact}</artifactId>\n      <version>{target}</version>\n    </dependency>\n  </dependencies>\n</dependencyManagement>"}
         else:
-            steps.append("Fija la versión con una restricción de Gradle (sirve también si es transitiva).")
+            steps.append(msg("findings.fix.gradle_constraint"))
             example = {"language": "kotlin", "before": "", "note": "",
                        "after": f"dependencies {{\n    constraints {{\n        implementation(\"{group}:{artifact}:{target}\")\n    }}\n}}"}
     elif tool == "dotnet":
-        add("Actualiza", f"dotnet add package {name} --version {target}")
+        add("update", f"dotnet add package {name} --version {target}")
     elif tool == "pub":
-        add("Actualiza", f"dart pub upgrade {name}")
+        add("update", f"dart pub upgrade {name}")
     elif tool == "mix":
-        add("Actualiza", f"mix deps.update {name}")
+        add("update", f"mix deps.update {name}")
     elif tool in ("apt", "apk", "dnf"):
-        steps.append("Es un paquete del sistema de la imagen: lo mejor es reconstruirla sobre una base actualizada (docker build --pull).")
-        steps.append("Si la base aún no trae la corrección, actualiza el paquete en el Dockerfile:")
+        steps.append(msg("findings.fix.os_rebuild"))
+        steps.append(msg("findings.fix.os_dockerfile"))
         example = {"language": "dockerfile", "before": "", "note": "", "after": {
             "apt": f"RUN apt-get update && apt-get install -y --only-upgrade {name} && rm -rf /var/lib/apt/lists/*",
             "apk": f"RUN apk upgrade --no-cache {name}", "dnf": f"RUN dnf upgrade -y {name} && dnf clean all"}[tool]}
     else:
-        steps.append(f"Actualiza {name} de {version} a {target} o superior en {path} y regenera el lockfile.")
+        steps.append(msg("findings.fix.generic_update", package=name, installed=version, version=target, path=path))
     if transitive and tool not in ("npm", "yarn", "pnpm", "bun", "maven", "gradle"):
-        steps.insert(0, f"{name} llega como dependencia de otra: si el comando no la sube, actualiza la dependencia directa que la trae.")
+        steps.insert(0, msg("findings.fix.transitive_other", package=name))
     steps.append(VERIFY_IMAGE if tool in ("apt", "apk", "dnf") else VERIFY_DEPENDENCY)
     return {"kind": "dependency", "steps": steps, "commands": commands, "example": example}
 
 
 def _secret(finding: dict) -> dict:
     return {"kind": "secret", "commands": [], "example": None, "steps": [
-        "Revoca o rota la credencial ahora en su proveedor: borrarla del código no basta, ya está en el historial de Git.",
-        "Revisa en el proveedor si se usó desde un origen que no reconoces.",
-        "Muévela a un gestor de secretos o a una variable de entorno y léela desde ahí.",
-        f"Quítala de {finding.get('path')} y haz commit.",
-        "Si el repositorio es o fue público, considera reescribir el historial (git filter-repo); rotar es lo que te protege.",
-        "Después pulsa «Reverificar»."]}
+        msg("findings.fix.secret.revoke"), msg("findings.fix.secret.review_use"), msg("findings.fix.secret.vault"),
+        msg("findings.fix.secret.remove", path=str(finding.get("path") or "")), msg("findings.fix.secret.history"),
+        msg("findings.fix.secret.verify")]}
 
 
 def guide(finding: dict, *, target: str | None = None) -> dict | None:
@@ -193,8 +191,8 @@ def attach(findings: list[dict]) -> list[dict]:
         key = (finding.get("path"), package.get("name"), package.get("version"))
         if key in hostile and not finding.get("malicious"):
             finding["fix"] = {"kind": "dependency", "commands": [], "example": None,
-                              "steps": [f"{package.get('name')} {package.get('version')} es un paquete malicioso: elimínalo en lugar de actualizarlo "
-                                        "(ver su aviso MAL-). Actualizar no basta.", VERIFY]}
+                              "steps": [msg("findings.fix.malicious_sibling", package=str(package.get("name") or ""),
+                                            version=str(package.get("version") or "")), VERIFY]}
             continue
         fix = guide(finding, target=targets.get(key))
         if fix:
