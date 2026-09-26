@@ -111,7 +111,7 @@ class SbomAndVexTests(unittest.TestCase):
 class ExportRouteTests(HttpCase):
     def setUp(self):
         super().setUp()
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("miembro", PASSWORD)
             self.cookie = {"Cookie": self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})[2][0].split("; ")[0]}
         scan = {**_scan("org/api", [_finding("a" * 64, "critical")], datetime.now(timezone.utc).isoformat()),
@@ -120,7 +120,7 @@ class ExportRouteTests(HttpCase):
         self.key = "github:org/api"
 
     def get(self, path):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             return self.call("GET", path, headers=self.cookie)
 
     def test_sbom_and_vex_from_a_run_and_from_the_asset_state(self):
@@ -161,7 +161,7 @@ class EuvdTests(unittest.TestCase):
             raise OSError("sin red")
         self.assertEqual(euvd.lookup(self.data_dir, "CVE-2026-7777", fetch=down, now=NOW + timedelta(days=30))["id"], "EUVD-2026-9")
         self.assertIsNone(euvd.lookup(self.data_dir, "no-es-un-cve", fetch=fetch))
-        with patch.dict(os.environ, {"APPSEC_AGENT_EUVD": "off"}):
+        with patch.dict(os.environ, {"TAMANDUA_EUVD": "off"}):
             self.assertIsNone(euvd.lookup(self.data_dir, "CVE-2026-8888", fetch=fetch))
 
 
@@ -226,7 +226,7 @@ class CraTests(unittest.TestCase):
 
 class CraRouteTests(HttpCase):
     def test_members_read_only_admins_change(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("jefa", PASSWORD, role="admin")
             Users(self.data_dir).create("miembro", PASSWORD)
             admin = self.post("/api/auth/login", "login", {"username": "jefa", "password": PASSWORD})[2][0].split("; ")[0]

@@ -222,12 +222,12 @@ class ModelTests(unittest.TestCase):
             # Cajas que no caben (la base de datos se sale) y que se pisan entre sí.
             "boundaries": [{"id": "backend", "name": "Backend", "components": ["api", "db"], "box": {"x": 350, "y": 120, "width": 450, "height": 380}},
                            {"id": "nube", "name": "Nube", "components": ["gcp"], "box": {"x": 660, "y": 20, "width": 200, "height": 120}}]}
-        imported = tm.from_portable({"format": "appsec-agent-threat-model", "version": 1, "model": base})
+        imported = tm.from_portable({"format": "tamandua-threat-model", "version": 1, "model": base})
         self.assertTrue(imported.get("relayout"))
         self.assertTrue(all(item["position"] is None for item in imported["components"]))
         coherent = {**base, "components": [{**item, "position": None} for item in base["components"]],
                     "boundaries": [{**item, "box": None} for item in base["boundaries"]]}
-        self.assertFalse(tm.from_portable({"format": "appsec-agent-threat-model", "version": 1, "model": coherent}).get("relayout"))
+        self.assertFalse(tm.from_portable({"format": "tamandua-threat-model", "version": 1, "model": coherent}).get("relayout"))
 
     def test_automatic_layout_keeps_members_inside_and_boxes_apart(self):
         import glob
@@ -338,7 +338,7 @@ class ModelTests(unittest.TestCase):
         original = model(methodology="custom", custom_modules=["stride", "trees", "manual"],
                          repository_refs=["grupo/por-conectar"])
         document = tm.to_portable(original, {REPO: {"name": "org/shop"}})
-        self.assertEqual(document["format"], "appsec-agent-threat-model")
+        self.assertEqual(document["format"], "tamandua-threat-model")
         self.assertEqual(document["model"]["components"][1]["asset_ref"], "org/shop")
         self.assertEqual(set(document["model"]["repository_refs"]), {"org/shop", "grupo/por-conectar"})
         imported = tm.from_portable(json.loads(json.dumps(document)))
@@ -381,7 +381,7 @@ class ModelTests(unittest.TestCase):
 
 class RouteTests(HttpCase):
     def test_suggest_edit_decide_and_export(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("operadora", PASSWORD, role="admin")
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
             cookie = cookies[0].split("; ")[0]

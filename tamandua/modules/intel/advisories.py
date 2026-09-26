@@ -26,6 +26,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from tamandua.modules.intel import data_sources
+from tamandua.version import USER_AGENT
 
 OSV_VULN = "https://api.osv.dev/v1/vulns/"
 KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
@@ -135,7 +136,7 @@ def fetch_advisory(identifier: str) -> dict | None:
         return None
     if identifier in _details_cache:
         return _details_cache[identifier]
-    request = Request(OSV_VULN + identifier, headers={"Accept": "application/json", "User-Agent": "AppSecAgent/0.4"})
+    request = Request(OSV_VULN + identifier, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
     try:
         with urlopen(request, timeout=15) as response:
             body = response.read(1_000_001)
@@ -183,7 +184,7 @@ def _feed(name: str, url: str, data_dir: Path, parse) -> dict:
     fresh = path.is_file() and time.time() - path.stat().st_mtime < FEED_TTL
     if not fresh:
         try:
-            with urlopen(Request(url, headers={"User-Agent": "AppSecAgent/0.4"}), timeout=60) as response:
+            with urlopen(Request(url, headers={"User-Agent": USER_AGENT}), timeout=60) as response:
                 body = response.read(60_000_001)
             if len(body) > 60_000_000:
                 raise ValueError("feed demasiado grande")
@@ -258,7 +259,7 @@ _nvd_lock = __import__("threading").Lock()
 
 def _nvd_get(params: dict) -> bytes:
     from urllib.parse import urlencode
-    request = Request(f"{NVD_URL}?{urlencode(params)}", headers={"User-Agent": "AppSecAgent/0.8", "Accept": "application/json"})
+    request = Request(f"{NVD_URL}?{urlencode(params)}", headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
     with urlopen(request, timeout=60) as response:
         body = response.read(40_000_001)
     if len(body) > 40_000_000:
@@ -317,7 +318,7 @@ def _refresh_in_background(data_dir: Path) -> None:
             pass  # se reintenta en la siguiente consulta; mientras, vale lo último descargado
         finally:
             _nvd_refresh["running"] = False
-    threading.Thread(target=run, name="appsec-nvd", daemon=True).start()
+    threading.Thread(target=run, name="tamandua-nvd", daemon=True).start()
 
 
 def load_recent_cves(data_dir: Path, days: int = 7) -> dict:

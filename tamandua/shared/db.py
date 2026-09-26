@@ -1,9 +1,9 @@
 """Base de datos: PostgreSQL con SQLAlchemy 2 (Core) y psycopg 3.
 
-* `APPSEC_AGENT_DATABASE_URL` (p. ej. `postgresql+psycopg://tamandua:…@postgres:5432/tamandua`) dice dónde está.
+* `TAMANDUA_DATABASE_URL` (p. ej. `postgresql+psycopg://tamandua:…@postgres:5432/tamandua`) dice dónde está.
 * Cada tabla lleva `tenant_id`: hoy siempre `TENANT` («default»); la edición gestionada lo usará con RLS.
 * El esquema lo crean las migraciones de Alembic (`tamandua/app/alembic`) al arrancar; `metadata` es su fuente.
-* Aislamiento para pruebas: con `APPSEC_AGENT_DB_ISOLATE=data-dir`, cada carpeta de datos usa su propio esquema de
+* Aislamiento para pruebas: con `TAMANDUA_DB_ISOLATE=data-dir`, cada carpeta de datos usa su propio esquema de
   Postgres (creado al vuelo). Así cada prueba, que usa un directorio temporal, tiene su base limpia sin cambiar la
   firma de las 150 funciones que reciben `data_dir`.
 
@@ -39,9 +39,9 @@ class DatabaseNotConfigured(RuntimeError):
 
 
 def url() -> str:
-    value = os.environ.get("APPSEC_AGENT_DATABASE_URL", "").strip()
+    value = os.environ.get("TAMANDUA_DATABASE_URL", "").strip()
     if not value:
-        raise DatabaseNotConfigured("Falta APPSEC_AGENT_DATABASE_URL: Tamandua guarda ejecuciones y hallazgos en PostgreSQL "
+        raise DatabaseNotConfigured("Falta TAMANDUA_DATABASE_URL: Tamandua guarda ejecuciones y hallazgos en PostgreSQL "
                                     "(con `make up` se configura solo).")
     return value
 
@@ -66,7 +66,7 @@ def reset() -> None:
 
 
 def schema_for(data_dir: Path) -> str | None:
-    if os.environ.get("APPSEC_AGENT_DB_ISOLATE") != "data-dir":
+    if os.environ.get("TAMANDUA_DB_ISOLATE") != "data-dir":
         return None
     return "t_" + hashlib.sha256(str(Path(data_dir).resolve()).encode()).hexdigest()[:20]
 

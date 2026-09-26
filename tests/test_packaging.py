@@ -14,17 +14,27 @@ ROOT = Path(__file__).resolve().parents[1]
 class PackagingTests(unittest.TestCase):
     def test_compose_version_and_build_paths_match_the_code(self):
         compose = (ROOT / "compose.yaml").read_text()
-        self.assertIn(f"${{APPSEC_VERSION:-{VERSION}}}", compose)
+        self.assertIn(f"${{TAMANDUA_VERSION:-{VERSION}}}", compose)
         for path in re.findall(r"dockerfile: (\S+)", compose) + re.findall(r"build: (docker/\S+)", compose):
             self.assertTrue((ROOT / path).exists() or (ROOT / path / "Dockerfile").exists(), path)
         self.assertIn(IMAGES["opengrep"]["image"], compose)
 
+    def test_host_settings_never_reach_the_app(self):
+        """.env entra entero en el contenedor (env_file): una variable del host con el nombre de una de la app la pisaría
+        (p. ej. la interfaz publicada en el host acabaría siendo la de escucha dentro del contenedor)."""
+        compose = (ROOT / "compose.yaml").read_text()
+        host = {name for line in compose.splitlines() if re.match(r"\s*(- |user:|image:)", line)
+                for name in re.findall(r"\$\{(TAMANDUA_[A-Z_]+)", line)}
+        self.assertIn("TAMANDUA_HOST_BIND", host)
+        source = "\n".join(path.read_text() for path in (ROOT / "tamandua").rglob("*.py"))
+        self.assertEqual({name for name in host if name in source}, set())
+
     def test_container_is_hardened(self):
         compose = (ROOT / "compose.yaml").read_text()
-        for setting in ("read_only: true", "no-new-privileges:true", "cap_drop:", '"${APPSEC_BIND:-127.0.0.1}'):
+        for setting in ("read_only: true", "no-new-privileges:true", "cap_drop:", '"${TAMANDUA_HOST_BIND:-127.0.0.1}'):
             self.assertIn(setting, compose)
         dockerfile = (ROOT / "docker/app/Dockerfile").read_text()
-        self.assertIn("USER appsec", dockerfile)
+        self.assertIn("USER tamandua", dockerfile)
         self.assertRegex(dockerfile, r"FROM python:[^\s]+@sha256:[0-9a-f]{64}")
         self.assertRegex((ROOT / "docker/engines/opengrep/Dockerfile").read_text(), r"sha256sum -c")
 

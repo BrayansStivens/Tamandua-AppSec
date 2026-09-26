@@ -116,7 +116,7 @@ class WorkerTests(unittest.TestCase):
 class BatchRouteTests(HttpCase):
     def setUp(self):
         super().setUp()
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("admin", PASSWORD, role="admin")
             Users(self.data_dir).create("miembro", PASSWORD)
             self.admin = self.post("/api/auth/login", "login", {"username": "admin", "password": PASSWORD})[2][0].split("; ")[0]
@@ -128,7 +128,7 @@ class BatchRouteTests(HttpCase):
         self.addCleanup(patcher.stop)
 
     def create(self, body, cookie):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}), fake_github(REPOS, ACCOUNTS):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}), fake_github(REPOS, ACCOUNTS):
             return self.post("/api/repositories/batches", "scan-batch", body, cookie)
 
     def test_a_member_scans_a_selection_but_not_a_whole_organization(self):
@@ -138,7 +138,7 @@ class BatchRouteTests(HttpCase):
         self.assertEqual(status, 403)
         # Otro lote mientras uno sigue en curso: se rechaza.
         self.assertEqual(self.create({"source_ids": ["github:acme/servicio-03"]}, self.member)[0], 409)
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             _, listing, _ = self.call("GET", "/api/repositories/batches", headers={"Cookie": self.member})
             self.assertEqual(listing["active"]["total"], 2)
             self.assertEqual(self.post("/api/repositories/batches/cancel", "cancel-batch", {"id": listing["active"]["id"]}, self.member)[0], 200)
@@ -149,7 +149,7 @@ class BatchRouteTests(HttpCase):
 
     def test_a_member_scans_several_images_in_one_batch(self):
         def create(body):
-            with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+            with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
                 return self.post("/api/images/batches", "scan-image-batch", body, self.member)
         for body in ({"references": []}, {"references": ["NGINX:Mayúsculas"]}, {"references": [7]},
                      {"references": [f"nginx:{index}" for index in range(101)]}, {"references": ["nginx"], "extra": 1}):

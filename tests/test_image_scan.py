@@ -39,7 +39,7 @@ class ReferenceTests(unittest.TestCase):
             for host in ("localhost:5000", "127.0.0.1:5000", "10.0.0.5:5000"):
                 with self.subTest(host=host), self.assertRaises(ImageError):
                     image_scan.check_registry_address(host)
-        with patch.dict(os.environ, {"APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES": "1"}):
+        with patch.dict(os.environ, {"TAMANDUA_ALLOW_PRIVATE_REGISTRIES": "1"}):
             image_scan.check_registry_address("localhost:5000")
 
 
@@ -127,7 +127,7 @@ class ImageRoutesTests(HttpCase):
 
     def test_scan_validation_and_registry_admin_only(self):
         self.assertEqual(self.post("/api/images/scans", "scan-image", {"reference": "http://x"}, self.member)[0], 400)
-        with patch.dict(os.environ, {"APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES": ""}):
+        with patch.dict(os.environ, {"TAMANDUA_ALLOW_PRIVATE_REGISTRIES": ""}):
             status, body, _ = self.post("/api/images/scans", "scan-image", {"reference": "localhost:5000/app:1"}, self.member)
         self.assertEqual(status, 400)
         self.assertIn("privada", body["error"])

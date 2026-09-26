@@ -26,7 +26,7 @@ class NotificationTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         for patcher in (patch.object(paths, "CONFIG_DIR", Path(self.directory.name) / "config"),
-                        patch.dict(os.environ, {"APPSEC_AGENT_PUBLIC_URL": "https://tamandua.example.com"}),
+                        patch.dict(os.environ, {"TAMANDUA_PUBLIC_URL": "https://tamandua.example.com"}),
                         patch("socket.getaddrinfo", return_value=PUBLIC)):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -105,7 +105,7 @@ from test_auth import PASSWORD, HttpCase  # noqa: E402
 
 class RouteTests(HttpCase):
     def test_only_an_admin_sees_or_changes_the_channels(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("admin", PASSWORD, role="admin")
             Users(self.data_dir).create("miembro", PASSWORD)
             admin = self.post("/api/auth/login", "login", {"username": "admin", "password": PASSWORD})[2][0].split("; ")[0]

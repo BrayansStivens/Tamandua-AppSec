@@ -18,6 +18,7 @@ from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
 from tamandua.modules.scanning.engines import IMAGES, docker_available, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from tamandua.version import USER_AGENT
 
 
 SECRET_RULES = (
@@ -135,7 +136,7 @@ def _query_osv(dependencies: list[dict]) -> list[dict]:
     request = Request("https://api.osv.dev/v1/querybatch",
                       data=json.dumps({"queries": [{"package": {"ecosystem": item["ecosystem"], "name": item["name"]},
                                                       "version": item["version"]} for item in dependencies]}).encode(),
-                      headers={"Content-Type": "application/json", "User-Agent": "AppSecAgent/0.3"}, method="POST")
+                      headers={"Content-Type": "application/json", "User-Agent": USER_AGENT}, method="POST")
     with urlopen(request, timeout=15) as response:
         body = response.read(2_000_001)
     if len(body) > 2_000_000:

@@ -52,15 +52,15 @@ class VaultTests(unittest.TestCase):
         with self.assertRaises(vault.VaultError):
             vault.get("jira")
         vault.put("jira", {"token": "ATATT3xFfGF0-token-de-prueba"})
-        with patch.dict(os.environ, {"APPSEC_AGENT_MASTER_KEY": base64.b64encode(b"k" * 32).decode()}):
+        with patch.dict(os.environ, {"TAMANDUA_MASTER_KEY": base64.b64encode(b"k" * 32).decode()}):
             with self.assertRaises(vault.VaultError):
                 vault.get("jira")
-        with patch.dict(os.environ, {"APPSEC_AGENT_MASTER_KEY": "corta"}):
+        with patch.dict(os.environ, {"TAMANDUA_MASTER_KEY": "corta"}):
             with self.assertRaises(vault.VaultError):
                 vault.put("x", "y")
 
     def test_master_key_from_environment_is_never_written(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_MASTER_KEY": base64.b64encode(b"m" * 32).decode()}):
+        with patch.dict(os.environ, {"TAMANDUA_MASTER_KEY": base64.b64encode(b"m" * 32).decode()}):
             vault.put("jira", {"token": "ATATT3xFfGF0-otro-token"})
             self.assertEqual(vault.get("jira")["token"], "ATATT3xFfGF0-otro-token")
         self.assertFalse((self.config / "master.key").exists())

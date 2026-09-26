@@ -1,7 +1,7 @@
 import type { Box, Component, Model, Point } from '@/features/threats/threat-model-types'
 
 // Colocación automática del diagrama («Ordenar» y lo que llega sin posición, p. ej. un JSON importado).
-// Mismo algoritmo que appsec_agent/threat_diagram.py (el SVG y el PDF): si cambia uno, cambia el otro.
+// Mismo algoritmo que tamandua/modules/threats/diagram.py (el SVG y el PDF): si cambia uno, cambia el otro.
 // - Columnas según el recorrido de los datos: lo que entra desde Internet a la izquierda, lo que recibe
 //   datos a su derecha y los terceros al final. Los flujos de vuelta (respuestas, webhooks) no empujan
 //   columnas: cuenta la distancia a los actores.

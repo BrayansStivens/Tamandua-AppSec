@@ -6,4 +6,4 @@ Criterio: **precisión sobre cobertura**. Cada regla apunta a un sumidero concre
 
 Severidad: `ERROR` → alta, `WARNING` → media, `INFO` → baja; `metadata.severity: CRITICAL` eleva a crítica los sumideros de ejecución remota con flujo desde la petición.
 
-Validar: `docker run --rm --network none -v "$PWD/rules:/rules:ro" appsec-agent/opengrep:1.30.0 scan --validate --config /rules /rules`
+Validar: `docker run --rm --network none -v "$PWD/rules:/rules:ro" tamandua/opengrep:1.30.0 scan --validate --config /rules /rules`

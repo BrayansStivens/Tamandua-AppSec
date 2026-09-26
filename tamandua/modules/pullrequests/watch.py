@@ -4,12 +4,12 @@ La configuración se guarda por identidad estable (`github#<id>`): renombrar un
 repositorio no apaga su vigilancia.
 
 Sin webhooks (el MVP local no tiene URL pública) se sondea: cada
-``APPSEC_AGENT_PR_POLL_SECONDS`` (300 por defecto, mínimo 60) se listan los PRs
+``TAMANDUA_PR_POLL_SECONDS`` (300 por defecto, mínimo 60) se listan los PRs
 abiertos de los repositorios activados y se encola una revisión por cada commit
 de cabeza que aún no se haya revisado. Los borradores se saltan.
 
 La rama principal también: si su último commit cambió, se reanaliza el repositorio entero para que el
-estado no se quede viejo tras un merge. Como mucho una vez cada ``APPSEC_AGENT_BRANCH_MIN_MINUTES``
+estado no se quede viejo tras un merge. Como mucho una vez cada ``TAMANDUA_BRANCH_MIN_MINUTES``
 (60 por defecto) por repositorio, unos pocos por vuelta y solo con la cola casi vacía: los análisis
 manuales y las revisiones de PR no esperan detrás de la vigilancia.
 """
@@ -124,11 +124,11 @@ def mark_branch(data_dir: Path, key: str, head_sha: str, run_id: str) -> None:
 
 
 def branch_min_seconds() -> int:
-    return 60 * max(10, int(os.environ.get("APPSEC_AGENT_BRANCH_MIN_MINUTES", "60") or 60))
+    return 60 * max(10, int(os.environ.get("TAMANDUA_BRANCH_MIN_MINUTES", "60") or 60))
 
 
 def interval() -> int:
-    return max(60, int(os.environ.get("APPSEC_AGENT_PR_POLL_SECONDS", "300") or 300))
+    return max(60, int(os.environ.get("TAMANDUA_PR_POLL_SECONDS", "300") or 300))
 
 
 def mark_closed(data_dir: Path, key: str, number: int) -> None:
@@ -147,7 +147,7 @@ class Watcher:
         self.data_dir, self.jobs, self.installation_for = data_dir, jobs, installation_for
         self.interval = interval()
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._loop, name="appsec-pr-watch", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="tamandua-pr-watch", daemon=True)
 
     def start(self) -> None:
         self._thread.start()

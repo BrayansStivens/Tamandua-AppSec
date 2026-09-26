@@ -11,13 +11,13 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 | Token de Jira | `config/secrets.vault`, cifrado | Igual que las anteriores. |
 | Tokens de registros de contenedores | `config/secrets.vault`, cifrados | Solo el servidor. Llegan a Trivy y Grype por variable de entorno (`-e NOMBRE` sin valor en la orden), nunca en la línea de comandos. |
 | Tokens de instalación de GitHub | Memoria, 1 h | Se renuevan solos; nunca se escriben en disco. |
-| Clave maestra | `config/master.key` (0400) o `APPSEC_AGENT_MASTER_KEY` | Quien administra el servidor. |
+| Clave maestra | `config/master.key` (0400) o `TAMANDUA_MASTER_KEY` | Quien administra el servidor. |
 | Contraseñas de usuarios | Tabla `users` de PostgreSQL, solo hash scrypt | Nadie: no son recuperables. |
 | Cookies de sesión | Tabla `sessions`, solo su hash; firmadas con `data/auth/session.key` | Copiar la base no da acceso. |
 
 **Cifrado.** AES-256-GCM, un nonce aleatorio por secreto y el nombre del secreto como dato asociado: un valor cifrado no se puede mover a otra entrada sin que falle el descifrado, y cualquier manipulación se detecta. Si la clave maestra no descifra, el servidor lo dice en lugar de usar datos corruptos.
 
-**Separación.** `config/` (secretos), la base de datos y `data/` (cachés, logs, clave de firma de sesiones) están separados. `data/` es lo que se suele copiar, enviar para depurar o subir con los logs: no lleva ningún secreto. Para separar también la clave del almacén, define `APPSEC_AGENT_MASTER_KEY` desde tu gestor de secretos en vez de dejar `master.key` junto a `secrets.vault`.
+**Separación.** `config/` (secretos), la base de datos y `data/` (cachés, logs, clave de firma de sesiones) están separados. `data/` es lo que se suele copiar, enviar para depurar o subir con los logs: no lleva ningún secreto. Para separar también la clave del almacén, define `TAMANDUA_MASTER_KEY` desde tu gestor de secretos en vez de dejar `master.key` junto a `secrets.vault`.
 
 **Logs.** No se registran cuerpos de petición, cabeceras, contraseñas, códigos TOTP ni cookies. Además, todo mensaje pasa por un filtro que tacha:
 
@@ -39,7 +39,7 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 ## Transporte
 
 - El puerto se publica solo en `127.0.0.1` por defecto.
-- Si `APPSEC_AGENT_PUBLIC_URL` apunta fuera de esta máquina y no es HTTPS, **el servidor no arranca**. Solo `APPSEC_AGENT_ALLOW_INSECURE_HTTP=1` lo permite, bajo tu responsabilidad.
+- Si `TAMANDUA_PUBLIC_URL` apunta fuera de esta máquina y no es HTTPS, **el servidor no arranca**. Solo `TAMANDUA_ALLOW_INSECURE_HTTP=1` lo permite, bajo tu responsabilidad.
 - Con HTTPS: HSTS (1 año) y cookies `Secure`. TLS 1.2 como mínimo si el propio servidor sirve TLS.
 - Todas las respuestas llevan `Content-Security-Policy` estricta (sin scripts ni estilos en línea), `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` y `Permissions-Policy`.
 - Las llamadas salientes van por HTTPS con verificación de certificado y **no siguen redirecciones**, para que una credencial nunca acabe en un destino distinto del previsto.
@@ -52,7 +52,7 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 | `services.nvd.nist.gov` | Rangos de índices y de fechas | Copia local de CVE, en segundo plano. |
 | `www.cisa.gov`, `epss.empiricalsecurity.com` | Nada: descarga de feeds públicos completos | Una vez al día. Se descargan enteros para no revelar qué CVE te interesan. |
 | Registro de imágenes y base de Trivy | Nada propio | Al construir y cuando Trivy actualiza su base. |
-| Registros de contenedores (Docker Hub, GHCR, ECR…) | Petición de la imagen que pides analizar, con tu token si lo guardaste | Al analizar una imagen. Los registros con IP privada se bloquean salvo `APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES=1`, para que el formulario no sirva de puente a tu red interna (SSRF). |
+| Registros de contenedores (Docker Hub, GHCR, ECR…) | Petición de la imagen que pides analizar, con tu token si lo guardaste | Al analizar una imagen. Los registros con IP privada se bloquean salvo `TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1`, para que el formulario no sirva de puente a tu red interna (SSRF). |
 | `api.osv.dev` | Nombres y versiones de tus dependencias | **Solo si lo autorizas** en cada análisis. Por defecto no se usa. |
 | Tu sitio de Jira | Título, descripción y prioridad de las incidencias que exportas | Solo si conectas Jira y pulsas exportar. |
 | `api.openai.com`, `api.anthropic.com` | Tu clave, para comprobar que es válida | Solo al guardarla o probarla. Hoy la IA no recibe código ni hallazgos. |
@@ -72,14 +72,14 @@ No hay telemetría.
 
 - **Socket de Docker.** Los motores se lanzan a través de `/var/run/docker.sock`, lo que equivale a root en el host. Solo lo monta el servicio `worker`, que no expone ningún puerto; el servicio que atiende las peticiones (`appsec`) no lo tiene. Es el precio de no instalar nada más que Docker; para endurecerlo más, pon el worker detrás de un socket-proxy con lista blanca o en otra máquina.
 - **Cola de trabajos.** Los análisis pendientes viven en PostgreSQL. Los tokens de código que acompañan a un análisis van sellados con la clave maestra (AES-GCM): la base nunca los guarda en claro.
-- **Clave maestra junto al almacén** si no defines `APPSEC_AGENT_MASTER_KEY`. Protege frente a una copia suelta de `secrets.vault`, no frente a alguien con acceso completo a `config/`.
+- **Clave maestra junto al almacén** si no defines `TAMANDUA_MASTER_KEY`. Protege frente a una copia suelta de `secrets.vault`, no frente a alguien con acceso completo a `config/`.
 - **Un solo workspace** por instalación: todos los usuarios ven todos los repositorios conectados.
 - **Token de registro visible para root.** Mientras dura el análisis de una imagen privada, el token está en la configuración del contenedor del motor: lo puede leer quien tenga acceso a Docker en el host (que ya es root). Usa tokens de solo lectura.
 
 ## Recomendaciones
 
 1. Mantén el panel en `127.0.0.1` salvo que necesites acceso remoto, y entonces usa HTTPS.
-2. Activa TOTP para todos (`APPSEC_AGENT_REQUIRE_TOTP=all`) si varias personas lo usan.
+2. Activa TOTP para todos (`TAMANDUA_REQUIRE_TOTP=all`) si varias personas lo usan.
 3. Instala la App solo en los repositorios que quieras analizar (**Only select repositories**).
 4. Guarda `config/` aparte de `data/` en tus copias.
 5. Si una clave de la App se filtra: revócala en GitHub (*Private keys → Delete*), genera otra y vuelve a conectarla en **Integraciones**.

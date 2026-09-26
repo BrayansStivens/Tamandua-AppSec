@@ -12,6 +12,7 @@ from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from tamandua.version import USER_AGENT
 
 
 # Los topes no son una política de producto: son defensa contra descompresión
@@ -106,7 +107,7 @@ class _NoRedirect(HTTPRedirectHandler):
 
 
 def _request(url: str, token: str, provider: str, *, redirect_host: str | None = None) -> bytes:
-    headers = {"Accept": "application/json", "User-Agent": "AppSecAgent/0.3"}
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     if provider == "github":
         headers["Authorization"] = f"Bearer {token}"
         headers["X-GitHub-Api-Version"] = "2022-11-28"
@@ -124,7 +125,7 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
                 raise SourceError("Redirección de archivo no permitida")
             # La URL temporal se consulta sin la credencial original.
-            response = opener.open(Request(target, headers={"User-Agent": "AppSecAgent/0.3"}), timeout=20)
+            response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=20)
         with response:
             body = response.read(MAX_ARCHIVE + 1)
             if len(body) > MAX_ARCHIVE:
@@ -136,7 +137,7 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
 
 def _download_timeout() -> int:
     try:
-        return max(60, int(os.environ.get("APPSEC_AGENT_DOWNLOAD_TIMEOUT", "900")))
+        return max(60, int(os.environ.get("TAMANDUA_DOWNLOAD_TIMEOUT", "900")))
     except ValueError:
         return 900
 
@@ -148,7 +149,7 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
     El `timeout` del socket solo corta si no llega nada; una conexión que gotea podría
     tardar horas sin decir nada. Por eso hay un plazo total y se informa de lo descargado."""
     deadline = time.monotonic() + _download_timeout()
-    headers = {"Accept": "application/vnd.github+json", "User-Agent": "AppSecAgent/0.4"}
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT}
     if provider == "github":
         headers["Authorization"] = f"Bearer {token}"
         headers["X-GitHub-Api-Version"] = "2022-11-28"
@@ -166,7 +167,7 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
                 raise SourceError("Redirección de archivo no permitida")
             # La URL temporal se consulta sin la credencial original.
-            response = opener.open(Request(target, headers={"User-Agent": "AppSecAgent/0.4"}), timeout=180)
+            response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=180)
         written, reported = 0, time.monotonic()
         with response, open(destination, "wb") as handle:
             while True:

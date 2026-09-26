@@ -6,15 +6,15 @@ set -eu
 
 stamp=$(date +%Y%m%d-%H%M%S)
 target="backups/$stamp"
-running=$(docker compose ps --status running --services 2>/dev/null | grep -x appsec || true)
+running=$(docker compose ps --status running --services 2>/dev/null | grep -x api || true)
 
 if [ -n "$running" ]; then
-  active=$(docker compose exec -T appsec python -c "from pathlib import Path; from tamandua.modules.runs.store import list_runs; print(sum(1 for r in list_runs(Path('/data')) if r.get('status') in ('queued', 'running')))" 2>/dev/null || echo 0)
+  active=$(docker compose exec -T api python -c "from pathlib import Path; from tamandua.modules.runs.store import list_runs; print(sum(1 for r in list_runs(Path('/data')) if r.get('status') in ('queued', 'running')))" 2>/dev/null || echo 0)
   if [ "${active:-0}" != "0" ] && [ "${FORCE:-}" != "1" ]; then
     echo "Hay $active análisis en marcha. Espera a que terminen o usa FORCE=1 (se marcarán como fallidos)." >&2
     exit 1
   fi
-  docker compose stop appsec >/dev/null
+  docker compose stop api >/dev/null
 fi
 
 mkdir -p "$target"
@@ -25,7 +25,7 @@ tar czf "$target/data.tgz" --exclude=data/feeds --exclude=data/trivy-cache --exc
 tar czf "$target/config.tgz" config
 chmod 600 "$target"/*.tgz "$target/database.dump"
 
-[ -n "$running" ] && docker compose start appsec >/dev/null
+[ -n "$running" ] && docker compose start api >/dev/null
 echo "Copia en $target/"
 echo "  database.dump  ejecuciones, hallazgos y triage (PostgreSQL; se restaura con pg_restore)"
 echo "  data.tgz    usuarios, ajustes y el resto de data/ (sin secretos)"

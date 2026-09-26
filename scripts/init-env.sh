@@ -4,7 +4,7 @@
 set -eu
 
 if [ ! -f .env ]; then
-  sed -e "s/^APPSEC_UID=.*/APPSEC_UID=$(id -u)/" -e "s/^APPSEC_GID=.*/APPSEC_GID=$(id -g)/" .env.example > .env
+  sed -e "s/^TAMANDUA_UID=.*/TAMANDUA_UID=$(id -u)/" -e "s/^TAMANDUA_GID=.*/TAMANDUA_GID=$(id -g)/" .env.example > .env
   chmod 600 .env
   echo "Creado .env con tu usuario ($(id -u):$(id -g)). Revísalo si quieres cambiar puerto, URL o TLS."
 else

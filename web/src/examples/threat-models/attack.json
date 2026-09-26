@@ -1,5 +1,5 @@
 {
-  "format": "appsec-agent-threat-model",
+  "format": "tamandua-threat-model",
   "version": 1,
   "model": {
     "name": "Portal de clientes · MITRE ATT&CK",

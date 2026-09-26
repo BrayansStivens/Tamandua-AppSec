@@ -45,7 +45,7 @@ IMAGES = {
                     "image": "ghcr.io/google/osv-scanner@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa"},
     "gitleaks": {"name": "Gitleaks", "version": "8.30.1",
                  "image": "ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"},
-    "opengrep": {"name": "Opengrep", "version": "1.30.0", "image": "appsec-agent/opengrep:1.30.0"},
+    "opengrep": {"name": "Opengrep", "version": "1.30.0", "image": "tamandua/opengrep:1.30.0"},
     # Segunda opinión en imágenes de contenedor: discrepa con Trivy sobre todo en paquetes del sistema.
     "grype": {"name": "Grype", "version": "0.119.0",
               "image": "anchore/grype@sha256:8c2c9234a345577a6d321a4753aa3ee1276d8975c8452d2344a56b57733ecad3"},
@@ -105,8 +105,8 @@ def own_mounts() -> dict[str, str]:
 def _host_pairs() -> list[tuple[str, str]]:
     detected = own_mounts()
     pairs = []
-    for inside, configured in ((os.environ.get("APPSEC_AGENT_DATA_DIR"), os.environ.get("APPSEC_AGENT_HOST_DATA_DIR")),
-                               (str(RULES_DIR), os.environ.get("APPSEC_AGENT_HOST_RULES_DIR"))):
+    for inside, configured in ((os.environ.get("TAMANDUA_DATA_DIR"), os.environ.get("TAMANDUA_HOST_DATA_DIR")),
+                               (str(RULES_DIR), os.environ.get("TAMANDUA_HOST_RULES_DIR"))):
         if not inside:
             continue
         outside = detected.get(str(Path(inside)).rstrip("/")) or (configured if _usable(inside, configured) else None)
@@ -126,7 +126,7 @@ def host_path(path: Path) -> str:
     Cuando la app corre en un contenedor, los volúmenes que pide para los
     contenedores hermanos se resuelven en el host, no dentro de la app. La ruta del
     host se detecta preguntando a Docker por los montajes de este contenedor; si no
-    se puede, se usan APPSEC_AGENT_HOST_DATA_DIR y APPSEC_AGENT_HOST_RULES_DIR.
+    se puede, se usan TAMANDUA_HOST_DATA_DIR y TAMANDUA_HOST_RULES_DIR.
     """
     resolved = path.resolve()
     for inside, outside in _host_pairs():
@@ -152,7 +152,7 @@ def cause(completed: subprocess.CompletedProcess | None) -> str:
     if not lines:
         return ""
     text = _TOKENS.sub("[token]", lines[-1])
-    host = os.environ.get("APPSEC_AGENT_HOST_DATA_DIR", "")
+    host = os.environ.get("TAMANDUA_HOST_DATA_DIR", "")
     if len(host) > 1:
         text = text.replace(host, "<datos>")
     return " ".join(text.split())[:240]
@@ -166,13 +166,13 @@ def with_cause(message: str, completed: subprocess.CompletedProcess | None) -> s
 def host_mount_problem() -> str | None:
     """Dentro del contenedor, los motores montan la carpeta de datos *del host*. Si no se pudo
     averiguar (ni preguntando a Docker ni por el entorno), los motores fallarían sin explicación."""
-    inside = os.environ.get("APPSEC_AGENT_DATA_DIR")
+    inside = os.environ.get("TAMANDUA_DATA_DIR")
     if not inside or not in_container():
         return None
     if any(pair[0] == inside for pair in _host_pairs()):
         return None
     return ("No se pudo averiguar la ruta de ./data en el host, así que los motores no pueden leer el código. "
-            "Define APPSEC_AGENT_HOST_DATA_DIR en .env con la ruta absoluta de ./data y reinicia (make up).")
+            "Define TAMANDUA_HOST_DATA_DIR en .env con la ruta absoluta de ./data y reinicia (make up).")
 
 
 _last_image_error: dict[str, str] = {}

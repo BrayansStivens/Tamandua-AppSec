@@ -28,7 +28,7 @@ class Route:
     public: bool = False       # accesible sin sesión
     admin: bool = False        # solo administradores
     enrolment: bool = False    # accesible aunque la política TOTP esté pendiente
-    action: str | None = None  # cabecera X-AppSec-Agent-Action exigida (POST)
+    action: str | None = None  # cabecera X-Tamandua-Action exigida (POST)
     body: int = 256            # tamaño máximo del cuerpo JSON (POST)
     prefix: bool = False       # la ruta cubre todo lo que empiece por `path`
 
@@ -95,7 +95,7 @@ def _endpoint(entry: Route):
     async def endpoint(http: HttpRequest) -> Response:
         state: State = http.app.state.core
         verdict = await run_in_threadpool(authorize, state, entry, method=entry.method, port=http.app.state.port,
-                                          origin=http.headers.get("origin"), action=http.headers.get("x-appsec-agent-action"),
+                                          origin=http.headers.get("origin"), action=http.headers.get("x-tamandua-action"),
                                           cookie=http.headers.get("cookie"))
         if isinstance(verdict, Denied):
             return error(verdict.status, verdict.message, **verdict.extra)

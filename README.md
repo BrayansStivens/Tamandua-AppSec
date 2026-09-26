@@ -87,8 +87,8 @@ appsec.tu-dominio.com {
 y en `.env`:
 
 ```bash
-APPSEC_AGENT_PUBLIC_URL=https://appsec.tu-dominio.com
-APPSEC_AGENT_ALLOWED_ORIGINS=https://appsec.tu-dominio.com
+TAMANDUA_PUBLIC_URL=https://appsec.tu-dominio.com
+TAMANDUA_ALLOWED_ORIGINS=https://appsec.tu-dominio.com
 ```
 
 ## Contribuir

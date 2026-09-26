@@ -19,7 +19,7 @@ export type Priority = { action: 'act' | 'attend' | 'track'; factors: string[] }
 export type Package = { ecosystem: string; name: string; version: string; fixed_version: string | null; introduced: string | null; dev?: boolean; direct?: boolean | null }
 export type Advisory = { id: string; aliases: string[]; summary: string; details: string; cvss_vector: string | null; cvss_score: number | null; published: string | null; modified: string | null; references: string[] }
 export type RepositoryFinding = { finding_id: string; fingerprint: string; scanner: string; tool?: string; also_detected_by?: string[]; related_rules?: string[]; framework?: string; rule_id: string; title: string; path: string; line: number; severity: string; confidence: number; verdict: string; cwe: number[]; cve: string[]; ghsa: string[]; owasp: string[]; reason: string; remediation: string; package?: Package | null; advisory?: Advisory | null; kev?: { date_added: string | null; due_date: string | null; ransomware: boolean; name: string | null } | null; epss?: { score: number; percentile: number } | null; priority?: Priority; triage?: TriageState; ticket?: TicketLink; lifecycle?: Lifecycle; source?: AdvisorySource | null; fix?: FixGuide | null; verification?: Verification | null; sla?: Sla | null; malicious?: boolean }
-// Base de la que sale el aviso y su licencia (appsec_agent/data_sources.py): se atribuye donde se muestra.
+// Base de la que sale el aviso y su licencia (tamandua/modules/intel/data_sources.py): se atribuye donde se muestra.
 export type AdvisorySource = { id: string; name: string; short?: string; url: string; license: string; terms: 'open' | 'attribution' | 'share-alike' | 'non-commercial' | 'unclear' }
 export type Lifecycle = { status: 'open' | 'fixed' | 'excluded'; excluded?: { pattern: string | null; at: string } | null; origin?: { kind: 'scan' | 'pr' | 'advisory'; pr?: number; branch?: string; merged?: boolean }; first_seen?: string; last_seen?: string; fixed?: { at: string; how: string; auto: boolean } | null; reopened_at?: string | null }
 export type ScanStep = { id: string; name: string; status: string; detail: string }
@@ -35,7 +35,7 @@ const RUN_EXPORTS: { label: string; items: [string, string][] }[] = [
   { label: 'Cumplimiento', items: [['SBOM · CycloneDX 1.6', 'sbom.cdx.json'], ['VEX · OpenVEX (desde el triage)', 'vex.openvex.json']] },
   { label: 'Datos', items: [['Informe Markdown', 'report.md'], ['SARIF (code scanning)', 'findings.sarif'], ['JSON completo', 'run.json'], ['Tickets para Jira (JSON)', 'tickets.json']] },
 ]
-const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', 'osv-scanner': 'OSV-Scanner', checkov: 'Checkov', zizmor: 'zizmor', 'appsec-agent': 'Reglas propias' }
+const toolLabel: Record<string, string> = { trivy: 'Trivy', gitleaks: 'Gitleaks', opengrep: 'Opengrep', grype: 'Grype', 'osv-scanner': 'OSV-Scanner', checkov: 'Checkov', zizmor: 'zizmor', tamandua: 'Reglas propias' }
 // Motor y, si otro lo confirmó, también ese: «Trivy + Grype».
 const toolsOf = (finding: { tool?: string; also_detected_by?: string[] }) => [finding.tool, ...(finding.also_detected_by ?? [])].filter(Boolean).map(tool => toolLabel[tool as string] ?? tool).join(' + ')
 const stepLabel = (status: string) => ({ completed: 'Completado', partial: 'Parcial', not_tested: 'No probado', inconclusive: 'Inconcluso', pending: 'Pendiente' }[status] ?? status)

@@ -147,7 +147,7 @@ class HttpCase(unittest.TestCase):
         self.addCleanup(store.stop)
         engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
         # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.
-        policy = patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"})
+        policy = patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"})
         policy.start()
         self.addCleanup(policy.stop)
         engines.start()
@@ -169,7 +169,7 @@ class HttpCase(unittest.TestCase):
         return response.status_code, body, cookies
 
     def post(self, path, action, body, cookie=None):
-        return self.call("POST", path, body, {"Origin": ORIGIN, "X-AppSec-Agent-Action": action,
+        return self.call("POST", path, body, {"Origin": ORIGIN, "X-Tamandua-Action": action,
                                               **({"Cookie": cookie} if cookie else {})})
 
 
@@ -207,7 +207,7 @@ class GateTests(HttpCase):
     def test_login_needs_origin_and_action(self):
         Users(self.data_dir).create("analista", PASSWORD)
         status, _, _ = self.call("POST", "/api/auth/login", {"username": "analista", "password": PASSWORD},
-                                 {"Origin": "http://evil.test", "X-AppSec-Agent-Action": "login"})
+                                 {"Origin": "http://evil.test", "X-Tamandua-Action": "login"})
         self.assertEqual(status, 403)
         status, body, _ = self.post("/api/auth/login", "login", {"username": "nadie", "password": PASSWORD})
         self.assertEqual((status, body["error"]), (401, "Usuario o contraseña incorrectos"))
@@ -233,7 +233,7 @@ class GateTests(HttpCase):
 
     def test_secure_cookie_behind_https(self):
         Users(self.data_dir).create("analista", PASSWORD)
-        with patch.dict(os.environ, {"APPSEC_AGENT_PUBLIC_URL": "https://appsec.example.com"}):
+        with patch.dict(os.environ, {"TAMANDUA_PUBLIC_URL": "https://appsec.example.com"}):
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})
         self.assertIn("Secure", cookies[0].split("; "))
 
@@ -255,7 +255,7 @@ class PolicyAndUsersTests(HttpCase):
         return self.post("/api/auth/totp/confirm", "totp-confirm", {"code": code}, cookie)
 
     def test_admin_without_totp_can_only_enrol(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "admins"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "admins"}):
             cookie = self.login_cookie()
             _, session, _ = self.call("GET", "/api/auth/session", headers={"Cookie": cookie})
             self.assertTrue(session["totp_required"])

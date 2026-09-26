@@ -83,7 +83,7 @@ class HostPathTests(unittest.TestCase):
     def test_paths_inside_the_data_dir_are_translated_for_the_docker_daemon(self):
         with tempfile.TemporaryDirectory() as temporary:
             inside = Path(temporary)
-            with patch.dict(os.environ, {"APPSEC_AGENT_DATA_DIR": str(inside), "APPSEC_AGENT_HOST_DATA_DIR": "/Users/dev/appsec/data"}):
+            with patch.dict(os.environ, {"TAMANDUA_DATA_DIR": str(inside), "TAMANDUA_HOST_DATA_DIR": "/Users/dev/appsec/data"}):
                 self.assertEqual(host_path(inside / "work" / "snap"), "/Users/dev/appsec/data/work/snap")
                 # Fuera del directorio de datos no se toca la ruta.
                 self.assertEqual(host_path(Path("/etc/hosts")), str(Path("/etc/hosts").resolve()))

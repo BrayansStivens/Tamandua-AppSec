@@ -16,6 +16,7 @@ import json
 import os
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from tamandua.version import USER_AGENT
 
 
 PROVIDERS = {
@@ -105,7 +106,7 @@ def check_provider(name: str, api_key: str | None = None) -> dict:
     if not key:
         return {"provider": name, "status": "not_configured",
                 "message": "Añade tu clave de API para habilitar la asistencia con IA"}
-    headers = {"Accept": "application/json", "User-Agent": "AppSecAgent/0.2"}
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     if name == "openai":
         headers["Authorization"] = f"Bearer {key}"
     else:

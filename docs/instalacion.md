@@ -22,9 +22,9 @@ cd appsec-agent
 make up
 ```
 
-`make up` crea `.env` desde `.env.example` con tu usuario del host (`APPSEC_UID`/`APPSEC_GID`, para que `data/` y `config/` sean tuyas y no de root), construye, arranca y espera a que el panel responda. Sin `make`: `sh scripts/init-env.sh && docker compose up --build -d`.
+`make up` crea `.env` desde `.env.example` con tu usuario del host (`TAMANDUA_UID`/`TAMANDUA_GID`, para que `data/` y `config/` sean tuyas y no de root), construye, arranca y espera a que el panel responda. Sin `make`: `sh scripts/init-env.sh && docker compose up --build -d`.
 
-La primera construcción tarda unos minutos: compila el panel, descarga el binario de Opengrep y comprueba su SHA-256. Verás dos contenedores: `appsec-agent`, que se queda en marcha, y `opengrep`, que solo construye la imagen del motor y **termina enseguida**: es normal.
+La primera construcción tarda unos minutos: compila el panel, descarga el binario de Opengrep y comprueba su SHA-256. Verás dos contenedores: `tamandua`, que se queda en marcha, y `opengrep`, que solo construye la imagen del motor y **termina enseguida**: es normal.
 
 Al terminar muestra el **código de configuración** (también con `make setup-code`, o en los logs):
 
@@ -44,7 +44,7 @@ Luego:
 2. **Integraciones**: crea y conecta tu GitHub App con la guía del panel (también en [github-app.md](github-app.md)).
 3. **Repositorios**: elige uno y pulsa **Analizar**.
 
-La copia local de NVD para el CVE tracker se descarga sola en segundo plano: unas horas sin API key, mucho menos con `APPSEC_AGENT_NVD_API_KEY` (gratuita en <https://nvd.nist.gov/developers/request-an-api-key>). Todo lo demás funciona mientras tanto.
+La copia local de NVD para el CVE tracker se descarga sola en segundo plano: unas horas sin API key, mucho menos con `TAMANDUA_NVD_API_KEY` (gratuita en <https://nvd.nist.gov/developers/request-an-api-key>). Todo lo demás funciona mientras tanto.
 
 ## Actualizar
 
@@ -75,11 +75,11 @@ docker compose exec -T postgres pg_restore -U tamandua -d tamandua --clean --if-
 make up
 ```
 
-Si pierdes `config/master.key` (o cambias `APPSEC_AGENT_MASTER_KEY`), los secretos guardados no se pueden descifrar: tendrás que volver a conectar la GitHub App y las claves de IA y Jira. El resto de datos no se pierde.
+Si pierdes `config/master.key` (o cambias `TAMANDUA_MASTER_KEY`), los secretos guardados no se pueden descifrar: tendrás que volver a conectar la GitHub App y las claves de IA y Jira. El resto de datos no se pierde.
 
 ## Exponerlo en tu red o en internet
 
-Por defecto el puerto solo se publica en `127.0.0.1`. Para abrirlo desde otras máquinas necesitas HTTPS: el servidor **se niega a arrancar** si `APPSEC_AGENT_PUBLIC_URL` no es loopback y no empieza por `https://`. La forma más sencilla es Caddy delante; está explicado en el [README](../README.md#usarlo-desde-otra-máquina-https).
+Por defecto el puerto solo se publica en `127.0.0.1`. Para abrirlo desde otras máquinas necesitas HTTPS: el servidor **se niega a arrancar** si `TAMANDUA_PUBLIC_URL` no es loopback y no empieza por `https://`. La forma más sencilla es Caddy delante; está explicado en el [README](../README.md#usarlo-desde-otra-máquina-https).
 
 Aunque uses HTTPS, ten en cuenta que la app controla Docker a través de su socket, lo que equivale a root en el host. Expón el panel solo a personas de confianza.
 

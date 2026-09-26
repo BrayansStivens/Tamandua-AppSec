@@ -89,9 +89,9 @@ def check_registry_address(registry: str) -> None:
     """El motor se conectará a ese registro: si resuelve a una red interna, se exige permiso expreso.
 
     Evita que el formulario sirva para que el servidor hable con servicios internos (SSRF).
-    Para registros propios en la red local: APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES=1.
+    Para registros propios en la red local: TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.
     """
-    if os.environ.get("APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES", "").strip() == "1":
+    if os.environ.get("TAMANDUA_ALLOW_PRIVATE_REGISTRIES", "").strip() == "1":
         return
     import ipaddress
     host = _host_only(registry)
@@ -101,7 +101,7 @@ def check_registry_address(registry: str) -> None:
         raise ImageError(f"No se pudo resolver el registro {registry}") from exc
     if not addresses or not all(ipaddress.ip_address(address.split("%")[0]).is_global for address in addresses):
         raise ImageError(f"El registro {registry} resuelve a una dirección privada. Si es un registro propio de tu red, "
-                         "arranca el servidor con APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES=1.")
+                         "arranca el servidor con TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.")
 
 
 # --- credenciales de registros ------------------------------------------------------------
@@ -284,7 +284,7 @@ AUTH_HEADER = re.compile(r"(?i)authorization:\s*(bearer|basic|token)\s+(?!\$)[A-
 def _config_finding(rule: str, title: str, severity: str, reason: str, remediation: str, cwe: int, asset: str, key: str,
                     path: str = "configuración de la imagen") -> dict:
     from tamandua.modules.scanning.engines import _base, _stable
-    finding = _base("iac" if cwe != 798 else "secrets", rule, title, path, 1, severity, tool="appsec-agent",
+    finding = _base("iac" if cwe != 798 else "secrets", rule, title, path, 1, severity, tool="tamandua",
                     reason=reason, remediation=remediation, cwe=[cwe], owasp="A02:2025" if cwe != 798 else "A04:2025",
                     confidence=8, digest=_stable("image-config", rule, asset, key))
     return finding

@@ -4,15 +4,15 @@
 SHELL := /bin/sh
 COMPOSE ?= docker compose
 VERSION := $(shell sed -n 's/^VERSION = "\(.*\)"/\1/p' tamandua/version.py)
-PORT := $(shell sed -n 's/^APPSEC_PORT=//p' .env 2>/dev/null | tail -n1)
-PUBLIC_URL := $(shell sed -n 's/^APPSEC_AGENT_PUBLIC_URL=//p' .env 2>/dev/null | tail -n1)
+PORT := $(shell sed -n 's/^TAMANDUA_HOST_PORT=//p' .env 2>/dev/null | tail -n1)
+PUBLIC_URL := $(shell sed -n 's/^TAMANDUA_PUBLIC_URL=//p' .env 2>/dev/null | tail -n1)
 HOST_PORT := $(if $(PORT),$(PORT),8766)
 URL := $(if $(PUBLIC_URL),$(PUBLIC_URL),http://127.0.0.1:$(HOST_PORT))
 PYTHON ?= python3
 DIR ?=
 ARGS ?=
 VENV := .venv
-export APPSEC_VERSION := $(VERSION)
+export TAMANDUA_VERSION := $(VERSION)
 # Grupo del socket de Docker en Linux y WSL con Docker nativo (en macOS, Docker Desktop usa el 0).
 # Un valor en el entorno o en .env manda sobre la detección.
 DOCKER_SOCKET_GID ?= $(shell sed -n 's/^DOCKER_SOCKET_GID=//p' .env 2>/dev/null | tail -n1)
@@ -52,7 +52,7 @@ build: setup ## Construye las imágenes (app y motor Opengrep verificado)
 up: setup ## Construye si hace falta, descarga los motores que falten, arranca y muestra la URL
 	$(COMPOSE) up --build -d
 	@printf 'Esperando a que el panel responda'
-	@i=0; until [ "$$(docker inspect -f '{{.State.Health.Status}}' appsec-agent 2>/dev/null)" = healthy ]; do \
+	@i=0; until [ "$$(docker inspect -f '{{.State.Health.Status}}' tamandua 2>/dev/null)" = healthy ]; do \
 	  i=$$((i + 1)); if [ $$i -gt 60 ]; then echo; echo 'No arrancó en 2 minutos: make logs'; exit 1; fi; printf '.'; sleep 2; done; echo
 	@$(MAKE) --no-print-directory engines || echo 'Aviso: faltan motores; el panel funciona y se reintentan con make engines.'
 	@echo "Panel: $(URL)"
@@ -62,7 +62,7 @@ down: ## Para y elimina los contenedores (conserva data/ y config/)
 	$(COMPOSE) down
 
 restart: ## Reinicia la app (marca como fallidos los análisis en curso)
-	$(COMPOSE) restart appsec worker
+	$(COMPOSE) restart api worker
 
 status: ## Estado de los contenedores y de los motores
 	@$(COMPOSE) ps
@@ -72,10 +72,10 @@ status: ## Estado de los contenedores y de los motores
 ps: status
 
 logs: ## Sigue los logs de la app (Ctrl+C para salir)
-	$(COMPOSE) logs -f --tail 100 appsec
+	$(COMPOSE) logs -f --tail 100 api
 
 setup-code: ## Muestra el código para crear el primer administrador
-	@code=$$($(COMPOSE) logs appsec 2>/dev/null | grep -A1 'Primer arranque' | tail -n1 | sed 's/.*| *//; s/^ *//'); \
+	@code=$$($(COMPOSE) logs api 2>/dev/null | grep -A1 'Primer arranque' | tail -n1 | sed 's/.*| *//; s/^ *//'); \
 	if [ -n "$$code" ] && curl -fsS -H "Host: 127.0.0.1:$(HOST_PORT)" "http://127.0.0.1:$(HOST_PORT)/api/auth/session" 2>/dev/null | grep -q '"setup_required": true'; then \
 	  echo "Código de configuración: $$code  (créalo en $(URL))"; \
 	else echo "Ya hay un administrador creado: entra con tu usuario."; fi
@@ -107,10 +107,10 @@ backup: ## Copia data/ y config/ en backups/<fecha>/ (FORCE=1 si hay análisis e
 	@sh scripts/backup.sh
 
 shell: ## Abre una terminal dentro del contenedor
-	$(COMPOSE) exec appsec sh
+	$(COMPOSE) exec api sh
 
 cli: ## CLI de la app: make cli ARGS="user list"
-	$(COMPOSE) exec appsec python -m tamandua --data-dir /data $(ARGS)
+	$(COMPOSE) exec api python -m tamandua --data-dir /data $(ARGS)
 
 clean: ## Para todo y borra las imágenes locales (conserva data/ y config/)
 	$(COMPOSE) down --rmi all
@@ -128,14 +128,14 @@ dev-setup: ## Crea .venv e instala dependencias de Python y del panel
 	cd web && npm ci --no-audit --no-fund
 
 dev: ## Servidor local sin contenedor en 127.0.0.1:8767 (motores vía tu Docker)
-	APPSEC_AGENT_PUBLIC_URL=http://127.0.0.1:8767 APPSEC_AGENT_ALLOWED_ORIGINS=http://127.0.0.1:8767,http://localhost:8767 \
-	APPSEC_AGENT_CONFIG_DIR=$(CURDIR)/.dev/config $(VENV)/bin/python -m tamandua --data-dir .dev/data serve --port 8767
+	TAMANDUA_PUBLIC_URL=http://127.0.0.1:8767 TAMANDUA_ALLOWED_ORIGINS=http://127.0.0.1:8767,http://localhost:8767 \
+	TAMANDUA_CONFIG_DIR=$(CURDIR)/.dev/config $(VENV)/bin/python -m tamandua --data-dir .dev/data serve --port 8767
 
 web: ## Compila el panel en tamandua/app/static/
 	cd web && npm run build
 
 test: ## Pruebas del backend (arranca un Postgres efímero de pruebas si hace falta)
-	@url=$$(sh scripts/test-db.sh) && APPSEC_AGENT_DATABASE_URL="$$url" APPSEC_AGENT_DB_ISOLATE=data-dir $(VENV)/bin/python -m unittest discover -s tests
+	@url=$$(sh scripts/test-db.sh) && TAMANDUA_DATABASE_URL="$$url" TAMANDUA_DB_ISOLATE=data-dir $(VENV)/bin/python -m unittest discover -s tests
 
 openapi: ## Esquema OpenAPI de la API y tipos TypeScript del panel (web/src/shared/api/)
 	@mkdir -p web/src/shared/api

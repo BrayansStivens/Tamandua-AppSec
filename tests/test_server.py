@@ -28,7 +28,7 @@ class ServerTests(unittest.TestCase):
         engines.start()
         self.addCleanup(engines.stop)
         # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.
-        policy = patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"})
+        policy = patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"})
         policy.start()
         self.addCleanup(policy.stop)
         self.state = build_state(self.data_dir)
@@ -39,7 +39,7 @@ class ServerTests(unittest.TestCase):
         self.cookie = self.login("operadora", "correcto-caballo-bateria")
 
     def login(self, username, password):
-        handler_headers = {"Origin": self.origin, "X-AppSec-Agent-Action": "login"}
+        handler_headers = {"Origin": self.origin, "X-Tamandua-Action": "login"}
         raw = self.raw_request("POST", "/api/auth/login", json.dumps({"username": username, "password": password}),
                                handler_headers, cookie=None)
         for line in raw.split(b"\r\n\r\n", 1)[0].split(b"\r\n"):
@@ -61,10 +61,10 @@ class ServerTests(unittest.TestCase):
 
     def test_rejects_cross_origin_and_arbitrary_targets(self):
         body = json.dumps({"source_id": "local:x", "allow_osv_upload": False})
-        status, _ = self.request("POST", "/api/repositories/scans", body, {"Origin": "http://evil.test", "X-AppSec-Agent-Action": "scan-repository"})
+        status, _ = self.request("POST", "/api/repositories/scans", body, {"Origin": "http://evil.test", "X-Tamandua-Action": "scan-repository"})
         self.assertEqual(status, 403)
         status, _ = self.request("POST", "/api/images/scans", json.dumps({"reference": "https://example.com/x"}),
-                                 {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-image"})
+                                 {"Origin": self.origin, "X-Tamandua-Action": "scan-image"})
         self.assertEqual(status, 400)
         for path in ("/assets/../store.py", "/assets/..%2f..%2fversion.py", "/assets/%2e%2e/%2e%2e/version.py", "/assets/%2e%2e"):
             status, _ = self.request("GET", path)
@@ -81,7 +81,7 @@ class ServerTests(unittest.TestCase):
     def test_unknown_method_or_path_is_a_plain_404(self):
         for method, path in (("POST", "/api/runs/abc"), ("PUT", "/api/runs"), ("DELETE", "/api/health"), ("GET", "/api/sla/")):
             status, body = self.request(method, path, "{}" if method != "GET" else None,
-                                        {"Origin": self.origin, "X-AppSec-Agent-Action": "x"})
+                                        {"Origin": self.origin, "X-Tamandua-Action": "x"})
             self.assertEqual((status, json.loads(body)), (404, {"error": "Ruta no encontrada"}), f"{method} {path}")
 
     def test_unexpected_error_does_not_leak_a_trace(self):
@@ -93,13 +93,13 @@ class ServerTests(unittest.TestCase):
 
     def test_lab_is_no_longer_reachable_from_the_api(self):
         status, _ = self.request("POST", "/api/lab/scans", json.dumps({"variant": "fixed"}),
-                                 {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-lab"})
+                                 {"Origin": self.origin, "X-Tamandua-Action": "scan-lab"})
         self.assertEqual(status, 404)
         self.assertEqual(list_runs(self.data_dir), [])
 
     def test_user_supplies_own_ai_key_and_it_never_returns_to_the_browser(self):
         secret = "sk-user-owned-key-000111222333"
-        headers = {"Origin": self.origin, "X-AppSec-Agent-Action": "save-ai-key"}
+        headers = {"Origin": self.origin, "X-Tamandua-Action": "save-ai-key"}
         # Una clave que el proveedor rechaza no se guarda.
         with patch("tamandua.modules.integrations.ai_providers.check_provider",
                    return_value={"provider": "openai", "status": "invalid_credentials",
@@ -136,16 +136,16 @@ class ServerTests(unittest.TestCase):
 
     def test_provider_endpoint_never_starts_a_lab_scan_or_exposes_keys(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "server-secret", "ANTHROPIC_API_KEY": "",
-                                       "APPSEC_AGENT_BOOTSTRAP": "1"}), \
+                                       "TAMANDUA_BOOTSTRAP": "1"}), \
                 patch("tamandua.app.api.routes.sources.check_provider", return_value={"status": "connected"}) as check:
             status, payload = self.request("GET", "/api/providers")
             self.assertEqual(status, 200)
             self.assertNotIn(b"server-secret", payload)
             status, _ = self.request("POST", "/api/providers/check", json.dumps({"variant": "fixed"}),
-                                     {"Origin": self.origin, "X-AppSec-Agent-Action": "check-provider"})
+                                     {"Origin": self.origin, "X-Tamandua-Action": "check-provider"})
             self.assertEqual(status, 400)
             status, payload = self.request("POST", "/api/providers/check", json.dumps({"provider": "openai"}),
-                                           {"Origin": self.origin, "X-AppSec-Agent-Action": "check-provider"})
+                                           {"Origin": self.origin, "X-Tamandua-Action": "check-provider"})
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(payload)["status"], "connected")
             check.assert_called_once_with("openai")
@@ -165,7 +165,7 @@ class ServerTests(unittest.TestCase):
             self.assertTrue(pdf.startswith(b"%PDF-"))
 
     def test_repository_scan_is_queued_and_never_opts_in_to_osv_implicitly(self):
-        headers = {"Origin": self.origin, "X-AppSec-Agent-Action": "scan-repository"}
+        headers = {"Origin": self.origin, "X-Tamandua-Action": "scan-repository"}
         status, _ = self.request("POST", "/api/repositories/scans",
                                  json.dumps({"source_id": "https://example.com", "allow_osv_upload": False}), headers)
         self.assertEqual(status, 400)
@@ -215,7 +215,7 @@ class ServerTests(unittest.TestCase):
         # Otro Host o Origin distinto de los permitidos se rechaza aunque el puerto coincida.
         status, _ = self.request("GET", "/api/health", headers={"Host": "evil.test:8766"})
         self.assertEqual(status, 403)
-        with patch.dict(os.environ, {"APPSEC_AGENT_ALLOWED_ORIGINS": "http://appsec.local:8766"}):
+        with patch.dict(os.environ, {"TAMANDUA_ALLOWED_ORIGINS": "http://appsec.local:8766"}):
             status, _ = self.request("GET", "/api/health", headers={"Host": "appsec.local:8766"})
             self.assertEqual(status, 200)
             status, _ = self.request("GET", "/api/health")   # 127.0.0.1 deja de estar permitido
@@ -223,7 +223,7 @@ class ServerTests(unittest.TestCase):
 
     def test_code_connection_from_ui_validates_lists_and_forgets_token(self):
         secret = "ghp_test_read_only_secret_123"
-        headers = {"Origin": self.origin, "X-AppSec-Agent-Action": "connect-code"}
+        headers = {"Origin": self.origin, "X-Tamandua-Action": "connect-code"}
         with patch("tamandua.modules.sources.repositories._request", return_value=json.dumps([
             {"full_name": "example/private", "private": True, "default_branch": "main"}
         ]).encode()) as request:
@@ -245,11 +245,11 @@ class ServerTests(unittest.TestCase):
     def test_code_connection_rejects_cross_origin_and_invalid_token(self):
         body = json.dumps({"provider": "github", "token": "test-token-123"})
         status, _ = self.request("POST", "/api/integrations/code", body,
-                                 {"Origin": "http://evil.test", "X-AppSec-Agent-Action": "connect-code"})
+                                 {"Origin": "http://evil.test", "X-Tamandua-Action": "connect-code"})
         self.assertEqual(status, 403)
         with patch("tamandua.modules.sources.repositories._request", side_effect=Exception("should not call")):
             status, _ = self.request("POST", "/api/integrations/code", json.dumps({"provider": "github", "token": "bad token"}),
-                                     {"Origin": self.origin, "X-AppSec-Agent-Action": "connect-code"})
+                                     {"Origin": self.origin, "X-Tamandua-Action": "connect-code"})
             self.assertEqual(status, 400)
 
 

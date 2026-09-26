@@ -282,7 +282,7 @@ class WatcherTests(unittest.TestCase):
 
 class BranchWatchTests(unittest.TestCase):
     def test_the_default_branch_is_rescanned_when_it_changes(self):
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"APPSEC_AGENT_BRANCH_MIN_MINUTES": "60"}):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"TAMANDUA_BRANCH_MIN_MINUTES": "60"}):
             data_dir = Path(directory)
             for index in range(1, 6):
                 pr_watch.configure(data_dir, f"github#{index}", enabled=True, by="operadora")
@@ -325,7 +325,7 @@ class BranchWatchTests(unittest.TestCase):
 
 class RouteTests(HttpCase):
     def test_settings_survive_when_github_denies_reading_pulls(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("operadora", PASSWORD, role="admin")
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
             cookie = cookies[0].split("; ")[0]

@@ -26,7 +26,7 @@ except ImportError:
 
 
 def _environment(key_file: str) -> dict:
-    return {"GITHUB_APP_ID": "123456", "GITHUB_APP_SLUG": "appsec-agent-local",
+    return {"GITHUB_APP_ID": "123456", "GITHUB_APP_SLUG": "tamandua-local",
             "GITHUB_APP_CLIENT_ID": "Iv1.0123456789abcdef", "GITHUB_APP_CLIENT_SECRET": "s" * 40,
             "GITHUB_APP_PRIVATE_KEY_FILE": key_file}
 
@@ -51,7 +51,7 @@ class GitHubAppTests(unittest.TestCase):
 
     def test_install_url_points_at_the_selection_screen(self):
         with tempfile.NamedTemporaryFile() as key, patch.dict(os.environ, _environment(key.name), clear=True):
-            self.assertEqual(install_url(), "https://github.com/apps/appsec-agent-local/installations/new")
+            self.assertEqual(install_url(), "https://github.com/apps/tamandua-local/installations/new")
 
     @unittest.skipUnless(CRYPTO, "requiere cryptography (.venv)")
     def test_verified_app_is_stored_encrypted_and_bad_input_is_refused(self):

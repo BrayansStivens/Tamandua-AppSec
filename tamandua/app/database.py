@@ -32,7 +32,7 @@ def config() -> Config:
 def upgrade() -> None:
     """Lleva el esquema a la última versión. En pruebas (esquema por carpeta de datos) lo crea `db` al vuelo."""
     tables()
-    if os.environ.get("APPSEC_AGENT_DB_ISOLATE") == "data-dir":
+    if os.environ.get("TAMANDUA_DB_ISOLATE") == "data-dir":
         return
     with db.engine().begin() as connection:
         # API y worker arrancan a la vez: sin cerrojo, los dos crearían las mismas tablas y uno fallaría.

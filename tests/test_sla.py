@@ -114,14 +114,14 @@ class IntegrationTests(unittest.TestCase):
 class RouteTests(HttpCase):
     def setUp(self):
         super().setUp()
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("jefa", PASSWORD, role="admin")
             Users(self.data_dir).create("miembro", PASSWORD)
             self.admin = self.post("/api/auth/login", "login", {"username": "jefa", "password": PASSWORD})[2][0].split("; ")[0]
             self.member = self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})[2][0].split("; ")[0]
 
     def test_everyone_reads_only_admins_change(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             self.assertEqual(self.call("GET", "/api/sla")[0], 401)
             status, body, _ = self.call("GET", "/api/sla", headers={"Cookie": self.member})
             self.assertEqual((status, body["days"]), (200, sla.DEFAULTS))

@@ -5,24 +5,27 @@
 #
 # Sin make:  cp .env.example .env && mkdir -p data config && docker compose up --build -d
 #
-# Servicios: `appsec` (el panel y la API, sin Docker), `worker` (ejecuta los análisis y las tareas periódicas),
+# Servicios: `api` (el panel y la API, sin Docker), `worker` (ejecuta los análisis y las tareas periódicas),
 # `postgres` (datos) y `opengrep` (solo construye la imagen del motor).
 #
 # Los motores de análisis (Trivy, Gitleaks, Opengrep) son contenedores hermanos que el WORKER lanza por el socket
 # de Docker: por eso solo él lo monta, y por eso la carpeta de datos se comparte con la MISMA ruta absoluta del host
-# (APPSEC_AGENT_HOST_DATA_DIR). El socket de Docker equivale a root en el host: el servicio que atiende peticiones
-# (appsec) ya no lo tiene.
+# (TAMANDUA_HOST_DATA_DIR). El socket de Docker equivale a root en el host: el servicio que atiende peticiones
+# (api) ya no lo tiene.
+# Nombre fijo del proyecto: el volumen y la red no dependen de cómo se llame la carpeta clonada.
+name: tamandua
+
 # Lo común al API y al worker (misma imagen, mismos datos y endurecimiento).
 x-app: &app
   build:
     context: .
     dockerfile: docker/app/Dockerfile
     args:
-      VERSION: ${APPSEC_VERSION:-0.9}
-  image: appsec-agent/app:${APPSEC_VERSION:-0.9}
+      VERSION: ${TAMANDUA_VERSION:-0.9}
+  image: tamandua/app:${TAMANDUA_VERSION:-0.9}
   init: true
   # Tu UID/GID para que los ficheros de ./data y ./config sean tuyos (ver .env.example).
-  user: "${APPSEC_UID:-10001}:${APPSEC_GID:-10001}"
+  user: "${TAMANDUA_UID:-10001}:${TAMANDUA_GID:-10001}"
   env_file:
     - path: .env
       required: false
@@ -31,7 +34,7 @@ x-app: &app
   read_only: true
   tmpfs:
     - /tmp:size=256m
-    - /home/appsec:size=16m,uid=${APPSEC_UID:-10001},gid=${APPSEC_GID:-10001}
+    - /home/tamandua:size=16m,uid=${TAMANDUA_UID:-10001},gid=${TAMANDUA_GID:-10001}
   cap_drop:
     - ALL
   security_opt:
@@ -44,39 +47,39 @@ x-app: &app
   restart: unless-stopped
 
 x-app-env: &app-env
-  APPSEC_AGENT_DATA_DIR: /data
-  APPSEC_AGENT_HOST_DATA_DIR: ${PWD}/data
-  APPSEC_AGENT_HOST_RULES_DIR: ${PWD}/rules
-  APPSEC_AGENT_CONFIG_DIR: /config
-  APPSEC_AGENT_PUBLIC_URL: ${APPSEC_AGENT_PUBLIC_URL:-http://127.0.0.1:8766}
-  APPSEC_AGENT_ALLOWED_ORIGINS: ${APPSEC_AGENT_ALLOWED_ORIGINS:-http://127.0.0.1:8766,http://localhost:8766}
-  APPSEC_AGENT_LOG_LEVEL: ${APPSEC_AGENT_LOG_LEVEL:-INFO}
+  TAMANDUA_DATA_DIR: /data
+  TAMANDUA_HOST_DATA_DIR: ${PWD}/data
+  TAMANDUA_HOST_RULES_DIR: ${PWD}/rules
+  TAMANDUA_CONFIG_DIR: /config
+  TAMANDUA_PUBLIC_URL: ${TAMANDUA_PUBLIC_URL:-http://127.0.0.1:8766}
+  TAMANDUA_ALLOWED_ORIGINS: ${TAMANDUA_ALLOWED_ORIGINS:-http://127.0.0.1:8766,http://localhost:8766}
+  TAMANDUA_LOG_LEVEL: ${TAMANDUA_LOG_LEVEL:-INFO}
   # admins (por defecto): TOTP obligatorio para administradores · all: para todos · none: opcional
-  APPSEC_AGENT_REQUIRE_TOTP: ${APPSEC_AGENT_REQUIRE_TOTP:-admins}
-  APPSEC_AGENT_PR_POLL_SECONDS: ${APPSEC_AGENT_PR_POLL_SECONDS:-300}
-  APPSEC_AGENT_BRANCH_MIN_MINUTES: ${APPSEC_AGENT_BRANCH_MIN_MINUTES:-60}
-  APPSEC_AGENT_ADVISORY_WATCH_HOURS: ${APPSEC_AGENT_ADVISORY_WATCH_HOURS:-24}
+  TAMANDUA_REQUIRE_TOTP: ${TAMANDUA_REQUIRE_TOTP:-admins}
+  TAMANDUA_PR_POLL_SECONDS: ${TAMANDUA_PR_POLL_SECONDS:-300}
+  TAMANDUA_BRANCH_MIN_MINUTES: ${TAMANDUA_BRANCH_MIN_MINUTES:-60}
+  TAMANDUA_ADVISORY_WATCH_HOURS: ${TAMANDUA_ADVISORY_WATCH_HOURS:-24}
   # Ejecuciones, hallazgos y triage viven en PostgreSQL (servicio `postgres`, solo en la red interna).
-  APPSEC_AGENT_DATABASE_URL: "postgresql+psycopg://tamandua:${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}@postgres:5432/tamandua"
-  HOME: /home/appsec
+  TAMANDUA_DATABASE_URL: "postgresql+psycopg://tamandua:${TAMANDUA_DB_PASSWORD:?Falta TAMANDUA_DB_PASSWORD en .env (ejecuta make setup)}@postgres:5432/tamandua"
+  HOME: /home/tamandua
 
 x-app-volumes: &app-volumes
   - ./data:/data
   - ./rules:/app/rules:ro
   # Secretos cifrados (GitHub App, claves de IA, Jira) y su clave maestra. Nunca en ./data.
-  - ${APPSEC_CONFIG_DIR:-./config}:/config
+  - ${TAMANDUA_HOST_CONFIG_DIR:-./config}:/config
 
 services:
-  appsec:
+  api:
     <<: *app
-    container_name: appsec-agent
+    container_name: tamandua
     ports:
       # Solo en esta máquina por defecto. Para exponerlo en la red usa HTTPS (ver README).
-      - "${APPSEC_BIND:-127.0.0.1}:${APPSEC_PORT:-8766}:8766"
+      - "${TAMANDUA_HOST_BIND:-127.0.0.1}:${TAMANDUA_HOST_PORT:-8766}:8766"
     environment:
       <<: *app-env
       # Los análisis los ejecuta el servicio `worker`: el API no necesita Docker.
-      APPSEC_AGENT_EMBEDDED_WORKER: "0"
+      TAMANDUA_EMBEDDED_WORKER: "0"
     volumes: *app-volumes
     depends_on:
       postgres:
@@ -103,7 +106,7 @@ services:
     volumes:
       - ./data:/data
       - ./rules:/app/rules:ro
-      - ${APPSEC_CONFIG_DIR:-./config}:/config
+      - ${TAMANDUA_HOST_CONFIG_DIR:-./config}:/config
       - /var/run/docker.sock:/var/run/docker.sock
     # Acceso al socket de Docker para lanzar los motores. En Docker Desktop y OrbStack (macOS,
     # Windows) el socket es del grupo 0; en Linux y en WSL con Docker nativo, del grupo `docker`,
@@ -111,7 +114,7 @@ services:
     # que añadir, la segunda entrada repite tu propio grupo (compose no admite dos iguales).
     group_add:
       - "0"
-      - "${DOCKER_SOCKET_GID:-${APPSEC_GID:-10001}}"
+      - "${DOCKER_SOCKET_GID:-${TAMANDUA_GID:-10001}}"
     depends_on:
       opengrep:
         condition: service_completed_successfully
@@ -148,7 +151,7 @@ services:
   # que arranca; la app la lanza después por cada análisis. Termina al momento: es normal.
   opengrep:
     build: docker/engines/opengrep
-    image: appsec-agent/opengrep:1.30.0
+    image: tamandua/opengrep:1.30.0
     command: ["--version"]
     network_mode: none
     restart: "no"

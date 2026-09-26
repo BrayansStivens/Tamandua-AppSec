@@ -31,6 +31,7 @@ from tamandua.modules.runs.kinds import FINDING_RUNS
 from tamandua.shared import log as logging_setup
 from tamandua.modules.intel.advisories import compare_versions
 from tamandua.modules.findings.triage import asset_key
+from tamandua.version import USER_AGENT
 
 SITE_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.atlassian\.net")
 PROJECT_PATTERN = re.compile(r"[A-Z][A-Z0-9_]{1,9}")
@@ -131,7 +132,7 @@ def _http(credentials: dict, method: str, path: str, body: dict | None = None) -
     request = Request(f"https://{credentials['site']}{path}", method=method,
                       data=json.dumps(body).encode("utf-8") if body is not None else None,
                       headers={"Authorization": f"Basic {token}", "Accept": "application/json",
-                               "Content-Type": "application/json", "User-Agent": "AppSecAgent/0.7"})
+                               "Content-Type": "application/json", "User-Agent": USER_AGENT})
     try:
         with build_opener(_NoRedirect()).open(request, timeout=15) as response:
             raw = response.read(RESPONSE_LIMIT + 1)

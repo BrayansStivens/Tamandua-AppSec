@@ -81,15 +81,15 @@ scripts/
 
 | Imagen | Origen | Tamaño aprox. |
 | --- | --- | --- |
-| `appsec-agent/app:<versión>` | Se construye de `docker/app/Dockerfile` (Node solo en la etapa de compilación) | 360 MB |
-| `appsec-agent/opengrep:1.30.0` | Se construye de `docker/engines/opengrep/` | 230 MB |
+| `tamandua/app:<versión>` | Se construye de `docker/app/Dockerfile` (Node solo en la etapa de compilación) | 360 MB |
+| `tamandua/opengrep:1.30.0` | Se construye de `docker/engines/opengrep/` | 230 MB |
 | `aquasec/trivy` | Docker Hub, fijada por digest | 240 MB |
 | `ghcr.io/gitleaks/gitleaks` | GHCR, fijada por digest | 80 MB |
 | `anchore/grype` | Docker Hub, fijada por digest; solo para imágenes de contenedor | 110 MB (+2,1 GB de base) |
 | `bridgecrew/checkov` | Docker Hub, fijada por digest | 200 MB |
 | `ghcr.io/zizmorcore/zizmor` | GHCR, fijada por digest | 15 MB |
 
-Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos construcciones de la misma versión usan exactamente las mismas capas. Las etiquetas OCI de la imagen de la app declaran versión, licencia y repositorio (`docker inspect appsec-agent`).
+Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos construcciones de la misma versión usan exactamente las mismas capas. Las etiquetas OCI de la imagen de la app declaran versión, licencia y repositorio (`docker inspect tamandua`).
 
 ## Endurecimiento del contenedor de la app
 

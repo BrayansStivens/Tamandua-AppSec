@@ -9,9 +9,7 @@ Estructura (monolito modular):
 * `shared/`: lo transversal sin negocio (logs, almacén cifrado, rutas). No importa de `modules`.
 * `cli/`: la línea de comandos.
 
-Los contratos entre capas los comprueba import-linter en el CI (pyproject.toml). Las variables
-`APPSEC_AGENT_*`, el contexto de estado en GitHub y `python -m appsec_agent` conservan el nombre
-técnico anterior para no romper instalaciones.
+Los contratos entre capas los comprueba import-linter en el CI (pyproject.toml).
 """
 
 from tamandua.version import VERSION

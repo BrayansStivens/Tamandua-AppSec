@@ -414,7 +414,7 @@ def render_repository_sarif(record: dict) -> dict:
     results = [{"ruleId": item["rule_id"], "level": SARIF_LEVEL.get(item["severity"], "warning"), "message": {"text": item["reason"] or item["title"]},
                 "locations": [{"physicalLocation": {"artifactLocation": {"uri": item["path"]},
                                                     "region": {"startLine": item["line"]}}}],
-                "partialFingerprints": {"appsecAgent/v1": item["fingerprint"]},
+                "partialFingerprints": {"tamandua/v1": item["fingerprint"]},
                 **_sarif_suppression(item),
                 "properties": {"verdict": "candidate", "scanner": item["scanner"], "cwe": item["cwe"],
                                "owasp": item["owasp"]}} for item in findings]

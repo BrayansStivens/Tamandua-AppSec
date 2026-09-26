@@ -54,7 +54,7 @@ Para añadir o quitar repositorios más tarde: **Integraciones → Cambiar repos
 
 ## Revisión de pull requests
 
-En **Pull requests** activa la vigilancia por repositorio y elige el umbral de bloqueo. Cada pocos minutos (`APPSEC_AGENT_PR_POLL_SECONDS`) se revisan los PRs abiertos con commits nuevos: solo cuenta lo que el PR introduce frente a la rama principal. El resultado se publica como **un único comentario** que se actualiza y como un estado de commit `appsec-agent`.
+En **Pull requests** activa la vigilancia por repositorio y elige el umbral de bloqueo. Cada pocos minutos (`TAMANDUA_PR_POLL_SECONDS`) se revisan los PRs abiertos con commits nuevos: solo cuenta lo que el PR introduce frente a la rama principal. El resultado se publica como **un único comentario** que se actualiza y como un estado de commit `tamandua`.
 
 ## Alternativa: montar la App como secreto
 

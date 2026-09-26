@@ -43,7 +43,7 @@ class OutboxDrainer:
     def __init__(self, data_dir: Path, interval: float = 10.0):
         self.data_dir, self.interval = data_dir, interval
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._loop, name="appsec-outbox", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="tamandua-outbox", daemon=True)
 
     def start(self) -> None:
         self._thread.start()
@@ -93,7 +93,7 @@ def run(data_dir: Path) -> None:
         jobs.stop()
     signal.signal(signal.SIGTERM, shutdown)
     signal.signal(signal.SIGINT, shutdown)
-    threading.Thread(target=_lead, args=(data_dir, jobs, stop), name="appsec-leader", daemon=True).start()
+    threading.Thread(target=_lead, args=(data_dir, jobs, stop), name="tamandua-leader", daemon=True).start()
     print("Worker en marcha: ejecuta los análisis de la cola.", flush=True)
     jobs.run_worker()
     print("Worker detenido.", flush=True)

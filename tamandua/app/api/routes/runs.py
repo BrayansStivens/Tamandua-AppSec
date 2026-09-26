@@ -653,7 +653,7 @@ def notification_change(request: Request):
 @route("GET", "/api/registries")
 def registry_list(request: Request):
     from tamandua.modules.scanning.image import registries
-    return request.json(200, {"registries": registries(), "allow_private": os.environ.get("APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES", "").strip() == "1"})
+    return request.json(200, {"registries": registries(), "allow_private": os.environ.get("TAMANDUA_ALLOW_PRIVATE_REGISTRIES", "").strip() == "1"})
 
 
 @route("POST", "/api/registries", admin=True, action="save-registry", body=6000)

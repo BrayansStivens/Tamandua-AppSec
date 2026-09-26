@@ -29,7 +29,7 @@ La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 
 ## Logs
 
-`data/logs/app.log` recibe una línea JSON por evento (hora, nivel, componente, identificador de ejecución, método, ruta, estado, duración), rotada a 10 MB × 5; en consola sale legible. `APPSEC_AGENT_LOG_LEVEL=DEBUG` para depurar. No se registran cuerpos, cabeceras ni tokens, y `redact()` tacha patrones de credenciales que pudieran colarse en un mensaje.
+`data/logs/app.log` recibe una línea JSON por evento (hora, nivel, componente, identificador de ejecución, método, ruta, estado, duración), rotada a 10 MB × 5; en consola sale legible. `TAMANDUA_LOG_LEVEL=DEBUG` para depurar. No se registran cuerpos, cabeceras ni tokens, y `redact()` tacha patrones de credenciales que pudieran colarse en un mensaje.
 
 ## Desarrollo y pruebas
 
@@ -44,7 +44,7 @@ cd ..
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Las pruebas necesitan PostgreSQL: `make test` arranca uno efímero en Docker (datos en memoria) y da a cada prueba su propio esquema (`APPSEC_AGENT_DB_ISOLATE=data-dir`). Para correr una sola: `APPSEC_AGENT_DATABASE_URL=$(sh scripts/test-db.sh) APPSEC_AGENT_DB_ISOLATE=data-dir .venv/bin/python -m unittest discover -s tests -p 'test_x.py'`.
+Las pruebas necesitan PostgreSQL: `make test` arranca uno efímero en Docker (datos en memoria) y da a cada prueba su propio esquema (`TAMANDUA_DB_ISOLATE=data-dir`). Para correr una sola: `TAMANDUA_DATABASE_URL=$(sh scripts/test-db.sh) TAMANDUA_DB_ISOLATE=data-dir .venv/bin/python -m unittest discover -s tests -p 'test_x.py'`.
 
 ### Añadir o migrar una ruta de la API
 
@@ -62,7 +62,7 @@ Después, `make openapi` regenera el esquema y los tipos TypeScript del panel (`
 Las tablas se definen en `tamandua/modules/<contexto>/tables.py`. Un cambio lleva su migración de Alembic:
 
 ```bash
-APPSEC_AGENT_DATABASE_URL=… .venv/bin/python -c "from alembic import command; from tamandua.app.database import config; command.revision(config(), message='qué cambia', autogenerate=True)"
+TAMANDUA_DATABASE_URL=… .venv/bin/python -c "from alembic import command; from tamandua.app.database import config; command.revision(config(), message='qué cambia', autogenerate=True)"
 ```
 
 Revisa el archivo generado en `tamandua/app/alembic/versions/`. `tests/test_database.py` falla si las tablas del código y

@@ -60,7 +60,7 @@ export function RegistriesCard({ canManage }: { canManage: boolean }) {
       </form> : <p className="text-xs text-app-subtle">Solo un administrador puede guardar credenciales de registros.</p>}
       <details className="text-xs text-app-muted"><summary className="cursor-pointer">Qué poner en cada registro</summary>
         <table className="mt-2 w-full text-left"><thead><tr className="text-app-subtle"><th scope="col" className="py-1.5 pr-3 font-medium">Registro</th><th scope="col" className="py-1.5 pr-3 font-medium">Usuario</th><th scope="col" className="py-1.5 font-medium">Token</th></tr></thead><tbody>{HINTS.map(([host, user, secret]) => <tr key={host} className="border-t border-app-line"><td className="py-1.5 pr-3 font-mono">{host}</td><td className="py-1.5 pr-3">{user}</td><td className="py-1.5">{secret}</td></tr>)}</tbody></table>
-        {!allowPrivate && <p className="mt-2">Los registros de tu red interna (IP privada) están bloqueados para que nadie use el panel para llegar a servicios internos. Para permitirlos, arranca con <span className="font-mono">APPSEC_AGENT_ALLOW_PRIVATE_REGISTRIES=1</span>.</p>}
+        {!allowPrivate && <p className="mt-2">Los registros de tu red interna (IP privada) están bloqueados para que nadie use el panel para llegar a servicios internos. Para permitirlos, arranca con <span className="font-mono">TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1</span>.</p>}
       </details>
       {error && <div role="alert" className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2 text-xs text-danger">{error}</div>}
     </CardContent>

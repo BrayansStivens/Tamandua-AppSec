@@ -3,7 +3,6 @@
 data
 web/node_modules
 web/dist
-appsec_agent/static
 config
 backups
 .env

@@ -37,7 +37,7 @@ class OptionsTests(unittest.TestCase):
 class RouteTests(HttpCase):
     def setUp(self):
         super().setUp()
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("miembro", PASSWORD)
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})
         self.cookie = cookies[0].split("; ")[0]
@@ -45,7 +45,7 @@ class RouteTests(HttpCase):
         self.run = save_repository_scan(self.data_dir, _scan("org/api", findings, datetime.now(timezone.utc).isoformat()))
 
     def report(self, body):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             return self.post("/api/reports/audit", "audit-report", body, self.cookie)
 
     def test_a_member_generates_one_document_with_the_chosen_findings(self):

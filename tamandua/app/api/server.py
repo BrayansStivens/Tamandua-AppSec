@@ -15,8 +15,8 @@ from tamandua.modules.runs.jobs import ScanJobs
 
 def embedded_worker() -> bool:
     """Un solo proceso (por defecto): el servidor ejecuta también los análisis. En compose, un servicio `worker` aparte
-    los ejecuta y el API corre con APPSEC_AGENT_EMBEDDED_WORKER=0 (sin Docker)."""
-    return os.environ.get("APPSEC_AGENT_EMBEDDED_WORKER", "1").lower() not in ("0", "false", "no", "off")
+    los ejecuta y el API corre con TAMANDUA_EMBEDDED_WORKER=0 (sin Docker)."""
+    return os.environ.get("TAMANDUA_EMBEDDED_WORKER", "1").lower() not in ("0", "false", "no", "off")
 
 
 def build_state(data_dir: Path, *, watch_pull_requests: bool = False, worker: bool | None = None) -> State:
@@ -45,11 +45,11 @@ def transport_check(port: int) -> str | None:
         return None
     if parts.scheme == "http" and (parts.hostname or "") in LOOPBACK:
         return None
-    if os.environ.get("APPSEC_AGENT_ALLOW_INSECURE_HTTP", "").strip() == "1":
+    if os.environ.get("TAMANDUA_ALLOW_INSECURE_HTTP", "").strip() == "1":
         return None
-    return (f"APPSEC_AGENT_PUBLIC_URL={url} expone el panel por HTTP en claro. Usa HTTPS "
-            "(APPSEC_AGENT_TLS_CERT/APPSEC_AGENT_TLS_KEY o un proxy como Caddy delante) o, solo en una red "
-            "de confianza y bajo tu responsabilidad, APPSEC_AGENT_ALLOW_INSECURE_HTTP=1.")
+    return (f"TAMANDUA_PUBLIC_URL={url} expone el panel por HTTP en claro. Usa HTTPS "
+            "(TAMANDUA_TLS_CERT/TAMANDUA_TLS_KEY o un proxy como Caddy delante) o, solo en una red "
+            "de confianza y bajo tu responsabilidad, TAMANDUA_ALLOW_INSECURE_HTTP=1.")
 
 
 def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
@@ -59,19 +59,19 @@ def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
     if problem:
         raise SystemExit(problem)
     # Fuera de un contenedor se escucha solo en loopback; dentro, en todas las interfaces del contenedor.
-    address = bind or os.environ.get("APPSEC_AGENT_BIND", "127.0.0.1")
+    address = bind or os.environ.get("TAMANDUA_BIND", "127.0.0.1")
     state = build_state(data_dir, watch_pull_requests=True)
     from tamandua.app.api import create_app
     import uvicorn
     app = create_app(data_dir, port=port, state=state)
-    cert, key = os.environ.get("APPSEC_AGENT_TLS_CERT", "").strip(), os.environ.get("APPSEC_AGENT_TLS_KEY", "").strip()
+    cert, key = os.environ.get("TAMANDUA_TLS_CERT", "").strip(), os.environ.get("TAMANDUA_TLS_KEY", "").strip()
     print(f"Panel: {public_url(port)} (escuchando en {address}:{port}{', TLS' if cert else ''})", flush=True)
     code = state.auth.setup_code()
     if code:
         # Directo a la consola y no al log en fichero: solo quien ve la consola del servidor puede reclamarlo.
         print("\n" + "=" * 64 + "\n  Primer arranque: crea el administrador en el panel con este código\n"
               f"      {code}\n  (solo sirve una vez y solo mientras no haya usuarios)\n" + "=" * 64 + "\n", flush=True)
-    # Sin cabecera Server, sin confiar en X-Forwarded-* (el host permitido lo decide APPSEC_AGENT_ALLOWED_ORIGINS)
+    # Sin cabecera Server, sin confiar en X-Forwarded-* (el host permitido lo decide TAMANDUA_ALLOWED_ORIGINS)
     # y con los mismos límites de TLS que antes (1.2 como mínimo).
     uvicorn.run(app, host=address, port=port, log_level="warning", access_log=False, server_header=False, proxy_headers=False,
                 ssl_certfile=cert or None, ssl_keyfile=key or None, timeout_keep_alive=5)

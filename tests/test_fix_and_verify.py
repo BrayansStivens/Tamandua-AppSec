@@ -82,7 +82,7 @@ class FixCommandSafetyTests(unittest.TestCase):
 class ReverifyTests(HttpCase):
     def setUp(self):
         super().setUp()
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("miembro", PASSWORD)
             _, _, cookies = self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})
         self.cookie = cookies[0].split("; ")[0]
@@ -91,7 +91,7 @@ class ReverifyTests(HttpCase):
                                                              datetime.now(timezone.utc).isoformat()))
 
     def reverify(self, fingerprint, run_id=None):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             return self.post("/api/findings/reverify", "reverify-finding", {"run_id": run_id or self.run["id"], "fingerprint": fingerprint}, self.cookie)
 
     def test_reverify_rescans_once_and_reports_the_outcome(self):

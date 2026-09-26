@@ -84,7 +84,7 @@ def check_url(kind: str, url: str) -> str:
         raise NotificationError("La URL debe ser https y sin usuario ni contraseña")
     if kind in HOSTS and not HOSTS[kind].fullmatch(host):
         raise NotificationError(f"No parece una URL de {KINDS[kind]}: {host}")
-    if os.environ.get("APPSEC_AGENT_ALLOW_PRIVATE_WEBHOOKS", "").strip() != "1":
+    if os.environ.get("TAMANDUA_ALLOW_PRIVATE_WEBHOOKS", "").strip() != "1":
         # El servidor hará la petición: una dirección interna convertiría el formulario en un SSRF.
         try:
             addresses = {info[4][0] for info in socket.getaddrinfo(host, parts.port or 443, proto=socket.IPPROTO_TCP)}
@@ -92,7 +92,7 @@ def check_url(kind: str, url: str) -> str:
             raise NotificationError(f"No se pudo resolver {host}") from exc
         if not addresses or not all(ipaddress.ip_address(address.split("%")[0]).is_global for address in addresses):
             raise NotificationError(f"{host} resuelve a una dirección privada. Para un receptor de tu red, arranca con "
-                                    "APPSEC_AGENT_ALLOW_PRIVATE_WEBHOOKS=1.")
+                                    "TAMANDUA_ALLOW_PRIVATE_WEBHOOKS=1.")
     return url.strip()
 
 
@@ -143,7 +143,7 @@ def _record_delivery(identifier: str, ok: bool, detail: str) -> None:
 # ------------------------------------------------------------------ mensajes
 
 def panel_link(run_id: str | None = None) -> str | None:
-    base = os.environ.get("APPSEC_AGENT_PUBLIC_URL", "").strip().rstrip("/")
+    base = os.environ.get("TAMANDUA_PUBLIC_URL", "").strip().rstrip("/")
     if not base.startswith(("https://", "http://")):
         return None
     return f"{base}/#/hallazgos?run={run_id}" if run_id else base
@@ -248,7 +248,7 @@ def _send(identifier: str, channel: dict, payload: dict, sender=None) -> threadi
         _record_delivery(identifier, ok, detail)
         (_log.info if ok else _log.warning)("notification_sent" if ok else "notification_failed",
                                            extra={"reason": f"{channel['kind']} {channel['name']}: {detail}"})
-    thread = threading.Thread(target=send, name="appsec-notify", daemon=True)
+    thread = threading.Thread(target=send, name="tamandua-notify", daemon=True)
     thread.start()
     return thread
 

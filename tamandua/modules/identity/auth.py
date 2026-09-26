@@ -60,7 +60,7 @@ BACKUP_CODES = 8
 LINK_TTL = 72 * 3600
 TOTP_POLICIES = ("admins", "all", "none")
 LOCK_BASE, LOCK_MAX, LOCK_AFTER = 30, 900, 5
-COOKIE_NAME = "appsec_session"
+COOKIE_NAME = "tamandua_session"
 _log = logging_setup.get("auth")
 _SCRYPT_SLOTS = threading.BoundedSemaphore(8)
 
@@ -567,7 +567,7 @@ class Authenticator:
 
     @staticmethod
     def totp_policy() -> str:
-        value = os.environ.get("APPSEC_AGENT_REQUIRE_TOTP", "admins").strip().lower()
+        value = os.environ.get("TAMANDUA_REQUIRE_TOTP", "admins").strip().lower()
         return value if value in TOTP_POLICIES else "admins"
 
     def needs_totp(self, user: dict) -> bool:

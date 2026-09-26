@@ -77,11 +77,10 @@ tabla (`routing.mount`). Los manejadores no leen cabeceras ni cookies por su cue
 500 sin traza.
 El panel React + TypeScript (`web/`) se compila a `tamandua/app/static/`.
 
-Servicios (compose): `appsec` (panel y API con FastAPI, sin acceso a Docker), `worker` (ejecuta los análisis de la
+Servicios (compose): `api` (panel y API con FastAPI, sin acceso a Docker), `worker` (ejecuta los análisis de la
 cola y las tareas periódicas; el único con el socket de Docker; se puede escalar y las tareas periódicas solo las corre el
 líder, elegido con un cerrojo de PostgreSQL), `postgres` y `opengrep` (solo construye la imagen del motor). La cola
 (`jobs`) y el buzón de avisos (`outbox`, con reintentos) viven en PostgreSQL: un reinicio no pierde lo encolado.
-`python -m appsec_agent` y las variables `APPSEC_AGENT_*` siguen funcionando.
 
 ## Flujo de un análisis
 

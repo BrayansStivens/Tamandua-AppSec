@@ -168,7 +168,7 @@ function SetupCard({ onDone }: { onDone: () => void }) {
     <CardContent><form className="space-y-4" onSubmit={submit}>
       <div className="space-y-1.5"><label htmlFor="setup-code" className="text-xs text-app-muted">Código de configuración</label>
         <Input id="setup-code" autoFocus required autoComplete="off" spellCheck={false} maxLength={20} value={code} onChange={event => setCode(event.target.value.toUpperCase())} placeholder="XXXX-XXXX-XXXX" className="border-app-line bg-app-soft font-mono tracking-widest" />
-        <p className="text-[11px] leading-4 text-app-subtle">Con Docker: <code className="font-mono">docker compose logs appsec</code>. Sirve una sola vez.</p></div>
+        <p className="text-[11px] leading-4 text-app-subtle">Con Docker: <code className="font-mono">docker compose logs api</code>. Sirve una sola vez.</p></div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5"><label htmlFor="setup-user" className="text-xs text-app-muted">Usuario</label><Input id="setup-user" required autoComplete="username" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{1,38}[A-Za-z0-9]" maxLength={40} value={username} onChange={event => setUsername(event.target.value)} className="border-app-line bg-app-soft" /></div>
         <div className="space-y-1.5"><label htmlFor="setup-name" className="text-xs text-app-muted">Nombre (opcional)</label><Input id="setup-name" maxLength={80} value={displayName} onChange={event => setDisplayName(event.target.value)} className="border-app-line bg-app-soft" /></div>

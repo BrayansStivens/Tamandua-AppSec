@@ -26,7 +26,7 @@ LABEL org.opencontainers.image.title="Tamandua" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="${VERSION}"
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 LANG=C.UTF-8 \
-    APPSEC_AGENT_BIND=0.0.0.0 APPSEC_AGENT_DATA_DIR=/data APPSEC_AGENT_CONFIG_DIR=/config
+    TAMANDUA_BIND=0.0.0.0 TAMANDUA_DATA_DIR=/data TAMANDUA_CONFIG_DIR=/config
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl dnsutils git \
  && ARCH="$(dpkg --print-architecture)" && case "$ARCH" in amd64) A=x86_64 ;; arm64) A=aarch64 ;; *) echo "arquitectura no soportada: $ARCH" && exit 1 ;; esac \
  && curl -fsSL --proto '=https' --tlsv1.2 "https://download.docker.com/linux/static/stable/${A}/docker-${DOCKER_CLI_VERSION}.tgz" -o /tmp/docker.tgz \
@@ -39,9 +39,9 @@ COPY tamandua/ ./tamandua/
 COPY rules/ ./rules/
 COPY --from=web /src/tamandua/app/static ./tamandua/app/static
 # Usuario sin privilegios; compose alinea su UID/GID con el del host para que data/ y config/ sean tuyos.
-RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin appsec \
- && mkdir -p /data /config && chown -R appsec:appsec /data /config
-USER appsec
+RUN useradd --uid 10001 --create-home --shell /usr/sbin/nologin tamandua \
+ && mkdir -p /data /config && chown -R tamandua:tamandua /data /config
+USER tamandua
 VOLUME ["/data", "/config"]
 EXPOSE 8766
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \

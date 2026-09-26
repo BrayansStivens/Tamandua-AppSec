@@ -44,7 +44,7 @@ def guard(policy: Policy = Policy()):
     def dependency(request: Request) -> Context:
         state: State = request.app.state.core
         verdict = authorize(state, policy, method=request.method, port=request.app.state.port,
-                            origin=request.headers.get("origin"), action=request.headers.get("x-appsec-agent-action"),
+                            origin=request.headers.get("origin"), action=request.headers.get("x-tamandua-action"),
                             cookie=request.headers.get("cookie"))
         if isinstance(verdict, Denied):
             raise ApiError(verdict.status, verdict.message, **verdict.extra)

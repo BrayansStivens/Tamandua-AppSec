@@ -1,6 +1,6 @@
 #!/bin/sh
 # Postgres efímero para las pruebas (datos en memoria). Imprime la URL de conexión.
-# Cada prueba usa su propio esquema (APPSEC_AGENT_DB_ISOLATE=data-dir), así que el contenedor se reutiliza.
+# Cada prueba usa su propio esquema (TAMANDUA_DB_ISOLATE=data-dir), así que el contenedor se reutiliza.
 set -eu
 NAME=tamandua-test-db
 IMAGE="postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873"

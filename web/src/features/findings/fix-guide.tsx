@@ -3,7 +3,7 @@ import { Check, Copy, LoaderCircle, RefreshCw } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { api } from '@/shared/api/http'
 
-// Cómo corregir un hallazgo (appsec_agent/fix_guide.py) y reverificarlo (verifications.py): cierra el ciclo
+// Cómo corregir un hallazgo (tamandua/modules/findings/fix_guide.py) y reverificarlo (verifications.py): cierra el ciclo
 // encontrar → corregir → verificar sin buscar el hallazgo a mano en un análisis nuevo.
 export type FixGuide = { kind: 'dependency' | 'code' | 'secret' | 'config'; steps: string[]; commands: { label: string; code: string }[]
   example: { language: string; before: string; after: string; note?: string } | null }

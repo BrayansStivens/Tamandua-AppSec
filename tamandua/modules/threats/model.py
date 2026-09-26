@@ -240,7 +240,7 @@ def to_portable(model: dict, assets: dict[str, dict] | None = None) -> dict:
         entry = {key: value for key, value in component.items() if key != "asset"}
         entry["asset_ref"] = label(component["asset"]) if component.get("asset") else component.get("asset_ref") or ""
         portable["components"].append(entry)
-    return {"format": "appsec-agent-threat-model", "version": 1, "model": portable}
+    return {"format": "tamandua-threat-model", "version": 1, "model": portable}
 
 
 def from_portable(document: dict) -> dict:
@@ -248,7 +248,7 @@ def from_portable(document: dict) -> dict:
     if not isinstance(document, dict):
         raise ModelError("El archivo debe contener un objeto JSON")
     if "format" in document or "version" in document:
-        if document.get("format") != "appsec-agent-threat-model" or document.get("version") != 1:
+        if document.get("format") != "tamandua-threat-model" or document.get("version") != 1:
             raise ModelError("Formato o versión de modelo no compatible")
         raw = document.get("model")
     else:

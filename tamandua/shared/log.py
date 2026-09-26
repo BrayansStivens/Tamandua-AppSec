@@ -2,7 +2,7 @@
 
 Una línea por evento con hora, nivel, componente y campos propios. El fichero
 vive en `data/logs/app.log`; en consola sale legible. El nivel se controla con
-`APPSEC_AGENT_LOG_LEVEL` (DEBUG para depurar). Nunca se registran cuerpos de
+`TAMANDUA_LOG_LEVEL` (DEBUG para depurar). Nunca se registran cuerpos de
 petición, cabeceras ni tokens: `redact()` existe para lo que pudiera colarse.
 """
 
@@ -19,7 +19,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 SECRET_PATTERN = re.compile(r"(ghp_|ghs_|ghu_|gho_|ghr_|github_pat_|sk-[A-Za-z0-9-]|xox[abp]-|AKIA|ATATT|eyJ[A-Za-z0-9_-]{10,}"
-                            r"|appsec-agent-verify=|Bearer |Basic |token=|apiKey=|client_secret=)[A-Za-z0-9_\-./+=]*")
+                            r"|tamandua-verify=|Bearer |Basic |token=|apiKey=|client_secret=)[A-Za-z0-9_\-./+=]*")
 PEM_PATTERN = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?(-----END [A-Z ]*PRIVATE KEY-----|$)", re.S)
 _configured = False
 _known: set[str] = set()
@@ -69,10 +69,10 @@ class ConsoleFormatter(logging.Formatter):
 
 def configure(data_dir: Path) -> logging.Logger:
     global _configured
-    root = logging.getLogger("appsec")
+    root = logging.getLogger("tamandua")
     if _configured:
         return root
-    level = getattr(logging, os.environ.get("APPSEC_AGENT_LOG_LEVEL", "INFO").upper(), logging.INFO)
+    level = getattr(logging, os.environ.get("TAMANDUA_LOG_LEVEL", "INFO").upper(), logging.INFO)
     root.setLevel(level)
     root.propagate = False
     logs = data_dir / "logs"
@@ -87,4 +87,4 @@ def configure(data_dir: Path) -> logging.Logger:
 
 
 def get(component: str) -> logging.Logger:
-    return logging.getLogger(f"appsec.{component}")
+    return logging.getLogger(f"tamandua.{component}")

@@ -62,15 +62,15 @@ for dir in data config; do
   fi
 done
 if [ -f .env ]; then
-  uid=$(sed -n 's/^APPSEC_UID=//p' .env | tail -n1); gid=$(sed -n 's/^APPSEC_GID=//p' .env | tail -n1)
-  if [ "${uid:-}" = "$(id -u)" ] && [ "${gid:-}" = "$(id -g)" ]; then pass "APPSEC_UID/GID coinciden con tu usuario"; else note "APPSEC_UID/GID de .env ($uid/$gid) no son los tuyos ($(id -u)/$(id -g))" "Corrígelos en .env o borra .env y ejecuta 'make setup'."; fi
-  port=$(sed -n 's/^APPSEC_PORT=//p' .env | tail -n1)
+  uid=$(sed -n 's/^TAMANDUA_UID=//p' .env | tail -n1); gid=$(sed -n 's/^TAMANDUA_GID=//p' .env | tail -n1)
+  if [ "${uid:-}" = "$(id -u)" ] && [ "${gid:-}" = "$(id -g)" ]; then pass "TAMANDUA_UID/GID coinciden con tu usuario"; else note "TAMANDUA_UID/GID de .env ($uid/$gid) no son los tuyos ($(id -u)/$(id -g))" "Corrígelos en .env o borra .env y ejecuta 'make setup'."; fi
+  port=$(sed -n 's/^TAMANDUA_HOST_PORT=//p' .env | tail -n1)
 fi
 port=${port:-8766}
-if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx appsec-agent; then
+if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx tamandua; then
   pass "Tamandua ya está en marcha (puerto $port)"
 elif (command -v nc >/dev/null 2>&1 && nc -z 127.0.0.1 "$port" 2>/dev/null); then
-  bad "el puerto $port está ocupado por otro programa" "Cambia APPSEC_PORT, APPSEC_AGENT_PUBLIC_URL y APPSEC_AGENT_ALLOWED_ORIGINS en .env."
+  bad "el puerto $port está ocupado por otro programa" "Cambia TAMANDUA_HOST_PORT, TAMANDUA_PUBLIC_URL y TAMANDUA_ALLOWED_ORIGINS en .env."
 else
   pass "puerto $port libre"
 fi

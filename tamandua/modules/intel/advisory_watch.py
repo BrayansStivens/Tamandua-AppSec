@@ -35,9 +35,9 @@ PURL_TYPE = {"npm": "npm", "pypi": "pypi", "go": "golang", "cargo": "cargo", "co
 
 
 def hours() -> int:
-    """Cada cuántas horas se contrasta (APPSEC_AGENT_ADVISORY_WATCH_HOURS; 0 lo apaga)."""
+    """Cada cuántas horas se contrasta (TAMANDUA_ADVISORY_WATCH_HOURS; 0 lo apaga)."""
     try:
-        return max(0, int(os.environ.get("APPSEC_AGENT_ADVISORY_WATCH_HOURS", "24") or 24))
+        return max(0, int(os.environ.get("TAMANDUA_ADVISORY_WATCH_HOURS", "24") or 24))
     except ValueError:
         return 24
 
@@ -216,7 +216,7 @@ class Watcher:
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._loop, name="appsec-advisory-watch", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="tamandua-advisory-watch", daemon=True)
 
     def start(self) -> None:
         if hours():

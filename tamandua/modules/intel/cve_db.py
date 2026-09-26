@@ -11,7 +11,7 @@ en segundo plano:
 3. **KEV y EPSS** se vuelcan a sus tablas cuando cambia el fichero descargado.
 
 Solo viajan a NVD rangos de índices y de fechas; ningún dato del cliente. La API key
-opcional (`APPSEC_AGENT_NVD_API_KEY`) va en cabecera y nunca se registra.
+opcional (`TAMANDUA_NVD_API_KEY`) va en cabecera y nunca se registra.
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from tamandua.shared import log as logging_setup
+from tamandua.version import USER_AGENT
 
 _log = logging_setup.get("cve-db")
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -142,8 +143,8 @@ def upsert(connection: sqlite3.Connection, entries: list[dict]) -> int:
 
 
 def _nvd_get(params: dict) -> dict:
-    headers = {"User-Agent": "AppSecAgent/0.9", "Accept": "application/json"}
-    key = os.environ.get("APPSEC_AGENT_NVD_API_KEY", "").strip()
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+    key = os.environ.get("TAMANDUA_NVD_API_KEY", "").strip()
     if key:
         headers["apiKey"] = key
     with urlopen(Request(f"{NVD_URL}?{urlencode(params)}", headers=headers), timeout=120) as response:
@@ -155,7 +156,7 @@ def _nvd_get(params: dict) -> dict:
 
 def pause() -> float:
     # Límite público de NVD: 5 peticiones / 30 s sin key, 50 / 30 s con key.
-    return 0.8 if os.environ.get("APPSEC_AGENT_NVD_API_KEY", "").strip() else 6.5
+    return 0.8 if os.environ.get("TAMANDUA_NVD_API_KEY", "").strip() else 6.5
 
 
 def _stamp(value: datetime) -> str:
@@ -231,15 +232,15 @@ def load_signals(data_dir: Path, feeds: dict) -> None:
 
 
 class Syncer:
-    """Hilo que mantiene la base al día. Solo lo arranca `serve`; se puede apagar con APPSEC_AGENT_CVE_SYNC=off."""
+    """Hilo que mantiene la base al día. Solo lo arranca `serve`; se puede apagar con TAMANDUA_CVE_SYNC=off."""
 
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._loop, name="appsec-cve-sync", daemon=True)
+        self._thread = threading.Thread(target=self._loop, name="tamandua-cve-sync", daemon=True)
 
     def start(self) -> None:
-        if os.environ.get("APPSEC_AGENT_CVE_SYNC", "on").lower() in ("off", "0", "false", "no"):
+        if os.environ.get("TAMANDUA_CVE_SYNC", "on").lower() in ("off", "0", "false", "no"):
             return
         self._thread.start()
 

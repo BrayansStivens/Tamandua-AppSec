@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 from tamandua.shared import documents
+from tamandua.version import USER_AGENT
 
 
 class DomainError(ValueError):
@@ -76,8 +77,8 @@ def register_domain(data_dir: Path, url: str, kind: str = "web", context: str = 
     if len(rows) >= 20:
         raise DomainError("Máximo de dominios registrados alcanzado")
     record = {"id": secrets.token_hex(12), "host": host, "url": normalized, "kind": kind,
-              "context": declared, "txt_name": f"_appsec-agent.{host}",
-              "txt_value": f"appsec-agent-verify={secrets.token_urlsafe(24)}",
+              "context": declared, "txt_name": f"_tamandua.{host}",
+              "txt_value": f"tamandua-verify={secrets.token_urlsafe(24)}",
               "verified": False, "registered_at": datetime.now(timezone.utc).isoformat(), "verified_at": None}
     rows.append(record)
     _write(data_dir, rows)
@@ -143,7 +144,7 @@ def check_reachability(url: str) -> dict:
                 connection = http.client.HTTPSConnection(host, 443, timeout=6)
                 connection.sock = secure
                 connection.request("HEAD", path, headers={
-                    "Host": host, "User-Agent": "appsec-agent-local", "Accept": "*/*", "Connection": "close"})
+                    "Host": host, "User-Agent": USER_AGENT, "Accept": "*/*", "Connection": "close"})
                 code = connection.getresponse().status
     except ssl.SSLCertVerificationError:
         return {"host": host, "reachable": False, "status": "tls_error",

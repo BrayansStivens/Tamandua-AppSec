@@ -6,7 +6,7 @@ El fichero (`secrets.vault`) y la clave maestra (`master.key`) viven en el direc
 de configuración, fuera de `data/` —que es lo que se suele copiar, compartir o subir
 con los logs— y con permisos solo del propietario.
 
-La clave maestra puede venir del entorno (`APPSEC_AGENT_MASTER_KEY`, 32 bytes en
+La clave maestra puede venir del entorno (`TAMANDUA_MASTER_KEY`, 32 bytes en
 base64), que es lo recomendable en un despliegue con gestor de secretos: así el
 almacén copiado sin la clave no sirve de nada. Si no, se genera una la primera vez.
 
@@ -64,14 +64,14 @@ def _write_private(path: Path, content: bytes, mode: int = stat.S_IRUSR | stat.S
 
 
 def _master_key() -> bytes:
-    configured = os.environ.get("APPSEC_AGENT_MASTER_KEY", "").strip()
+    configured = os.environ.get("TAMANDUA_MASTER_KEY", "").strip()
     if configured:
         try:
             key = base64.b64decode(configured, validate=True)
         except ValueError as exc:
-            raise VaultError("APPSEC_AGENT_MASTER_KEY no es base64 válido") from exc
+            raise VaultError("TAMANDUA_MASTER_KEY no es base64 válido") from exc
         if len(key) != 32:
-            raise VaultError("APPSEC_AGENT_MASTER_KEY debe tener 32 bytes (openssl rand -base64 32)")
+            raise VaultError("TAMANDUA_MASTER_KEY debe tener 32 bytes (openssl rand -base64 32)")
         return key
     path = _private_dir() / KEY_FILE
     try:

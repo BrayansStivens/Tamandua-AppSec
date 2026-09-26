@@ -53,7 +53,7 @@ class ScanJobs:
         self.leader = worker
         if worker:
             self.prepare(embedded=True)
-            self._thread = threading.Thread(target=self.run_worker, name="appsec-scans", daemon=True)
+            self._thread = threading.Thread(target=self.run_worker, name="tamandua-scans", daemon=True)
             self._thread.start()
 
     def prepare(self, *, embedded: bool) -> None:
@@ -383,7 +383,7 @@ class ScanJobs:
                                                 gate=config["gate"], tools=outcome.get("tools"),
                                                 # Solo se enlaza un panel público declarado: nunca el host interno.
                                                 panel_url=(lambda url: url if url.startswith("https://") else None)(
-                                                    os.environ.get("APPSEC_AGENT_PUBLIC_URL", "").strip()))
+                                                    os.environ.get("TAMANDUA_PUBLIC_URL", "").strip()))
                 delivery["comment"] = upsert_pr_comment(installation, repository, pull["number"], body)
                 progress("ok", "Comentario publicado en el PR.")
                 unused = outcome.get("unused") or {}

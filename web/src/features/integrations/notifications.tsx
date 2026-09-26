@@ -97,7 +97,7 @@ export function NotificationsCard() {
           {data.channels.length > 0 && <Button type="button" variant="ghost" onClick={() => setAdding(false)}>Cancelar</Button>}
           <span className="flex items-center gap-1.5 text-xs text-app-subtle"><ShieldCheck className="size-3.5" />La URL se guarda cifrada y nunca vuelve al navegador.</span>
         </div>
-        {!data.links && <p className="text-xs text-app-subtle">Para que los mensajes enlacen al hallazgo, define APPSEC_AGENT_PUBLIC_URL con la dirección del panel.</p>}
+        {!data.links && <p className="text-xs text-app-subtle">Para que los mensajes enlacen al hallazgo, define TAMANDUA_PUBLIC_URL con la dirección del panel.</p>}
       </form>}
       {/* Regiones vivas siempre montadas: así se anuncia el texto cuando cambia. */}
       <p role="status" className="text-xs text-app-muted empty:hidden">{notice}</p>

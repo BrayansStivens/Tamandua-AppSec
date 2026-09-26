@@ -38,13 +38,13 @@ class FirstRunTests(HttpCase):
     def test_plain_http_is_refused_outside_loopback(self):
         for url, allowed in (("http://127.0.0.1:8766", True), ("http://localhost:8766", True), ("https://appsec.acme.io", True),
                              ("http://192.168.1.20:8766", False), ("http://appsec.acme.io", False)):
-            with self.subTest(url=url), patch.dict(os.environ, {"APPSEC_AGENT_PUBLIC_URL": url}):
+            with self.subTest(url=url), patch.dict(os.environ, {"TAMANDUA_PUBLIC_URL": url}):
                 self.assertEqual(transport_check(8766) is None, allowed)
-        with patch.dict(os.environ, {"APPSEC_AGENT_PUBLIC_URL": "http://192.168.1.20:8766", "APPSEC_AGENT_ALLOW_INSECURE_HTTP": "1"}):
+        with patch.dict(os.environ, {"TAMANDUA_PUBLIC_URL": "http://192.168.1.20:8766", "TAMANDUA_ALLOW_INSECURE_HTTP": "1"}):
             self.assertIsNone(transport_check(8766))
 
     def test_security_headers(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_PUBLIC_URL": "https://appsec.acme.io", "APPSEC_AGENT_ALLOWED_ORIGINS": "https://appsec.acme.io"}):
+        with patch.dict(os.environ, {"TAMANDUA_PUBLIC_URL": "https://appsec.acme.io", "TAMANDUA_ALLOWED_ORIGINS": "https://appsec.acme.io"}):
             raw = self.raw("GET", "/api/health", {"Host": "appsec.acme.io"})
         self.assertIn(b"Strict-Transport-Security: max-age=31536000", raw)
         self.assertIn(b"Referrer-Policy: no-referrer", raw)

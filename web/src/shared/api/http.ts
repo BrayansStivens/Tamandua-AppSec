@@ -51,12 +51,12 @@ export const api = {
     track(fetch(path, { credentials: 'same-origin', signal: init?.signal }).then(response => parse<T>(response, path))),
   post: <T>(path: string, action: string, body: unknown, init?: { signal?: AbortSignal }) => track(fetch(path, {
     method: 'POST', credentials: 'same-origin', signal: init?.signal,
-    headers: { 'Content-Type': 'application/json', 'X-AppSec-Agent-Action': action }, body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json', 'X-Tamandua-Action': action }, body: JSON.stringify(body),
   }).then(response => parse<T>(response, path))),
   // Descarga la respuesta de un POST (p. ej. un informe generado con opciones de un formulario).
   downloadPost: (path: string, action: string, body: unknown, filename: string) => track(fetch(path, {
     method: 'POST', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-AppSec-Agent-Action': action }, body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json', 'X-Tamandua-Action': action }, body: JSON.stringify(body),
   }).then(async response => {
     if (!response.ok) { await parse(response, path); throw new ApiError(`Error ${response.status}`, response.status) }
     saveBlob(await response.blob(), filename)

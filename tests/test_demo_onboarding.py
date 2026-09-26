@@ -43,7 +43,7 @@ class DemoTests(unittest.TestCase):
 
 class OnboardingTests(HttpCase):
     def test_steps_follow_the_real_state(self):
-        with patch.dict(os.environ, {"APPSEC_AGENT_REQUIRE_TOTP": "none"}):
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("admin", PASSWORD, role="admin")
             cookie = self.post("/api/auth/login", "login", {"username": "admin", "password": PASSWORD})[2][0].split("; ")[0]
             _, state, _ = self.call("GET", "/api/onboarding", headers={"Cookie": cookie})

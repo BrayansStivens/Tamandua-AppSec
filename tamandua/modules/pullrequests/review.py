@@ -136,7 +136,7 @@ def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str 
         lines += ["> [!CAUTION]",
                   f"> **{_plural(state['blocking'], 'hallazgo nuevo bloquea', 'hallazgos nuevos bloquean')} este PR** "
                   f"(severidad {GATE_LABEL.get(gate, gate)}).",
-                  "> Corrígelo antes de mergear: el estado `appsec-agent` se recalcula en cada push."]
+                  "> Corrígelo antes de mergear: el estado `tamandua` se recalcula en cada push."]
     elif introduced:
         lines += ["> [!WARNING]", f"> **{_plural(len(introduced), 'hallazgo nuevo', 'hallazgos nuevos')}** por debajo del umbral de bloqueo.",
                   "> Revísalos antes de mergear. No bloquean el PR."]

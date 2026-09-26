@@ -60,7 +60,7 @@ fecha de caducidad: queda como evidencia y no vuelve a molestar.
 - **Avisos nuevos a diario:** activos por defecto. Una vez al día se contrastan tus dependencias con los
   avisos publicados después del último análisis, sin conexión.
 - **Avisos a tu canal:** en **Integraciones → Avisos**, añade Slack, Teams o un webhook para enterarte sin abrir
-  el panel. Para que los mensajes enlacen al hallazgo, define `APPSEC_AGENT_PUBLIC_URL`.
+  el panel. Para que los mensajes enlacen al hallazgo, define `TAMANDUA_PUBLIC_URL`.
 
 ## 6. Más adelante (opcional)
 

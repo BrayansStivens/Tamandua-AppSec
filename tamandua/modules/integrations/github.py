@@ -27,6 +27,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from tamandua.version import USER_AGENT
 
 API = "https://api.github.com"
 WEB = "https://github.com"
@@ -176,7 +177,7 @@ def install_url() -> str:
 def _get(url: str, token: str, *, jwt: bool = False, forbidden: str | None = None) -> dict | list:
     request = Request(url, headers={
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}",
-        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "AppSecAgent/0.4"})
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
         with build_opener(_NoRedirect).open(request, timeout=15) as response:
             return json.loads(response.read(2_000_000))
@@ -231,7 +232,7 @@ def installation_token(installation_id: int) -> str:
         return cached[0]
     request = Request(f"{API}/app/installations/{installation_id}/access_tokens", data=b"", method="POST", headers={
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {_app_jwt()}",
-        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "AppSecAgent/0.4"})
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
         with build_opener(_NoRedirect).open(request, timeout=15) as response:
             payload = json.loads(response.read(200_000))
@@ -418,7 +419,7 @@ def installation_repositories_snapshot(installation_id: int, *, fresh: bool = Fa
                 with _repos_guard:
                     _repos_errors[installation_id] = (time.time(), str(exc))
             except Exception:
-                logging.getLogger("appsec.github").exception("repository_catalog_sync_failed")
+                logging.getLogger("tamandua.github").exception("repository_catalog_sync_failed")
                 with _repos_guard:
                     _repos_errors[installation_id] = (time.time(), "No se pudo sincronizar el catálogo de repositorios")
             finally:
@@ -564,7 +565,7 @@ def _scoped_repository(installation_id: int, name: str) -> dict | None:
     body = json.dumps({"repositories": [name], "permissions": {"metadata": "read"}}).encode()
     request = Request(f"{API}/app/installations/{installation_id}/access_tokens", data=body, method="POST", headers={
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {_app_jwt()}", "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "AppSecAgent/0.4"})
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
         with build_opener(_NoRedirect).open(request, timeout=15) as response:
             payload = json.loads(response.read(2_000_000))
@@ -633,8 +634,8 @@ def installation_repository_by_uid(installation_id: int, uid: str) -> dict | Non
 # ------------------------------------------------------------ pull requests
 
 REPO_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")
-COMMENT_MARKER = "<!-- appsec-agent:pr-review -->"
-UNUSED_MARKER = "<!-- appsec-agent:unused-dependencies -->"
+COMMENT_MARKER = "<!-- tamandua:pr-review -->"
+UNUSED_MARKER = "<!-- tamandua:unused-dependencies -->"
 PULLS_FORBIDDEN = ("La GitHub App no puede leer los pull requests de este repositorio: su instalación necesita el "
                    "permiso «Pull requests». El operador lo añade en la configuración de la App y la cuenta acepta la actualización.")
 
@@ -642,7 +643,7 @@ PULLS_FORBIDDEN = ("La GitHub App no puede leer los pull requests de este reposi
 def _send_json(method: str, url: str, token: str, body: dict) -> dict:
     request = Request(url, data=json.dumps(body).encode("utf-8"), method=method, headers={
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}", "Content-Type": "application/json",
-        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "AppSecAgent/0.7"})
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
         with build_opener(_NoRedirect).open(request, timeout=15) as response:
             payload = json.loads(response.read(2_000_000) or b"{}")
@@ -737,7 +738,7 @@ def set_commit_status(installation_id: int, repository: str, sha: str, state: st
     if state not in ("success", "failure", "error", "pending") or not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise GitHubAppError("Estado de commit inválido")
     _send_json("POST", f"{API}/repos/{_repo(repository)}/statuses/{sha}", installation_token(installation_id),
-               {"state": state, "context": "appsec-agent", "description": description[:140]})
+               {"state": state, "context": "tamandua", "description": description[:140]})
 
 
 # ------------------------------------------------------------ mínimo privilegio

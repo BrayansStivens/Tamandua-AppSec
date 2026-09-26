@@ -37,8 +37,8 @@ jobs:
         ports: ["5432:5432"]
         options: --health-cmd "pg_isready -U tamandua" --health-interval 2s --health-timeout 5s --health-retries 30
     env:
-      APPSEC_AGENT_DATABASE_URL: postgresql+psycopg://tamandua:tamandua@127.0.0.1:5432/tamandua
-      APPSEC_AGENT_DB_ISOLATE: data-dir
+      TAMANDUA_DATABASE_URL: postgresql+psycopg://tamandua:tamandua@127.0.0.1:5432/tamandua
+      TAMANDUA_DB_ISOLATE: data-dir
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
@@ -123,7 +123,7 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)" \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "$PWD":/src:ro -v "$RUNNER_TEMP/tamandua-data":/data \
-            "appsec-agent/app:$version" python -m tamandua scan /src --name appsec-agent \
+            "tamandua/app:$version" python -m tamandua scan /src --name tamandua \
             --exclude fixtures/ "${scope[@]}" --format sarif --output /data/tamandua.sarif
       - name: ¿Hay SARIF?
         id: sarif

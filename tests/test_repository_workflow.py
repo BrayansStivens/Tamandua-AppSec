@@ -265,7 +265,7 @@ class DownloadTests(unittest.TestCase):
         messages = []
         opener = type("Opener", (), {"open": lambda self, *a, **k: response})()
         with tempfile.TemporaryDirectory() as temporary, \
-                patch.dict("os.environ", {"APPSEC_AGENT_DOWNLOAD_TIMEOUT": timeout}), \
+                patch.dict("os.environ", {"TAMANDUA_DOWNLOAD_TIMEOUT": timeout}), \
                 patch("tamandua.modules.sources.repositories.build_opener", return_value=opener), \
                 patch("tamandua.modules.sources.repositories.time.monotonic", side_effect=lambda: clock[0]):
             written = repository_sources._download_archive("https://api.github.com/x", "t", "github", Path(temporary) / "a.tar.gz",
@@ -319,7 +319,7 @@ class EngineCauseTests(unittest.TestCase):
         from tamandua.modules.scanning.engines import with_cause
         failed = subprocess.CompletedProcess([], 125, "", "\x1b[31mdocker: Error response from daemon: invalid mount /c/Users/yo/tamandua/data/work/x "
                                                              "token ghp_abcdefghijklmnopqrstuvwxyz123456\x1b[0m\n")
-        with patch.dict("os.environ", {"APPSEC_AGENT_HOST_DATA_DIR": "/c/Users/yo/tamandua/data"}):
+        with patch.dict("os.environ", {"TAMANDUA_HOST_DATA_DIR": "/c/Users/yo/tamandua/data"}):
             text = with_cause("Gitleaks terminó con error.", failed)
         self.assertTrue(text.startswith("Gitleaks terminó con error: docker: Error response from daemon: invalid mount <datos>/work/x"))
         self.assertNotIn("ghp_", text)
@@ -332,7 +332,7 @@ class EngineCauseTests(unittest.TestCase):
                              {"Type": "bind", "Source": "/var/run/docker.sock", "Destination": "/var/run/docker.sock"}])
         scanners._own_mounts.update(at=None, mounts={})
         # En PowerShell `${PWD}` llega vacío y compose deja la ruta del host en `/data`.
-        with patch.dict("os.environ", {"APPSEC_AGENT_DATA_DIR": "/data", "APPSEC_AGENT_HOST_DATA_DIR": "/data", "HOSTNAME": "074eeb4e2cfd"}), \
+        with patch.dict("os.environ", {"TAMANDUA_DATA_DIR": "/data", "TAMANDUA_HOST_DATA_DIR": "/data", "HOSTNAME": "074eeb4e2cfd"}), \
                 patch.object(scanners, "in_container", return_value=True), \
                 patch.object(scanners.shutil, "which", return_value="/usr/bin/docker"), \
                 patch.object(scanners.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, mounts, "")), \
@@ -344,10 +344,10 @@ class EngineCauseTests(unittest.TestCase):
     def test_without_docker_answer_a_bad_env_path_is_explained(self):
         from tamandua.modules.scanning import engines as scanners
         scanners._own_mounts.update(at=None, mounts={})
-        with patch.dict("os.environ", {"APPSEC_AGENT_DATA_DIR": "/data", "APPSEC_AGENT_HOST_DATA_DIR": "/data", "HOSTNAME": "x"}), \
+        with patch.dict("os.environ", {"TAMANDUA_DATA_DIR": "/data", "TAMANDUA_HOST_DATA_DIR": "/data", "HOSTNAME": "x"}), \
                 patch.object(scanners, "in_container", return_value=True):
-            self.assertIn("APPSEC_AGENT_HOST_DATA_DIR", scanners.host_mount_problem())
-        with patch.dict("os.environ", {"APPSEC_AGENT_DATA_DIR": "/data", "APPSEC_AGENT_HOST_DATA_DIR": "/home/yo/tamandua/data", "HOSTNAME": "x"}), \
+            self.assertIn("TAMANDUA_HOST_DATA_DIR", scanners.host_mount_problem())
+        with patch.dict("os.environ", {"TAMANDUA_DATA_DIR": "/data", "TAMANDUA_HOST_DATA_DIR": "/home/yo/tamandua/data", "HOSTNAME": "x"}), \
                 patch.object(scanners, "in_container", return_value=True):
             self.assertIsNone(scanners.host_mount_problem())
         scanners._own_mounts.update(at=None, mounts={})

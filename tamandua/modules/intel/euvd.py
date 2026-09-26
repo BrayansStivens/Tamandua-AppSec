@@ -3,7 +3,7 @@
 Desde abril de 2026 NVD solo enriquece una parte de los CVE (KEV, software federal y crítico): muchos quedan sin
 CVSS. EUVD, mantenida por ENISA por mandato de NIS2, publica puntuación, vector y si la vulnerabilidad se explota
 activamente. Se consulta bajo demanda, solo para el CVE que se está mirando (el identificador es público; no sale
-nada del código ni de los hallazgos), con caché en `data/feeds/euvd-cache.json`. `APPSEC_AGENT_EUVD=off` lo apaga.
+nada del código ni de los hallazgos), con caché en `data/feeds/euvd-cache.json`. `TAMANDUA_EUVD=off` lo apaga.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ _lock = threading.Lock()
 
 
 def enabled() -> bool:
-    return os.environ.get("APPSEC_AGENT_EUVD", "on").lower() not in ("off", "0", "false", "no")
+    return os.environ.get("TAMANDUA_EUVD", "on").lower() not in ("off", "0", "false", "no")
 
 
 def _cache_path(data_dir: Path) -> Path:

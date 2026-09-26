@@ -17,4 +17,4 @@ labels: bug
 - Sistema y arquitectura:
 - `docker compose version`:
 
-**Logs** (`docker compose logs --tail 100 appsec`, revisados)
+**Logs** (`docker compose logs --tail 100 api`, revisados)

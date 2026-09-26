@@ -111,7 +111,7 @@ def build_parser() -> argparse.ArgumentParser:
     worker.add_argument("--check", action="store_true", help="Salud: 0 si este worker ha dado señales de vida hace poco (healthcheck)")
     panel = commands.add_parser("serve", help="Abrir el panel web")
     panel.add_argument("--port", type=int, default=8766)
-    panel.add_argument("--bind", default=None, help="Interfaz de escucha; por defecto 127.0.0.1 (o APPSEC_AGENT_BIND)")
+    panel.add_argument("--bind", default=None, help="Interfaz de escucha; por defecto 127.0.0.1 (o TAMANDUA_BIND)")
     return parser
 
 
@@ -120,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "scan":
         # Se ejecuta dentro del repositorio del usuario: sus datos (y la caché de avisos) no van a parar a él.
-        args.data_dir = args.data_dir or (Path(os.environ["APPSEC_AGENT_DATA_DIR"]) if os.environ.get("APPSEC_AGENT_DATA_DIR")
+        args.data_dir = args.data_dir or (Path(os.environ["TAMANDUA_DATA_DIR"]) if os.environ.get("TAMANDUA_DATA_DIR")
                                           else Path.home() / ".cache" / "tamandua")
         return _scan_command(args)
     args.data_dir = args.data_dir or Path("data")

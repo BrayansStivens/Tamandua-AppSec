@@ -2,7 +2,7 @@ import { baseKind } from '@/features/threats/threat-layout'
 import type { Component } from '@/features/threats/threat-model-types'
 
 // Colores del diagrama: solo tokens del panel (claro y oscuro con contraste comprobado), los mismos que
-// usan el SVG y el PDF (appsec_agent/threat_diagram.py). Sin color elegido, cada componente toma el de su
+// usan el SVG y el PDF (tamandua/modules/threats/diagram.py). Sin color elegido, cada componente toma el de su
 // papel y la leyenda lo explica; el equipo puede cambiarlo para marcar lo que quiera (un equipo, un país…).
 export const TONES = ['neutral', 'brand', 'info', 'success', 'warning', 'attention', 'danger'] as const
 export type Tone = typeof TONES[number]

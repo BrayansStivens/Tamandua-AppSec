@@ -23,12 +23,12 @@ DEFAULT_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; font-sr
 
 
 def allowed_origins(port: int) -> list[str]:
-    configured = [item.strip().rstrip("/") for item in os.environ.get("APPSEC_AGENT_ALLOWED_ORIGINS", "").split(",") if item.strip()]
+    configured = [item.strip().rstrip("/") for item in os.environ.get("TAMANDUA_ALLOWED_ORIGINS", "").split(",") if item.strip()]
     return configured or [f"http://127.0.0.1:{port}", f"http://localhost:{port}"]
 
 
 def public_url(port: int) -> str:
-    return os.environ.get("APPSEC_AGENT_PUBLIC_URL", "").strip().rstrip("/") or allowed_origins(port)[0]
+    return os.environ.get("TAMANDUA_PUBLIC_URL", "").strip().rstrip("/") or allowed_origins(port)[0]
 
 
 def host_allowed(port: int, host: str | None) -> bool:

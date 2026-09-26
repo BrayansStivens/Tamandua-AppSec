@@ -177,7 +177,7 @@ function SyncBanner({ overview }: { overview: CveOverview }) {
       {sync.phase === 'pending' ? 'Preparando la copia local de NVD…' : `Descargando NVD: ${Math.round(sync.progress * 100)} %`}</span>
       <span className="text-xs text-app-subtle">{overview.count.toLocaleString('es-CO')}{sync.nvd_total ? ` de ${sync.nvd_total.toLocaleString('es-CO')}` : ''} CVE · lo más reciente primero</span></div>
     <div role="progressbar" aria-label="Sincronización con NVD" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(sync.progress * 100)} className="mt-2 h-1 overflow-hidden rounded-full bg-app-soft"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.max(2, sync.progress * 100)}%` }} /></div>
-    <p className="mt-2 text-xs text-app-subtle">{sync.error ? 'NVD no responde ahora; se reintenta solo.' : 'Ya puedes buscar en lo cargado. NVD limita la descarga sin API key; con APPSEC_AGENT_NVD_API_KEY va unas 8 veces más rápido.'}</p>
+    <p className="mt-2 text-xs text-app-subtle">{sync.error ? 'NVD no responde ahora; se reintenta solo.' : 'Ya puedes buscar en lo cargado. NVD limita la descarga sin API key; con TAMANDUA_NVD_API_KEY va unas 8 veces más rápido.'}</p>
   </div>
 }
 
