@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { FileCheck2, LoaderCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 
-type Framework = 'soc2' | 'iso27001' | 'general'
+type Framework = 'soc2' | 'iso27001' | 'pci' | 'cra' | 'br-cmn' | 'cl-21663' | 'co-sfc' | 'general'
 type Detail = 'none' | 'high' | 'all'
 type Scope = 'selected' | 'filtered' | 'all'
 export type AuditTarget = { runId: string } | { asset: string; status: 'open' | 'fixed' | 'all' } | { account: string }
@@ -13,6 +14,11 @@ export type AuditTarget = { runId: string } | { asset: string; status: 'open' | 
 const FRAMEWORKS: [Framework, string, string][] = [
   ['soc2', 'SOC 2 Tipo II', 'Relaciona la evidencia con CC3.2, CC7.1 y CC8.1'],
   ['iso27001', 'ISO/IEC 27001:2022', 'Relaciona la evidencia con A.8.8, A.8.9, A.8.28 y A.8.29'],
+  ['pci', 'PCI DSS 4.0.1', 'Requisitos 6.2.4, 6.3.1, 6.3.2 (inventario) y 6.3.3 (parches en un mes)'],
+  ['cra', 'Ciberresiliencia de la UE (CRA)', 'Anexo I, parte II (vulnerabilidades, SBOM, pruebas) y artículo 14'],
+  ['br-cmn', 'Brasil · Res. CMN 4.893 / 5.274', 'Gestión continua de vulnerabilidades, pruebas y trazabilidad'],
+  ['cl-21663', 'Chile · Ley 21.663', 'Gestión de riesgos, revisión periódica y registro de decisiones'],
+  ['co-sfc', 'Colombia · SFC, CE 007 de 2018', 'Vulnerabilidades técnicas, desarrollo seguro y evidencia para supervisión'],
   ['general', 'General', 'Sin marco: gestión de vulnerabilidades'],
 ]
 const MEMORY = 'tamandua-audit-report'
@@ -61,10 +67,13 @@ export function AuditReportDialog({ open, onClose, target, name, selected, filte
     <DialogHeader><DialogTitle>{portfolio ? `Informe consolidado · ${name}` : 'Informe de evidencia para auditoría'}</DialogTitle>
       <DialogDescription>Un PDF conciso con alcance, método, hallazgos con su estado, excepciones aprobadas y firmas. Todo es opcional: sin tocar nada se genera con valores por defecto.</DialogDescription></DialogHeader>
     <form className="space-y-5" onSubmit={submit}>
-      <fieldset className="space-y-2"><legend className={label}>Marco</legend>
-        <div className="grid gap-2 sm:grid-cols-3">{FRAMEWORKS.map(([id, text, hint]) => <label key={id} className={`flex cursor-pointer flex-col gap-0.5 rounded-lg border p-3 text-sm ${framework === id ? 'border-brand/60 bg-brand/10' : 'border-app-line bg-inset'}`}>
-          <span className="flex items-center gap-2"><input type="radio" name="framework" value={id} checked={framework === id} onChange={() => setFramework(id)} className="size-4 accent-brand" /><span className="font-medium">{text}</span></span>
-          <span className="pl-6 text-xs text-app-muted">{hint}</span></label>)}</div></fieldset>
+      {/* Ley de Hick: ocho marcos en un selector, con lo que aporta el elegido debajo. */}
+      <div className="space-y-2"><span id="audit-framework" className={label}>Marco</span>
+        <Select value={framework} onValueChange={value => setFramework((value ?? 'general') as Framework)}>
+          <SelectTrigger aria-labelledby="audit-framework" className="w-full border-app-line bg-inset">{FRAMEWORKS.find(([id]) => id === framework)?.[1]}</SelectTrigger>
+          <SelectContent className="border border-app-line bg-panel p-1 text-app-fg shadow-xl">{FRAMEWORKS.map(([id, text]) => <SelectItem key={id} value={id}>{text}</SelectItem>)}</SelectContent>
+        </Select>
+        <p className="text-xs text-app-muted">{FRAMEWORKS.find(([id]) => id === framework)?.[2]}. La relación con cada control es orientativa.</p></div>
 
       {portfolio ? <p className="rounded-lg border border-app-line bg-inset p-3 text-sm text-app-muted">Todos los repositorios analizados de la organización, su cobertura frente a GitHub (cuáles no tienen un análisis completo), los críticos y altos abiertos y las excepciones, en un solo documento.</p>
       : <fieldset className="space-y-2"><legend className={label}>Hallazgos del informe</legend>

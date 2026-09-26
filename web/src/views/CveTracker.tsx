@@ -19,7 +19,8 @@ export type CveOverview = {
   daily: { day: string; severity: string; count: number }[]
   sync: { phase: 'pending' | 'backfill' | 'ready'; progress: number; nvd_total: number | null; synced_at: string | null; running: boolean; error: string | null }
 }
-type CveDetail = CveRow & { vector: string | null; modified: string | null; cwe: string[]; references: { url: string; tags: string[] }[]
+type Euvd = { id: string; url: string | null; score: number | null; severity: string | null; exploited_since: string | null }
+type CveDetail = CveRow & { vector: string | null; modified: string | null; cwe: string[]; references: { url: string; tags: string[] }[]; score_source?: 'nvd' | 'euvd' | null; euvd?: Euvd | null
   kev_detail: { date_added: string; due_date?: string; ransomware: boolean; name: string | null } | null
   affected: { asset: string; name: string; open: number; fixed: number; packages: string[] }[] }
 
@@ -199,12 +200,15 @@ function CveSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
         {!item && !error && <Skeleton rows={4} />}
         {item && <>
           <div className="grid grid-cols-3 gap-2">
-            <Metric label={`CVSS${item.version ? ` ${item.version}` : ''}`} value={item.score?.toFixed(1) ?? '—'} extra={<SeverityPill severity={item.severity} />} />
+            <Metric label={`CVSS${item.version ? ` ${item.version}` : ''}${item.score_source === 'euvd' ? ' · según EUVD' : ''}`} value={item.score?.toFixed(1) ?? '—'} extra={<SeverityPill severity={item.severity} />} />
             <Metric label="EPSS" value={percent(item.epss)} extra={item.epss_percentile !== null ? <span className="text-[11px] text-app-subtle">percentil {Math.round(item.epss_percentile * 100)}</span> : null} />
             <Metric label="CISA KEV" value={item.kev ? 'Sí' : 'No'} extra={item.kev_detail ? <span className="text-[11px] text-app-subtle">desde {item.kev_detail.date_added}</span> : null} />
           </div>
           {item.kev_detail && <div className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2.5 text-sm text-danger"><p className="flex items-center gap-2 font-medium"><Flame className="size-4" />Explotación activa conocida{item.kev_detail.ransomware ? ' · usada por ransomware' : ''}</p>
             <p className="mt-1 text-xs">{item.kev_detail.name}{item.kev_detail.due_date ? ` · fecha límite federal ${item.kev_detail.due_date}` : ''}</p></div>}
+          {!item.kev_detail && item.euvd?.exploited_since && <div className="rounded-lg border border-danger-line bg-danger-soft px-3 py-2.5 text-sm text-danger"><p className="flex items-center gap-2 font-medium"><Flame className="size-4" />ENISA la registra como explotada activamente</p>
+            <p className="mt-1 text-xs">Desde {item.euvd.exploited_since}, según la base europea de vulnerabilidades (EUVD).</p></div>}
+          {item.score_source === 'euvd' && <p className="text-xs text-app-subtle">NVD no ha puntuado este CVE; la puntuación sale de EUVD (ENISA).</p>}
           <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Descripción</h3><p className="text-sm leading-6">{item.description}</p></section>
           {item.vector && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Vector</h3><code className="block rounded-md bg-inset px-2.5 py-1.5 font-mono text-xs break-all">{item.vector}</code></section>}
           {item.cwe.length > 0 && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Debilidad</h3><div className="flex flex-wrap gap-1.5">{item.cwe.map(cwe => <a key={cwe} href={`https://cwe.mitre.org/data/definitions/${cwe.slice(4)}.html`} target="_blank" rel="noreferrer" className="rounded-md border border-app-line px-2 py-0.5 font-mono text-xs hover:bg-app-soft">{cwe}</a>)}</div></section>}
@@ -213,7 +217,7 @@ function CveSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
               {asset.open ? <Badge variant="outline" className="border-transparent bg-danger-solid text-[11px] text-on-solid">{asset.open} abierto{asset.open === 1 ? '' : 's'}</Badge> : <Badge variant="outline" className="border-app-line text-[11px] text-app-muted"><ShieldCheck className="size-3" />remediado</Badge>}</div>)}</div>
               : <p className="text-sm text-app-muted">Ningún repositorio analizado tiene este CVE entre sus hallazgos.</p>}</section>
           {item.references.length > 0 && <section><h3 className="mb-1.5 text-xs font-medium text-app-muted">Referencias</h3><ul className="space-y-1">{item.references.map(reference => <li key={reference.url} className="flex items-start gap-1.5 text-xs"><ExternalLink className="mt-0.5 size-3 shrink-0 text-app-subtle" /><a href={reference.url} target="_blank" rel="noreferrer noopener" className="min-w-0 break-all text-app-secondary hover:underline">{reference.url}</a>{reference.tags[0] && <span className="shrink-0 text-app-subtle">{reference.tags[0]}</span>}</li>)}</ul></section>}
-          <div className="flex flex-wrap gap-2 border-t border-app-line pt-4"><a href={`https://nvd.nist.gov/vuln/detail/${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">NVD <ExternalLink className="size-3" /></a><a href={`https://www.cve.org/CVERecord?id=${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">CVE.org <ExternalLink className="size-3" /></a></div>
+          <div className="flex flex-wrap gap-2 border-t border-app-line pt-4"><a href={`https://nvd.nist.gov/vuln/detail/${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">NVD <ExternalLink className="size-3" /></a><a href={`https://www.cve.org/CVERecord?id=${item.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">CVE.org <ExternalLink className="size-3" /></a>{item.euvd?.url && <a href={item.euvd.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-app-muted hover:text-app-fg">EUVD <ExternalLink className="size-3" /></a>}</div>
         </>}
       </div>
     </SheetContent>

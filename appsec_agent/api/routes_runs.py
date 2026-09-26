@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 from ..kinds import FINDING_RUNS
-from .. import batches, exclusions, findings_registry, jira, sla, triage
+from .. import batches, exclusions, findings_registry, jira, sbom, sla, triage, vex
 from ..assets import overview as assets_overview
 from ..advisories import load_feeds, load_recent_cves
 from ..dashboard import cached as compute_dashboard, zone
@@ -31,6 +31,13 @@ PROFILE_REPORTS = ("report-soc2.md", "report-iso27001.md", "report-custom.md",
                    "report-soc2.pdf", "report-iso27001.pdf", "report-custom.pdf")
 
 
+SBOM_FILE, VEX_FILE = "sbom.cdx.json", "vex.openvex.json"
+
+
+def _json_file(request: Request, payload: dict, content_type: str):
+    return request.send(200, json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"), content_type)
+
+
 def _artifact(request: Request, record: dict, artifact: str):
     repository = record.get("type") in FINDING_RUNS or record.get("type") == "asset_state"
     if artifact == "tickets.json" and repository:
@@ -43,6 +50,13 @@ def _artifact(request: Request, record: dict, artifact: str):
     if artifact == "findings.sarif" and repository:
         return request.send(200, json.dumps(render_repository_sarif(record), ensure_ascii=False, indent=2).encode("utf-8"),
                             "application/sarif+json")
+    if artifact == SBOM_FILE and repository:
+        scan = sbom.latest_scan(request.data_dir, record["source"]["id"]) if record["type"] == "asset_state" else record
+        if scan is None or scan.get("type") not in FULL_SCANS:
+            return request.json(404, {"error": "El SBOM sale de un análisis completo terminado: este activo aún no tiene uno."})
+        return _json_file(request, sbom.cyclonedx(scan, version=VERSION), "application/vnd.cyclonedx+json")
+    if artifact == VEX_FILE and repository:
+        return _json_file(request, vex.openvex(record, version=VERSION), "application/json")
     if artifact in PROFILE_REPORTS:
         profile = artifact.removeprefix("report-").rsplit(".", 1)[0]
         report = render_profile_report(record, profile, request.arg("title", ""))
@@ -120,11 +134,12 @@ def asset_export(request: Request):
     artifact = request.arg("artifact") or ""
     if not key or len(key) > 200 or status not in ("open", "fixed", "excluded", "all"):
         return request.json(400, {"error": "Activo o estado inválido"})
-    if artifact not in ("tickets.json", "report.md", "report.pdf", "findings.sarif", *PROFILE_REPORTS, "record.json"):
+    if artifact not in ("tickets.json", "report.md", "report.pdf", "findings.sarif", *PROFILE_REPORTS, "record.json", SBOM_FILE, VEX_FILE):
         return request.json(404, {"error": "Formato no disponible"})
     if not any(row["key"] == key for row in assets_overview(request.data_dir)):
         return request.json(404, {"error": "Activo no encontrado"})
-    record = jira.annotate(request.data_dir, findings_registry.view(request.data_dir, key, status=status))
+    # El VEX describe todas las decisiones (también lo remediado y lo descartado), sea cual sea la pestaña.
+    record = jira.annotate(request.data_dir, findings_registry.view(request.data_dir, key, status="all" if artifact == VEX_FILE else status))
     if artifact == "record.json":
         return request.json(200, record)
     try:

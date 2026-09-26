@@ -9,7 +9,7 @@ from pathlib import Path
 from .. import logging_setup, migrations
 from ..auth import Authenticator
 from ..jobs import ScanJobs
-from . import routes_auth, routes_cves, routes_prs, routes_runs, routes_sources, routes_threats  # noqa: F401 — registran sus rutas
+from . import routes_auth, routes_cra, routes_cves, routes_prs, routes_runs, routes_sources, routes_threats  # noqa: F401 — registran sus rutas
 from .core import ROUTES, PREFIXES, State, allowed_origins, build_handler, public_url
 
 __all__ = ["make_handler", "serve", "allowed_origins", "public_url", "ROUTES", "PREFIXES"]

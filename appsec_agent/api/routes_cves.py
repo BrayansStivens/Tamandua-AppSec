@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from .. import cve_db
+from .. import cve_db, euvd
 from ..findings_registry import assets_with_cve, open_cves
 from .core import Request, route
 
@@ -45,4 +45,10 @@ def cve_item(request: Request):
     item = cve_db.detail(request.data_dir, identifier)
     if item is None:
         return request.json(404, {"error": "CVE no encontrado en la copia local"})
-    return request.json(200, {**item, "affected": assets_with_cve(request.data_dir, identifier)})
+    # NVD ya no puntúa todos los CVE: EUVD (ENISA) completa la puntuación y dice si se explota activamente.
+    europe = euvd.lookup(request.data_dir, identifier)
+    item["score_source"] = "nvd" if item.get("score") is not None else None
+    if item.get("score") is None and europe and europe.get("score") is not None:
+        item.update(score=europe["score"], severity=europe["severity"], version=europe["version"],
+                    vector=item.get("vector") or europe["vector"], score_source="euvd")
+    return request.json(200, {**item, "euvd": europe, "affected": assets_with_cve(request.data_dir, identifier)})

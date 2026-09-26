@@ -3,7 +3,7 @@
 const SLUGS: Record<string, string> = {
   overview: 'resumen', analyses: 'analisis', new: 'nuevo', findings: 'hallazgos', coverage: 'cobertura', threats: 'amenazas',
   repositories: 'repositorios', pulls: 'pull-requests', domains: 'dominios', integrations: 'integraciones',
-  users: 'usuarios', account: 'cuenta', cves: 'cve-tracker',
+  users: 'usuarios', account: 'cuenta', cves: 'cve-tracker', compliance: 'cumplimiento',
 }
 // Enlaces guardados de antes del cambio de nombre («Pentests» pasó a «Análisis»): siguen funcionando.
 const LEGACY: Record<string, string> = { pentests: 'analyses' }

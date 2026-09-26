@@ -373,6 +373,29 @@ def prioritize(severity: str, cvss_score: float | None, kev: dict | None, epss: 
 
 # --- hallazgo enriquecido -----------------------------------------------------------
 
+def is_malicious(summary: dict) -> bool:
+    """Avisos MAL-* (OpenSSF Malicious Packages, vía OSV): el paquete es código hostil, no un fallo."""
+    return any(str(identifier).upper().startswith("MAL-") for identifier in [summary.get("id"), *(summary.get("aliases") or [])])
+
+
+def malicious_finding(dependency: dict, summary: dict) -> dict:
+    """Un paquete malicioso no se «actualiza»: se elimina y se da por comprometido lo que lo instaló."""
+    name, installed, path = dependency["name"], dependency["version"], dependency["path"]
+    digest = fingerprint("sca", summary["id"], dependency["ecosystem"], name, installed)
+    return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "rule_id": summary["id"],
+            "title": f"Paquete malicioso: {name} {installed}"[:200], "path": path, "line": 1, "severity": "critical",
+            "confidence": 9, "verdict": "candidate", "malicious": True, "cwe": [506], "owasp": ["A03:2025"],
+            "cve": [], "ghsa": sorted({alias for alias in summary["aliases"] if alias.startswith("GHSA-")}),
+            "package": {"ecosystem": dependency["ecosystem"], "name": name, "version": installed, "fixed_version": None, "introduced": None},
+            "advisory": {key: summary[key] for key in ("id", "aliases", "summary", "details", "cvss_vector", "cvss_score", "published",
+                                                        "modified", "references")},
+            "kev": None, "epss": None, "source": data_sources.from_osv(summary["id"]),
+            "priority": {"action": "act", "factors": ["Paquete malicioso conocido (OpenSSF Malicious Packages): código hostil, no un fallo"]},
+            "reason": summary["summary"] or f"{summary['id']} marca {name} {installed} como malicioso.",
+            "remediation": (f"Elimina {name} {installed} de {path}, borra la caché del gestor y vuelve a generar el lockfile sin él. "
+                            "Trata como comprometidas las máquinas y pipelines de CI que lo instalaron: rota sus tokens y claves "
+                            "(registro de paquetes, GitHub, nube) y revisa si publicaron algo en tu nombre.")}
+
 def fingerprint(scanner: str, rule: str, ecosystem: str, name: str, version: str) -> str:
     """Estable entre ejecuciones e independiente de la ruta: la clave para no duplicar tickets."""
     return hashlib.sha256(f"{scanner}|{rule}|{ecosystem}|{name}|{version}".encode()).hexdigest()
@@ -388,6 +411,8 @@ def dependency_finding(dependency: dict, advisory: dict, feeds: dict) -> dict:
     fixed = version_range["fixed"]
     priority = prioritize(summary["severity"], summary["cvss_score"], kev, epss, fixed)
     name, installed, path = dependency["name"], dependency["version"], dependency["path"]
+    if is_malicious(summary):
+        return malicious_finding(dependency, summary)
     if fixed:
         remediation = f"Actualiza {name} de {installed} a {fixed} o superior en {path} y vuelve a generar el lockfile."
     else:

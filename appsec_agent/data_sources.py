@@ -22,7 +22,10 @@ _CATALOG: dict[str, tuple[str, str, str, str]] = {
     "pypa": ("PyPA Advisory Database", "CC BY 4.0", "https://github.com/pypa/advisory-database", "attribution"),
     "rustsec": ("RustSec Advisory Database", "CC0 1.0", "https://rustsec.org", "open"),
     "osv": ("OSV.dev", "Según la fuente de cada aviso", "https://osv.dev", "attribution"),
+    "ossf-malicious": ("OpenSSF Malicious Packages", "Apache-2.0", "https://github.com/ossf/malicious-packages", "open"),
     "nvd": ("NVD (NIST)", "Dominio público", "https://nvd.nist.gov", "attribution"),
+    "euvd": ("EUVD (ENISA)", "Reutilización citando la fuente (aviso legal de ENISA); condiciones de la API por confirmar",
+             "https://euvd.enisa.europa.eu", "unclear"),
     "redhat": ("Red Hat Security Data", "CC BY 4.0", "https://access.redhat.com/security/data", "attribution"),
     "suse-cvrf": ("SUSE Security", "CC BY 4.0", "https://www.suse.com/support/security/", "attribution"),
     "ubuntu": ("Ubuntu Security", "CC BY-SA 4.0 (avisos); CVE Tracker sin licencia declarada", "https://ubuntu.com/security", "share-alike"),
@@ -56,18 +59,18 @@ _ALIASES = {"redhat-oval": "redhat", "redhat-csaf-vex": "redhat", "hummingbird":
             "mariner": "cbl-mariner", "azurelinux": "azure", "arch": "arch-linux", "amazonlinux": "amazon", "almalinux": "alma",
             "go": "govulndb", "chainguard-libraries": "chainguard", "chainguard_libraries": "chainguard"}
 # Prefijo del identificador OSV → base de origen.
-_OSV_PREFIX = {"GHSA-": "ghsa", "PYSEC-": "pypa", "RUSTSEC-": "rustsec", "GO-": "govulndb", "JLSEC-": "julia",
+_OSV_PREFIX = {"MAL-": "ossf-malicious", "GHSA-": "ghsa", "PYSEC-": "pypa", "RUSTSEC-": "rustsec", "GO-": "govulndb", "JLSEC-": "julia",
                "BIT-": "bitnami", "CGA-": "chainguard", "ALSA-": "alma", "ALBA-": "alma", "RLSA-": "rocky", "UBUNTU-": "ubuntu",
                "USN-": "ubuntu", "DSA-": "debian", "DLA-": "debian", "DEBIAN-": "debian", "SUSE-": "suse-cvrf", "RHSA-": "redhat"}
 
 # Nombre corto para columnas estrechas (el completo va en «Fuentes de los avisos»).
 _SHORT = {"ghsa": "GitHub", "glad": "GitLab", "govulndb": "Go", "julia": "Julia", "k8s": "Kubernetes", "nodejs-security-wg": "Node.js",
           "php-security-advisories": "PHP", "ruby-advisory-db": "RubySec", "pypa": "PyPA", "rustsec": "RustSec", "osv": "OSV",
-          "nvd": "NVD", "redhat": "Red Hat", "suse-cvrf": "SUSE", "ubuntu": "Ubuntu", "alpine": "Alpine", "debian": "Debian",
+          "nvd": "NVD", "euvd": "EUVD", "redhat": "Red Hat", "suse-cvrf": "SUSE", "ubuntu": "Ubuntu", "alpine": "Alpine", "debian": "Debian",
           "amazon": "Amazon", "oracle-oval": "Oracle", "alma": "AlmaLinux", "rocky": "Rocky", "centos": "CentOS", "fedora": "Fedora",
           "arch-linux": "Arch", "azure": "Azure Linux", "cbl-mariner": "Mariner", "photon": "Photon", "bottlerocket": "Bottlerocket",
           "bitnami": "Bitnami", "wolfi": "Wolfi", "chainguard": "Chainguard", "minimos": "Minimus", "echo": "Echo", "rootio": "Root.io",
-          "seal": "Seal", "rapidfort": "RapidFort", "secureos": "SecureOS", "aqua": "Aqua"}
+          "seal": "Seal", "ossf-malicious": "OpenSSF", "rapidfort": "RapidFort", "secureos": "SecureOS", "aqua": "Aqua"}
 
 TERMS_LABEL = {"open": "uso libre", "attribution": "requiere atribución", "share-alike": "atribución y compartir igual",
                "non-commercial": "no comercial", "unclear": "sin licencia clara"}

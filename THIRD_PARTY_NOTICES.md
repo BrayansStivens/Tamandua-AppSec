@@ -39,6 +39,8 @@ Se consultan en tiempo de análisis; no se redistribuyen dentro de Tamandua.
 | [OSV.dev](https://osv.dev) (API) | Avisos por paquete y versión | Servicio de Google (Apache-2.0); cada aviso conserva la licencia de su fuente | Citar la fuente del aviso |
 | [GitHub Advisory Database](https://github.com/github/advisory-database) | Avisos (vía OSV y los motores) | CC-BY-4.0 | «Contiene datos de la GitHub Advisory Database (CC-BY-4.0)» |
 | [NVD](https://nvd.nist.gov) (API 2.0) | CVSS y descripciones | Dominio público (Gobierno de EE. UU.) | «This product uses data from the NVD API but is not endorsed or certified by the NVD.» |
+| [EUVD](https://euvd.enisa.europa.eu) (ENISA, API de búsqueda) | CVSS cuando NVD no puntúa y fecha de explotación activa, bajo demanda en el CVE tracker | Aviso legal de ENISA: reutilización citando la fuente; condiciones propias de la API **por confirmar** | Citar «EUVD (ENISA)»; se apaga con `APPSEC_AGENT_EUVD=off` |
+| [OpenSSF Malicious Packages](https://github.com/ossf/malicious-packages) | Avisos `MAL-*` de paquetes maliciosos (vía OSV-Scanner) | Apache-2.0 | Conservar el aviso |
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Explotación activa conocida | Dominio público (Gobierno de EE. UU.) | Citar CISA |
 | [EPSS](https://www.first.org/epss/) | Probabilidad de explotación | Uso libre con atribución (FIRST) | «EPSS: FIRST.org» |
 | Bases de Trivy y Grype (`trivy-db`, `grype-db`) | Descargadas por cada motor | Código Apache-2.0; las bases no declaran licencia propia y agregan fuentes con términos distintos | Ver la sección siguiente |

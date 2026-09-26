@@ -19,7 +19,7 @@ class OptionsTests(unittest.TestCase):
                          ("general", "high", True, "Brayan"))
 
     def test_invalid_options_are_rejected(self):
-        for raw in ({"framework": "pci"}, {"detail": "some"}, {"title": "x" * 121}, {"organization": "a\nb"},
+        for raw in ({"framework": "hipaa"}, {"detail": "some"}, {"title": "x" * 121}, {"organization": "a\nb"},
                     {"period_from": "2026-13-01"}, {"period_from": "2026-09-10", "period_to": "2026-09-01"}, {"extra": 1}):
             with self.assertRaises(ReportError, msg=raw):
                 validate_options(raw, default_by="x")
@@ -85,7 +85,7 @@ class RouteTests(HttpCase):
 
     def test_bad_requests(self):
         cases = [{"run_id": self.run["id"], "asset": "x"}, {}, {"run_id": "../../etc/passwd"}, {"run_id": "f" * 32},
-                 {"run_id": self.run["id"], "fingerprints": "a"}, {"run_id": self.run["id"], "options": {"framework": "pci"}},
+                 {"run_id": self.run["id"], "fingerprints": "a"}, {"run_id": self.run["id"], "options": {"framework": "hipaa"}},
                  {"asset": "no-existe"}]
         for body in cases:
             status, _, _ = self.report(body)

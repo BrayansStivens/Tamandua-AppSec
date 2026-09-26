@@ -21,7 +21,7 @@ class DataSourceTests(unittest.TestCase):
         self.assertTrue(osv and all(item["source"]["id"] == "ghsa" for item in osv))
         self.assertEqual(data_sources.from_osv("PYSEC-2024-1")["id"], "pypa")
         self.assertEqual(data_sources.from_osv("RUSTSEC-2024-0001")["license"], "CC0 1.0")
-        self.assertEqual(data_sources.from_osv("MAL-2024-1")["id"], "osv")
+        self.assertEqual(data_sources.from_osv("MAL-2024-1")["id"], "ossf-malicious")
 
     def test_non_commercial_and_unknown_sources_are_flagged(self):
         wolfi = data_sources.from_grype({"namespace": "wolfi:distro:wolfi:rolling", "dataSource": "https://packages.wolfi.dev/os/security.json"})

@@ -157,6 +157,9 @@ def _secret(finding: dict) -> dict:
 
 def guide(finding: dict, *, target: str | None = None) -> dict | None:
     scanner = finding.get("scanner")
+    if finding.get("malicious"):
+        # Nada que actualizar: se quita y se da por comprometido lo que lo instaló (ver advisories.malicious_finding).
+        return {"kind": "dependency", "steps": [finding.get("remediation") or "", VERIFY], "commands": [], "example": None}
     if scanner == "sca" and (finding.get("package") or {}).get("name"):
         return _dependency(finding, target or (finding.get("package") or {}).get("fixed_version"))
     if scanner == "secrets":
@@ -174,16 +177,25 @@ def guide(finding: dict, *, target: str | None = None) -> dict | None:
 def attach(findings: list[dict]) -> list[dict]:
     """Añade `fix` a cada hallazgo. En dependencias, la versión que cierra todos los avisos del mismo paquete."""
     targets: dict[tuple, str] = {}
+    # Un paquete malicioso no se actualiza: sus otros avisos tampoco deben proponer «actualiza a…».
+    hostile = {(item.get("path"), (item.get("package") or {}).get("name"), (item.get("package") or {}).get("version"))
+               for item in findings if item.get("malicious")}
     for finding in findings:
         package = finding.get("package") or {}
         fixed = package.get("fixed_version")
-        if finding.get("scanner") == "sca" and fixed:
+        if finding.get("scanner") == "sca" and fixed and (finding.get("path"), package.get("name"), package.get("version")) not in hostile:
             key = (finding.get("path"), package.get("name"), package.get("version"))
             current = targets.get(key)
             targets[key] = fixed if current is None or compare_versions(fixed, current) > 0 else current
     for finding in findings:
         package = finding.get("package") or {}
-        fix = guide(finding, target=targets.get((finding.get("path"), package.get("name"), package.get("version"))))
+        key = (finding.get("path"), package.get("name"), package.get("version"))
+        if key in hostile and not finding.get("malicious"):
+            finding["fix"] = {"kind": "dependency", "commands": [], "example": None,
+                              "steps": [f"{package.get('name')} {package.get('version')} es un paquete malicioso: elimínalo en lugar de actualizarlo "
+                                        "(ver su aviso MAL-). Actualizar no basta.", VERIFY]}
+            continue
+        fix = guide(finding, target=targets.get(key))
         if fix:
             finding["fix"] = fix
     return findings

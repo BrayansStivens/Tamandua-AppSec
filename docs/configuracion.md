@@ -12,6 +12,7 @@ Todas las variables son opcionales y se ponen en `.env` (copia de `.env.example`
 | `APPSEC_AGENT_REQUIRE_TOTP` | `admins` | `admins`, `all` o `none`. |
 | `APPSEC_AGENT_NVD_API_KEY` | — | API key de NVD: descarga de CVE más rápida. Va en cabecera y nunca se registra. |
 | `APPSEC_AGENT_CVE_SYNC` | `on` | `off` desactiva la copia local de NVD. |
+| `APPSEC_AGENT_EUVD` | `on` | `off` no consulta EUVD (ENISA) cuando NVD no puntúa un CVE. Solo sale el identificador del CVE. |
 | `APPSEC_AGENT_PR_POLL_SECONDS` | `300` | Cada cuánto se consultan los PRs vigilados. |
 | `APPSEC_AGENT_BRANCH_MIN_MINUTES` | `60` | Pausa mínima entre dos reanálisis automáticos de la rama principal de un mismo repositorio (mínimo 10). |
 | `APPSEC_AGENT_ADVISORY_WATCH_HOURS` | `24` | Cada cuántas horas se contrastan las dependencias ya analizadas con los avisos nuevos (sin conexión). `0` lo apaga. |

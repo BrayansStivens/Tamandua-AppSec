@@ -523,13 +523,17 @@ def _trivy_secret(entry: dict, target: str) -> dict:
 MAX_PACKAGES = 20_000
 
 
-def trivy_packages(payload: dict) -> list[dict]:
-    """Todos los paquetes de aplicación con su versión (no solo los vulnerables): con ellos se comprueban a diario
-    los avisos que se publiquen después, sin volver a analizar (ver advisory_watch). Los del sistema operativo
-    de una imagen no entran: sus avisos dependen de la versión de la distribución."""
+def trivy_packages(payload: dict, *, system: bool = False) -> list[dict]:
+    """Paquetes con su versión (no solo los vulnerables), de Trivy.
+
+    Por defecto, los de aplicación: con ellos se comprueban a diario los avisos que se publiquen después, sin
+    volver a analizar (ver advisory_watch). Con `system`, los del sistema operativo de una imagen, que solo van
+    al SBOM (sus avisos dependen de la versión de la distribución y llegan al reanalizar).
+    Además del nombre y la versión se guarda lo que pide un SBOM: purl, licencias y si es dependencia directa."""
     packages, seen = [], set()
+    wanted = "os-pkgs" if system else "lang-pkgs"
     for result in payload.get("Results", []) or []:
-        if result.get("Class") != "lang-pkgs":
+        if result.get("Class") != wanted:
             continue
         ecosystem = str(result.get("Type") or "").lower()
         target = _relative(str(result.get("Target", "")))
@@ -539,7 +543,16 @@ def trivy_packages(payload: dict) -> list[dict]:
             if not name or not version or key in seen:
                 continue
             seen.add(key)
-            packages.append({"ecosystem": ecosystem, "name": name, "version": version, "path": target})
+            package = {"ecosystem": ecosystem, "name": name, "version": version, "path": target}
+            purl = str((item.get("Identifier") or {}).get("PURL") or "")
+            if purl.startswith("pkg:"):
+                package["purl"] = purl[:500]
+            licenses = [str(entry)[:100] for entry in item.get("Licenses") or [] if entry][:5]
+            if licenses:
+                package["licenses"] = licenses
+            if item.get("Relationship") in ("direct", "indirect"):
+                package["direct"] = item["Relationship"] == "direct"
+            packages.append(package)
             if len(packages) >= MAX_PACKAGES:
                 return packages
     return packages

@@ -188,7 +188,8 @@ def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
     counts = {kind: sum(1 for item in findings if item["scanner"] == kind) for kind in ("sca", "iac", "secrets")}
     detail = (f"{counts['sca']} avisos en paquetes, {counts['iac']} problemas de configuración de la imagen y "
               f"{counts['secrets']} secretos en capas, variables de entorno o historial.")
-    return {**_result("trivy", "completed", detail, findings, started), "packages": trivy_packages(payload)}, metadata
+    return {**_result("trivy", "completed", detail, findings, started), "packages": trivy_packages(payload),
+            "system_packages": trivy_packages(payload, system=True)}, metadata
 
 
 def _grype_finding(match: dict, feeds: dict) -> dict:
@@ -472,6 +473,7 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
             "fixture": image["reference"], "variant": "image", "context": " ".join(str(context).split())[:400],
             "steps": steps, "findings": findings, "owasp_coverage": coverage,
             "dependencies": trivy.get("packages") or [],
+            "system_packages": trivy.get("system_packages") or [],  # solo para el SBOM
             "summary": {"files": 0, "dependencies": 0, "candidates": len(findings), "sast": 0, "secrets": secret_count,
                         "sca": sca_count, "iac": iac_count, "severities": severities, "priorities": priorities,
                         "kev": sum(1 for item in findings if item.get("kev")),

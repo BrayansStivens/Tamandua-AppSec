@@ -13,7 +13,7 @@ Se ven en el panel en gris, con la marca **En desarrollo**, para que se sepa que
 | Pruebas dinámicas de aplicaciones web y API | Escaneo activo (DAST) con ZAP o Nuclei en un contenedor aislado, solo sobre dominios cuya propiedad hayas verificado por DNS. |
 | GitLab, Bitbucket, Azure DevOps | Conectar repositorios con tokens de solo lectura del proyecto. |
 | Asistencia con IA | Explicación de hallazgos y propuesta de parche con tu propia clave, con consentimiento en cada ejecución. |
-| API pública y CLI para CI | Tokens personales con ámbitos, `/api/v1` documentada y un comando para CI que envía los resultados a tu instancia y rompe el build según un umbral. |
+| API pública | Tokens personales con ámbitos y `/api/v1` documentada. (La CLI para CI ya existe: [`scan`](cli.md).) |
 
 ## Panel
 
@@ -76,9 +76,27 @@ Se ven en **Hallazgos** (tarjeta «Fuera de plazo», marca «Vencido hace N día
 **Más filtros → Plazo**), en el **Resumen** (KPI «Fuera de plazo») y en el **informe de auditoría** (sección con la
 política y los vencidos ordenados por retraso: lo que piden SOC 2 e ISO 27001 como evidencia de gestión en plazo).
 
+## Cumplimiento: SBOM, VEX, paquetes maliciosos y CRA
+
+- **SBOM (CycloneDX 1.6).** En **Hallazgos → Más formatos → SBOM**, de cada análisis o del estado actual de un repositorio
+  o imagen (sale del último análisis completo). Lleva purl, versión, licencias cuando Trivy las da, si la dependencia es
+  directa y, en imágenes, los paquetes del sistema. No inventa lo que no sabe (proveedor, hash por componente). Válido
+  contra el esquema oficial; es la base que piden el CRA (Anexo I) y la guía BSI TR-03183-2.
+- **VEX (OpenVEX).** El triage convertido en declaraciones estándar: sin decidir → `under_investigation`; en curso o
+  riesgo aceptado → `affected` con la acción; falso positivo → `not_affected` con el motivo; remediado → `fixed`.
+- **Paquetes maliciosos.** Los avisos `MAL-*` de OpenSSF (vía OSV) se marcan como **Malicioso**, críticos y «Actuar
+  ya», con la corrección real: eliminar el paquete y rotar los secretos de donde se instaló. Nunca «actualiza a…».
+- **Marcos del informe de auditoría.** Además de SOC 2 e ISO 27001: PCI DSS 4.0.1, CRA, Brasil (Res. CMN 4.893/5.274),
+  Chile (Ley 21.663) y Colombia (SFC, CE 007/2018). La relación con cada control es orientativa.
+- **Kit CRA (vista Cumplimiento).** Un administrador marca qué repositorios o imágenes son productos bajo el Reglamento de
+  Ciberresiliencia. Si uno tiene un CVE del catálogo CISA KEV, corren los plazos del artículo 14 (alerta temprana en 24 h
+  y notificación en 72 h desde que se supo; informe final 14 días después de la corrección), con un borrador para
+  ENISA y el registro de quién marcó cada etapa como enviada. Tamandua no notifica por ti. Un falso positivo
+  («no afecta») no abre plazos.
+
 ## CVE tracker
 
-Busca en una copia local de NVD (`data/feeds/cves.sqlite`, SQLite con FTS5) cruzada con CISA KEV y EPSS: texto libre, CVE por prefijo, severidad, solo KEV, año, orden por fecha, CVSS o EPSS y paginación. Un hilo la carga en segundo plano de lo más reciente a lo más antiguo, reanudable tras reiniciar, y luego la mantiene al día cada 2 horas por fecha de modificación. Sin API key NVD admite 5 peticiones cada 30 s y la carga completa (~400.000 CVE) tarda unas horas; con `APPSEC_AGENT_NVD_API_KEY` (va en cabecera, nunca se registra) va unas 8 veces más rápido. `APPSEC_AGENT_CVE_SYNC=off` la desactiva. El detalle de cada CVE dice qué repositorios analizados lo tienen entre sus hallazgos.
+Busca en una copia local de NVD (`data/feeds/cves.sqlite`, SQLite con FTS5) cruzada con CISA KEV y EPSS: texto libre, CVE por prefijo, severidad, solo KEV, año, orden por fecha, CVSS o EPSS y paginación. Un hilo la carga en segundo plano de lo más reciente a lo más antiguo, reanudable tras reiniciar, y luego la mantiene al día cada 2 horas por fecha de modificación. Sin API key NVD admite 5 peticiones cada 30 s y la carga completa (~400.000 CVE) tarda unas horas; con `APPSEC_AGENT_NVD_API_KEY` (va en cabecera, nunca se registra) va unas 8 veces más rápido. `APPSEC_AGENT_CVE_SYNC=off` la desactiva. El detalle de cada CVE dice qué repositorios analizados lo tienen entre sus hallazgos. Cuando NVD no lo ha puntuado (desde 2026 solo enriquece una parte), la puntuación sale de **EUVD** (ENISA), consultada bajo demanda y en caché, que además indica si se explota activamente.
 
 La página muestra, para cada CVE, severidad y CVSS, EPSS, si está en CISA KEV, CWE, vector, referencias y **qué repositorios tuyos lo tienen** entre sus hallazgos. **Solo los que me afectan** limita la lista a los CVE
 abiertos en tus repositorios e imágenes (sin lo descartado en triage), y cada fila marca «te afecta». La búsqueda queda en la URL: se puede compartir o recargar. En el **Resumen**, *Novedades* muestra los publicados en 7 y 30 días y un «skyline» 3D de los últimos 30 días por severidad.

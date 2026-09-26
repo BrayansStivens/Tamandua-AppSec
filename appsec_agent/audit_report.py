@@ -39,6 +39,33 @@ FRAMEWORKS = {
         ("A.8.28", "Codificación segura", "Análisis estático del código propio y búsqueda de secretos."),
         ("A.8.29", "Pruebas de seguridad en desarrollo", "Pruebas automatizadas de seguridad integradas en el ciclo de desarrollo."),
     ]),
+    "pci": ("PCI DSS 4.0.1", [
+        ("6.2.4", "Prevenir ataques comunes en el software", "Análisis estático del código propio contra inyección, XSS, deserialización y demás fallos comunes."),
+        ("6.3.1", "Identificar vulnerabilidades y clasificar su riesgo", "Hallazgos con severidad, explotación activa (CISA KEV) y probabilidad (EPSS)."),
+        ("6.3.2", "Inventario del software y sus componentes", "Inventario de dependencias exportable como SBOM (CycloneDX) desde cada análisis."),
+        ("6.3.3", "Parches críticos en el plazo de un mes", "Plazos de corrección por severidad y hallazgos fuera de plazo (sección «Plazos de corrección»)."),
+    ]),
+    "cra": ("Reglamento de Ciberresiliencia (UE) 2024/2847", [
+        ("Anexo I, II.1", "Identificar y documentar vulnerabilidades y componentes", "Hallazgos por análisis e inventario de componentes exportable como SBOM CycloneDX."),
+        ("Anexo I, II.2", "Abordar y remediar las vulnerabilidades sin demora", "Estado de cada vulnerabilidad, acción recomendada y plazos de corrección."),
+        ("Anexo I, II.3", "Pruebas y revisiones de seguridad periódicas", "Análisis automatizados en cada cambio y en la rama principal, con su cobertura."),
+        ("Art. 14", "Notificar vulnerabilidades explotadas activamente", "Vulnerabilidades en el catálogo CISA KEV señaladas como explotación activa conocida."),
+    ]),
+    "br-cmn": ("Brasil · Res. CMN 4.893 (con los cambios de la 5.274/2025)", [
+        ("Vulnerabilidades", "Prevención y tratamiento continuo de vulnerabilidades", "Hallazgos identificados, priorizados y con su estado y plazo de corrección."),
+        ("Pruebas", "Pruebas de seguridad y plan de acción", "Análisis automatizados con su cobertura; acciones recomendadas por hallazgo."),
+        ("Trazabilidad", "Trazabilidad de decisiones", "Excepciones y decisiones con motivo, responsable, fecha y caducidad."),
+    ]),
+    "cl-21663": ("Chile · Ley Marco de Ciberseguridad 21.663", [
+        ("Gestión de riesgos", "Medidas para prevenir incidentes", "Vulnerabilidades del software identificadas y priorizadas por riesgo y explotación activa."),
+        ("Mejora continua", "Revisión periódica de la seguridad", "Análisis en cada cambio y de la rama principal, con su cobertura y los plazos de corrección."),
+        ("Evidencia", "Registro de medidas y decisiones", "Decisiones de triage con motivo, responsable y fecha, conservadas como historial."),
+    ]),
+    "co-sfc": ("Colombia · SFC, riesgo de ciberseguridad (CE 007 de 2018)", [
+        ("Vulnerabilidades", "Gestión de vulnerabilidades técnicas", "Vulnerabilidades del código, dependencias e imágenes con severidad, estado y plazo."),
+        ("Desarrollo seguro", "Seguridad en el ciclo de desarrollo", "Revisión de lo que introduce cada cambio antes de integrarlo y análisis de la rama principal."),
+        ("Evidencia", "Registro para supervisión", "Informe con alcance, método, cobertura y decisiones, listo para revisión."),
+    ]),
     "general": ("Gestión de vulnerabilidades", []),
 }
 DETAIL = ("none", "high", "all")

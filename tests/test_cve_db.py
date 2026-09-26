@@ -1,10 +1,11 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from appsec_agent import cve_db, findings_registry
+from appsec_agent import cve_db, euvd, findings_registry
 from appsec_agent.auth import Users
 
 from tests.test_auth import PASSWORD, HttpCase
@@ -112,6 +113,12 @@ class CveDbTests(unittest.TestCase):
 class CveRoutesTests(HttpCase):
     def setUp(self):
         super().setUp()
+        # Las pruebas no salen a la red: EUVD responde desde aquí.
+        self.europe = {"CVE-2026-12345": {"items": [{"id": "EUVD-2026-1", "aliases": "CVE-2026-12345\n", "baseScore": 8.1,
+                                                     "baseScoreVersion": "3.1", "exploitedSince": "Sep 1, 2026, 12:00:00 AM"}]}}
+        fake = patch("appsec_agent.euvd._fetch", side_effect=lambda cve: euvd.parse(self.europe.get(cve, {}), cve))
+        fake.start()
+        self.addCleanup(fake.stop)
         Users(self.data_dir).create("analista", PASSWORD)
         _, _, cookies = self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})
         self.cookie = {"Cookie": cookies[0].split("; ")[0]}
@@ -135,6 +142,8 @@ class CveRoutesTests(HttpCase):
         status, body, _ = self.call("GET", "/api/cve-db/item?id=cve-2026-12345", headers=self.cookie)
         self.assertEqual(status, 200)
         self.assertEqual(body["affected"], [{"asset": "github#1", "name": "acme/web", "open": 1, "fixed": 0, "packages": ["fastjson"]}])
+        # NVD lo puntúa: EUVD solo añade que se explota; la puntuación sigue siendo la de NVD.
+        self.assertEqual((body["score_source"], body["score"], body["euvd"]["exploited_since"]), ("nvd", 9.8, "2026-09-01"))
         status, body, _ = self.call("GET", "/api/cve-db/overview", headers=self.cookie)
         self.assertEqual((status, body["count"], body["sync"]["phase"]), (200, 1, "pending"))
         self.assertNotIn("nvd_api_key", json.dumps(body).lower())
