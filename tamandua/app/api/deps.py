@@ -1,4 +1,4 @@
-"""Seguridad y contexto de las rutas tipadas: la misma tubería que las de tabla (security.authorize)."""
+"""Route security and context: every route applies `guard(Policy)`, which runs `security.authorize`."""
 
 from __future__ import annotations
 

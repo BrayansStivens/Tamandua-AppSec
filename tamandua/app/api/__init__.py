@@ -1,4 +1,4 @@
-"""API HTTP sobre FastAPI: rutas tipadas por contexto (`<contexto>.py`) y rutas declaradas en tabla (`routes/`).
+"""HTTP API on FastAPI: one router per context (`<context>.py`).
 
 Toda petición pasa por el mismo control (ver `security.py`): host permitido (middleware) → CSRF, sesión, segundo
 factor y rol (`security.authorize`, vía `deps.guard`) → límites de cuerpo. Las respuestas llevan
