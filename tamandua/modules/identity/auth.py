@@ -37,7 +37,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from tamandua.modules.identity.tables import auth_challenges, sessions, users
-from tamandua.shared import db
+from tamandua.shared import db, vault
 from tamandua.shared.db import TENANT
 from urllib.parse import quote
 
@@ -142,6 +142,34 @@ def otpauth_uri(secret: bytes, username: str, issuer: str = "Tamandua") -> str:
 
 def _hash_backup(code: str) -> str:
     return hashlib.sha256(code.replace("-", "").lower().encode("ascii")).hexdigest()
+
+
+TOTP_PURPOSE = "totp"
+
+
+def _seal_totp(encoded: str) -> str:
+    """TOTP seeds are sealed with the master key: a database dump alone can't mint codes."""
+    return vault.seal(encoded, TOTP_PURPOSE)
+
+
+def _totp_seed(totp: dict, field: str) -> bytes | None:
+    """`field` is "secret" or "pending". Seeds stored in the clear by earlier versions are still read
+    (the `seal_totp_seeds` data migration rewrites them)."""
+    sealed = totp.get(f"{field}_sealed")
+    if sealed:
+        return base64.b32decode(vault.unseal(sealed, TOTP_PURPOSE))
+    legacy = totp.get(field)
+    return base64.b32decode(legacy) if legacy else None
+
+
+def _seal_clear_seeds(totp: dict) -> bool:
+    """Replaces clear seeds with sealed ones in place. True if something changed."""
+    changed = False
+    for field in ("secret", "pending"):
+        if isinstance(totp.get(field), str):
+            totp[f"{field}_sealed"] = _seal_totp(totp.pop(field))
+            changed = True
+    return changed
 
 
 # ------------------------------------------------------------------- usuarios
@@ -311,7 +339,7 @@ class Users:
     def begin_totp(self, user_id: str) -> dict:
         secret = secrets.token_bytes(20)
         def mutate(user):
-            user["totp"] = {"enabled": False, "pending": base64.b32encode(secret).decode("ascii"),
+            user["totp"] = {"enabled": False, "pending_sealed": _seal_totp(base64.b32encode(secret).decode("ascii")),
                             "requested_at": _now()}
         user = self._update(user_id, mutate)
         return {"secret": base64.b32encode(secret).decode("ascii"), "uri": otpauth_uri(secret, user["username"])}
@@ -319,18 +347,27 @@ class Users:
     def confirm_totp(self, user_id: str, code: str, moment: int | None = None) -> list[str]:
         codes = ["-".join((secrets.token_hex(5)[:5], secrets.token_hex(5)[:5])) for _ in range(BACKUP_CODES)]
         def mutate(user):
-            pending = user.get("totp", {}).get("pending")
-            if not pending:
+            secret = _totp_seed(user.get("totp", {}), "pending")
+            if not secret:
                 raise AuthError(msg("auth.errors.no_totp_setup"))
-            secret = base64.b32decode(pending)
             step = totp_matches(secret, code, moment or int(time.time()), None)
             if step is None:
                 raise AuthError(msg("auth.errors.totp_mismatch"))
-            user["totp"] = {"enabled": True, "secret": pending, "last_step": step, "enabled_at": _now(),
+            user["totp"] = {"enabled": True, "secret_sealed": _seal_totp(base64.b32encode(secret).decode("ascii")),
+                            "last_step": step, "enabled_at": _now(),
                             "backup_codes": [_hash_backup(item) for item in codes]}
         user = self._update(user_id, mutate)
         _log.info("totp_enabled", extra={"user": user["username"]})
         return codes
+
+    def seal_clear_totp(self) -> int:
+        """Seals the TOTP seeds that earlier versions stored in the clear. Returns how many users changed."""
+        with self._locked():
+            rows = self._load()
+            changed = sum(1 for row in rows if isinstance(row.get("totp"), dict) and _seal_clear_seeds(row["totp"]))
+            if changed:
+                self._save(rows)
+            return changed
 
     def reset_totp(self, user_id: str) -> None:
         user = self._update(user_id, lambda user: user.update(totp={"enabled": False}))
@@ -343,7 +380,8 @@ class Users:
             totp = user.get("totp", {})
             if not totp.get("enabled"):
                 return
-            step = totp_matches(base64.b32decode(totp["secret"]), code, moment or int(time.time()), totp.get("last_step"))
+            seed = _totp_seed(totp, "secret")
+            step = totp_matches(seed, code, moment or int(time.time()), totp.get("last_step")) if seed else None
             if step is not None:
                 totp["last_step"] = step
                 outcome["ok"] = True

@@ -1,21 +1,22 @@
-"""Versión del formato de `data/` y migraciones ordenadas al arrancar.
+"""Data format version and ordered data migrations at start-up.
 
-Regla para quien cambie el formato de algo que ya está en disco (ver docs/development.md):
-1. Los lectores toleran el formato viejo (campos que faltan, tipos antiguos): nunca rompen al leer.
-2. Si hay que reescribir datos, se añade una migración al final de MIGRATIONS: idempotente (se puede
-   repetir sin daño), declara qué rutas toca (se copian antes) y tiene su prueba con datos viejos.
-3. Nunca se reordena ni se borra una migración publicada: la versión es su posición.
+The version lives in PostgreSQL (document `data-version`): a restored database carries its own version, and no process
+needs a shared disk to know it. A `data-version.json` left on disk by earlier versions is adopted once.
 
-Una instalación nueva nace en la última versión sin migrar nada. Una existente sin `data-version.json`
-es la versión 0 (anterior a este sistema). Si los datos son de una versión más nueva que el código
-(se volvió a una versión anterior), no se arranca: escribir con el formato viejo podría estropearlos.
+Rules for whoever changes the format of stored data (see docs/development.md):
+1. Readers tolerate the old format (missing fields, old types): reading never breaks.
+2. Rewriting data takes a migration appended to MIGRATIONS: idempotent, declaring the data/ paths it touches (they are
+   copied first), with a test on old data.
+3. A published migration is never reordered or deleted: the version is its position.
+
+A new install starts at the latest version without migrating. Data from a newer version than the code (a rollback)
+refuses to start: writing it with the old format could damage it.
 """
 
 from __future__ import annotations
 
-import fcntl
+import hashlib
 import json
-import os
 import shutil
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -23,11 +24,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+from sqlalchemy import select, text as sql
+
+from tamandua.shared import db, documents
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import msg, text
 
 _log = logging_setup.get("migrations")
-VERSION_FILE = "data-version.json"
+VERSION_DOCUMENT = "data-version"
+VERSION_FILE = "data-version.json"  # earlier versions kept it on disk: adopted once
 BACKUPS = "backups"
 KEEP_BACKUPS = 5
 
@@ -57,8 +62,15 @@ def _cra_opt_in(data_dir: Path) -> int:
     return 1
 
 
+def _seal_totp_seeds(data_dir: Path) -> int:
+    """TOTP seeds were stored in the clear; they are sealed with the master key."""
+    from tamandua.modules.identity.auth import Users
+    return Users(data_dir).seal_clear_totp()
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration("cra_opt_in", (), _cra_opt_in),
+    Migration("seal_totp_seeds", (), _seal_totp_seeds),
 )
 LATEST = len(MIGRATIONS)
 
@@ -71,48 +83,63 @@ class DataTooNew(RuntimeError):
         self.message = message
 
 
-def _path(data_dir: Path) -> Path:
-    return data_dir / VERSION_FILE
-
-
-def current(data_dir: Path) -> int | None:
-    """La versión guardada; None si no hay archivo (instalación nueva o anterior a este sistema)."""
+def _legacy_version(data_dir: Path) -> int | None:
     try:
-        state = json.loads(_path(data_dir).read_text(encoding="utf-8"))
-        return int(state["version"])
+        return int(json.loads((data_dir / VERSION_FILE).read_text(encoding="utf-8"))["version"])
     except FileNotFoundError:
         return None
     except (OSError, ValueError, KeyError, TypeError):
-        return 0  # ilegible: se asume lo más viejo; las migraciones son idempotentes
+        return 0  # unreadable: assume the oldest; migrations are idempotent
+
+
+def _state(data_dir: Path) -> dict | None:
+    state = documents.load(data_dir, VERSION_DOCUMENT)
+    return state if isinstance(state, dict) and isinstance(state.get("version"), int) else None
+
+
+def current(data_dir: Path) -> int | None:
+    """The stored version; None on a new install (no version anywhere)."""
+    state = _state(data_dir)
+    return state["version"] if state else _legacy_version(data_dir)
 
 
 def _has_data(data_dir: Path) -> bool:
-    return any((data_dir / name).exists() for name in ("runs", "findings", "triage.json", "pr-watch.json", "threat-models"))
+    from tamandua.modules.identity.tables import users
+    from tamandua.modules.runs.tables import runs
+    with db.transaction(data_dir) as connection:
+        return any(connection.execute(select(table.c.tenant_id).where(table.c.tenant_id == db.TENANT).limit(1)).first()
+                   for table in (users, runs, documents.documents))
 
 
 def _write(data_dir: Path, version: int, history: list[dict]) -> None:
-    path = _path(data_dir)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps({"version": version, "history": history[-50:]}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    documents.save(data_dir, VERSION_DOCUMENT, {"version": version, "history": history[-50:]})
 
 
 def _history(data_dir: Path) -> list[dict]:
+    state = _state(data_dir)
+    if state:
+        return list(state.get("history") or [])
     try:
-        return list(json.loads(_path(data_dir).read_text(encoding="utf-8")).get("history") or [])
+        return list(json.loads((data_dir / VERSION_FILE).read_text(encoding="utf-8")).get("history") or [])
     except (OSError, ValueError, AttributeError):
         return []
 
 
 @contextmanager
 def _locked(data_dir: Path):
-    # El panel y un comando de la CLI (p. ej. `make demo`) pueden arrancar a la vez sobre el mismo data/.
-    with open(data_dir / ".migrate.lock", "a+") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
+    """The API, the workers and a CLI command can start at once: one migrates, the rest wait. A session-level lock
+    on its own connection, so each migration still commits on its own and a failure resumes from there."""
+    key = int.from_bytes(hashlib.sha256(f"{db.TENANT}\x1fdata-migrations\x1f{db.schema_for(data_dir)}".encode()).digest()[:8],
+                         "big", signed=True)
+    connection = db.engine().connect()
+    try:
+        connection.execute(sql("SELECT pg_advisory_lock(:key)"), {"key": key})
+        connection.commit()
+        yield
+    finally:
+        connection.execute(sql("SELECT pg_advisory_unlock(:key)"), {"key": key})
+        connection.commit()
+        connection.close()
 
 
 def _backup(data_dir: Path, pending: list[tuple[int, Migration]]) -> Path | None:
@@ -140,11 +167,13 @@ def upgrade(data_dir: Path) -> list[str]:
     from tamandua.app import database
     database.upgrade()  # antes que nada: las migraciones de datos y la aplicación leen de estas tablas
     data_dir.mkdir(parents=True, exist_ok=True)
-    version = current(data_dir)
-    if version == LATEST:
+    state = _state(data_dir)
+    if state and state["version"] == LATEST:
         return []
     with _locked(data_dir):
-        version = current(data_dir)  # otro proceso pudo migrar mientras se esperaba el cerrojo
+        version = current(data_dir)  # another process may have migrated while this one waited for the lock
+        if _state(data_dir) is None and version is not None:
+            _write(data_dir, version, _history(data_dir))  # adopt the on-disk version of earlier releases
         if version is None and not _has_data(data_dir):
             _write(data_dir, LATEST, [{"version": LATEST, "at": datetime.now(timezone.utc).isoformat(), "name": "fresh install"}])
             return []
