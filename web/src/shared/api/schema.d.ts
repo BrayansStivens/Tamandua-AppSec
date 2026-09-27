@@ -252,6 +252,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cron": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cron */
+        get: operations["cron_api_cron_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dashboard": {
         parameters: {
             query?: never;
@@ -2406,6 +2423,15 @@ export interface components {
         ReviewQueued: {
             run: components["schemas"]["QueuedRun"];
         };
+        /** Round */
+        Round: {
+            /** Ran */
+            ran: string[];
+            /** Queued */
+            queued: string[];
+            /** Failed */
+            failed: string[];
+        };
         /** RunPage */
         RunPage: {
             /** Items */
@@ -3167,6 +3193,40 @@ export interface operations {
                 content?: never;
             };
             /** @description Metrics are off (TAMANDUA_METRICS_TOKEN is not set) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    cron_api_cron_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Round"];
+                };
+            };
+            /** @description Missing or wrong bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Off: no TAMANDUA_CRON_TOKEN / CRON_SECRET */
             404: {
                 headers: {
                     [name: string]: unknown;

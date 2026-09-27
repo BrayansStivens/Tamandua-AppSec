@@ -127,6 +127,9 @@ def build_parser() -> argparse.ArgumentParser:
     worker = commands.add_parser("worker", help="Run queued analyses and periodic tasks (the compose `worker` service)")
     worker.add_argument("--check", action="store_true", help="Health: 0 if this worker showed signs of life recently (healthcheck)")
     commands.add_parser("check-config", help="Check the settings in the environment (exit 1 if any is invalid)")
+    rounds = commands.add_parser("periodic", help="Run one round of the due periodic tasks and exit (TAMANDUA_PERIODIC=external)")
+    rounds.add_argument("--task", action="append", choices=("outbox", "pull_requests", "nvd", "advisories"),
+                        help="Only this task (repeatable); by default every due task")
     commands.add_parser("setup-code", help="Show the one-time code to create the first administrator (while there is none)")
     panel = commands.add_parser("serve", help="Open the web panel")
     panel.add_argument("--port", type=int, default=8766)
@@ -165,6 +168,12 @@ def main(argv: list[str] | None = None) -> int:
                 return 0 if healthy(args.data_dir) else 1
             run_worker(args.data_dir)
             return 0
+        if args.command == "periodic":
+            from tamandua.modules.runs import periodic
+            from tamandua.modules.runs.jobs import ScanJobs
+            outcome = periodic.run_round(args.data_dir, ScanJobs(args.data_dir, worker=False), here_only=False, only=args.task)
+            print(_json(outcome))
+            return 1 if outcome["failed"] else 0
         if args.command == "setup-code":
             from tamandua.modules.identity.auth import Authenticator
             code = Authenticator(args.data_dir).setup_code()

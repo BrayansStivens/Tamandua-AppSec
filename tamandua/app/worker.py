@@ -16,6 +16,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from tamandua.app import data_migrations, wiring
+from tamandua.modules.runs import periodic
 from tamandua.modules.runs.jobs import ScanJobs
 from tamandua.shared import db
 from tamandua.shared import log as logging_setup
@@ -72,7 +73,8 @@ def _lead(data_dir: Path, jobs: ScanJobs, stop: threading.Event) -> None:
                 connection.commit()
                 log.info("worker_leader", extra={"reason": "este worker corre las tareas periódicas y avanza los lotes"})
                 jobs.leader = True
-                start_periodic(data_dir, jobs)
+                if not periodic.external():  # external: a scheduler triggers the rounds (tamandua periodic, /api/cron)
+                    start_periodic(data_dir, jobs)
                 stop.wait()  # mientras viva el proceso, la conexión abierta conserva el cerrojo
                 return
             connection.rollback()

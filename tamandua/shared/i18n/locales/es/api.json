@@ -67,5 +67,6 @@
     "selected_other": "{{count}} repositorios seleccionados",
     "images_one": "1 imagen",
     "images_other": "{{count}} imágenes"
-  }
+  },
+  "cron_token_required": "Envía el token de cron como token bearer (Authorization: Bearer …)"
 }

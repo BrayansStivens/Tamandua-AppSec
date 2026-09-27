@@ -9,6 +9,7 @@ from tamandua.shared import log as logging_setup, settings
 from tamandua.app import data_migrations as migrations, wiring
 from tamandua.app.api.security import State, public_url
 from tamandua.modules.identity.auth import Authenticator
+from tamandua.modules.runs import periodic
 from tamandua.modules.runs.jobs import ScanJobs
 from tamandua.shared.i18n import t
 
@@ -25,7 +26,7 @@ def build_state(data_dir: Path, *, watch_pull_requests: bool = False, worker: bo
     embedded = embedded_worker() if worker is None else worker
     state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir, worker=embedded),
                   auth=Authenticator(data_dir))
-    if watch_pull_requests and embedded:
+    if watch_pull_requests and embedded and not periodic.external():
         from tamandua.app.worker import start_periodic
         start_periodic(data_dir, state.jobs)
     return state

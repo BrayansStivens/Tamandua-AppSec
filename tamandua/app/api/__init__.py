@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from tamandua.app.api import assets, auth, compliance, findings, images, intel, metrics, notifications, onboarding, pullrequests, reporting, repositories, runs, scanning, sources, static, system, threats
+from tamandua.app.api import assets, auth, compliance, cron, findings, images, intel, metrics, notifications, onboarding, pullrequests, reporting, repositories, runs, scanning, sources, static, system, threats
 from tamandua.app.api.deps import ApiError
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
 from tamandua.modules.identity.auth import COOKIE_NAME
@@ -25,7 +25,7 @@ from tamandua.shared.i18n import localize, msg, negotiate
 from tamandua.shared.vault import VaultError
 from tamandua.version import VERSION
 
-ROUTERS = (auth, system, metrics, reporting, intel, findings, compliance, pullrequests, repositories, scanning, sources, threats, runs, assets, images, notifications, onboarding, static)
+ROUTERS = (auth, system, metrics, cron, reporting, intel, findings, compliance, pullrequests, repositories, scanning, sources, threats, runs, assets, images, notifications, onboarding, static)
 
 
 def _security_headers(response, port: int) -> None:
@@ -145,6 +145,7 @@ def openapi_document(data_dir: Path | None = None) -> str:
     # Los POST exigen además Origin y la cabecera X-Tamandua-Action (CSRF), que la cookie sola no cubre.
     document.setdefault("components", {})["securitySchemes"] = {
         "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Session signed in to the panel."},
-        "metrics": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_METRICS_TOKEN (Prometheus scraper)."}}
+        "metrics": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_METRICS_TOKEN (Prometheus scraper)."},
+        "cron": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_CRON_TOKEN or CRON_SECRET (external scheduler)."}}
     document["security"] = [{"session": []}]
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"

@@ -633,6 +633,38 @@
         ]
       }
     },
+    "/api/cron": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Cron",
+        "operationId": "cron_api_cron_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Round"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or wrong bearer token"
+          },
+          "404": {
+            "description": "Off: no TAMANDUA_CRON_TOKEN / CRON_SECRET"
+          }
+        },
+        "security": [
+          {
+            "cron": []
+          }
+        ]
+      }
+    },
     "/api/dashboard": {
       "get": {
         "tags": [
@@ -7432,6 +7464,41 @@
         ],
         "title": "ReviewQueued"
       },
+      "Round": {
+        "properties": {
+          "ran": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Ran"
+          },
+          "queued": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Queued"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ran",
+          "queued",
+          "failed"
+        ],
+        "title": "Round"
+      },
       "RunPage": {
         "properties": {
           "items": {
@@ -8499,6 +8566,11 @@
         "type": "http",
         "scheme": "bearer",
         "description": "TAMANDUA_METRICS_TOKEN (Prometheus scraper)."
+      },
+      "cron": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "TAMANDUA_CRON_TOKEN or CRON_SECRET (external scheduler)."
       }
     }
   },

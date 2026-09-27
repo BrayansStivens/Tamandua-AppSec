@@ -183,6 +183,10 @@ class ScanJobs:
         log.info("análisis de imagen encolado", extra={"run_id": run_id, "path": image["reference"]})
         return {"id": run_id, "status": "queued"}
 
+    def enqueue_periodic(self, task: str) -> None:
+        """A periodic task (NVD sync, advisory watch) for a worker to run: see runs/periodic.py."""
+        queue.enqueue(self.data_dir, "periodic", {"task": task})
+
     def pending(self) -> int:
         return queue.pending(self.data_dir)
 
@@ -262,6 +266,13 @@ class ScanJobs:
             self._beat(recover=False)
 
     def _execute(self, job: dict) -> None:
+        if job.get("kind") == "periodic":
+            # Already claimed as due by whoever queued it: the worker just runs it.
+            from tamandua.modules.runs import periodic
+            task = periodic.TASKS.get(job.get("task"))
+            if task is not None:
+                log.info("periodic_task_done", extra={"reason": f"{job['task']}: {task.run(self.data_dir, self)}"})
+            return None
         if job.get("kind") == "pr_review":
             return self._execute_pr(job)
         if job.get("kind") == "image_scan":
