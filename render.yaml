@@ -1,0 +1,60 @@
+# Render Blueprint: the API with the panel (web service), the worker with the engines inside (background worker, no
+# Docker socket) and PostgreSQL. New Blueprint → this repository → fill in TAMANDUA_PUBLIC_URL when asked.
+# It uses the published images: it needs a released version (see docs/deploy.md). Not yet tried on Render.
+databases:
+  - name: tamandua-db
+    databaseName: tamandua
+    user: tamandua
+
+services:
+  - type: web
+    name: tamandua-api
+    runtime: image
+    image:
+      url: ghcr.io/brayansstivens/tamandua:0.9
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: "8766"
+      - key: TAMANDUA_BIND
+        value: 0.0.0.0
+      - key: TAMANDUA_EMBEDDED_WORKER
+        value: "0"
+      - key: TAMANDUA_DATABASE_URL
+        fromDatabase:
+          name: tamandua-db
+          property: connectionString
+      # 32 random bytes in base64: exactly the master key's format. Keep a copy apart: it decrypts every secret.
+      - key: TAMANDUA_MASTER_KEY
+        generateValue: true
+      # https://<your service>.onrender.com, or your own domain
+      - key: TAMANDUA_PUBLIC_URL
+        sync: false
+      # Render's proxy is the only way in: its X-Forwarded-For is believed (sign-in throttling needs the real address).
+      - key: TAMANDUA_FORWARDED_ALLOW_IPS
+        value: "*"
+      - key: TAMANDUA_LOG_FORMAT
+        value: json
+
+  - type: worker
+    name: tamandua-worker
+    runtime: image
+    image:
+      url: ghcr.io/brayansstivens/tamandua-worker:0.9
+    envVars:
+      - key: TAMANDUA_DATABASE_URL
+        fromDatabase:
+          name: tamandua-db
+          property: connectionString
+      - key: TAMANDUA_MASTER_KEY
+        fromService:
+          type: web
+          name: tamandua-api
+          envVarKey: TAMANDUA_MASTER_KEY
+      - key: TAMANDUA_PUBLIC_URL
+        fromService:
+          type: web
+          name: tamandua-api
+          envVarKey: TAMANDUA_PUBLIC_URL
+      - key: TAMANDUA_LOG_FORMAT
+        value: json

@@ -212,13 +212,13 @@ class ServerTests(unittest.TestCase):
         status, payload = self.request("GET", "/api/health")
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(payload)["status"], "ok")
-        # Otro Host o Origin distinto de los permitidos se rechaza aunque el puerto coincida.
-        status, _ = self.request("GET", "/api/health", headers={"Host": "evil.test:8766"})
+        # Another Host is refused even on the right port (health alone answers, anonymously, for platform probes).
+        status, _ = self.request("GET", "/api/auth/session", headers={"Host": "evil.test:8766"})
         self.assertEqual(status, 403)
         with patch.dict(os.environ, {"TAMANDUA_ALLOWED_ORIGINS": "http://appsec.local:8766"}):
-            status, _ = self.request("GET", "/api/health", headers={"Host": "appsec.local:8766"})
+            status, _ = self.request("GET", "/api/auth/session", headers={"Host": "appsec.local:8766"})
             self.assertEqual(status, 200)
-            status, _ = self.request("GET", "/api/health")   # 127.0.0.1 deja de estar permitido
+            status, _ = self.request("GET", "/api/auth/session")   # 127.0.0.1 is no longer allowed
             self.assertEqual(status, 403)
 
     def test_code_connection_from_ui_validates_lists_and_forgets_token(self):

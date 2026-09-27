@@ -1,0 +1,19 @@
+# Only the Python app and its rules go to Vercel: no panel sources, data, secrets or development leftovers.
+.git
+.github
+.venv
+.dev
+.claude
+data
+config
+backups
+web
+tests
+fixtures
+docs
+deploy
+docker
+scripts
+skills
+*.md
+!README.md

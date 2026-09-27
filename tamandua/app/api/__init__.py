@@ -75,7 +75,11 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
     async def pipeline(request: Request, call_next):
         started = time.time()
         if not host_allowed(port, request.headers.get("host")):
-            response = JSONResponse(_error(request, msg("api.host_not_allowed")), status_code=403)
+            if request.method == "GET" and request.url.path == "/api/health":
+                # Platforms probe health with a Host of their own: it gets the anonymous answer, never session data.
+                response = JSONResponse({"status": "ok", "version": VERSION})
+            else:
+                response = JSONResponse(_error(request, msg("api.host_not_allowed")), status_code=403)
         elif (oversized := _body_problem(request)) is not None:
             response = JSONResponse(_error(request, msg("api.invalid_request")), status_code=oversized)
         else:

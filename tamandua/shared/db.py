@@ -44,6 +44,11 @@ def url() -> str:
     if not value:
         raise DatabaseNotConfigured("TAMANDUA_DATABASE_URL is missing: Tamandua stores runs and findings in PostgreSQL "
                                     "(`make up` configures it for you).")
+    # Managed databases (Neon, Supabase, Railway, Render, Heroku) hand out postgres:// or postgresql://: same database,
+    # with the driver Tamandua ships (psycopg 3).
+    for prefix in ("postgres://", "postgresql://"):
+        if value.startswith(prefix):
+            return "postgresql+psycopg://" + value.removeprefix(prefix)
     return value
 
 
