@@ -374,6 +374,23 @@ class DockerAccessTests(unittest.TestCase):
             with patch.object(scanners, "DOCKER_SOCKET", socket), patch.object(scanners.os, "access", return_value=True):
                 self.assertIsNone(scanners.socket_problem())
 
+    def test_a_docker_that_was_down_is_asked_again(self):
+        import subprocess
+        from tamandua.modules.scanning import engines as scanners
+        scanners._docker_state.clear()
+        down = subprocess.CompletedProcess([], 1, "", "Cannot connect to the Docker daemon")
+        up = subprocess.CompletedProcess([], 0, "27.5.1\n", "")
+        with patch.object(scanners.shutil, "which", return_value="/usr/bin/docker"), \
+                patch.object(scanners, "socket_problem", return_value=None), \
+                patch.object(scanners.subprocess, "run", side_effect=[down, up]) as run:
+            self.assertFalse(scanners.docker_available())
+            self.assertFalse(scanners.docker_available())  # within the minute: not asked again
+            scanners._docker_state["at"] -= scanners.RECHECK_SECONDS + 1
+            self.assertTrue(scanners.docker_available())
+            self.assertTrue(scanners.docker_available())  # a Docker that answers stays answered
+        self.assertEqual(run.call_count, 2)
+        scanners._docker_state.clear()
+
     def test_docker_info_without_server_version_is_not_available(self):
         import subprocess
         from tamandua.modules.scanning import engines as scanners

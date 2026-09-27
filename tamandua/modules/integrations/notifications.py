@@ -331,19 +331,28 @@ def on_batch(summary: dict, *, sender=None, wait: bool = False, data_dir: Path |
         _log.exception("notification_dispatch_failed")
 
 
+OUTBOX_LEASE = timedelta(minutes=5)  # a claimed message nobody finished sending is due again after this
+
+
 def drain(data_dir: Path, *, sender=None, limit: int = 20) -> int:
-    """Entrega lo que toca del buzón de salida (lo llama el worker cada pocos segundos). Devuelve cuántos intentó."""
+    """Delivers the due outbox messages (the worker calls it every few seconds). Returns how many it tried.
+
+    Messages are claimed in a short transaction (their next attempt moves past a lease, so another worker skips
+    them) and sent outside it: a slow webhook never holds a database connection or a lock. A worker that dies
+    mid-delivery leaves them due again when the lease runs out: delivery is at least once."""
     channels = _vault()
     with db.transaction(data_dir) as connection:
         rows = connection.execute(select(outbox.c.id, outbox.c.channel_id, outbox.c.payload, outbox.c.attempts)
                                   .where(outbox.c.tenant_id == db.TENANT, outbox.c.status == "pending", outbox.c.next_attempt_at <= func.now())
                                   .order_by(outbox.c.created_at).limit(limit).with_for_update(skip_locked=True)).all()
-        for row in rows:
-            channel = channels.get(row.channel_id)
-            if channel is None:  # el canal se borró mientras esperaba
-                connection.execute(update(outbox).where(outbox.c.tenant_id == db.TENANT, outbox.c.id == row.id)
-                                   .values(status="failed", last_error="Canal eliminado"))
-                continue
+        if rows:
+            connection.execute(update(outbox).where(outbox.c.tenant_id == db.TENANT, outbox.c.id.in_([row.id for row in rows]))
+                               .values(next_attempt_at=func.now() + OUTBOX_LEASE))
+    for row in rows:
+        channel = channels.get(row.channel_id)
+        if channel is None:  # the channel was deleted while the message waited
+            values = {"status": "failed", "last_error": "Channel deleted"}
+        else:
             ok, detail = _post(channel, row.payload, sender=sender)
             _record_delivery(row.channel_id, ok, detail)
             attempts = row.attempts + 1
@@ -354,9 +363,10 @@ def drain(data_dir: Path, *, sender=None, limit: int = 20) -> int:
             else:
                 values = {"attempts": attempts, "last_error": text(detail, "en"),
                           "next_attempt_at": func.now() + timedelta(minutes=RETRY_MINUTES[attempts - 1])}
-            connection.execute(update(outbox).where(outbox.c.tenant_id == db.TENANT, outbox.c.id == row.id).values(**values))
             (_log.info if ok else _log.warning)("notification_sent" if ok else "notification_failed",
-                                               extra={"reason": f"{channel['kind']} {channel['name']}: {text(detail, 'en')} (intento {attempts})"})
+                                               extra={"reason": f"{channel['kind']} {channel['name']}: {text(detail, 'en')} (attempt {attempts})"})
+        with db.transaction(data_dir) as connection:
+            connection.execute(update(outbox).where(outbox.c.tenant_id == db.TENANT, outbox.c.id == row.id).values(**values))
     return len(rows)
 
 

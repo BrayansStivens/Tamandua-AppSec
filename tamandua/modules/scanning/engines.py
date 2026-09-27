@@ -227,8 +227,13 @@ def socket_problem() -> dict | None:
     return msg("scanning.engines.socket_problem", gid=gid)
 
 
+RECHECK_SECONDS = 60  # a Docker that wasn't answering is asked again after this (it may have been starting)
+
+
 def docker_available() -> bool:
-    if "ok" not in _docker_state:
+    checked = _docker_state.get("at")
+    stale = checked is not None and not _docker_state.get("ok") and time.monotonic() - checked > RECHECK_SECONDS
+    if "ok" not in _docker_state or stale:
         binary = shutil.which("docker")
         try:
             completed = subprocess.run([binary, "info", "--format", "{{.ServerVersion}}"], capture_output=True, text=True,
@@ -238,6 +243,8 @@ def docker_available() -> bool:
         # Sin permiso sobre el socket, `docker info` puede salir con 0 y sin versión de servidor: eso no es Docker disponible.
         _docker_state["ok"] = bool(completed) and completed.returncode == 0 and bool(completed.stdout.strip())
         _docker_state["why"] = socket_problem() or cause(completed) if not _docker_state["ok"] else ""
+        _docker_state["at"] = time.monotonic()
+        _runner_state.pop("auto", None)  # the runner choice follows what Docker answers now
     return _docker_state["ok"]
 
 

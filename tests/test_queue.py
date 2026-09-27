@@ -124,6 +124,42 @@ class QueueTests(unittest.TestCase):
         feed.assert_not_called()
         self.assertTrue(ScanJobs(self.data_dir, worker=True).leader)  # un solo proceso: siempre líder
 
+    def test_a_leader_that_loses_its_connection_stops_its_tasks_and_competes_again(self):
+        import time
+        from tamandua.app import worker as worker_module
+        stopped, started = [], []
+
+        class Task:
+            def stop(self):
+                stopped.append(True)
+        jobs = ScanJobs(self.data_dir, worker=False)
+        stop = threading.Event()
+        with patch.object(worker_module, "LEADER_CHECK_SECONDS", 0.2), \
+                patch.object(worker_module, "start_periodic", side_effect=lambda *_: started.append(True) or [Task()]):
+            leader = threading.Thread(target=worker_module._lead, args=(self.data_dir, jobs, stop), daemon=True)
+            leader.start()
+            try:
+                deadline = time.monotonic() + 5
+                while not jobs.leader and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                self.assertTrue(jobs.leader)
+                with db.engine().connect() as admin:  # the database drops the leader's session (restart, network, idle kill)
+                    admin.execute(text("SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'advisory' "
+                                       "AND database = (SELECT oid FROM pg_database WHERE datname = current_database()) "
+                                       "AND pid <> pg_backend_pid()"))
+                    admin.commit()
+                deadline = time.monotonic() + 5
+                while not stopped and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                self.assertEqual(stopped, [True])  # its periodic tasks stop at once
+                deadline = time.monotonic() + 5
+                while len(started) < 2 and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                self.assertEqual(len(started), 2)  # and it leads again once it gets the lock back
+            finally:
+                stop.set()
+                leader.join(5)
+
     def test_only_one_worker_leads_the_periodic_tasks(self):
         from tamandua.app.worker import LEADER_KEY
         first, second = db.engine().connect(), db.engine().connect()
@@ -152,6 +188,15 @@ class OutboxTests(unittest.TestCase):
 
     def tearDown(self):
         self.directory.cleanup()
+
+    def test_a_message_is_sent_outside_any_transaction(self):
+        from tamandua.shared.db import _current
+        seen = []
+        notifications.deliver("findings", lambda channel: {"event": "findings", "title": "t", "text": "x", "asset": None,
+                                                           "run_id": None, "link": None, "counts": {}, "items": [], "more": 0},
+                              data_dir=self.data_dir)
+        notifications.drain(self.data_dir, sender=lambda url, body, headers: seen.append(_current.get()) or (True, "HTTP 200"))
+        self.assertEqual(seen, [None])  # no connection held while the webhook answers
 
     def test_messages_wait_in_the_outbox_and_are_retried(self):
         notifications.on_batch({"label": "3 repositorios", "done": 3, "failed": 0, "critical": 1, "high": 2}, data_dir=self.data_dir)

@@ -64,11 +64,18 @@ class OutboxDrainer:
                 log.exception("outbox_drain_failed")
 
 
+LEADER_CHECK_SECONDS = 30
+
+
 def _lead(data_dir: Path, jobs: ScanJobs, stop: threading.Event) -> None:
-    """Intenta ser líder; si lo consigue, arranca las tareas periódicas y mantiene la conexión (y el cerrojo)."""
+    """Tries to become the leader; while it is, runs the periodic tasks and keeps the connection that holds the lock.
+
+    Every LEADER_CHECK_SECONDS it checks that connection. If it is gone, so is the lock (PostgreSQL frees it with the
+    session) and another worker may lead by now: this one stops its periodic tasks and competes again."""
     log = logging_setup.get("worker")
     while not stop.is_set():
         connection = db.engine().connect()
+        tasks: list = []
         try:
             if connection.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": LEADER_KEY}).scalar():
                 connection.commit()
@@ -76,14 +83,21 @@ def _lead(data_dir: Path, jobs: ScanJobs, stop: threading.Event) -> None:
                     "; a scheduler triggers the periodic tasks" if periodic.external() else " and runs the periodic tasks")})
                 jobs.leader = True
                 if not periodic.external():  # external: a scheduler triggers the rounds (tamandua periodic, /api/cron)
-                    start_periodic(data_dir, jobs)
-                stop.wait()  # mientras viva el proceso, la conexión abierta conserva el cerrojo
+                    tasks = start_periodic(data_dir, jobs)
+                while not stop.wait(LEADER_CHECK_SECONDS):
+                    connection.execute(text("SELECT 1"))
+                    connection.commit()
                 return
             connection.rollback()
-        except Exception:  # noqa: BLE001
-            log.exception("worker_leader_failed")
-        connection.close()
-        stop.wait(60)
+        except Exception:  # noqa: BLE001 — the database dropped the connection: leadership (and the lock) is lost
+            log.exception("worker_leader_lost" if jobs.leader else "worker_leader_failed")
+        finally:
+            for task in tasks:
+                task.stop()
+            jobs.leader = False
+            # Really closed, never back to the pool: a pooled session would keep the leader lock held for nobody.
+            connection.invalidate()
+        stop.wait(LEADER_CHECK_SECONDS)
 
 
 def run(data_dir: Path) -> None:
