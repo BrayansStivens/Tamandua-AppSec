@@ -11,7 +11,8 @@ import time
 from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import Request
+from tamandua.shared import http
 from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
@@ -116,11 +117,6 @@ def _joined(problems: list) -> dict | str:
     return result
 
 
-class _NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, request, response, code, message, headers, new_url):
-        return None
-
-
 def _request(url: str, token: str, provider: str, *, redirect_host: str | None = None) -> bytes:
     headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
     if provider == "github":
@@ -128,7 +124,7 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
         headers["X-GitHub-Api-Version"] = "2022-11-28"
     else:
         headers["PRIVATE-TOKEN"] = token
-    opener = build_opener(_NoRedirect)
+    opener = http.opener()
     try:
         try:
             response = opener.open(Request(url, headers=headers), timeout=12)
@@ -170,7 +166,7 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
         headers["X-GitHub-Api-Version"] = "2022-11-28"
     else:
         headers["PRIVATE-TOKEN"] = token
-    opener = build_opener(_NoRedirect)
+    opener = http.opener()
     try:
         try:
             response = opener.open(Request(url, headers=headers), timeout=30)

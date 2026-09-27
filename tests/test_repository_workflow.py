@@ -268,7 +268,7 @@ class DownloadTests(unittest.TestCase):
         opener = type("Opener", (), {"open": lambda self, *a, **k: response})()
         with tempfile.TemporaryDirectory() as temporary, \
                 patch.dict("os.environ", {"TAMANDUA_DOWNLOAD_TIMEOUT": timeout}), \
-                patch("tamandua.modules.sources.repositories.build_opener", return_value=opener), \
+                patch("tamandua.shared.http.build_opener", return_value=opener), \
                 patch("tamandua.modules.sources.repositories.time.monotonic", side_effect=lambda: clock[0]):
             written = repository_sources._download_archive("https://api.github.com/x", "t", "github", Path(temporary) / "a.tar.gz",
                                                            progress=lambda level, message: messages.append(message))

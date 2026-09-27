@@ -28,14 +28,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request
 
 
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from tamandua.modules.integrations.tables import outbox
-from tamandua.shared import db
+from tamandua.shared import db, http
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import default_locale, msg, t, text
 
@@ -255,7 +255,8 @@ def _post(channel: dict, payload: dict, *, sender=None) -> tuple[bool, str]:
         if sender:
             return sender(channel["url"], body, headers)
         check_url(channel["kind"], channel["url"])  # el DNS puede haber cambiado desde que se guardó
-        with urlopen(Request(channel["url"], data=body, headers=headers, method="POST"), timeout=10) as response:
+        # No redirects: a validated public URL could otherwise bounce the signed payload to an internal address.
+        with http.opener().open(Request(channel["url"], data=body, headers=headers, method="POST"), timeout=10) as response:
             return 200 <= response.status < 300, f"HTTP {response.status}"
     except HTTPError as exc:  # 404: la URL ya no existe; 401/403: sin permiso. Nunca se incluye la URL.
         return False, f"HTTP {exc.code}"

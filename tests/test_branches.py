@@ -47,7 +47,7 @@ class BranchNameTests(unittest.TestCase):
             open = staticmethod(refuse)
 
         with patch("tamandua.modules.integrations.github.installation_token", return_value="token"), \
-                patch("tamandua.modules.integrations.github.build_opener", return_value=Opener()):
+                patch("tamandua.shared.http.build_opener", return_value=Opener()):
             with self.assertRaises(BranchNotFound) as caught:
                 branch_head(7, "acme/api", "develop")
         self.assertIn("develop", text(caught.exception.message, "en"))

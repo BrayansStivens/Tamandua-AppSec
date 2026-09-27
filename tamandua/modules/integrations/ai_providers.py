@@ -15,7 +15,8 @@ from __future__ import annotations
 import json
 import os
 from urllib.error import HTTPError, URLError
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import Request
+from tamandua.shared import http
 from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
@@ -24,13 +25,6 @@ PROVIDERS = {
     "openai": {"env": "OPENAI_API_KEY", "url": "https://api.openai.com/v1/models"},
     "anthropic": {"env": "ANTHROPIC_API_KEY", "url": "https://api.anthropic.com/v1/models?limit=1"},
 }
-
-
-class _NoRedirect(HTTPRedirectHandler):
-    """Nunca reenviar una credencial a un destino indicado por una redirección."""
-
-    def redirect_request(self, request, response, code, message, headers, new_url):
-        return None
 
 
 class ProviderError(ValueError):
@@ -119,7 +113,7 @@ def check_provider(name: str, api_key: str | None = None) -> dict:
         headers["anthropic-version"] = "2023-06-01"
     request = Request(config["url"], headers=headers)
     try:
-        with build_opener(_NoRedirect).open(request, timeout=8) as response:
+        with http.opener().open(request, timeout=8) as response:
             content = response.read(256_001)
             if len(content) > 256_000:
                 return {"provider": name, "status": "error", "message": msg("integrations.ai.too_large")}

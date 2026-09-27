@@ -132,11 +132,11 @@ class GitHubAppTests(unittest.TestCase):
 
     def test_installation_token_is_reused_until_it_is_close_to_expiring(self):
         github_app._tokens[99] = ("ghs_vigente", time.time() + 3600)
-        with patch("tamandua.modules.integrations.github.build_opener", side_effect=AssertionError("pidió token de nuevo")):
+        with patch("tamandua.shared.http.build_opener", side_effect=AssertionError("pidió token de nuevo")):
             self.assertEqual(github_app.installation_token(99), "ghs_vigente")
         github_app._tokens[99] = ("ghs_por_caducar", time.time() + 60)
         with patch("tamandua.modules.integrations.github._app_jwt", return_value="jwt"), \
-                patch("tamandua.modules.integrations.github.build_opener") as opener:
+                patch("tamandua.shared.http.build_opener") as opener:
             response = opener.return_value.open.return_value.__enter__.return_value
             response.read.return_value = json.dumps({"token": "ghs_nuevo"}).encode()
             self.assertEqual(github_app.installation_token(99), "ghs_nuevo")

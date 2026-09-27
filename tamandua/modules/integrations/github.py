@@ -26,7 +26,8 @@ import threading
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import Request
+from tamandua.shared import http
 from tamandua.shared.i18n import default_locale, msg, text
 from tamandua.version import USER_AGENT
 
@@ -48,11 +49,6 @@ class GitHubAppError(RuntimeError):
     def __init__(self, message):
         super().__init__(text(message, "en"))
         self.message = message
-
-
-class _NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, request, response, code, message, headers, new_url):
-        return None
 
 
 VAULT_NAME = "github_app"
@@ -184,7 +180,7 @@ def _get(url: str, token: str, *, jwt: bool = False, forbidden: dict | None = No
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}",
         "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
-        with build_opener(_NoRedirect).open(request, timeout=15) as response:
+        with http.opener().open(request, timeout=15) as response:
             return json.loads(response.read(2_000_000))
     except HTTPError as exc:
         if missing and exc.code == 404:
@@ -241,7 +237,7 @@ def installation_token(installation_id: int) -> str:
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {_app_jwt()}",
         "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
-        with build_opener(_NoRedirect).open(request, timeout=15) as response:
+        with http.opener().open(request, timeout=15) as response:
             payload = json.loads(response.read(200_000))
     except HTTPError as exc:
         if exc.code in (401, 404):
@@ -574,7 +570,7 @@ def _scoped_repository(installation_id: int, name: str) -> dict | None:
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {_app_jwt()}", "Content-Type": "application/json",
         "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
-        with build_opener(_NoRedirect).open(request, timeout=15) as response:
+        with http.opener().open(request, timeout=15) as response:
             payload = json.loads(response.read(2_000_000))
     except HTTPError as exc:
         if exc.code in (404, 422):
@@ -651,7 +647,7 @@ def _send_json(method: str, url: str, token: str, body: dict) -> dict:
         "Accept": "application/vnd.github+json", "Authorization": f"Bearer {token}", "Content-Type": "application/json",
         "X-GitHub-Api-Version": "2022-11-28", "User-Agent": USER_AGENT})
     try:
-        with build_opener(_NoRedirect).open(request, timeout=15) as response:
+        with http.opener().open(request, timeout=15) as response:
             payload = json.loads(response.read(2_000_000) or b"{}")
     except HTTPError as exc:
         if exc.code in (403, 404):

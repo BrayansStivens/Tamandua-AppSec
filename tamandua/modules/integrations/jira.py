@@ -23,9 +23,10 @@ import re
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import Request
 
 from tamandua.shared import log as logging_setup
+from tamandua.shared import http
 from tamandua.modules.intel.advisories import compare_versions
 from tamandua.shared.i18n import default_locale, msg, t, text
 from tamandua.version import USER_AGENT
@@ -43,13 +44,6 @@ class JiraError(ValueError):
     def __init__(self, message):
         super().__init__(text(message, "en"))
         self.message = message
-
-
-class _NoRedirect(HTTPRedirectHandler):
-    """La credencial no viaja a un destino que indique una redirección."""
-
-    def redirect_request(self, request, response, code, message, headers, new_url):
-        return None
 
 
 # ------------------------------------------------------------ credencial
@@ -135,7 +129,7 @@ def _http(credentials: dict, method: str, path: str, body: dict | None = None) -
                       headers={"Authorization": f"Basic {token}", "Accept": "application/json",
                                "Content-Type": "application/json", "User-Agent": USER_AGENT})
     try:
-        with build_opener(_NoRedirect()).open(request, timeout=15) as response:
+        with http.opener().open(request, timeout=15) as response:
             raw = response.read(RESPONSE_LIMIT + 1)
     except HTTPError as exc:
         detail = ""
