@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 
 from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, guard, json_body
 from tamandua.app.api.deps import problem
+from tamandua.modules.integrations import code_tokens
 from tamandua.modules.integrations.github import BranchNotFound, GitHubAppError, branch_head, valid_branch
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.runs import batches
@@ -73,8 +74,7 @@ QUEUE_LIMIT = 20
 @router.get("/api/repositories/plan")
 def plan(source_id: str = "", context: Context = Depends(guard())) -> dict[str, Any]:
     """What the scan will do, worked out from the repository's real tree and the available engines."""
-    with context.state.code_lock:
-        tokens = context.state.code_tokens.copy()
+    tokens = code_tokens.current()
     source = find_source(tokens, github_installations(context.data_dir), source_id or None)
     if source is None:
         raise ApiError(400, msg("sources.errors.not_available"))
@@ -99,8 +99,7 @@ class QueuedScan(BaseModel):
 def repository_scan(context: Context = Depends(guard(Policy(action="scan-repository", body=1024))),
                     data: RepositoryScanIn = Depends(body(RepositoryScanIn, msg("api.invalid_repository")))) -> dict:
     state = context.state
-    with state.code_lock:
-        tokens = state.code_tokens.copy()
+    tokens = code_tokens.current()
     # The repository must exist for this credential before anything is queued.
     source = find_source(tokens, github_installations(context.data_dir), data.source_id)
     if source is None or source["id"] != data.source_id:

@@ -40,3 +40,13 @@ auth_challenges = Table(
     Column("created_at", Float, nullable=False),
     ForeignKeyConstraint(["tenant_id", "user_id"], ["users.tenant_id", "users.id"], name="fk_auth_challenges_user", ondelete="CASCADE"),
 )
+
+# Progressive lock-out per key (user, client address, setup code…), shared by every instance of the API.
+auth_throttle = Table(
+    "auth_throttle", metadata,
+    Column("tenant_id", Text, primary_key=True, server_default=TENANT),
+    Column("key", Text, primary_key=True),
+    Column("failures", Integer, nullable=False, server_default="0"),
+    Column("until", Float, nullable=False, server_default="0"),
+    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+)

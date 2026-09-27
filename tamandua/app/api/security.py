@@ -9,7 +9,6 @@ Todas las rutas la aplican con `deps.guard(Policy)`, que llama a
 
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -43,8 +42,6 @@ class State:
     log: object
     jobs: ScanJobs
     auth: Authenticator
-    code_lock: threading.Lock = field(default_factory=threading.Lock)
-    code_tokens: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

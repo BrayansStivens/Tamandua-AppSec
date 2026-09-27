@@ -13,6 +13,7 @@ from tamandua.app.demo import DEMO_SOURCE_ID
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.findings import sla, triage, verifications
 from tamandua.modules.findings.registry import VIEW_PREFIX
+from tamandua.modules.integrations import code_tokens
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.findings.kinds import FINDING_RUNS
 from tamandua.modules.runs import assets as run_assets
@@ -176,8 +177,7 @@ def reverify_finding(context: Context = Depends(guard(Policy(action="reverify-fi
             raise ApiError(409, msg("api.image_rescan_failed", detail=problem(exc))) from exc
         queued = state.jobs.enqueue_image_scan(image=image, context="", requested_by=by)
     else:
-        with state.code_lock:
-            tokens = state.code_tokens.copy()
+        tokens = code_tokens.current()
         found = find_source(tokens, github_installations(data_dir), source.get("id") or "")
         if found is None:
             raise ApiError(409, msg("api.repository_gone"))

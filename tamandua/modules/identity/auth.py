@@ -28,14 +28,14 @@ import struct
 import threading
 import time
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from contextlib import contextmanager
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
-from tamandua.modules.identity.tables import auth_challenges, sessions, users
+from tamandua.modules.identity.tables import auth_challenges, auth_throttle, sessions, users
 from tamandua.shared import db, settings, vault
 from tamandua.shared.db import TENANT
 from urllib.parse import quote
@@ -552,34 +552,36 @@ def parse_cookie(header: str | None) -> str | None:
 # ------------------------------------------------------- límite de intentos
 
 class Throttle:
-    """Bloqueo progresivo por clave (usuario o dirección): 30 s, 60 s, 120 s… hasta 15 min."""
+    """Progressive lock-out per key (user or address): 30 s, 60 s, 120 s… up to 15 min. In the database, so every
+    instance of the API counts the same attempts and a restart doesn't reset them."""
 
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._failures: dict[str, tuple[int, float]] = {}
+    def __init__(self, data_dir: Path):
+        self.data_dir = data_dir
 
     def reserve(self, key: str) -> int:
-        """Comprueba el bloqueo y cuenta el intento a la vez: 0 si puede intentarlo, si no los segundos de espera.
+        """Checks the lock-out and counts the attempt at once: 0 if it may go ahead, else the seconds to wait.
 
-        Contar antes de verificar cierra la carrera en la que N peticiones simultáneas pasaban
-        la comprobación antes de que ninguna registrase su fallo. Un acierto llama a `succeeded`.
+        Counting before verifying closes the race where N simultaneous requests passed the check before any of them
+        recorded its failure (the row lock serializes them). A success calls `succeeded`.
         """
-        with self._lock:
-            count, until = self._failures.get(key, (0, 0.0))
+        condition = (auth_throttle.c.tenant_id == TENANT, auth_throttle.c.key == key)
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(insert(auth_throttle).values(tenant_id=TENANT, key=key).on_conflict_do_nothing())
+            row = connection.execute(select(auth_throttle.c.failures, auth_throttle.c.until).where(*condition).with_for_update()).one()
             now = time.time()
-            if count >= LOCK_AFTER and until > now:
-                return max(1, int(until - now))
-            count += 1
+            if row.failures >= LOCK_AFTER and row.until > now:
+                return max(1, int(row.until - now))
+            count = row.failures + 1
             penalty = min(LOCK_MAX, LOCK_BASE * (2 ** max(0, count - LOCK_AFTER))) if count >= LOCK_AFTER else 0
-            self._failures[key] = (count, now + penalty)
-            if len(self._failures) > 5000:
-                for stale_key, _ in sorted(self._failures.items(), key=lambda item: item[1][1])[:1000]:
-                    del self._failures[stale_key]
+            connection.execute(update(auth_throttle).where(*condition).values(failures=count, until=now + penalty, updated_at=func.now()))
+            if secrets.randbelow(100) == 0:  # now and then, forget keys nobody has used for a day
+                connection.execute(delete(auth_throttle).where(auth_throttle.c.tenant_id == TENANT,
+                                                               auth_throttle.c.updated_at < func.now() - timedelta(days=1)))
             return 0
 
     def succeeded(self, key: str) -> None:
-        with self._lock:
-            self._failures.pop(key, None)
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(delete(auth_throttle).where(auth_throttle.c.tenant_id == TENANT, auth_throttle.c.key == key))
 
 
 class Authenticator:
@@ -588,7 +590,7 @@ class Authenticator:
     def __init__(self, data_dir: Path):
         self.users = Users(data_dir)
         self.sessions = Sessions(data_dir)
-        self.throttle = Throttle()
+        self.throttle = Throttle(data_dir)
 
     def setup_required(self) -> bool:
         return not self.users.any()

@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, guard, json_body
+from tamandua.modules.integrations import code_tokens
 from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.runs.store import list_runs, load_run
@@ -51,8 +52,7 @@ def _assets(context: Context, keys: list[str] = ()) -> dict[str, dict]:
     for domain in list_domains(context.data_dir):
         assets[f"domain:{domain['id']}"] = {"id": f"domain:{domain['id']}", "name": domain["host"], "kind": "domain"}
     if keys:
-        with context.state.code_lock:
-            tokens = context.state.code_tokens.copy()
+        tokens = code_tokens.current()
         installations = github_installations(context.data_dir)
         for key in keys:
             try:

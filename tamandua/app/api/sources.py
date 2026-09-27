@@ -16,7 +16,7 @@ from tamandua.app.api.security import public_url
 from tamandua.modules.findings import triage
 from tamandua.modules.runs.registry import resolve
 from tamandua.modules.findings import tickets
-from tamandua.modules.integrations import jira
+from tamandua.modules.integrations import code_tokens, jira
 from tamandua.modules.integrations.ai_providers import ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
 from tamandua.modules.integrations.github import (REQUIRED_PERMISSIONS, GitHubAppError, app_installations, app_permissions,
                                                   config as github_config, forget as forget_installation, forget_app, forget_catalog,
@@ -53,8 +53,7 @@ def sources(source_id: str | None = Query(None, alias="id"), q: str | None = Non
             context: Context = Depends(guard())) -> Any:
     """A page of repositories (`q`, `account`, `provider`, `page` from 1, `per_page` 1–100) or one of them (`id`)."""
     # An empty parameter counts as absent, and they are read as text: `id` answers whatever the others say.
-    with context.state.code_lock:
-        tokens = context.state.code_tokens.copy()
+    tokens = code_tokens.current()
     installations = github_installations(context.data_dir)
     if source_id:
         found = find_source(tokens, installations, source_id)
@@ -85,13 +84,11 @@ class CodeDisconnectIn(BaseModel):
 def connect_code(context: Context = Depends(guard(Policy(admin=True, action="connect-code", body=1024))),
                  data: CodeTokenIn | CodeDisconnectIn = Depends(body(CodeTokenIn | CodeDisconnectIn,
                                                                      msg("integrations.code.invalid_provider")))) -> Any:
-    """Connects a GitHub or GitLab token (kept in memory only), or disconnects it with `disconnect: true`."""
-    state = context.state
+    """Connects a GitHub or GitLab token (sealed in the vault), or disconnects it with `disconnect: true`."""
     if isinstance(data, CodeDisconnectIn):
         if data.disconnect is not True:
             raise ApiError(400, msg("api.invalid_request"))
-        with state.code_lock:
-            state.code_tokens.pop(data.provider, None)
+        code_tokens.disconnect(data.provider)
         return {"provider": data.provider, "connected": False}
     token = data.token
     if (not isinstance(token, str) or not 8 <= len(token) <= 512
@@ -101,8 +98,7 @@ def connect_code(context: Context = Depends(guard(Policy(admin=True, action="con
         repositories = list_repositories(data.provider, token)
     except SourceError as exc:
         raise ApiError(400, msg("integrations.code.auth_failed")) from exc
-    with state.code_lock:
-        state.code_tokens[data.provider] = token
+    code_tokens.connect(data.provider, token)
     return {"provider": data.provider, "connected": True, "repositories": len(repositories)}
 
 

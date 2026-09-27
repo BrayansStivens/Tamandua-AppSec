@@ -940,7 +940,7 @@ export interface paths {
         put?: never;
         /**
          * Connect Code
-         * @description Connects a GitHub or GitLab token (kept in memory only), or disconnects it with `disconnect: true`.
+         * @description Connects a GitHub or GitLab token (sealed in the vault), or disconnects it with `disconnect: true`.
          */
         post: operations["connect_code_api_integrations_code_post"];
         delete?: never;

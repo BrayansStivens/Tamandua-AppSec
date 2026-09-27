@@ -90,6 +90,24 @@ class AuthenticatorTests(unittest.TestCase):
         with self.assertRaises(Locked):
             self.auth.login("operadora", PASSWORD, "c")
 
+    def test_the_lockout_is_shared_by_every_instance_and_survives_a_restart(self):
+        other = Authenticator(self.data_dir)  # another API instance (or the same one after a restart)
+        for index in range(auth.LOCK_AFTER):
+            with self.assertRaises(AuthError):
+                (self.auth if index % 2 else other).login("operadora", "incorrecta-del-todo", "c")
+        with self.assertRaises(Locked):
+            Authenticator(self.data_dir).login("operadora", PASSWORD, "c")
+
+    def test_code_tokens_are_shared_and_sealed(self):
+        from tamandua.modules.integrations import code_tokens
+        from tamandua.shared import vault
+        with patch("tamandua.shared.paths.CONFIG_DIR", self.data_dir / "config"):
+            code_tokens.connect("gitlab", "glpat-token-de-prueba-123")
+            self.assertEqual(code_tokens.current(), {"gitlab": "glpat-token-de-prueba-123"})
+            self.assertIn("code_tokens", vault.names())
+            code_tokens.disconnect("gitlab")
+            self.assertEqual((code_tokens.current(), vault.names()), ({}, [name for name in vault.names() if name != "code_tokens"]))
+
     def test_totp_flow_with_backup_codes(self):
         enrolment = self.auth.users.begin_totp(self.user["id"])
         secret = base64.b32decode(enrolment["secret"])
