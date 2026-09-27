@@ -394,11 +394,6 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
         raise
 
 
-def _limits() -> None:
-    import resource
-    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # a crashing engine never dumps repository contents to disk
-
-
 def _run_local(key: str, arguments: list[str], snapshot: Path | None, *, mounts: list[str] | None, timeout: int,
                env: dict[str, str] | None, secret_env: dict[str, str] | None) -> subprocess.CompletedProcess:
     """The engine installed next to the worker, with the same arguments as its container. Container paths (/src,
@@ -433,9 +428,11 @@ def _run_local(key: str, arguments: list[str], snapshot: Path | None, *, mounts:
         environment = {"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"), "HOME": home, "TMPDIR": home,
                        "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONUTF8": "1", **{name: local(value) for name, value in (env or {}).items()},
                        **(secret_env or {})}
-        process = subprocess.Popen([binary, *(local(argument) for argument in arguments)], stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE, text=True, env=environment, cwd=home, start_new_session=True,
-                                   preexec_fn=_limits)
+        # `ulimit -c 0`: a crashing engine never dumps repository contents to disk. Through sh rather than preexec_fn,
+        # which isn't safe in a process with threads (the worker has them); "$@" passes the arguments untouched.
+        command = ["/bin/sh", "-c", 'ulimit -c 0 && exec "$0" "$@"', binary, *(local(argument) for argument in arguments)]
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment,
+                                   cwd=home, start_new_session=True)
         try:
             stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:

@@ -77,6 +77,12 @@ class LocalRunnerTests(unittest.TestCase):
         self.assertEqual(engines._rule_id("data.work.scan-2l5.opengrep-rules.appsec.py.eval-exec-non-literal"),
                          "appsec.py.eval-exec-non-literal")
 
+    def test_arguments_reach_the_engine_untouched_and_no_core_dumps(self):
+        self.install("gitleaks", '#!/bin/sh\nprintf "%s|" "$@"; ulimit -c\n')
+        tricky = ["dir", "/src", "--report-path", "a b; echo pwned", "$(id)", "`id`", "*"]
+        completed = engines._run("gitleaks", tricky, self.snapshot)
+        self.assertEqual(completed.stdout.strip(), "dir|/src|--report-path|a b; echo pwned|$(id)|`id`|*|0")
+
 
 if __name__ == "__main__":
     unittest.main()
