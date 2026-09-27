@@ -13,6 +13,9 @@ make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS with Caddy + publish
 make up                                             # prints https://tamandua.example.com and the setup code
 ```
 
+Until the first release is tagged there are no published images yet: skip `git checkout` and `PREBUILT=1`, and the
+server builds from `main`.
+
 The rest of this page covers what to prepare before, and what to do after.
 
 ## How it's laid out
@@ -151,7 +154,7 @@ Follow [github-app.md](github-app.md) with these values:
 
 ## Backups
 
-Three things make up an instance: the **database** (runs, findings, triage, users), **`config/`** (encrypted secrets and the master key) and **`.env`**. `data/` holds caches, logs and the session signing key: useful, but it all rebuilds.
+Three things make up an instance: the **database** (runs, findings, triage, users and the encrypted secrets), the **master key** (`config/master.key`, or `TAMANDUA_MASTER_KEY` in `.env`) and **`.env`**. `data/` holds caches and logs: useful, but it all rebuilds.
 
 **Scheduled, inside Compose.** Add `COMPOSE_PROFILES=backup` to `.env` and run `make up`. The `backup` service writes `backups/auto-<date>/` (database.dump, config.tgz, data.tgz) every `TAMANDUA_BACKUP_INTERVAL_HOURS` (24) and deletes its own copies older than `TAMANDUA_BACKUP_KEEP_DAYS` (14). It doesn't stop the app (`pg_dump` is consistent on its own), gets only the database password and mounts `config/` and `data/` read-only. Its healthcheck turns unhealthy if the last backup is older than two intervals. `TAMANDUA_BACKUP_DIR` moves them elsewhere (e.g. a mounted volume).
 

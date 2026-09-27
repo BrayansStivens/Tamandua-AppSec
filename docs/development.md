@@ -31,7 +31,7 @@ The CLI uses the same store as the panel (in Docker: `make cli ARGS="…"`):
 
 ## Logs
 
-`data/logs/app.log` gets one JSON line per event (time, level, component, run ID, method, path, status, duration), rotated at 10 MB × 5; the console output is human-readable. Set `TAMANDUA_LOG_LEVEL=DEBUG` to debug. Bodies, headers and tokens are never logged, and `redact()` masks credential patterns that might slip into a message.
+Logs go to standard error, human-readable by default or one JSON object per event with `TAMANDUA_LOG_FORMAT=json` (time, level, component, run ID, method, path, status, duration). `TAMANDUA_LOG_FILE=logs/app.log` also keeps a JSON copy under the data folder, rotated at 10 MB × 5 (Compose sets it). Set `TAMANDUA_LOG_LEVEL=DEBUG` to debug. Bodies, headers and tokens are never logged, and `redact()` masks credential patterns that might slip into a message.
 
 ## Development and tests
 

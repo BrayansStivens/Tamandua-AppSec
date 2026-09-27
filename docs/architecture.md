@@ -117,6 +117,16 @@ periodic tasks; the only one with the Docker socket; it can scale out, and only 
 lock, runs the periodic tasks), `postgres` and `opengrep` (only builds the engine image). The queue (`jobs`) and the
 notification outbox (`outbox`, with retries) live in PostgreSQL: a restart loses nothing that was queued.
 
+## Where each piece runs
+
+The API keeps no state of its own: users, runs, the queue, settings, the encrypted secrets, the session signing key and
+the local NVD copy are all in PostgreSQL. Several API instances can serve at once, and one without a persistent disk
+(a serverless function) works too; its data folder only holds caches that rebuild themselves. The worker runs the
+engines in one of two ways (`TAMANDUA_ENGINE_RUNNER`): a sibling container per engine through the Docker socket, or as
+processes from the engines installed in its own image (`worker-standalone`), for platforms without a socket. Periodic
+tasks run on the leader worker's clock, or are triggered from outside (`TAMANDUA_PERIODIC=external`). Every target is
+in [deploy.md](deploy.md).
+
 ## How a scan flows
 
 1. You click **Scan**, or a pull request is opened on a watched repository.
@@ -138,21 +148,20 @@ PostgreSQL (tamandua-pg volume; schema managed by Alembic migrations in tamandua
   documents           JSONB settings, one document each: due dates, exclusions, integrations, domains, batches,
                       threat models, PR and advisory watching, Jira links, CRA kit…
   jobs, workers, outbox   scan queue, worker heartbeat and notification outbox with retries
+  intel_*             local copy of NVD with KEV and EPSS for the CVE tracker (full-text search with a GIN index)
+  vault_entries       encrypted secrets (AES-256-GCM with the master key), the session signing key and the setup code
 data/
-  auth/session.key  cookie signing key (kept out of the database: whoever reads the database cannot sign sessions)
-  feeds/            KEV, EPSS, NVD (cves.sqlite; a cache that can be rebuilt)
+  feeds/            downloaded KEV and EPSS files (a cache that can be rebuilt)
   trivy-cache/      Trivy's vulnerability database
-  logs/app.log      one JSON object per line, rotated (10 MB × 5), no secrets
-  data-version.json version of the data migrations already applied
+  logs/app.log      optional JSON copy of the logs (TAMANDUA_LOG_FILE; Compose sets it), rotated, no secrets
   backups/          copy of whatever each data migration touched (the last 5 are kept)
 config/
-  secrets.vault     encrypted secrets
-  master.key        master key (unless it comes from the environment)
+  master.key        master key, only when TAMANDUA_MASTER_KEY isn't set (a single server)
 ```
 
 **Upgrading without breaking data.** Alembic migrations (`tamandua/app/alembic/versions/`) own the database schema and
 run at startup. For data that has to be rewritten, `tamandua/app/data_migrations.py` compares the version stored in
-`data-version.json` with the code's version and applies the pending migrations in order, exactly once, after copying
+the database (document `data-version`; an older `data-version.json` is adopted once) with the code's version and applies the pending migrations in order, exactly once, after copying
 to `data/backups/` only what they are about to touch. Each step records its version: if one fails, the next start
 resumes from there. A fresh install starts at the latest version; data from a newer version than the code (a
 downgrade) blocks startup instead of risking damage.

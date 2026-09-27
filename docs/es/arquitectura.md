@@ -122,6 +122,16 @@ cola y las tareas periódicas; el único con el socket de Docker; se puede escal
 líder, elegido con un cerrojo de PostgreSQL), `postgres` y `opengrep` (solo construye la imagen del motor). La cola
 (`jobs`) y el buzón de avisos (`outbox`, con reintentos) viven en PostgreSQL: un reinicio no pierde lo encolado.
 
+## Dónde corre cada pieza
+
+La API no guarda estado propio: usuarios, ejecuciones, la cola, la configuración, los secretos cifrados, la clave de
+firma de sesiones y la copia local de NVD están en PostgreSQL. Pueden atender varias instancias de la API a la vez, y
+también una sin disco persistente (una función serverless); su carpeta de datos solo guarda cachés que se regeneran. El
+worker ejecuta los motores de una de dos formas (`TAMANDUA_ENGINE_RUNNER`): un contenedor hermano por motor a través
+del socket de Docker, o como procesos, con los motores instalados en su propia imagen (`worker-standalone`), para
+plataformas sin socket. Las tareas periódicas van con el reloj del worker líder o se disparan desde fuera
+(`TAMANDUA_PERIODIC=external`). Todos los destinos están en [despliegue.md](despliegue.md).
+
 ## Flujo de un análisis
 
 1. Pulsas **Analizar** o se abre un PR en un repositorio vigilado.
@@ -143,22 +153,21 @@ PostgreSQL (volumen tamandua-pg; esquema con migraciones de Alembic en tamandua/
   documents           configuración por documento JSONB: plazos, exclusiones, integraciones, dominios, lotes,
                       modelos de amenazas, vigilancia de PRs y de avisos, enlaces con Jira, kit CRA…
   jobs, workers, outbox   cola de análisis, latido de los workers y buzón de avisos con reintentos
+  intel_*             copia local de NVD con KEV y EPSS para el CVE tracker (búsqueda de texto con índice GIN)
+  vault_entries       secretos cifrados (AES-256-GCM con la clave maestra), la clave de firma de sesiones y el código inicial
 data/
-  auth/session.key  clave de firma de cookies (no va a la base: quien lee la base no puede firmar sesiones)
-  feeds/            KEV, EPSS, NVD (cves.sqlite; caché regenerable)
+  feeds/            ficheros descargados de KEV y EPSS (caché regenerable)
   trivy-cache/      base de vulnerabilidades de Trivy
-  logs/app.log      JSON por línea, rotado (10 MB × 5), sin secretos
-  data-version.json versión de las migraciones de datos aplicadas
+  logs/app.log      copia JSON opcional de los registros (TAMANDUA_LOG_FILE; Compose la activa), rotada, sin secretos
   backups/          copia de lo que tocó cada migración de datos (se guardan las 5 últimas)
 config/
-  secrets.vault     secretos cifrados
-  master.key        clave maestra (si no viene del entorno)
+  master.key        clave maestra, solo si no se define TAMANDUA_MASTER_KEY (un único servidor)
 ```
 
 **Actualizar sin romper los datos.** El esquema de la base lo llevan las migraciones de Alembic
 (`tamandua/app/alembic/versions/`), que se aplican al arrancar. Para datos que haya que reescribir,
 `tamandua/app/data_migrations.py` compara la versión
-guardada en `data-version.json` con la del código y aplica, en orden y una sola vez, las migraciones pendientes,
+guardada en la base (documento `data-version`; un `data-version.json` antiguo se adopta una vez) con la del código y aplica, en orden y una sola vez, las migraciones pendientes,
 tras copiar a `data/backups/` solo lo que van a tocar. Cada paso guarda su versión: si uno falla, el siguiente
 arranque reanuda desde ahí. Una instalación nueva nace en la última versión; unos datos de una versión más nueva
 que el código (volver a una versión anterior) impiden arrancar en vez de arriesgarse a estropearlos.

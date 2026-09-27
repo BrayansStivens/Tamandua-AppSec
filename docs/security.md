@@ -8,18 +8,18 @@ Tamandua reads your repositories' code and stores GitHub, AI and Jira credential
 
 | Secret | Where it lives | Who can see it |
 | --- | --- | --- |
-| GitHub App private key | `config/secrets.vault`, encrypted | Only the server process. GitHub receives a signed JWT, never the key. |
-| OpenAI / Anthropic keys | `config/secrets.vault`, encrypted | Only the server; they're validated against the provider before being saved. The panel shows the last 4 characters. |
-| Jira token | `config/secrets.vault`, encrypted | Same as above. |
-| Container registry tokens | `config/secrets.vault`, encrypted | Only the server. They reach Trivy and Grype as environment variables (`-e NAME` with no value on the command), never on the command line. |
+| GitHub App private key | `vault_entries` table, encrypted | Only the server process. GitHub receives a signed JWT, never the key. |
+| OpenAI / Anthropic keys | `vault_entries` table, encrypted | Only the server; they're validated against the provider before being saved. The panel shows the last 4 characters. |
+| Jira token | `vault_entries` table, encrypted | Same as above. |
+| Container registry tokens | `vault_entries` table, encrypted | Only the server. They reach Trivy and Grype as environment variables (`-e NAME` with no value on the command), never on the command line. |
 | GitHub installation tokens | Memory, 1 h | Renewed automatically; never written to disk. |
 | Master key | `config/master.key` (0400) or `TAMANDUA_MASTER_KEY` | Whoever administers the server. |
 | User passwords | `users` table in PostgreSQL, scrypt hash only | Nobody: they can't be recovered. |
-| Session cookies | `sessions` table, hash only; signed with `data/auth/session.key` | A copy of the database doesn't grant access. |
+| Session cookies | `sessions` table, hash only; signed with a key sealed in the vault (or `TAMANDUA_SESSION_KEY`) | A copy of the database doesn't grant access. |
 
 **Encryption.** AES-256-GCM, a random nonce per secret, and the secret's name as associated data: an encrypted value can't be moved to another entry without decryption failing, and any tampering is detected. If the master key doesn't decrypt the vault, the server says so instead of using corrupted data.
 
-**Separation.** `config/` (secrets), the database and `data/` (caches, logs, session signing key) are kept apart. `data/` is what usually gets copied, sent for debugging or uploaded along with logs, so it holds no secrets. To keep the key apart from the vault too, set `TAMANDUA_MASTER_KEY` from your secrets manager instead of leaving `master.key` next to `secrets.vault`.
+**Separation.** The encrypted secrets live in the database, the master key apart from it (`TAMANDUA_MASTER_KEY` or `config/master.key`), and `data/` only holds caches and logs, so it carries no secrets. A database dump without the master key reveals nothing. On any platform with a secrets manager, set `TAMANDUA_MASTER_KEY` there: it's the one value that must never live next to the database backups.
 
 **Logs.** Request bodies, headers, passwords, TOTP codes and cookies are never logged. On top of that, every message goes through a filter that redacts:
 
@@ -73,9 +73,12 @@ There's no telemetry.
 
 ## Known trade-offs
 
-- **Docker socket.** Engines are launched through `/var/run/docker.sock`, which is equivalent to root on the host. Only the `worker` service mounts it, and it exposes no ports; the service that handles requests (`appsec`) doesn't have it. That's the price of installing nothing but Docker; to harden it further, put the worker behind an allowlisting socket proxy or on another machine.
+- **Docker socket.** Engines are launched through `/var/run/docker.sock`, which is equivalent to root on the host. Only the `worker` service mounts it, and it exposes no ports; the service that handles requests (`api`) doesn't have it. That's the price of installing nothing but Docker; to avoid it, use the worker image with the engines inside (`TAMANDUA_ENGINE_RUNNER=local`, as `deploy/compose.yaml` does).
+- **Engines inside the worker** (`TAMANDUA_ENGINE_RUNNER=local`). No Docker socket, but also no container per engine: each engine runs as a process of the worker, with a fresh home folder, only `PATH` from the worker's environment (never the database URL or the master key), no core dumps, and its whole process group killed when it times out. There is no network isolation per engine; the engines run with their offline options wherever they have them.
 - **Job queue.** Pending scans live in PostgreSQL. The code tokens that go with a scan are sealed with the master key (AES-GCM): the database never stores them in plaintext.
-- **Master key next to the vault** if you don't set `TAMANDUA_MASTER_KEY`. It protects against a stray copy of `secrets.vault`, not against someone with full access to `config/`.
+- **TOTP seeds** are sealed with the master key too: a database dump alone can't produce codes. Losing the master key
+  means resetting second factors (`make cli ARGS="user reset-totp --username <name>"`) as well as re-entering the vault's secrets.
+- **Master key on the same server** if you don't set `TAMANDUA_MASTER_KEY`. It protects against a stray copy of the database, not against someone with full access to the server.
 - **A single workspace** per installation: every user sees every connected repository.
 - **Registry token visible to root.** While a private image is being scanned, the token sits in the engine container's configuration: anyone with Docker access on the host (who is already root) can read it. Use read-only tokens.
 

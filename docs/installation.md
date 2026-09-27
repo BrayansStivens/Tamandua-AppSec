@@ -64,7 +64,7 @@ make update
 | --- | --- | --- |
 | Database (`tamandua-pg` volume) | Runs, finding history and triage (PostgreSQL) | `make backup` dumps it with `pg_dump` into `database.dump`. |
 | `data/` | Users (passwords hashed with scrypt), settings, logs, NVD copy and caches | No plaintext secrets. You can leave out `data/feeds/`, `data/trivy-cache/` and `data/grype-cache/`: they're downloaded again. |
-| `config/` | `secrets.vault` (encrypted) and `master.key` | **This is the key to your credentials.** Store it separately from `data/` and treat it like a password. |
+| `config/` | `master.key` (unless `TAMANDUA_MASTER_KEY` is set) | **This is the key to your credentials**, which are stored encrypted in the database. Store it separately from the database backups and treat it like a password. |
 
 ```bash
 make backup        # backups/<date>/database.dump, data.tgz and config.tgz

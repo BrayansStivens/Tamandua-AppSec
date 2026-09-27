@@ -8,18 +8,18 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 
 | Secreto | Dónde vive | Quién lo ve |
 | --- | --- | --- |
-| Clave privada de la GitHub App | `config/secrets.vault`, cifrada | Solo el proceso del servidor. A GitHub va un JWT firmado, nunca la clave. |
-| Claves de OpenAI / Anthropic | `config/secrets.vault`, cifradas | Solo el servidor; se validan contra el proveedor antes de guardarse. El panel muestra los 4 últimos caracteres. |
-| Token de Jira | `config/secrets.vault`, cifrado | Igual que las anteriores. |
-| Tokens de registros de contenedores | `config/secrets.vault`, cifrados | Solo el servidor. Llegan a Trivy y Grype por variable de entorno (`-e NOMBRE` sin valor en la orden), nunca en la línea de comandos. |
+| Clave privada de la GitHub App | tabla `vault_entries`, cifrada | Solo el proceso del servidor. A GitHub va un JWT firmado, nunca la clave. |
+| Claves de OpenAI / Anthropic | tabla `vault_entries`, cifradas | Solo el servidor; se validan contra el proveedor antes de guardarse. El panel muestra los 4 últimos caracteres. |
+| Token de Jira | tabla `vault_entries`, cifrado | Igual que las anteriores. |
+| Tokens de registros de contenedores | tabla `vault_entries`, cifrados | Solo el servidor. Llegan a Trivy y Grype por variable de entorno (`-e NOMBRE` sin valor en la orden), nunca en la línea de comandos. |
 | Tokens de instalación de GitHub | Memoria, 1 h | Se renuevan solos; nunca se escriben en disco. |
 | Clave maestra | `config/master.key` (0400) o `TAMANDUA_MASTER_KEY` | Quien administra el servidor. |
 | Contraseñas de usuarios | Tabla `users` de PostgreSQL, solo hash scrypt | Nadie: no son recuperables. |
-| Cookies de sesión | Tabla `sessions`, solo su hash; firmadas con `data/auth/session.key` | Copiar la base no da acceso. |
+| Cookies de sesión | Tabla `sessions`, solo su hash; firmadas con una clave sellada en el almacén (o `TAMANDUA_SESSION_KEY`) | Copiar la base no da acceso. |
 
 **Cifrado.** AES-256-GCM, un nonce aleatorio por secreto y el nombre del secreto como dato asociado: un valor cifrado no se puede mover a otra entrada sin que falle el descifrado, y cualquier manipulación se detecta. Si la clave maestra no descifra, el servidor lo dice en lugar de usar datos corruptos.
 
-**Separación.** `config/` (secretos), la base de datos y `data/` (cachés, logs, clave de firma de sesiones) están separados. `data/` es lo que se suele copiar, enviar para depurar o subir con los logs: no lleva ningún secreto. Para separar también la clave del almacén, define `TAMANDUA_MASTER_KEY` desde tu gestor de secretos en vez de dejar `master.key` junto a `secrets.vault`.
+**Separación.** Los secretos cifrados viven en la base de datos, la clave maestra fuera de ella (`TAMANDUA_MASTER_KEY` o `config/master.key`), y `data/` solo guarda cachés y registros, así que no lleva ningún secreto. Un volcado de la base sin la clave maestra no revela nada. En cualquier plataforma con gestor de secretos, define ahí `TAMANDUA_MASTER_KEY`: es el único valor que nunca debe vivir junto a las copias de la base.
 
 **Logs.** No se registran cuerpos de petición, cabeceras, contraseñas, códigos TOTP ni cookies. Además, todo mensaje pasa por un filtro que tacha:
 
@@ -72,9 +72,13 @@ No hay telemetría.
 
 ## Concesiones conocidas
 
-- **Socket de Docker.** Los motores se lanzan a través de `/var/run/docker.sock`, lo que equivale a root en el host. Solo lo monta el servicio `worker`, que no expone ningún puerto; el servicio que atiende las peticiones (`appsec`) no lo tiene. Es el precio de no instalar nada más que Docker; para endurecerlo más, pon el worker detrás de un socket-proxy con lista blanca o en otra máquina.
+- **Socket de Docker.** Los motores se lanzan a través de `/var/run/docker.sock`, lo que equivale a root en el host. Solo lo monta el servicio `worker`, que no expone ningún puerto; el servicio que atiende las peticiones (`api`) no lo tiene. Es el precio de no instalar nada más que Docker; para evitarlo, usa la imagen del worker con los motores dentro (`TAMANDUA_ENGINE_RUNNER=local`, como hace `deploy/compose.yaml`).
+- **Motores dentro del worker** (`TAMANDUA_ENGINE_RUNNER=local`). Sin socket de Docker, pero tampoco con un contenedor por motor: cada motor corre como un proceso del worker, con una carpeta personal nueva, solo el `PATH` del entorno del worker (nunca la URL de la base ni la clave maestra), sin volcados de memoria, y al vencer su plazo se mata todo su grupo de procesos. No hay aislamiento de red por motor; los motores corren con sus opciones sin conexión allí donde las tienen.
 - **Cola de trabajos.** Los análisis pendientes viven en PostgreSQL. Los tokens de código que acompañan a un análisis van sellados con la clave maestra (AES-GCM): la base nunca los guarda en claro.
-- **Clave maestra junto al almacén** si no defines `TAMANDUA_MASTER_KEY`. Protege frente a una copia suelta de `secrets.vault`, no frente a alguien con acceso completo a `config/`.
+- **Semillas TOTP** selladas también con la clave maestra: un volcado de la base no basta para generar códigos. Si
+  pierdes la clave maestra, además de volver a introducir los secretos del almacén tendrás que restablecer los segundos
+  factores (`make cli ARGS="user reset-totp --username <nombre>"`).
+- **Clave maestra en el mismo servidor** si no defines `TAMANDUA_MASTER_KEY`. Protege frente a una copia suelta de la base, no frente a alguien con acceso completo al servidor.
 - **Un solo workspace** por instalación: todos los usuarios ven todos los repositorios conectados.
 - **Token de registro visible para root.** Mientras dura el análisis de una imagen privada, el token está en la configuración del contenedor del motor: lo puede leer quien tenga acceso a Docker en el host (que ya es root). Usa tokens de solo lectura.
 

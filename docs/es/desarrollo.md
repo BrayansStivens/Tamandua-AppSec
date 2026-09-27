@@ -31,7 +31,7 @@ La CLI usa el mismo almacén que el panel (en Docker: `make cli ARGS="…"`):
 
 ## Logs
 
-`data/logs/app.log` recibe una línea JSON por evento (hora, nivel, componente, identificador de ejecución, método, ruta, estado, duración), rotada a 10 MB × 5; en consola sale legible. `TAMANDUA_LOG_LEVEL=DEBUG` para depurar. No se registran cuerpos, cabeceras ni tokens, y `redact()` tacha patrones de credenciales que pudieran colarse en un mensaje.
+Los registros salen por la salida de errores, legibles por defecto o como un objeto JSON por evento con `TAMANDUA_LOG_FORMAT=json` (hora, nivel, componente, identificador de ejecución, método, ruta, estado, duración). `TAMANDUA_LOG_FILE=logs/app.log` guarda además una copia JSON en la carpeta de datos, rotada a 10 MB × 5 (Compose lo activa). `TAMANDUA_LOG_LEVEL=DEBUG` para depurar. No se registran cuerpos, cabeceras ni tokens, y `redact()` tacha patrones de credenciales que pudieran colarse en un mensaje.
 
 ## Desarrollo y pruebas
 

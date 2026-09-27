@@ -55,6 +55,7 @@ The panel follows your browser's language and has a language switch in the sideb
 | --- | --- |
 | [Quickstart](docs/quickstart.md) | From zero to your first verified fix, and what to set up next |
 | [Installation](docs/installation.md) | Requirements, first run, upgrades, backups, uninstalling |
+| [Where to deploy](docs/deploy.md) | One compose file for any server or Docker panel, Render, Railway, Vercel for the API, Kubernetes |
 | [Deploy on a VPS](docs/deploy-vps.md) | Your own server with a domain: HTTPS, backups, upgrades, monitoring, Coolify and Dokploy |
 | [Connect GitHub](docs/github-app.md) | Create the GitHub App step by step and review PRs |
 | [Terminal and CI](docs/cli.md) | `scan`: check a folder or just what a change introduces, with SARIF output and exit codes for CI |
@@ -70,23 +71,27 @@ The panel follows your browser's language and has a language switch in the sideb
 
 ## Security in brief
 
-- Secrets (GitHub App key, AI keys, Jira token) are **encrypted with AES-256-GCM** in `config/`, kept apart from `data/`. They never go back to the browser and never show up in logs.
+- Secrets (GitHub App key, AI keys, Jira token, TOTP seeds) are **encrypted with AES-256-GCM** in the database, with a master key kept apart from it. A database dump alone reveals nothing. They never go back to the browser and never show up in logs.
 - The GitHub App needs only four permissions (`contents: read`, `metadata: read`, `pull_requests: write`, `statuses: write`), with no webhooks or OAuth; one-hour tokens kept in memory. For several organizations, set it to **Any account** and connect each installation explicitly in the panel.
 - The panel listens on `127.0.0.1` by default. If you expose it beyond your machine without **HTTPS**, the server refuses to start.
 - Private registry credentials are encrypted and handed to the engines through environment variables; registries on internal networks are blocked unless you explicitly allow them.
 - No telemetry. Advisory databases are downloaded and queried locally; your dependency list only goes to OSV if you allow it for a scan. Alerts only go to the channels you configure.
-- **Trade-off:** the app launches the engines through the Docker socket, which is equivalent to root on the host. Only expose the panel to people you trust.
+- **Trade-off** with the repository's `compose.yaml`: the worker launches the engines through the Docker socket, which is equivalent to root on the host. The worker image with the engines inside (`deploy/compose.yaml`) needs no socket.
 
 To report a vulnerability: [SECURITY.md](SECURITY.md).
 
 ## Run it on a server (HTTPS)
 
-Tamandua is meant to live on its own VPS (Hetzner, DigitalOcean, Hostinger…) under your domain. With the DNS record pointing at the server:
+Tamandua runs wherever a container does. [docs/deploy.md](docs/deploy.md) covers every target: a single compose file for any server or Docker panel (Coolify, Dokploy, Portainer, Hostinger), Render, Railway, and Vercel for the API. Its worker can run the engines inside its own image, so no target needs the host's Docker socket.
+
+On your own VPS with this repository, with the DNS record pointing at the server:
 
 ```bash
-make setup DOMAIN=appsec.your-domain.com PREBUILT=1   # Caddy with automatic HTTPS + the published, signed images
+make setup DOMAIN=appsec.your-domain.com   # Caddy with automatic HTTPS
 make up
 ```
+
+This builds the images on the server. Once a release is tagged, `PREBUILT=1` runs the published, signed images instead.
 
 The API is then reachable only through Caddy, HTTP redirects to HTTPS and the certificate renews itself. The guide covers sizing, OS and firewall, backups offsite and restore, upgrades, Prometheus metrics, and Coolify and Dokploy: [docs/deploy-vps.md](docs/deploy-vps.md).
 

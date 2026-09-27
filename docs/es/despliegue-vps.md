@@ -13,6 +13,9 @@ make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS con Caddy + imágene
 make up                                             # muestra https://tamandua.example.com y el código de configuración
 ```
 
+Hasta que se etiquete la primera versión no hay imágenes publicadas: sáltate `git checkout` y `PREBUILT=1`, y el
+servidor construye desde `main`.
+
 El resto de la página cuenta qué preparar antes y qué hacer después.
 
 ## Cómo queda montado
@@ -151,7 +154,7 @@ Sigue [github-app.md](github-app.md) con estos valores:
 
 ## Copias de seguridad
 
-Una instancia son tres cosas: la **base de datos** (ejecuciones, hallazgos, triage, usuarios), **`config/`** (secretos cifrados y clave maestra) y **`.env`**. `data/` guarda cachés, logs y la clave que firma las sesiones: es útil, pero todo se regenera.
+Una instancia son tres cosas: la **base de datos** (ejecuciones, hallazgos, triage, usuarios y los secretos cifrados), la **clave maestra** (`config/master.key`, o `TAMANDUA_MASTER_KEY` en `.env`) y **`.env`**. `data/` guarda cachés y registros: es útil, pero todo se regenera.
 
 **Programadas, dentro de Compose.** Añade `COMPOSE_PROFILES=backup` a `.env` y ejecuta `make up`. El servicio `backup` escribe `backups/auto-<fecha>/` (database.dump, config.tgz, data.tgz) cada `TAMANDUA_BACKUP_INTERVAL_HOURS` (24) y borra sus propias copias con más de `TAMANDUA_BACKUP_KEEP_DAYS` días (14). No detiene la app (`pg_dump` ya es coherente por sí solo), recibe solo la contraseña de la base y monta `config/` y `data/` en solo lectura. Su healthcheck se pone en rojo si la última copia tiene más de dos intervalos. `TAMANDUA_BACKUP_DIR` las lleva a otra carpeta (por ejemplo, un volumen montado).
 

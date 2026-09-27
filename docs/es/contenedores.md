@@ -62,6 +62,7 @@ Funciona igual en macOS (Apple Silicon e Intel), Linux y Windows con WSL o Git B
 | `make purge CONFIRM=delete` | **Borra `data/` y `config/`**: ejecuciones, usuarios y secretos. |
 | `make dev-setup` · `make dev` | Entorno de desarrollo sin contenedor (ver [desarrollo.md](desarrollo.md)). |
 | `make test` · `make lint` · `make check` | Pruebas del backend, lint del panel y ambos. |
+| `make standalone` | Regenera `deploy/compose.yaml`, el despliegue en un solo archivo ([despliegue.md](despliegue.md)). |
 
 Sin `make`, lo mismo con Compose: `sh scripts/init-env.sh && docker compose up --build -d`.
 
@@ -78,6 +79,7 @@ docker/
   engines/opengrep/Dockerfile   motor SAST, binario oficial verificado por SHA-256
   engines/opengrep/VERIFY.md    cómo repetir la verificación con Cosign al subir de versión
   caddy/Caddyfile               proxy inverso: certificado, redirección, límites y tiempos máximos
+deploy/compose.yaml             un solo archivo: imágenes publicadas, worker con los motores dentro, sin socket de Docker
 scripts/
   doctor.sh                     comprobación del entorno
   init-env.sh                   crea .env con tu UID/GID y las carpetas (y el modo servidor)
@@ -99,8 +101,9 @@ scripts/
 | `bridgecrew/checkov` | Docker Hub, fijada por digest | 200 MB |
 | `ghcr.io/zizmorcore/zizmor` | GHCR, fijada por digest | 15 MB |
 | `caddy` | Docker Hub, fijada por digest; solo con `compose.prod.yaml` | 50 MB |
+| Destino `worker-standalone` | `docker/app/Dockerfile`: la app más todos los motores, copiados por digest de las imágenes de arriba (Checkov instalado con pip) | 1,8 GB |
 
-**Imágenes publicadas.** Cada etiqueta de versión construye `ghcr.io/brayansstivens/tamandua:<versión>` y `ghcr.io/brayansstivens/tamandua-opengrep:<versión del motor>` para amd64 y arm64, con SBOM y procedencia SLSA, firmadas con cosign sin claves (`.github/workflows/release.yml`). `compose.images.yaml` las usa en lugar de construirlas; `make verify-images` comprueba las firmas. Todas las imágenes de motores que se usan tienen también variante arm64.
+**Imágenes publicadas.** Cada etiqueta de versión construye `ghcr.io/brayansstivens/tamandua:<versión>`, `ghcr.io/brayansstivens/tamandua-worker:<versión>` (motores dentro) y `ghcr.io/brayansstivens/tamandua-opengrep:<versión del motor>` para amd64 y arm64, con SBOM y procedencia SLSA, firmadas con cosign sin claves (`.github/workflows/release.yml`). `compose.images.yaml` las usa en lugar de construirlas; `make verify-images` comprueba las firmas. Todas las imágenes de motores que se usan tienen también variante arm64.
 
 Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos construcciones de la misma versión usan exactamente las mismas capas. Las etiquetas OCI de la imagen de la app declaran versión, licencia y repositorio (`docker inspect tamandua`).
 
@@ -117,7 +120,7 @@ Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos c
 
 Los motores se lanzan por cada análisis como contenedores efímeros (`--rm`) con el código en solo lectura, `--cap-drop ALL`, `no-new-privileges`, 3 GB de memoria, 2 CPU y 512 procesos como máximo; Gitleaks, Opengrep, Checkov y zizmor sin red.
 
-**La concesión que queda:** para lanzar los motores, la app monta `/var/run/docker.sock`, lo que equivale a root en el host. Por eso el panel solo escucha en `127.0.0.1` por defecto. Si lo abres a más gente, pon un socket-proxy con lista blanca de operaciones delante del socket (está en el plan de trabajo).
+**La concesión que queda:** para lanzar así los motores, el worker monta `/var/run/docker.sock`, lo que equivale a root en el host. Por eso el panel solo escucha en `127.0.0.1` por defecto. La alternativa es la imagen del worker con los motores dentro (`TAMANDUA_ENGINE_RUNNER=local`): sin socket, cada motor como un proceso del worker con su propia carpeta personal y sin heredar la configuración, pero sin un contenedor ni aislamiento de red por motor.
 
 ## Aislamiento entre análisis
 

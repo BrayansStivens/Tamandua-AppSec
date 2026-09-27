@@ -55,6 +55,7 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 | --- | --- |
 | [Inicio rápido](docs/es/inicio-rapido.md) | De cero al primer hallazgo corregido, y qué configurar después |
 | [Instalación](docs/es/instalacion.md) | Requisitos, primer arranque, actualizar, copias de seguridad, desinstalar |
+| [Dónde desplegar](docs/es/despliegue.md) | Un archivo de compose para cualquier servidor o panel de Docker, Render, Railway, Vercel para la API, Kubernetes |
 | [Desplegar en un VPS](docs/es/despliegue-vps.md) | Tu propio servidor con dominio: HTTPS, copias, actualizaciones, monitorización, Coolify y Dokploy |
 | [Conectar GitHub](docs/es/github-app.md) | Crear la GitHub App paso a paso y revisar PRs |
 | [Terminal y CI](docs/es/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos para CI |
@@ -70,23 +71,27 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 
 ## Seguridad, en corto
 
-- Secretos (clave de la GitHub App, claves de IA, token de Jira) **cifrados con AES-256-GCM** en `config/`, separado de `data/`. Nunca vuelven al navegador ni aparecen en los logs.
+- Secretos (clave de la GitHub App, claves de IA, token de Jira, semillas TOTP) **cifrados con AES-256-GCM** en la base de datos, con una clave maestra que vive fuera de ella. Un volcado de la base no revela nada. Nunca vuelven al navegador ni aparecen en los logs.
 - GitHub App con solo cuatro permisos (`contents: read`, `metadata: read`, `pull_requests: write`, `statuses: write`), sin webhooks ni OAuth; tokens de una hora en memoria. Para varias organizaciones se configura como **Any account** y se conecta cada instalación explícitamente en el panel.
 - Panel en `127.0.0.1` por defecto. Si lo publicas fuera de tu máquina sin **HTTPS**, el servidor no arranca.
 - Credenciales de registros privados cifradas y pasadas a los motores por variable de entorno; los registros de red interna se bloquean salvo permiso expreso.
 - Sin telemetría. Las bases de avisos se descargan y se consultan en local; tus dependencias solo salen hacia OSV si lo autorizas en un análisis. Los avisos solo van a los canales que configures.
-- **Concesión:** la app lanza los motores por el socket de Docker, lo que equivale a root en el host. Expón el panel solo a gente de confianza.
+- **Concesión** con el `compose.yaml` del repositorio: el worker lanza los motores por el socket de Docker, lo que equivale a root en el host. La imagen del worker con los motores dentro (`deploy/compose.yaml`) no necesita el socket.
 
 Para reportar una vulnerabilidad: [SECURITY.es.md](SECURITY.es.md).
 
 ## Llevarlo a un servidor (HTTPS)
 
-Tamandua está pensado para vivir en su propio VPS (Hetzner, DigitalOcean, Hostinger…) con tu dominio. Con el registro DNS apuntando al servidor:
+Tamandua corre donde corra un contenedor. [docs/es/despliegue.md](docs/es/despliegue.md) cubre cada destino: un solo archivo de compose para cualquier servidor o panel de Docker (Coolify, Dokploy, Portainer, Hostinger), Render, Railway y Vercel para la API. Su worker puede ejecutar los motores dentro de su propia imagen, así que ningún destino necesita el socket de Docker del servidor.
+
+En tu propio VPS con este repositorio, con el registro DNS apuntando al servidor:
 
 ```bash
-make setup DOMAIN=appsec.tu-dominio.com PREBUILT=1   # Caddy con HTTPS automático + las imágenes publicadas y firmadas
+make setup DOMAIN=appsec.tu-dominio.com   # Caddy con HTTPS automático
 make up
 ```
+
+Así las imágenes se construyen en el servidor. Cuando haya una versión publicada, `PREBUILT=1` usa en su lugar las imágenes publicadas y firmadas.
 
 A partir de ahí solo se llega a la API a través de Caddy, HTTP redirige a HTTPS y el certificado se renueva solo. La guía cubre dimensionado, sistema y cortafuegos, copias fuera del servidor y restauración, actualizaciones, métricas para Prometheus, y Coolify y Dokploy: [docs/es/despliegue-vps.md](docs/es/despliegue-vps.md).
 

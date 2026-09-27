@@ -13,9 +13,12 @@ load them automatically.
 - **Design.** Before creating or changing the panel (`web/src`), a report (PDF or Markdown), an export or the threat
   diagram, follow `.claude/skills/tamandua-design/SKILL.md`, and review the change against
   `.claude/agents/design-reviewer.md` before committing.
-- **Data.** All state lives in PostgreSQL (tables per context in `modules/<ctx>/tables.py`; settings in
-  `shared/documents.py`). A schema change needs an Alembic migration; rewriting data, a migration in
-  `tamandua/app/data_migrations.py` with its test. Never reorder or delete published migrations.
+- **Data.** Application state lives in PostgreSQL (tables per context in `modules/<ctx>/tables.py`; settings in
+  `shared/documents.py`). On disk only: the master key file when `TAMANDUA_MASTER_KEY` isn't set, and caches that
+  rebuild themselves (`data/`). Never add state to disk or process memory: the API must run as several instances or
+  without a persistent disk (docs/deploy.md). Every environment variable is declared in `shared/settings.py`. A schema
+  change needs an Alembic migration; rewriting data, a migration in `tamandua/app/data_migrations.py` with its test.
+  Never reorder or delete published migrations.
 - **Architecture.** Modular monolith in `tamandua/` (see `docs/architecture.md`). Business code in
   `tamandua/modules/<context>/`; `modules` never imports `app`/`cli`, `shared` never imports `modules`, and the
   business code never imports FastAPI/Starlette. `make arch` (import-linter) enforces it. Discuss a new context or a new

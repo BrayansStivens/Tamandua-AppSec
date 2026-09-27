@@ -62,6 +62,7 @@ It works the same on macOS (Apple Silicon and Intel), Linux, and Windows with WS
 | `make purge CONFIRM=delete` | **Deletes `data/` and `config/`**: runs, users and secrets. |
 | `make dev-setup` · `make dev` | Development environment without containers (see [development.md](development.md)). |
 | `make test` · `make lint` · `make check` | Backend tests, panel lint, and both. |
+| `make standalone` | Regenerates `deploy/compose.yaml`, the one-file deployment ([deploy.md](deploy.md)). |
 
 Without `make`, the same with Compose: `sh scripts/init-env.sh && docker compose up --build -d`.
 
@@ -72,9 +73,10 @@ Makefile                        everyday commands
 compose.yaml                    api, worker, postgres, Opengrep engine build, optional backup service
 compose.prod.yaml               server overlay: Caddy with HTTPS in front, no API port
 compose.images.yaml             overlay: published images instead of building
+deploy/compose.yaml             one file: published images, worker with the engines inside, no Docker socket
 .env.example                    variables (copied to .env)
 docker/
-  app/Dockerfile                app image: built panel + Python + Docker client
+  app/Dockerfile                app image (panel, Python, Docker client); target worker-standalone adds the engines
   engines/opengrep/Dockerfile   SAST engine, official binary verified by SHA-256
   engines/opengrep/VERIFY.md    how to repeat the Cosign verification when upgrading
   caddy/Caddyfile               reverse proxy: certificate, redirect, limits and timeouts
@@ -92,6 +94,7 @@ scripts/
 | Image | Source | Approx. size |
 | --- | --- | --- |
 | `localhost/tamandua/app:<version>` | Built from `docker/app/Dockerfile` (Node only in the build stage) | 360 MB |
+| `worker-standalone` target | `docker/app/Dockerfile`: the app plus every engine, copied by digest from the images below (Checkov installed with pip) | 1.8 GB |
 | `localhost/tamandua/opengrep:1.30.0` | Built from `docker/engines/opengrep/` | 230 MB |
 | `aquasec/trivy` | Docker Hub, pinned by digest | 240 MB |
 | `ghcr.io/gitleaks/gitleaks` | GHCR, pinned by digest | 80 MB |
@@ -100,7 +103,7 @@ scripts/
 | `ghcr.io/zizmorcore/zizmor` | GHCR, pinned by digest | 15 MB |
 | `caddy` | Docker Hub, pinned by digest; only with `compose.prod.yaml` | 50 MB |
 
-**Published images.** Each version tag builds `ghcr.io/brayansstivens/tamandua:<version>` and `ghcr.io/brayansstivens/tamandua-opengrep:<engine version>` for amd64 and arm64, with an SBOM and SLSA provenance, signed with cosign keyless (`.github/workflows/release.yml`). `compose.images.yaml` runs them instead of building; `make verify-images` checks the signatures. Every engine image used has an arm64 variant too.
+**Published images.** Each version tag builds `ghcr.io/brayansstivens/tamandua:<version>`, `ghcr.io/brayansstivens/tamandua-worker:<version>` (engines inside) and `ghcr.io/brayansstivens/tamandua-opengrep:<engine version>` for amd64 and arm64, with an SBOM and SLSA provenance, signed with cosign keyless (`.github/workflows/release.yml`). `compose.images.yaml` runs them instead of building; `make verify-images` checks the signatures. Every engine image used has an arm64 variant too.
 
 The base images (`node`, `python`, `debian`) are pinned by digest, so two builds of the same version use exactly the same layers. The app image's OCI labels declare the version, license and repository (`docker inspect tamandua`).
 
@@ -117,7 +120,7 @@ The base images (`node`, `python`, `debian`) are pinned by digest, so two builds
 
 Engines are launched per scan as ephemeral containers (`--rm`) with the code mounted read-only, `--cap-drop ALL`, `no-new-privileges`, and a cap of 3 GB of memory, 2 CPUs and 512 processes; Gitleaks, Opengrep, Checkov and zizmor run with no network.
 
-**The remaining trade-off:** to launch the engines, the app mounts `/var/run/docker.sock`, which is equivalent to root on the host. That's why the panel only listens on `127.0.0.1` by default. If you open it to more people, put a socket proxy with an allowlist of operations in front of the socket (it's on the roadmap).
+**The remaining trade-off:** to launch the engines this way, the worker mounts `/var/run/docker.sock`, which is equivalent to root on the host. That's why the panel only listens on `127.0.0.1` by default. The alternative is the worker image with the engines inside (`TAMANDUA_ENGINE_RUNNER=local`): no socket, each engine a process of the worker with its own home folder and no inherited settings, but without a container or network isolation per engine.
 
 ## Isolation between scans
 
