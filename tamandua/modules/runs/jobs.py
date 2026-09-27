@@ -29,10 +29,11 @@ from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.runs import queue
 from tamandua.modules.runs import registry as run_registry
 from tamandua.modules.runs.store import list_runs, load_run, save_record, save_repository_scan
-from tamandua.shared import vault
+from tamandua.shared import db, vault
 from tamandua.shared.i18n import msg, text
 
 log = logging_setup.get("jobs")
+HEARTBEAT_SECONDS = 30  # well under queue.STALE
 Progress = Callable[[str, object], None]
 
 
@@ -133,12 +134,14 @@ class ScanJobs:
         if trigger:
             # Qué lo lanzó (p. ej. la vigilancia de la rama principal, con el commit que vio cambiar).
             record["trigger"] = trigger
-        self._save(record)
-        # Los tokens de código no se guardan en claro en la cola: van sellados con la clave maestra.
-        queue.enqueue(self.data_dir, "repository_scan", {"source_id": source_id, "allow_osv_upload": allow_osv_upload, "context": context,
-                                                         "tokens": vault.seal(tokens, "job-tokens") if tokens else None,
-                                                         "installation_id": installation_id, "uid": uid,
-                                                         "branch": branch, "commit": commit}, run_id=run_id)
+        # The run and its job in one transaction: another worker's recovery never sees a queued run without its job.
+        with db.transaction(self.data_dir):
+            self._save(record)
+            # Los tokens de código no se guardan en claro en la cola: van sellados con la clave maestra.
+            queue.enqueue(self.data_dir, "repository_scan", {"source_id": source_id, "allow_osv_upload": allow_osv_upload, "context": context,
+                                                             "tokens": vault.seal(tokens, "job-tokens") if tokens else None,
+                                                             "installation_id": installation_id, "uid": uid,
+                                                             "branch": branch, "commit": commit}, run_id=run_id)
         log.info("escaneo encolado", extra={"run_id": run_id, "path": source_id})
         return {"id": run_id, "status": "queued"}
 
@@ -155,10 +158,12 @@ class ScanJobs:
                   "requested_by": requested_by, "context": "", "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
                   "progress": [_event("info", msg("runs.progress.queued_pr", number=pull["number"], sha=pull["head_sha"][:7]))]}
-        self._save(record)
-        pr_watch.mark(self.data_dir, uid or source_id, pull["number"], pull["head_sha"], run_id)
-        queue.enqueue(self.data_dir, "pr_review", {"source_id": source_id, "pull": pull, "installation_id": installation_id,
-                                                   "default_branch": default_branch}, run_id=run_id)
+        # All or nothing: a commit is never marked as reviewed without its review queued.
+        with db.transaction(self.data_dir):
+            self._save(record)
+            pr_watch.mark(self.data_dir, uid or source_id, pull["number"], pull["head_sha"], run_id)
+            queue.enqueue(self.data_dir, "pr_review", {"source_id": source_id, "pull": pull, "installation_id": installation_id,
+                                                       "default_branch": default_branch}, run_id=run_id)
         log.info("revisión de PR encolada", extra={"run_id": run_id, "path": f"{source_id}#{pull['number']}"})
         return {"id": run_id, "status": "queued"}
 
@@ -172,8 +177,9 @@ class ScanJobs:
                   "summary": {"candidates": 0, "files": 0, "dependencies": 0},
                   "steps": [], "findings": [], "owasp_coverage": [], "limitations": [],
                   "progress": [_event("info", msg("runs.progress.queued_image", image=image["reference"]))]}
-        self._save(record)
-        queue.enqueue(self.data_dir, "image_scan", {"image": image, "context": context}, run_id=run_id)
+        with db.transaction(self.data_dir):
+            self._save(record)
+            queue.enqueue(self.data_dir, "image_scan", {"image": image, "context": context}, run_id=run_id)
         log.info("análisis de imagen encolado", extra={"run_id": run_id, "path": image["reference"]})
         return {"id": run_id, "status": "queued"}
 
@@ -205,19 +211,13 @@ class ScanJobs:
     # --- trabajador ----------------------------------------------------------------
 
     def run_worker(self) -> None:
-        """Reclama y ejecuta trabajos hasta que se pida parar. Renueva su latido para que otro worker no lo dé por muerto."""
-        from tamandua.modules.scanning.engines import docker_available
-        from tamandua.version import VERSION
+        """Claims and runs jobs until asked to stop. The heartbeat keeps beating while a scan runs (scans take far
+        longer than queue.STALE), so no other worker takes a live job for a dead one."""
         beat = 0.0
         while not self._stop.is_set():
-            if time.monotonic() - beat > 30:
+            if time.monotonic() - beat > HEARTBEAT_SECONDS:
                 beat = time.monotonic()
-                try:
-                    queue.heartbeat(self.data_dir, self.worker_id, docker=docker_available(), version=VERSION)
-                    queue.touch(self.data_dir, self.worker_id)
-                    self._recover(everything=False)
-                except Exception:  # noqa: BLE001 — la base puede no estar lista un momento; se reintenta
-                    log.exception("latido del worker fallido")
+                self._beat(recover=True)
             try:
                 job = queue.claim(self.data_dir, self.worker_id)
             except Exception:  # noqa: BLE001
@@ -231,13 +231,35 @@ class ScanJobs:
                 self._stop.wait(self.idle_poll)
                 continue
             error = None
+            done = threading.Event()
+            beating = threading.Thread(target=self._beat_until, args=(done,), name="tamandua-heartbeat", daemon=True)
+            beating.start()
             try:
                 self._execute({**job["payload"], "kind": job["kind"], "run_id": job["run_id"]})
             except Exception as exc:  # noqa: BLE001 — el trabajador nunca debe morir por un análisis
                 error = type(exc).__name__
                 log.exception("fallo inesperado del trabajador", extra={"run_id": job.get("run_id")})
             finally:
-                queue.finish(self.data_dir, job["id"], error=error)
+                done.set()
+                beating.join()
+                beat = time.monotonic()
+                if not queue.finish(self.data_dir, job["id"], error=error, worker=self.worker_id):
+                    log.warning("job_lease_lost", extra={"run_id": job.get("run_id")})
+
+    def _beat(self, *, recover: bool) -> None:
+        from tamandua.modules.scanning.engines import docker_available
+        from tamandua.version import VERSION
+        try:
+            queue.heartbeat(self.data_dir, self.worker_id, docker=docker_available(), version=VERSION)
+            queue.touch(self.data_dir, self.worker_id)
+            if recover:
+                self._recover(everything=False)
+        except Exception:  # noqa: BLE001 — la base puede no estar lista un momento; se reintenta
+            log.exception("latido del worker fallido")
+
+    def _beat_until(self, done: threading.Event) -> None:
+        while not done.wait(HEARTBEAT_SECONDS):
+            self._beat(recover=False)
 
     def _execute(self, job: dict) -> None:
         if job.get("kind") == "pr_review":

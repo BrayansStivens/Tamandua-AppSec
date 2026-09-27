@@ -128,18 +128,20 @@ def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = Non
     from tamandua.modules.findings.kinds import FINDING_RUNS
     if record.get("type") in FINDING_RUNS:
         record = apply_to_record(data_dir, record, asset_key(record))
-    saved = _persist(data_dir, record, render_repository_report(record), render_repository_sarif(record),
-                     replace=run_id is not None)
-    # Toda ejecución terminada, venga de donde venga (trabajador o CLI), actualiza el registro de hallazgos.
     from tamandua.modules.findings.registry import apply
-    changes = apply(data_dir, saved)
-    # Lo nuevo que importa, a los canales configurados (Slack, Teams, webhook). En segundo plano: no retrasa nada.
-    if changes.get("new"):
-        from tamandua.modules.integrations import notifications
-        from tamandua.modules.findings import triage
-        opened = set(changes["new"])
-        active = [item for item in triage.annotate(data_dir, saved).get("findings", []) if item["fingerprint"] in opened and triage.is_active(item)]
-        notifications.on_run(saved, active, data_dir=data_dir)
+    report, sarif = render_repository_report(record), render_repository_sarif(record)
+    # The run, the findings registry and the outbox entries land together or not at all.
+    with db.transaction(data_dir):
+        saved = _persist(data_dir, record, report, sarif, replace=run_id is not None)
+        # Toda ejecución terminada, venga de donde venga (trabajador o CLI), actualiza el registro de hallazgos.
+        changes = apply(data_dir, saved)
+        # Lo nuevo que importa, a los canales configurados (Slack, Teams, webhook), vía el buzón de salida.
+        if changes.get("new"):
+            from tamandua.modules.integrations import notifications
+            from tamandua.modules.findings import triage
+            opened = set(changes["new"])
+            active = [item for item in triage.annotate(data_dir, saved).get("findings", []) if item["fingerprint"] in opened and triage.is_active(item)]
+            notifications.on_run(saved, active, data_dir=data_dir)
     return saved
 
 

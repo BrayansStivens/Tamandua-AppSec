@@ -57,6 +57,40 @@ class QueueTests(unittest.TestCase):
         self.assertEqual(load_run(self.data_dir, queued["id"])["status"], "failed")
         self.assertEqual(queue.pending(self.data_dir), 0)
 
+    def test_a_long_scan_keeps_its_lease_while_another_worker_recovers(self):
+        import time
+        from datetime import timedelta
+        from tamandua.modules.runs import jobs as jobs_module
+        slow, busy = ScanJobs(self.data_dir, worker=False), ScanJobs(self.data_dir, worker=False)
+        queued = slow.enqueue_image_scan(image={"reference": "nginx:1", "asset": "image:nginx", "name": "nginx"}, context="", requested_by="ana")
+        seen = {}
+
+        def scan(job):
+            time.sleep(3)  # longer than STALE below: without the heartbeat, the other worker takes it for dead
+            seen["status"] = load_run(self.data_dir, queued["id"])["status"]
+        slow._execute = scan
+        with patch.object(queue, "STALE", timedelta(seconds=1)), patch.object(jobs_module, "HEARTBEAT_SECONDS", 0.2):
+            worker = threading.Thread(target=slow.run_worker, daemon=True)
+            worker.start()
+            time.sleep(1.5)
+            busy._recover(everything=False)
+            time.sleep(2)
+            slow.stop()
+            worker.join(10)
+        self.assertEqual(seen["status"], "queued")  # never failed by the other worker's recovery
+        with db.transaction(self.data_dir) as connection:
+            self.assertEqual(connection.execute(select(jobs.c.status)).scalar_one(), "done")
+
+    def test_a_recovered_job_is_not_closed_again_by_its_old_worker(self):
+        queue.enqueue(self.data_dir, "noop", {})
+        job = queue.claim(self.data_dir, "lento")
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(update(jobs).where(jobs.c.id == job["id"]).values(locked_at=text("now() - interval '10 minutes'")))
+        queue.recover(self.data_dir)
+        self.assertFalse(queue.finish(self.data_dir, job["id"], worker="lento"))
+        with db.transaction(self.data_dir) as connection:
+            self.assertEqual(connection.execute(select(jobs.c.status)).scalar_one(), "failed")
+
     def test_queued_scans_survive_a_restart_but_orphans_fail(self):
         scans = ScanJobs(self.data_dir, worker=False)
         queued = scans.enqueue_image_scan(image={"reference": "nginx:1", "asset": "image:nginx", "name": "nginx"}, context="", requested_by="ana")

@@ -47,10 +47,17 @@ def touch(data_dir: Path, worker: str) -> None:
                            .values(locked_at=func.now()))
 
 
-def finish(data_dir: Path, job_id: str, *, error: str | None = None) -> None:
+def finish(data_dir: Path, job_id: str, *, error: str | None = None, worker: str | None = None) -> bool:
+    """Closes a job. With `worker`, only while that worker still holds it: a job already recovered as interrupted
+    stays failed. False if nothing was closed."""
+    conditions = [jobs.c.tenant_id == TENANT, jobs.c.id == job_id]
+    if worker is not None:
+        conditions += [jobs.c.locked_by == worker, jobs.c.status == "running"]
     with db.transaction(data_dir) as connection:
-        connection.execute(update(jobs).where(jobs.c.tenant_id == TENANT, jobs.c.id == job_id)
-                           .values(status="failed" if error else "done", error=(error or None) and error[:500], finished_at=func.now()))
+        closed = connection.execute(update(jobs).where(*conditions)
+                                    .values(status="failed" if error else "done", error=(error or None) and error[:500],
+                                            finished_at=func.now()).returning(jobs.c.id)).first()
+    return closed is not None
 
 
 def pending(data_dir: Path) -> int:
