@@ -42,7 +42,11 @@ class PackagingTests(unittest.TestCase):
                 with self.subTest(file=name, image=image):
                     self.assertTrue(re.search(r"@sha256:[0-9a-f]{64}$", image) or image.startswith(("localhost/tamandua/", "${TAMANDUA_IMAGE")), image)
         for dockerfile in (ROOT / "docker").rglob("Dockerfile"):
-            for base in re.findall(r"^FROM (?:--platform=\S+ )?(\S+)", dockerfile.read_text(), re.M):
+            text = dockerfile.read_text()
+            stages = set(re.findall(r"^FROM .+ AS (\S+)$", text, re.M))
+            for base in re.findall(r"^FROM (?:--platform=\S+ )?(\S+)", text, re.M):
+                if base in stages:  # an earlier stage of the same file, not an image
+                    continue
                 with self.subTest(file=str(dockerfile.relative_to(ROOT)), base=base):
                     self.assertRegex(base, r"@sha256:[0-9a-f]{64}$")
         self.assertRegex((ROOT / "compose.prod.yaml").read_text(), r"image: caddy:[0-9.]+-alpine@sha256:[0-9a-f]{64}")
@@ -125,6 +129,24 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("up", targets)
 
 
+class StandaloneWorkerImageTests(unittest.TestCase):
+    """The worker-standalone image runs the same engines as the Docker runner: same digests, same Opengrep binary."""
+
+    def test_engine_digests_and_opengrep_checksums_match(self):
+        import re
+        from tamandua.modules.scanning.engines import IMAGES
+        root = Path(__file__).resolve().parents[1]
+        app = (root / "docker" / "app" / "Dockerfile").read_text(encoding="utf-8")
+        for key in ("trivy", "osv-scanner", "gitleaks", "grype", "zizmor"):
+            self.assertIn(f"FROM {IMAGES[key]['image']} AS {key}", app, key)
+        engine = (root / "docker" / "engines" / "opengrep" / "Dockerfile").read_text(encoding="utf-8")
+        for name in ("OPENGREP_VERSION", "SHA_AMD64", "SHA_ARM64"):
+            pattern = re.compile(rf"^ARG {name}=(\S+)$", re.M)
+            self.assertEqual(pattern.findall(app), pattern.findall(engine), name)
+        self.assertEqual(re.search(r"^ARG CHECKOV_VERSION=(\S+)$", app, re.M).group(1), IMAGES["checkov"]["version"])
+        self.assertEqual(re.search(r"^ARG OPENGREP_VERSION=(\S+)$", app, re.M).group(1), IMAGES["opengrep"]["version"])
+
+
 if __name__ == "__main__":
     unittest.main()
 
@@ -135,6 +157,7 @@ class LocalImageTests(unittest.TestCase):
         from tamandua.modules.scanning import engines
         self.assertTrue(IMAGES["opengrep"]["image"].startswith("localhost/"))
         with patch.object(engines.shutil, "which", return_value="docker"), \
+                patch.dict("os.environ", {"TAMANDUA_ENGINE_RUNNER": "docker"}), \
                 patch.object(engines.subprocess, "run") as run:
             engines._run("opengrep", ["--version"], None)
             engines._run("gitleaks", ["version"], None)

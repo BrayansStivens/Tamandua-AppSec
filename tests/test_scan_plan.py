@@ -13,8 +13,7 @@ FILES = ["app/main.py", "app/models.py", "web/src/App.tsx", "crates/core/src/lib
 class PlanTests(unittest.TestCase):
     def plan(self, available: bool):
         with patch("tamandua.modules.scanning.plan.files_of", return_value=FILES), \
-                patch("tamandua.modules.scanning.plan.docker_available", return_value=available), \
-                patch("tamandua.modules.scanning.plan.image_available", return_value=available):
+                patch("tamandua.modules.scanning.plan.engine_ready", return_value=available):
             return localize(scan_plan.plan("github:o/r", installation_id=7))
 
     def test_languages_rules_manifests_and_iac(self):

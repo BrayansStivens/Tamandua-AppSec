@@ -120,7 +120,7 @@ def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] 
     document = sbom(record.get("dependencies") or [])
     if not document["components"]:
         return []
-    if run is None and not engines.docker_available():
+    if run is None and not engines.engine_ready("osv-scanner"):
         return None
     # Under data/ (a host bind mount): the engine runs as a sibling container and mounts it by its host path.
     work = data_dir / "work"

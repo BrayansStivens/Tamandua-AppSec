@@ -26,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -132,6 +133,8 @@ def host_path(path: Path) -> str:
     se puede, se usan TAMANDUA_HOST_DATA_DIR y TAMANDUA_HOST_RULES_DIR.
     """
     resolved = path.resolve()
+    if runner() == "local":
+        return str(resolved)
     for inside, outside in _host_pairs():
         try:
             return str(Path(outside) / resolved.relative_to(Path(inside).resolve()))
@@ -254,16 +257,66 @@ def image_available(key: str) -> bool:
     return bool(completed) and completed.returncode == 0
 
 
+# The local runner runs the same pinned engines installed in the worker image (the `worker-standalone` target), for
+# platforms without a Docker socket. Each engine's arguments are the ones its image's entrypoint takes.
+BINARIES = {"trivy": "trivy", "osv-scanner": "osv-scanner", "gitleaks": "gitleaks", "opengrep": "opengrep",
+            "grype": "grype", "checkov": "checkov", "zizmor": "zizmor"}
+_runner_state: dict[str, str] = {}
+
+
+def runner() -> str:
+    """"docker" (a sibling container per engine) or "local" (the engines installed next to the worker).
+    TAMANDUA_ENGINE_RUNNER decides; `auto` prefers Docker and falls back to installed engines."""
+    choice = settings.text("TAMANDUA_ENGINE_RUNNER")
+    if choice in ("docker", "local"):
+        return choice
+    if "auto" not in _runner_state:
+        installed = any(shutil.which(binary) for binary in BINARIES.values())
+        _runner_state["auto"] = "local" if installed and not docker_available() else "docker"
+    return _runner_state["auto"]
+
+
+def engine_ready(key: str) -> bool:
+    if runner() == "local":
+        return shutil.which(BINARIES[key]) is not None
+    return docker_available() and image_available(key)
+
+
+def engines_available() -> bool:
+    """Whether this process can run engines at all (Docker answers, or at least one engine is installed)."""
+    if runner() == "local":
+        return any(shutil.which(binary) for binary in BINARIES.values())
+    return docker_available()
+
+
+def engines_problem():
+    """Why no engine can run, in one sentence; empty if some can."""
+    if engines_available():
+        return ""
+    return msg("scanning.engines.none_installed") if runner() == "local" else docker_problem()
+
+
+def unavailable(key: str, without_docker):
+    """None if engine `key` can run; else the reason, in the terms of the runner in use."""
+    if runner() == "local":
+        return None if engine_ready(key) else msg("scanning.engines.not_installed", engine=IMAGES[key]["name"], binary=BINARIES[key])
+    return None if docker_available() else without_docker
+
+
 def engine_status() -> list[dict]:
-    """Qué motores hay listos en el Docker del host. Para `make doctor` y el comando `engines`."""
-    return [{"tool": key, "name": meta["name"], "version": meta["version"], "image": meta["image"],
-             "ready": image_available(key), "built_locally": "@sha256:" not in meta["image"]} for key, meta in IMAGES.items()]
+    """Which engines are ready (images in the host's Docker, or installed binaries). For `make doctor` and `engines`."""
+    local = runner() == "local"
+    return [{"tool": key, "name": meta["name"], "version": meta["version"], "image": shutil.which(BINARIES[key]) or BINARIES[key] if local else meta["image"],
+             "ready": engine_ready(key), "built_locally": local or "@sha256:" not in meta["image"]} for key, meta in IMAGES.items()]
 
 
 def pull_engines(report=None) -> list[dict]:
     """Descarga por digest las imágenes publicadas que falten; la de Opengrep se construye con `make build`.
 
     `make engines` descarga desde el host (con progreso); esto queda para quien no use make."""
+    if runner() == "local":  # installed with the image: nothing to download
+        return [{**row, "action": msg("scanning.engines.action.none") if row["ready"] else msg("scanning.engines.action.not_installed")}
+                for row in engine_status()]
     binary = shutil.which("docker")
     results = []
     for row in engine_status():
@@ -315,6 +368,8 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
          secret_env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     """Contenedor efímero del motor. `secret_env` viaja por el entorno del cliente de Docker
     (`-e NOMBRE` sin valor), nunca en la línea de comandos, para que no se vea en `ps` ni en los logs."""
+    if runner() == "local":
+        return _run_local(key, arguments, snapshot, mounts=mounts, timeout=timeout, env=env, secret_env=secret_env)
     environment = [part for name, value in (env or {}).items() for part in ("-e", f"{name}={value}")]
     environment += [part for name in (secret_env or {}) for part in ("-e", name)]
     source = ["-v", f"{host_path(snapshot)}:/src:ro"] if snapshot is not None else []
@@ -337,6 +392,62 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
         except (OSError, subprocess.TimeoutExpired):
             pass
         raise
+
+
+def _limits() -> None:
+    import resource
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # a crashing engine never dumps repository contents to disk
+
+
+def _run_local(key: str, arguments: list[str], snapshot: Path | None, *, mounts: list[str] | None, timeout: int,
+               env: dict[str, str] | None, secret_env: dict[str, str] | None) -> subprocess.CompletedProcess:
+    """The engine installed next to the worker, with the same arguments as its container. Container paths (/src,
+    /cache, /rules…) become the real folders, and back in its output, so parsers see what they always saw.
+
+    It gets a fresh HOME and only PATH from this process: never the database URL, the master key or any other
+    setting. There is no network isolation here (that needs the Docker runner); engines run with their offline flags.
+    """
+    binary = shutil.which(BINARIES[key])
+    if binary is None:
+        raise OSError(f"{BINARIES[key]} is not installed")
+    paths = {"/src": str(Path(snapshot).resolve())} if snapshot is not None else {}
+    parts = list(mounts or [])
+    for flag, spec in zip(parts[::2], parts[1::2]):
+        if flag == "-v":
+            source, destination = spec.split(":")[:2]
+            paths[destination] = source
+    order = sorted(paths, key=len, reverse=True)
+
+    def local(value: str) -> str:
+        for inside in order:
+            if value == inside or value.startswith(inside + "/"):
+                return paths[inside] + value[len(inside):]
+        return value
+
+    def back(text: str) -> str:
+        for inside in order:
+            text = text.replace(paths[inside], inside)
+        return text
+
+    with tempfile.TemporaryDirectory(prefix=f"engine-{key}-") as home:
+        environment = {"PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"), "HOME": home, "TMPDIR": home,
+                       "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PYTHONUTF8": "1", **{name: local(value) for name, value in (env or {}).items()},
+                       **(secret_env or {})}
+        process = subprocess.Popen([binary, *(local(argument) for argument in arguments)], stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE, text=True, env=environment, cwd=home, start_new_session=True,
+                                   preexec_fn=_limits)
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)  # the engine and anything it started
+            process.communicate()
+            raise
+    # Report files an engine writes (Gitleaks' /out) also name the real folders.
+    if "/out" in paths:
+        for report in Path(paths["/out"]).glob("*.json"):
+            if report.stat().st_size < 50_000_000:
+                report.write_text(back(report.read_text(encoding="utf-8", errors="replace")), encoding="utf-8")
+    return subprocess.CompletedProcess([BINARIES[key], *arguments], process.returncode, back(stdout), back(stderr))
 
 
 def _relative(path: str) -> str:
@@ -393,12 +504,19 @@ def _rule_texts(value, limit: int = 2000) -> dict | str:
     return inline({locale: text[:limit] for locale, text in value.items() if isinstance(text, str)})
 
 
+def _rule_id(check_id: str) -> str:
+    """Opengrep prefixes each rule id with the dotted path of the rules folder ("rules." in a container, the whole real
+    path when the engine runs locally). Our ids start at "appsec.", so the fingerprint is the same either way."""
+    start = check_id.find("appsec.")
+    return check_id[start:] if start >= 0 else check_id.removeprefix("rules.")
+
+
 def parse_opengrep(payload: dict) -> list[dict]:
     findings, seen = [], set()
     for result in payload.get("results", []):
         extra = result.get("extra") or {}
         metadata = extra.get("metadata") or {}
-        rule = str(result.get("check_id", "")).removeprefix("rules.")
+        rule = _rule_id(str(result.get("check_id", "")))
         path = _relative(result.get("path", ""))
         line = int((result.get("start") or {}).get("line") or 1)
         snippet = " ".join(str(extra.get("lines", "")).split())[:200]
@@ -463,9 +581,12 @@ def _rules_for(snapshot: Path) -> Path:
 
 def run_opengrep(snapshot: Path) -> dict:
     started = time.time()
-    if not docker_available():
+    if runner() == "local":
+        if not engine_ready("opengrep"):
+            return _result("opengrep", "not_tested", unavailable("opengrep", None))
+    elif not docker_available():
         return _result("opengrep", "not_tested", msg("scanning.opengrep.no_docker", problem=docker_problem()))
-    if not image_available("opengrep"):
+    elif not image_available("opengrep"):
         reason = _last_image_error.get("opengrep", "")
         # «No such image» es que falta construirla; cualquier otra cosa es un problema con Docker.
         if not reason or "no such image" in reason.lower():
@@ -667,8 +788,8 @@ def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict, secret_settings: dic
     `--secret-config`. If Trivy rejects them, it runs again without secret detection so dependencies and IaC are
     still analyzed, and the step says secrets were not covered by Trivy."""
     started = time.time()
-    if not docker_available():
-        return _result("trivy", "not_tested", msg("scanning.trivy.no_docker"))
+    if problem := unavailable("trivy", msg("scanning.trivy.no_docker")):
+        return _result("trivy", "not_tested", problem)
     cache_dir = writable_cache(cache_dir)
     rejected = None
     try:
@@ -785,8 +906,8 @@ def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bo
     manifiestos sin lockfile, lo que consulta deps.dev. El análisis de llamadas queda apagado: en Rust
     ejecutaría scripts de compilación del repositorio."""
     started = time.time()
-    if not docker_available():
-        return _result("osv-scanner", "not_tested", msg("scanning.osv.no_docker"))
+    if problem := unavailable("osv-scanner", msg("scanning.osv.no_docker")):
+        return _result("osv-scanner", "not_tested", problem)
     cache_dir = writable_cache(cache_dir)
     arguments = ["scan", "source", "-r", "--format", "json", "--offline-vulnerabilities", "--download-offline-databases",
                  "--allow-no-lockfiles", "--no-call-analysis=go", "--no-call-analysis=rust", *([] if resolve else ["--no-resolve"]), "/src"]
@@ -903,8 +1024,8 @@ def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
     """`settings`: the organization's secret detection settings (secret_rules). With them, Gitleaks gets a generated
     `--config` mounted read-only; if it rejects it, the step is inconclusive, never clean."""
     started = time.time()
-    if not docker_available():
-        return _result("gitleaks", "not_tested", msg("scanning.gitleaks.no_docker"))
+    if problem := unavailable("gitleaks", msg("scanning.gitleaks.no_docker")):
+        return _result("gitleaks", "not_tested", problem)
     payload, failure = _gitleaks_report(snapshot, settings, started)
     if failure:
         return failure

@@ -30,7 +30,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from tamandua.modules.scanning.engines import _base, _relative, _result, _run, _stable, docker_available, with_cause
+from tamandua.modules.scanning.engines import _base, _relative, _result, _run, _stable, unavailable, with_cause
 from tamandua.shared.i18n import msg, text
 
 CHECKOV_FRAMEWORKS = ("terraform", "terraform_json", "cloudformation", "kubernetes", "helm", "kustomize", "dockerfile",
@@ -293,8 +293,8 @@ def _checkov(arguments: list[str], mount: Path, timeout: int) -> subprocess.Comp
 
 def run_checkov(snapshot: Path) -> dict:
     started = time.time()
-    if not docker_available():
-        return _result("checkov", "not_tested", msg("scanning.checkov.no_docker"))
+    if problem := unavailable("checkov", msg("scanning.checkov.no_docker")):
+        return _result("checkov", "not_tested", problem)
     try:
         completed = _checkov(["--directory", "/src", "--framework", *CHECKOV_FRAMEWORKS], snapshot, 900)
         text = completed.stdout.strip()
@@ -357,8 +357,8 @@ def run_checkov_image(metadata: dict, image: dict, work_dir: Path) -> dict:
     """Checkov sobre el Dockerfile reconstruido. El historial puede llevar secretos: el fichero vive en una
     carpeta temporal que se borra al terminar y el contenedor no tiene red."""
     started = time.time()
-    if not docker_available():
-        return _result("checkov", "not_tested", msg("scanning.checkov.image_no_docker"))
+    if problem := unavailable("checkov", msg("scanning.checkov.image_no_docker")):
+        return _result("checkov", "not_tested", problem)
     config_block = metadata.get("ImageConfig") or {}
     history = [str(item.get("created_by") or "") for item in config_block.get("history") or []]
     if not history:
@@ -460,8 +460,8 @@ def github_actions_files(snapshot: Path) -> list[Path]:
 
 def run_zizmor(snapshot: Path) -> dict:
     started = time.time()
-    if not docker_available():
-        return _result("zizmor", "not_tested", msg("scanning.zizmor.no_docker"))
+    if problem := unavailable("zizmor", msg("scanning.zizmor.no_docker")):
+        return _result("zizmor", "not_tested", problem)
     audited = github_actions_files(snapshot)
     if not audited:
         return _result("zizmor", "completed", msg("scanning.zizmor.nothing_to_audit"), started=started)

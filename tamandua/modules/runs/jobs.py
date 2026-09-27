@@ -247,10 +247,10 @@ class ScanJobs:
                     log.warning("job_lease_lost", extra={"run_id": job.get("run_id")})
 
     def _beat(self, *, recover: bool) -> None:
-        from tamandua.modules.scanning.engines import docker_available
+        from tamandua.modules.scanning.engines import engines_available
         from tamandua.version import VERSION
         try:
-            queue.heartbeat(self.data_dir, self.worker_id, docker=docker_available(), version=VERSION)
+            queue.heartbeat(self.data_dir, self.worker_id, docker=engines_available(), version=VERSION)
             queue.touch(self.data_dir, self.worker_id)
             if recover:
                 self._recover(everything=False)

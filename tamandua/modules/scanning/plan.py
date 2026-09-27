@@ -15,7 +15,7 @@ from collections import Counter
 from pathlib import PurePosixPath
 
 from tamandua.modules.sources.repositories import is_manifest
-from tamandua.modules.scanning.engines import IMAGES, RULES_DIR, docker_available, image_available, joined
+from tamandua.modules.scanning.engines import IMAGES, RULES_DIR, engine_ready, joined
 from tamandua.shared.i18n import msg
 
 EXTENSIONS = {
@@ -71,9 +71,8 @@ def files_of(source_id: str, *, installation_id: int | None) -> list[str] | None
 def plan(source_id: str, *, installation_id: int | None) -> dict:
     paths = files_of(source_id, installation_id=installation_id)
     paths = [path for path in (paths or []) if not SKIP.intersection(path.split("/"))] if paths is not None else None
-    docker = docker_available()
     engines = {key: {"key": key, "name": value["name"], "version": value["version"],
-                     "available": docker and image_available(key)} for key, value in IMAGES.items()}
+                     "available": engine_ready(key)} for key, value in IMAGES.items()}
     rules = rule_counts()
     languages = Counter()
     manifests, iac, pipelines = [], [], []

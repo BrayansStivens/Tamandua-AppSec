@@ -446,7 +446,7 @@ class RepositorySettingsTests(unittest.TestCase):
         sr.save(self.data_dir, settings(rules=[OWN]), reason="Beta partner integration", user=ADMIN, asset=KEY)
         from tamandua.modules.scanning import repository
         seen = []
-        with patch.object(repository, "docker_available", return_value=True), \
+        with patch.object(repository, "engines_available", return_value=True), \
                 patch.object(repository, "run_opengrep", return_value=_tool("opengrep")), \
                 patch.object(repository, "run_gitleaks", side_effect=lambda root, applied: seen.append(applied) or _tool("gitleaks")), \
                 patch.object(repository, "run_trivy", side_effect=lambda root, cache, feeds, applied: seen.append(applied) or _tool("trivy")), \
@@ -682,7 +682,7 @@ class WithheldSecretsTests(unittest.TestCase):
         from tamandua.modules.scanning import repository
         fake = _Engines(secrets, **options)
         with patch.object(engines, "_run", side_effect=fake), \
-                patch.object(repository, "docker_available", return_value=True), \
+                patch.object(repository, "engines_available", return_value=True), \
                 patch.object(repository, "run_opengrep", return_value=_tool("opengrep")), \
                 patch.object(repository, "run_osv_scanner", return_value=_tool("osv-scanner")), \
                 patch.object(repository, "run_checkov", return_value=_tool("checkov")), \

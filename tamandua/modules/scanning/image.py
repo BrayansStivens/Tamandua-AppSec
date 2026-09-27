@@ -34,7 +34,7 @@ from tamandua.shared.i18n import default_locale, msg, text
 from tamandua.modules.intel.advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
 from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_image, run_checkov_image
-from tamandua.modules.scanning.engines import _pick_fixed, _result, _run, docker_available, parse_trivy, trivy_packages, writable_cache
+from tamandua.modules.scanning.engines import _pick_fixed, _result, _run, parse_trivy, trivy_packages, unavailable, writable_cache
 
 _log = logging_setup.get("images")
 VAULT_NAME = "registries"
@@ -174,8 +174,8 @@ def _family(ecosystem: str) -> str:
 
 def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None) -> tuple[dict, dict]:
     started = time.time()
-    if not docker_available():
-        return _result("trivy", "not_tested", msg("scanning.image.no_docker", engine="Trivy")), {}
+    if problem := unavailable("trivy", msg("scanning.image.no_docker", engine="Trivy")):
+        return _result("trivy", "not_tested", problem), {}
     cache_dir = writable_cache(cache_dir)
     secrets = {"TRIVY_USERNAME": credentials["username"], "TRIVY_PASSWORD": credentials["token"]} if credentials else None
     try:
@@ -237,8 +237,8 @@ def _grype_finding(match: dict, feeds: dict) -> dict:
 
 def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None, registry: str) -> dict:
     started = time.time()
-    if not docker_available():
-        return _result("grype", "not_tested", msg("scanning.image.no_docker", engine="Grype"))
+    if problem := unavailable("grype", msg("scanning.image.no_docker", engine="Grype")):
+        return _result("grype", "not_tested", problem)
     cache_dir = writable_cache(cache_dir)
     (cache_dir / "tmp").mkdir(exist_ok=True)
     secrets = ({"GRYPE_REGISTRY_AUTH_AUTHORITY": _host_only(registry) if registry != DOCKER_HUB else "index.docker.io",

@@ -300,7 +300,7 @@ class EnginesDownTests(unittest.TestCase):
         down = lambda key: _result(key, "inconclusive", "Imagen no construida")
         messages = []
         with tempfile.TemporaryDirectory() as temporary, \
-                patch.object(repository_scan, "docker_available", return_value=True), \
+                patch.object(repository_scan, "engines_available", return_value=True), \
                 patch.object(repository_scan, "run_opengrep", side_effect=lambda *_: down("opengrep")), \
                 patch.object(repository_scan, "run_gitleaks", side_effect=lambda *_: down("gitleaks")), \
                 patch.object(repository_scan, "run_trivy", side_effect=lambda *_: down("trivy")), \

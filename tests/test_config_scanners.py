@@ -103,7 +103,7 @@ class ZizmorTests(unittest.TestCase):
         self.assertEqual(len({item["fingerprint"] for item in findings}), len(findings))
 
     def test_repository_without_workflows_is_not_run(self):
-        with patch.object(cs, "docker_available", return_value=True), patch.object(cs, "_run") as run:
+        with patch.object(cs, "unavailable", return_value=None), patch.object(cs, "_run") as run:
             import tempfile
             with tempfile.TemporaryDirectory() as folder:
                 result = cs.run_zizmor(Path(folder))

@@ -18,7 +18,7 @@ from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
 from tamandua.modules.scanning import secret_rules
-from tamandua.modules.scanning.engines import IMAGES, SECRET_SEVERITY, SEVERITY_NAME, and_list, docker_available, joined as join_messages, host_mount_problem, run_osv_scanner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from tamandua.modules.scanning.engines import IMAGES, SECRET_SEVERITY, SEVERITY_NAME, and_list, engines_available, joined as join_messages, host_mount_problem, run_osv_scanner, runner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
 from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
@@ -184,16 +184,17 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     for path in files:
         relative = path.relative_to(root).as_posix()
         digest.update(relative.encode() + b"\0" + hashlib.sha256(path.read_bytes()).digest())
-    engines = docker_available()
+    engines = engines_available()
+    docker = runner() == "docker"
     feeds = load_feeds(data_dir or Path("data")) if (engines or allow_osv_upload) else {"kev": {}, "epss": {}}
     tools: list[dict] = []
-    misconfigured = None if engines else socket_problem()
+    misconfigured = None if engines or not docker else socket_problem()
     if misconfigured:
         # Docker está, pero este contenedor no puede usarlo: no es un análisis sin motores a propósito.
         report("warn", misconfigured)
     if engines:
         # Cada motor corre en su contenedor pinneado por digest; el paso guarda versión, imagen y duración.
-        mount_problem = host_mount_problem()
+        mount_problem = host_mount_problem() if docker else None
         if mount_problem:
             report("warn", mount_problem)
         report("info", msg("scanning.progress.opengrep", version=IMAGES["opengrep"]["version"]))

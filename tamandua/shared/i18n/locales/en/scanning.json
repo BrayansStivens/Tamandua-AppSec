@@ -43,12 +43,15 @@
       "build": "build it with make build",
       "no_docker": "Docker not available",
       "pulled": "downloaded",
-      "pull_failed": "download failed"
+      "pull_failed": "download failed",
+      "not_installed": "Not installed in this image"
     },
     "unreadable": "{{engine}} didn't return readable output.",
     "timeout": "{{engine}} exceeded the time limit.",
     "failed": "{{engine}} ended with an error",
-    "failed_early": "{{engine}} ended with an error before producing results"
+    "failed_early": "{{engine}} ended with an error before producing results",
+    "not_installed": "{{engine}} isn't installed on this worker ({{binary}} isn't on the PATH): that part of the analysis didn't run.",
+    "none_installed": "No analysis engine is installed on this worker and TAMANDUA_ENGINE_RUNNER=local: use the worker-standalone image, or give the worker the Docker socket."
   },
   "opengrep": {
     "no_docker": "Docker isn't available: multi-language SAST didn't run. {{problem}}",

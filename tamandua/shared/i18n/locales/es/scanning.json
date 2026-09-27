@@ -43,12 +43,15 @@
       "build": "construir con make build",
       "no_docker": "docker no disponible",
       "pulled": "descargada",
-      "pull_failed": "falló la descarga"
+      "pull_failed": "falló la descarga",
+      "not_installed": "No está instalado en esta imagen"
     },
     "unreadable": "{{engine}} no devolvió una salida legible.",
     "timeout": "{{engine}} superó el tiempo máximo.",
     "failed": "{{engine}} terminó con error",
-    "failed_early": "{{engine}} terminó con error antes de producir resultados"
+    "failed_early": "{{engine}} terminó con error antes de producir resultados",
+    "not_installed": "{{engine}} no está instalado en este worker ({{binary}} no está en el PATH): esa parte del análisis no se hizo.",
+    "none_installed": "Este worker no tiene ningún motor de análisis instalado y TAMANDUA_ENGINE_RUNNER=local: usa la imagen worker-standalone o dale al worker el socket de Docker."
   },
   "opengrep": {
     "no_docker": "Docker no disponible: el SAST multi-lenguaje no se ejecutó. {{problem}}",

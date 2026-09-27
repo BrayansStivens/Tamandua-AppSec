@@ -72,7 +72,7 @@ class CredentialTests(unittest.TestCase):
             class Done:
                 returncode, stdout, stderr = 0, json.dumps({"Results": [], "Metadata": {}}), ""
             return Done()
-        with patch("tamandua.modules.scanning.image.docker_available", return_value=True), \
+        with patch("tamandua.modules.scanning.image.unavailable", return_value=None), \
                 patch("tamandua.modules.scanning.engines.subprocess.run", side_effect=fake_run):
             image_scan.run_trivy_image("ghcr.io/acme/api:1", Path(self.directory.name) / "cache", {}, {"username": "brayan", "token": TOKEN})
         self.assertNotIn(TOKEN, " ".join(captured["argv"]))

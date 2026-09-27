@@ -145,7 +145,7 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
     `exclude`: patrones glob relativos a la raíz (`fixtures/**`, `**/testdata/**`) cuyos hallazgos no cuentan.
     Se dicen en la salida («N en rutas excluidas»): nada se oculta sin decirlo."""
     from tamandua.modules.findings.exclusions import ExclusionError, excluded, normalize
-    from tamandua.modules.scanning.engines import docker_available, docker_problem
+    from tamandua.modules.scanning.engines import engines_available, engines_problem
     try:
         patterns = normalize(list(exclude or []))
     except ExclusionError as exc:
@@ -187,7 +187,7 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
                           "baseline": prints is not None, "baseline_status": base_status,
                           "preexisting_in_changed_code": len(outcome["preexisting"])}
     ran, failed = _engines(scan)
-    missing = [] if docker_available() else [docker_problem() or msg("scanning.local.no_docker")]
+    missing = [] if engines_available() else [engines_problem() or msg("scanning.local.no_docker")]
     incomplete = scan["status"] == "incomplete" or bool(failed) or bool(missing)
     order = {level: index for index, level in enumerate(SEVERITY_ORDER)}
     findings = sorted(findings, key=lambda item: (order.get(item["severity"], 9), item["path"], item["line"]))
