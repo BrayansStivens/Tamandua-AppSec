@@ -87,10 +87,7 @@ class CveDbTests(unittest.TestCase):
 
     def test_kev_epss_rejected_and_detail(self):
         self.sync_all(FakeNvd(total=20))
-        connection = cve_db.connect(self.data_dir)
-        with connection:
-            cve_db.upsert(connection, [nvd_entry("CVE-2026-09999", "2026-09-19T00:00:00.000", status="Rejected")])
-        connection.close()
+        cve_db.upsert(self.data_dir, [nvd_entry("CVE-2026-09999", "2026-09-19T00:00:00.000", status="Rejected")])
         cve_db.load_signals(self.data_dir, {"kev": {"__meta__": {"version": "1"}, "CVE-2026-00003": {"date_added": "2026-09-01", "ransomware": True, "name": "Parser RCE"}},
                                             "epss": {"__meta__": {"header": "v"}, "CVE-2026-00003": (0.91, 0.99), "CVE-2026-00004": (0.2, 0.5)}})
         self.assertEqual(cve_db.search(self.data_dir)["total"], 20)  # los rechazados no cuentan
@@ -112,6 +109,33 @@ class CveDbTests(unittest.TestCase):
         self.assertEqual(cve_db.detail(self.data_dir, "CVE-2026-00001")["description"], "Updated text")
         self.assertEqual(cve_db.sync_step(self.data_dir, fetch=fake, now=later), "idle")
 
+    def test_the_sqlite_copy_of_earlier_versions_is_imported_once(self):
+        import sqlite3
+        feeds = self.data_dir / "feeds"
+        feeds.mkdir()
+        source = sqlite3.connect(feeds / "cves.sqlite")
+        source.executescript("""
+            CREATE TABLE cves (id TEXT PRIMARY KEY, year INTEGER NOT NULL, published TEXT, modified TEXT, status TEXT,
+                               severity TEXT, score REAL, vector TEXT, version TEXT, description TEXT, cwe TEXT, refs TEXT);
+            CREATE TABLE kev (id TEXT PRIMARY KEY, date_added TEXT, due_date TEXT, ransomware INTEGER, name TEXT);
+            CREATE TABLE epss (id TEXT PRIMARY KEY, score REAL, percentile REAL);
+            CREATE TABLE state (key TEXT PRIMARY KEY, value TEXT);
+            INSERT INTO cves VALUES ('CVE-2026-00007', 2026, '2026-09-01T00:00:00.000', NULL, 'Analyzed', 'high', 7.5, NULL, '3.1',
+                                     'Heap overflow in libpng', 'CWE-787', '[]');
+            INSERT INTO kev VALUES ('CVE-2026-00007', '2026-09-02', '2026-09-23', 1, 'libpng overflow');
+            INSERT INTO epss VALUES ('CVE-2026-00007', 0.4, 0.9);
+            INSERT INTO state VALUES ('backfill_done', '1'), ('synced_at', '2026-09-20T00:00:00+00:00');
+        """)
+        source.commit()
+        source.close()
+        self.assertEqual(cve_db.import_sqlite(self.data_dir), 1)
+        item = cve_db.detail(self.data_dir, "CVE-2026-00007")
+        self.assertEqual((item["severity"], item["kev"], item["epss"]), ("high", True, 0.4))
+        self.assertEqual(cve_db.search(self.data_dir, query="libpng")["total"], 1)
+        self.assertEqual(cve_db.overview(self.data_dir, now=NOW)["sync"]["phase"], "ready")  # the download isn't started over
+        self.assertFalse((feeds / "cves.sqlite").exists())
+        self.assertEqual(cve_db.import_sqlite(self.data_dir), 0)
+
 
 class CveRoutesTests(HttpCase):
     def setUp(self):
@@ -125,10 +149,7 @@ class CveRoutesTests(HttpCase):
         Users(self.data_dir).create("analista", PASSWORD)
         _, _, cookies = self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})
         self.cookie = {"Cookie": cookies[0].split("; ")[0]}
-        connection = cve_db.connect(self.data_dir)
-        with connection:
-            cve_db.upsert(connection, [nvd_entry("CVE-2026-12345", "2026-09-19T00:00:00.000")])
-        connection.close()
+        cve_db.upsert(self.data_dir, [nvd_entry("CVE-2026-12345", "2026-09-19T00:00:00.000")])
 
     def test_requires_session_and_validates(self):
         self.assertEqual(self.call("GET", "/api/cve-db")[0], 401)
@@ -177,11 +198,8 @@ class CveRoutesTests(HttpCase):
         self.assertEqual(self.call("GET", "/api/cve-db/affected?id=CVE-2026-12345&limit=500")[0], 401)  # the session first
 
     def test_only_mine_filters_to_open_cves_in_my_assets(self):
-        connection = cve_db.connect(self.data_dir)
-        with connection:
-            cve_db.upsert(connection, [nvd_entry("CVE-2026-20001", "2026-09-18T00:00:00.000"), nvd_entry("CVE-2026-20002", "2026-09-17T00:00:00.000"),
-                                       nvd_entry("CVE-2026-20003", "2026-09-16T00:00:00.000")])
-        connection.close()
+        cve_db.upsert(self.data_dir, [nvd_entry("CVE-2026-20001", "2026-09-18T00:00:00.000"), nvd_entry("CVE-2026-20002", "2026-09-17T00:00:00.000"),
+                                      nvd_entry("CVE-2026-20003", "2026-09-16T00:00:00.000")])
         findings_registry._save(self.data_dir, {"asset": "github#1", "name": "acme/web", "findings": {
             "a": {"status": "open", "finding": {"cve": ["CVE-2026-12345"]}},
             "b": {"status": "fixed", "finding": {"cve": ["CVE-2026-20001"]}},  # remediado: ya no es tuyo

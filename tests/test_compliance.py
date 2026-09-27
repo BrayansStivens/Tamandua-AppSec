@@ -279,10 +279,7 @@ class EuvdRouteTests(HttpCase):
         cookie = {"Cookie": self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})[2][0].split("; ")[0]}
         entry = nvd_entry("CVE-2026-55555", "2026-09-19T00:00:00.000")
         entry["cve"]["metrics"] = {}  # NVD ya no lo enriquece
-        connection = cve_db.connect(self.data_dir)
-        with connection:
-            cve_db.upsert(connection, [entry])
-        connection.close()
+        cve_db.upsert(self.data_dir, [entry])
         payload = {"items": [{"id": "EUVD-2026-5", "aliases": "CVE-2026-55555", "baseScore": 7.5, "baseScoreVersion": "3.1",
                               "baseScoreVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}]}
         with patch("tamandua.modules.intel.euvd._fetch", side_effect=lambda cve: euvd.parse(payload, cve)):

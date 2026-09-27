@@ -75,10 +75,17 @@ def _vault_to_database(data_dir: Path) -> int:
     return vault.import_file() + import_session_key(data_dir)
 
 
+def _cve_copy_to_database(data_dir: Path) -> int:
+    """The local NVD copy moved from data/feeds/cves.sqlite to the database."""
+    from tamandua.modules.intel import cve_db
+    return cve_db.import_sqlite(data_dir)
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration("cra_opt_in", (), _cra_opt_in),
     Migration("seal_totp_seeds", (), _seal_totp_seeds),
     Migration("vault_to_database", (), _vault_to_database),
+    Migration("cve_copy_to_database", (), _cve_copy_to_database),
 )
 LATEST = len(MIGRATIONS)
 

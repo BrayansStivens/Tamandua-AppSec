@@ -1,24 +1,22 @@
-"""Base local de CVE: copia de NVD en SQLite con búsqueda de texto, KEV y EPSS.
+"""Local copy of NVD in PostgreSQL, with full-text search, KEV and EPSS.
 
-El tracker consulta esta base, nunca NVD en vivo: las búsquedas son instantáneas y
-no dependen del límite de NVD (5 peticiones cada 30 s sin API key). Un hilo la llena
-en segundo plano:
+The tracker queries this copy, never NVD live: searches are instant and don't depend on NVD's rate limit (5 requests
+every 30 s without an API key). A background task fills it:
 
-1. **Carga inicial** de la más reciente a la más antigua, por páginas, reanudable tras
-   reiniciar: lo de este año está disponible en minutos aunque el histórico tarde más.
-2. **Actualización incremental** por fecha de modificación (`lastModStartDate`), en
-   ventanas de hasta 120 días, que es lo que admite NVD.
-3. **KEV y EPSS** se vuelcan a sus tablas cuando cambia el fichero descargado.
+1. **Initial load**, newest first, page by page, resumable after a restart: this year's CVEs are there in minutes
+   while the history keeps loading.
+2. **Incremental updates** by modification date (`lastModStartDate`), in windows of up to 120 days (what NVD allows).
+3. **KEV and EPSS** are copied to their tables whenever the downloaded file changes.
 
-Solo viajan a NVD rangos de índices y de fechas; ningún dato del cliente. La API key
-opcional (`TAMANDUA_NVD_API_KEY`) va en cabecera y nunca se registra.
+Only index and date ranges travel to NVD; nothing about the user. The optional API key (`TAMANDUA_NVD_API_KEY`) goes
+in a header and is never logged. It lives in the database, so any instance of the API (even one without a persistent
+disk) serves it; a copy left by earlier versions in data/feeds/cves.sqlite is imported once (`import_sqlite`).
 """
 
 from __future__ import annotations
 
 import json
 import re
-import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -27,7 +25,14 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from tamandua.shared import log as logging_setup, settings
+from sqlalchemy import ARRAY, Text, and_, any_, bindparam, delete, func, literal_column, or_, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.exc import SQLAlchemyError
+
+from tamandua.modules.intel.tables import cve_state, cves, epss
+from tamandua.modules.intel.tables import kev as exploited
+from tamandua.shared import db, settings
+from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
@@ -40,63 +45,25 @@ WINDOW_DAYS = 120
 MAX_CWES = 20
 MAX_REFERENCES = 10
 SEVERITIES = ("critical", "high", "medium", "low", "none")
-SORTS = {"published": "c.published DESC", "score": "c.score IS NULL, c.score DESC, c.published DESC",
-         "epss": "e.score IS NULL, e.score DESC, c.published DESC"}
+SORTS = {"published": (cves.c.published.desc().nulls_last(),),
+         "score": (cves.c.score.desc().nulls_last(), cves.c.published.desc().nulls_last()),
+         "epss": (epss.c.score.desc().nulls_last(), cves.c.published.desc().nulls_last())}
 _CVE_PREFIX = re.compile(r"(?i)cve-\d{4}(?:-\d{0,7})?")
-_schema_lock = threading.Lock()
 _sync = {"running": False, "error": None}
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS cves (
-    id TEXT PRIMARY KEY, year INTEGER NOT NULL, published TEXT, modified TEXT, status TEXT,
-    severity TEXT, score REAL, vector TEXT, version TEXT, description TEXT, cwe TEXT, refs TEXT
-);
-CREATE INDEX IF NOT EXISTS cves_published ON cves(published DESC);
-CREATE INDEX IF NOT EXISTS cves_year ON cves(year, published DESC);
-CREATE INDEX IF NOT EXISTS cves_severity ON cves(severity, published DESC);
-CREATE VIRTUAL TABLE IF NOT EXISTS cves_fts USING fts5(id, description, content='cves', content_rowid='rowid',
-                                                       tokenize='unicode61 remove_diacritics 2');
-CREATE TRIGGER IF NOT EXISTS cves_ai AFTER INSERT ON cves BEGIN
-    INSERT INTO cves_fts(rowid, id, description) VALUES (new.rowid, new.id, new.description);
-END;
-CREATE TRIGGER IF NOT EXISTS cves_au AFTER UPDATE ON cves BEGIN
-    INSERT INTO cves_fts(cves_fts, rowid, id, description) VALUES ('delete', old.rowid, old.id, old.description);
-    INSERT INTO cves_fts(rowid, id, description) VALUES (new.rowid, new.id, new.description);
-END;
-CREATE TABLE IF NOT EXISTS kev (id TEXT PRIMARY KEY, date_added TEXT, due_date TEXT, ransomware INTEGER, name TEXT);
-CREATE INDEX IF NOT EXISTS kev_added ON kev(date_added DESC);
-CREATE TABLE IF NOT EXISTS epss (id TEXT PRIMARY KEY, score REAL, percentile REAL) WITHOUT ROWID;
-CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT);
-"""
+COLUMNS = ("id", "year", "published", "modified", "status", "severity", "score", "vector", "version", "description", "cwe", "refs")
+NOT_REJECTED = or_(cves.c.status.is_(None), cves.c.status != "Rejected")
 
 
-def _path(data_dir: Path) -> Path:
-    return data_dir / "feeds" / "cves.sqlite"
+def _get_state(connection, key: str) -> str | None:
+    return connection.execute(select(cve_state.c.value).where(cve_state.c.key == key)).scalar_one_or_none()
 
 
-def connect(data_dir: Path) -> sqlite3.Connection:
-    path = _path(data_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path, timeout=30)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA journal_mode=WAL")
-    connection.execute("PRAGMA synchronous=NORMAL")
-    with _schema_lock:
-        connection.executescript(SCHEMA)
-    return connection
+def _set_state(connection, key: str, value) -> None:
+    statement = insert(cve_state).values(key=key, value=None if value is None else str(value))
+    connection.execute(statement.on_conflict_do_update(index_elements=[cve_state.c.key], set_={"value": statement.excluded.value}))
 
 
-def _get_state(connection: sqlite3.Connection, key: str) -> str | None:
-    row = connection.execute("SELECT value FROM state WHERE key = ?", (key,)).fetchone()
-    return row["value"] if row else None
-
-
-def _set_state(connection: sqlite3.Connection, key: str, value) -> None:
-    connection.execute("INSERT INTO state(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                       (key, None if value is None else str(value)))
-
-
-# --- ingesta ----------------------------------------------------------------------------
+# --- ingestion ---------------------------------------------------------------------------
 
 def parse_entry(entry: dict) -> tuple | None:
     """Una entrada de NVD 2.0 a una fila. La métrica más moderna disponible manda: 4.0, 3.1, 3.0, 2."""
@@ -127,14 +94,13 @@ def parse_entry(entry: dict) -> tuple | None:
             vector, version, description[:4000], ",".join(cwes) or None, json.dumps(references, ensure_ascii=False, separators=(",", ":")))
 
 
-def upsert(connection: sqlite3.Connection, entries: list[dict]) -> int:
-    rows = [row for row in (parse_entry(entry) for entry in entries) if row]
-    connection.executemany(
-        """INSERT INTO cves(id, year, published, modified, status, severity, score, vector, version, description, cwe, refs)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(id) DO UPDATE SET published = excluded.published, modified = excluded.modified,
-             status = excluded.status, severity = excluded.severity, score = excluded.score, vector = excluded.vector,
-             version = excluded.version, description = excluded.description, cwe = excluded.cwe, refs = excluded.refs""", rows)
+def upsert(data_dir: Path, entries: list[dict]) -> int:
+    rows = [dict(zip(COLUMNS, row)) for row in (parse_entry(entry) for entry in entries) if row]
+    if rows:
+        statement = insert(cves)
+        with db.transaction(data_dir) as connection:
+            connection.execute(statement.on_conflict_do_update(index_elements=[cves.c.id], set_={
+                name: statement.excluded[name] for name in COLUMNS if name not in ("id", "year")}), rows)
     return len(rows)
 
 
@@ -160,71 +126,103 @@ def _stamp(value: datetime) -> str:
 
 
 def sync_step(data_dir: Path, *, fetch=None, now: datetime | None = None) -> str:
-    """Un paso de sincronización (una petición a NVD). Devuelve qué hizo: backfill, incremental o idle."""
+    """One sync step (one request to NVD). Returns what it did: backfill, incremental or idle."""
     fetch = fetch or _nvd_get
     now = now or datetime.now(timezone.utc)
-    connection = connect(data_dir)
-    try:
-        if _get_state(connection, "backfill_done") != "1":
-            following = _get_state(connection, "backfill_next")
-            if following is None:
-                total = int(fetch({"resultsPerPage": 1}).get("totalResults") or 0)
-                with connection:
-                    _set_state(connection, "backfill_total", total)
-                    _set_state(connection, "backfill_next", max(0, (total - 1) // PAGE * PAGE))
-                    _set_state(connection, "synced_at", now.isoformat())  # lo modificado durante la carga lo recoge el incremental
-                return "backfill"
-            start = int(following)
-            payload = fetch({"resultsPerPage": PAGE, "startIndex": start})
-            with connection:
-                upsert(connection, payload.get("vulnerabilities") or [])
-                if start <= 0:
-                    _set_state(connection, "backfill_done", "1")
-                    _set_state(connection, "backfill_next", None)
-                else:
-                    _set_state(connection, "backfill_next", start - PAGE)
+    with db.transaction(data_dir) as connection:
+        done, following, since, offset = (_get_state(connection, key) for key in
+                                          ("backfill_done", "backfill_next", "synced_at", "incremental_index"))
+    if done != "1":
+        if following is None:
+            total = int(fetch({"resultsPerPage": 1}).get("totalResults") or 0)
+            with db.transaction(data_dir) as connection:
+                _set_state(connection, "backfill_total", total)
+                _set_state(connection, "backfill_next", max(0, (total - 1) // PAGE * PAGE))
+                _set_state(connection, "synced_at", now.isoformat())  # whatever changes meanwhile, the incremental picks up
             return "backfill"
-        since = datetime.fromisoformat(_get_state(connection, "synced_at") or now.isoformat())
-        if (now - since).total_seconds() < SYNC_EVERY:
-            return "idle"
-        start_at = since - timedelta(minutes=5)
-        end_at = min(now, start_at + timedelta(days=WINDOW_DAYS))
-        offset = int(_get_state(connection, "incremental_index") or 0)
-        payload = fetch({"lastModStartDate": _stamp(start_at), "lastModEndDate": _stamp(end_at),
-                         "resultsPerPage": PAGE, "startIndex": offset})
-        with connection:
-            upsert(connection, payload.get("vulnerabilities") or [])
-            if offset + PAGE < int(payload.get("totalResults") or 0):
-                _set_state(connection, "incremental_index", offset + PAGE)
+        start = int(following)
+        payload = fetch({"resultsPerPage": PAGE, "startIndex": start})
+        with db.transaction(data_dir) as connection:
+            upsert(data_dir, payload.get("vulnerabilities") or [])
+            if start <= 0:
+                _set_state(connection, "backfill_done", "1")
+                _set_state(connection, "backfill_next", None)
             else:
-                _set_state(connection, "incremental_index", 0)
-                _set_state(connection, "synced_at", end_at.isoformat())
-        return "incremental"
-    finally:
-        connection.close()
+                _set_state(connection, "backfill_next", start - PAGE)
+        return "backfill"
+    since_at = datetime.fromisoformat(since or now.isoformat())
+    if (now - since_at).total_seconds() < SYNC_EVERY:
+        return "idle"
+    start_at = since_at - timedelta(minutes=5)
+    end_at = min(now, start_at + timedelta(days=WINDOW_DAYS))
+    offset = int(offset or 0)
+    payload = fetch({"lastModStartDate": _stamp(start_at), "lastModEndDate": _stamp(end_at),
+                     "resultsPerPage": PAGE, "startIndex": offset})
+    with db.transaction(data_dir) as connection:
+        upsert(data_dir, payload.get("vulnerabilities") or [])
+        if offset + PAGE < int(payload.get("totalResults") or 0):
+            _set_state(connection, "incremental_index", offset + PAGE)
+        else:
+            _set_state(connection, "incremental_index", 0)
+            _set_state(connection, "synced_at", end_at.isoformat())
+    return "incremental"
 
 
 def load_signals(data_dir: Path, feeds: dict) -> None:
-    """Vuelca KEV y EPSS a la base cuando cambió la versión descargada."""
-    kev, epss = feeds.get("kev") or {}, feeds.get("epss") or {}
-    kev_version = str((kev.get("__meta__") or {}).get("version") or "") + f":{len(kev)}"
-    epss_version = str((epss.get("__meta__") or {}).get("header") or "") + f":{len(epss)}"
-    connection = connect(data_dir)
+    """Copies KEV and EPSS into the database when the downloaded version changed."""
+    kev_feed, epss_feed = feeds.get("kev") or {}, feeds.get("epss") or {}
+    kev_version = str((kev_feed.get("__meta__") or {}).get("version") or "") + f":{len(kev_feed)}"
+    epss_version = str((epss_feed.get("__meta__") or {}).get("header") or "") + f":{len(epss_feed)}"
+    with db.transaction(data_dir) as connection:
+        if len(kev_feed) > 1 and _get_state(connection, "kev_version") != kev_version:
+            connection.execute(delete(exploited))
+            connection.execute(insert(exploited).on_conflict_do_nothing(), [
+                {"id": key, "date_added": item.get("date_added"), "due_date": item.get("due_date"),
+                 "ransomware": bool(item.get("ransomware")), "name": item.get("name")}
+                for key, item in kev_feed.items() if key != "__meta__"])
+            _set_state(connection, "kev_version", kev_version)
+        if len(epss_feed) > 1 and _get_state(connection, "epss_version") != epss_version:
+            connection.execute(delete(epss))
+            rows = [{"id": key, "score": value[0], "percentile": value[1]} for key, value in epss_feed.items() if key != "__meta__"]
+            for index in range(0, len(rows), 20_000):
+                connection.execute(insert(epss).on_conflict_do_nothing(), rows[index:index + 20_000])
+            _set_state(connection, "epss_version", epss_version)
+
+
+def import_sqlite(data_dir: Path) -> int:
+    """Copies the SQLite copy of earlier versions (data/feeds/cves.sqlite) into the database, once, so the tracker
+    doesn't start the NVD download over. The file is renamed afterwards (it can be deleted). Returns the CVEs copied."""
+    import sqlite3
+    path = data_dir / "feeds" / "cves.sqlite"
+    if not path.is_file():
+        return 0
+    source = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    source.row_factory = sqlite3.Row
+    copied = 0
     try:
-        with connection:
-            if len(kev) > 1 and _get_state(connection, "kev_version") != kev_version:
-                connection.execute("DELETE FROM kev")
-                connection.executemany("INSERT OR REPLACE INTO kev VALUES (?, ?, ?, ?, ?)",
-                                       [(key, item.get("date_added"), item.get("due_date"), int(bool(item.get("ransomware"))), item.get("name"))
-                                        for key, item in kev.items() if key != "__meta__"])
-                _set_state(connection, "kev_version", kev_version)
-            if len(epss) > 1 and _get_state(connection, "epss_version") != epss_version:
-                connection.execute("DELETE FROM epss")
-                connection.executemany("INSERT OR REPLACE INTO epss VALUES (?, ?, ?)",
-                                       [(key, value[0], value[1]) for key, value in epss.items() if key != "__meta__"])
-                _set_state(connection, "epss_version", epss_version)
+        with db.transaction(data_dir) as connection:
+            cursor = source.execute(f"SELECT {', '.join(COLUMNS)} FROM cves")  # nosemgrep: appsec.py.sql-string-building
+            while rows := cursor.fetchmany(5000):
+                connection.execute(insert(cves).on_conflict_do_nothing(), [dict(row) for row in rows])
+                copied += len(rows)
+            for row in source.execute("SELECT id, date_added, due_date, ransomware, name FROM kev"):
+                connection.execute(insert(exploited).values(**{**dict(row), "ransomware": bool(row["ransomware"])}).on_conflict_do_nothing())
+            cursor = source.execute("SELECT id, score, percentile FROM epss")
+            while rows := cursor.fetchmany(20_000):
+                connection.execute(insert(epss).on_conflict_do_nothing(), [dict(row) for row in rows])
+            for row in source.execute("SELECT key, value FROM state"):
+                if _get_state(connection, row["key"]) is None:
+                    _set_state(connection, row["key"], row["value"])
+    except sqlite3.Error:
+        _log.warning("cve_sqlite_not_imported", extra={"reason": "the SQLite copy is unreadable; NVD will be downloaded again"})
+        return 0
     finally:
-        connection.close()
+        source.close()
+    try:
+        path.rename(path.with_name("cves.sqlite.imported"))
+    except OSError:
+        pass
+    return copied
 
 
 class Syncer:
@@ -257,7 +255,7 @@ class Syncer:
                 _sync["error"] = None
                 backoff = 60
                 delay = pause() if done != "idle" else 300
-            except (HTTPError, URLError, TimeoutError, OSError, ValueError, sqlite3.Error) as error:
+            except (HTTPError, URLError, TimeoutError, OSError, ValueError, SQLAlchemyError) as error:
                 # Sin detalles de la petición: la URL podría acabar en logs con parámetros; la key va en cabecera.
                 _sync["error"] = type(error).__name__
                 _log.warning("cve_sync_failed", extra={"reason": type(error).__name__})
@@ -266,117 +264,98 @@ class Syncer:
         _sync["running"] = False
 
 
-# --- consulta -----------------------------------------------------------------------------
+# --- queries -------------------------------------------------------------------------------
 
-def _fts_query(text: str) -> str | None:
+def _tsquery(text: str) -> str | None:
+    """Every word must appear, each as a prefix; only letters and digits reach the query syntax."""
     words = re.findall(r"[A-Za-z0-9]+", text)[:8]
-    return " ".join(f'"{word}"*' for word in words) or None
+    return " & ".join(f"{word.lower()}:*" for word in words) or None
 
 
-def _item(row: sqlite3.Row) -> dict:
-    return {"id": row["id"], "published": row["published"], "severity": row["severity"], "score": row["score"],
-            "version": row["version"], "description": (row["description"] or "")[:400], "status": row["status"],
-            "kev": row["kev_added"] is not None, "epss": row["epss"], "epss_percentile": row["epss_percentile"]}
+def _item(row) -> dict:
+    return {"id": row.id, "published": row.published, "severity": row.severity, "score": row.score,
+            "version": row.version, "description": (row.description or "")[:400], "status": row.status,
+            "kev": row.kev_added is not None, "epss": row.epss, "epss_percentile": row.epss_percentile}
 
 
-SELECT = """SELECT c.id, c.published, c.severity, c.score, c.version, c.description, c.status,
-                   k.date_added AS kev_added, e.score AS epss, e.percentile AS epss_percentile
-            FROM cves c LEFT JOIN kev k ON k.id = c.id LEFT JOIN epss e ON e.id = c.id"""
+LISTED = (cves.c.id, cves.c.published, cves.c.severity, cves.c.score, cves.c.version, cves.c.description, cves.c.status,
+          exploited.c.date_added.label("kev_added"), epss.c.score.label("epss"), epss.c.percentile.label("epss_percentile"))
+JOINED = cves.outerjoin(exploited, exploited.c.id == cves.c.id).outerjoin(epss, epss.c.id == cves.c.id)
 
 
 def search(data_dir: Path, *, query: str = "", severity: str | None = None, kev: bool = False, year: int | None = None,
            sort: str = "published", limit: int = 25, offset: int = 0, only: frozenset[str] | None = None,
            mine: frozenset[str] = frozenset()) -> dict:
-    """Búsqueda paginada. Todo va parametrizado; el texto libre pasa por FTS5 con palabras saneadas.
-
-    `only` restringe a esos CVE (p. ej. los abiertos en tus activos); `mine` solo marca cada fila con `affects`."""
-    clauses, params = ["(c.status IS NULL OR c.status != 'Rejected')"], []
-    join = ""
+    """Paged search, every value a bound parameter. `only` restricts to those CVEs (e.g. the open ones in your assets);
+    `mine` only marks each row with `affects`."""
+    conditions = [NOT_REJECTED]
     if only is not None:
-        # Un único parámetro JSON, sea cual sea el tamaño del conjunto (sin tope de variables de SQLite); el JOIN
-        # recorre esa lista y busca cada CVE por clave primaria en vez de recorrer la tabla entera.
-        join = " JOIN json_each(?) mine ON mine.value = c.id"
-        params.append(json.dumps(sorted(only)))
+        conditions.append(cves.c.id == any_(bindparam("only", sorted(only), type_=ARRAY(Text))))
     text = query.strip()
     if _CVE_PREFIX.fullmatch(text):
-        clauses.append("c.id LIKE ? ESCAPE '\\'")
-        params.append(text.upper().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+        conditions.append(cves.c.id.like(text.upper().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%", escape="\\"))
     elif text:
-        match = _fts_query(text)
+        match = _tsquery(text)
         if match:
-            join += " JOIN cves_fts f ON f.rowid = c.rowid"
-            clauses.append("cves_fts MATCH ?")
-            params.append(match)
+            conditions.append(cves.c.search.op("@@")(func.to_tsquery(literal_column("'simple'::regconfig"), match)))
     if severity == "none":
-        clauses.append("(c.severity IS NULL OR c.severity = 'none')")  # sin puntuar aún, o CVSS 0
+        conditions.append(or_(cves.c.severity.is_(None), cves.c.severity == "none"))  # not scored yet, or CVSS 0
     elif severity:
-        clauses.append("c.severity = ?")
-        params.append(severity)
+        conditions.append(cves.c.severity == severity)
     if kev:
-        clauses.append("k.id IS NOT NULL")
+        conditions.append(exploited.c.id.isnot(None))
     if year:
-        clauses.append("c.year = ?")
-        params.append(year)
-    where = " WHERE " + " AND ".join(clauses)
-    base = SELECT.replace("FROM cves c", f"FROM cves c{join}") + where
-    # El total no necesita EPSS; KEV solo si se filtra por él.
-    counting = f"SELECT COUNT(*) FROM cves c{join}" + (" LEFT JOIN kev k ON k.id = c.id" if kev else "") + where
-    connection = connect(data_dir)
-    try:
-        total = connection.execute(counting, params).fetchone()[0]
-        # Solo se interpolan fragmentos constantes y la columna de orden sale de la lista blanca SORTS
-        # (la ruta rechaza cualquier otro valor); todo dato del usuario va como parámetro «?».
-        rows = connection.execute(f"{base} ORDER BY {SORTS[sort]} LIMIT ? OFFSET ?", [*params, limit, offset]).fetchall()  # nosemgrep: appsec.py.sql-string-building
-    finally:
-        connection.close()
-    return {"items": [{**_item(row), "affects": row["id"] in mine} for row in rows], "total": total, "limit": limit, "offset": offset}
+        conditions.append(cves.c.year == year)
+    with db.transaction(data_dir) as connection:
+        total = connection.execute(select(func.count()).select_from(JOINED).where(and_(*conditions))).scalar_one()
+        rows = connection.execute(select(*LISTED).select_from(JOINED).where(and_(*conditions))
+                                  .order_by(*SORTS[sort]).limit(limit).offset(offset)).all()
+    return {"items": [{**_item(row), "affects": row.id in mine} for row in rows], "total": total, "limit": limit, "offset": offset}
 
 
 def detail(data_dir: Path, identifier: str) -> dict | None:
-    connection = connect(data_dir)
-    try:
-        row = connection.execute(SELECT.replace("c.status", "c.status, c.vector, c.cwe, c.refs, c.modified, k.due_date, k.ransomware, k.name AS kev_name")
-                                 + " WHERE c.id = ?", (identifier,)).fetchone()
+    with db.transaction(data_dir) as connection:
+        row = connection.execute(select(*LISTED, cves.c.vector, cves.c.cwe, cves.c.refs, cves.c.modified, exploited.c.due_date,
+                                        exploited.c.ransomware, exploited.c.name.label("kev_name")).select_from(JOINED)
+                                 .where(cves.c.id == identifier)).first()
         if row is None:
-            kev_row = connection.execute("SELECT * FROM kev WHERE id = ?", (identifier,)).fetchone()
-            epss_row = connection.execute("SELECT * FROM epss WHERE id = ?", (identifier,)).fetchone()
+            kev_row = connection.execute(select(exploited).where(exploited.c.id == identifier)).first()
+            epss_row = connection.execute(select(epss).where(epss.c.id == identifier)).first()
             if not kev_row and not epss_row:
                 return None
             return {"id": identifier, "published": None, "severity": None, "score": None, "version": None, "status": None,
-                    "description": (kev_row["name"] if kev_row else None) or msg("intel.cve.not_in_local_copy"),
-                    "kev": bool(kev_row), "kev_detail": dict(kev_row) if kev_row else None,
-                    "epss": epss_row["score"] if epss_row else None, "epss_percentile": epss_row["percentile"] if epss_row else None,
+                    "description": (kev_row.name if kev_row else None) or msg("intel.cve.not_in_local_copy"),
+                    "kev": bool(kev_row), "kev_detail": dict(kev_row._mapping) if kev_row else None,
+                    "epss": epss_row.score if epss_row else None, "epss_percentile": epss_row.percentile if epss_row else None,
                     "vector": None, "cwe": [], "references": [], "modified": None}
-    finally:
-        connection.close()
     item = _item(row)
-    item.update(description=row["description"], vector=row["vector"], modified=row["modified"],
-                cwe=(row["cwe"] or "").split(",")[:MAX_CWES] if row["cwe"] else [], references=json.loads(row["refs"] or "[]")[:MAX_REFERENCES],
-                kev_detail={"date_added": row["kev_added"], "due_date": row["due_date"], "ransomware": bool(row["ransomware"]),
-                            "name": row["kev_name"]} if row["kev_added"] else None)
+    item.update(description=row.description, vector=row.vector, modified=row.modified,
+                cwe=(row.cwe or "").split(",")[:MAX_CWES] if row.cwe else [], references=json.loads(row.refs or "[]")[:MAX_REFERENCES],
+                kev_detail={"date_added": row.kev_added, "due_date": row.due_date, "ransomware": bool(row.ransomware),
+                            "name": row.kev_name} if row.kev_added else None)
     return item
 
 
 def overview(data_dir: Path, *, now: datetime | None = None) -> dict:
-    """Lo que acompaña al tracker: estado de la carga, años, últimos KEV y publicados por día y severidad."""
+    """What goes with the tracker: load status, years, latest KEV and published per day and severity."""
     now = now or datetime.now(timezone.utc)
-    connection = connect(data_dir)
-    try:
-        count = connection.execute("SELECT COUNT(*) FROM cves").fetchone()[0]
-        years = [dict(row) for row in connection.execute(
-            "SELECT year, COUNT(*) AS count FROM cves WHERE status IS NULL OR status != 'Rejected' GROUP BY year ORDER BY year DESC")]
-        latest_kev = [{"id": row["id"], "date_added": row["date_added"], "name": row["name"], "ransomware": bool(row["ransomware"]),
-                       "severity": row["severity"], "score": row["score"]} for row in connection.execute(
-            "SELECT k.id, k.date_added, k.name, k.ransomware, c.severity, c.score FROM kev k LEFT JOIN cves c ON c.id = k.id "
-            "ORDER BY k.date_added DESC, k.id DESC LIMIT 8")]
+    day = func.substr(cves.c.published, 1, 10).label("day")
+    level = func.coalesce(cves.c.severity, "none").label("severity")
+    with db.transaction(data_dir) as connection:
+        count = connection.execute(select(func.count()).select_from(cves)).scalar_one()
+        years = [{"year": row.year, "count": row.count} for row in connection.execute(
+            select(cves.c.year, func.count().label("count")).where(NOT_REJECTED).group_by(cves.c.year).order_by(cves.c.year.desc()))]
+        latest_kev = [{"id": row.id, "date_added": row.date_added, "name": row.name, "ransomware": bool(row.ransomware),
+                       "severity": row.severity, "score": row.score} for row in connection.execute(
+            select(exploited.c.id, exploited.c.date_added, exploited.c.name, exploited.c.ransomware, cves.c.severity, cves.c.score)
+            .select_from(exploited.outerjoin(cves, cves.c.id == exploited.c.id))
+            .order_by(exploited.c.date_added.desc().nulls_last(), exploited.c.id.desc()).limit(8))]
         since = (now - timedelta(days=30)).strftime("%Y-%m-%d")
-        daily = [dict(row) for row in connection.execute(
-            "SELECT substr(published, 1, 10) AS day, COALESCE(severity, 'none') AS severity, COUNT(*) AS count FROM cves "
-            "WHERE published >= ? AND (status IS NULL OR status != 'Rejected') GROUP BY day, severity ORDER BY day", (since,))]
-        state = {row["key"]: row["value"] for row in connection.execute("SELECT key, value FROM state")}
-        kev_total = connection.execute("SELECT COUNT(*) FROM kev").fetchone()[0]
-    finally:
-        connection.close()
+        daily = [{"day": row.day, "severity": row.severity, "count": row.count} for row in connection.execute(
+            select(day, level, func.count().label("count")).where(cves.c.published >= since, NOT_REJECTED)
+            .group_by(day, level).order_by(day))]
+        state = {row.key: row.value for row in connection.execute(select(cve_state))}
+        kev_total = connection.execute(select(func.count()).select_from(exploited)).scalar_one()
     total = int(state.get("backfill_total") or 0)
     following = state.get("backfill_next")
     done = state.get("backfill_done") == "1"
