@@ -127,6 +127,7 @@ def build_parser() -> argparse.ArgumentParser:
     worker = commands.add_parser("worker", help="Run queued analyses and periodic tasks (the compose `worker` service)")
     worker.add_argument("--check", action="store_true", help="Health: 0 if this worker showed signs of life recently (healthcheck)")
     commands.add_parser("check-config", help="Check the settings in the environment (exit 1 if any is invalid)")
+    commands.add_parser("setup-code", help="Show the one-time code to create the first administrator (while there is none)")
     panel = commands.add_parser("serve", help="Open the web panel")
     panel.add_argument("--port", type=int, default=8766)
     panel.add_argument("--bind", default=None, help="Listening interface; default 127.0.0.1 (or TAMANDUA_BIND)")
@@ -163,6 +164,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.check:
                 return 0 if healthy(args.data_dir) else 1
             run_worker(args.data_dir)
+            return 0
+        if args.command == "setup-code":
+            from tamandua.modules.identity.auth import Authenticator
+            code = Authenticator(args.data_dir).setup_code()
+            print(t("cli.setup_code.code", code=code) if code else t("cli.setup_code.none"))
             return 0
         if args.command == "runs":
             print(_json(list_runs(args.data_dir)))

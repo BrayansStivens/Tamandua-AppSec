@@ -19,6 +19,7 @@ def tables() -> None:
     import tamandua.modules.integrations.tables  # noqa: F401
     import tamandua.modules.runs.tables  # noqa: F401
     import tamandua.shared.documents  # noqa: F401
+    import tamandua.shared.vault  # noqa: F401
 
 
 def config() -> Config:

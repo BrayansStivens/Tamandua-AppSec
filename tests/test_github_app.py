@@ -8,12 +8,13 @@ import threading
 import time
 import unittest
 
+import testenv
 from tamandua.shared import documents
 from pathlib import Path
 from unittest.mock import patch
 
 from tamandua.modules.integrations import github as github_app
-from tamandua.shared import paths
+from tamandua.shared import paths, vault
 from tamandua.shared.i18n import localize
 from tamandua.modules.integrations.github import GitHubAppError, config, install_url
 from tamandua.modules.integrations.installations import clear_github, github_installation, github_installations, load, save_github
@@ -43,7 +44,7 @@ class GitHubAppTests(unittest.TestCase):
         self.addCleanup(self.store.cleanup)
 
     def test_missing_configuration_is_named_and_never_invents_a_url(self):
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, testenv.base(), clear=True):
             state = config()
             self.assertFalse(state["configured"])
             self.assertEqual(localize(state["missing"], "es"), ["App ID", "clave privada", "GITHUB_APP_SLUG"])
@@ -51,7 +52,7 @@ class GitHubAppTests(unittest.TestCase):
                 install_url()
 
     def test_install_url_points_at_the_selection_screen(self):
-        with tempfile.NamedTemporaryFile() as key, patch.dict(os.environ, _environment(key.name), clear=True):
+        with tempfile.NamedTemporaryFile() as key, patch.dict(os.environ, testenv.base(**_environment(key.name)), clear=True):
             self.assertEqual(install_url(), "https://github.com/apps/tamandua-local/installations/new")
 
     @unittest.skipUnless(CRYPTO, "requiere cryptography (.venv)")
@@ -77,22 +78,21 @@ class GitHubAppTests(unittest.TestCase):
             serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
         with self.assertRaises(GitHubAppError):
             github_app.verify_app("4242", weak)
-        with patch.dict(os.environ, {}, clear=True), patch("tamandua.modules.integrations.github._get", side_effect=fake_get):
+        with patch.dict(os.environ, testenv.base(), clear=True), patch("tamandua.modules.integrations.github._get", side_effect=fake_get):
             verified = github_app.verify_app(" 4242 ", pem)
             self.assertEqual(seen[0][0], "https://api.github.com/app")
             self.assertNotIn("PRIVATE KEY", seen[0][1])  # a GitHub va un JWT, nunca la clave
             github_app.save_credentials(verified)
-            files = {path.name: path.read_bytes() for path in (Path(self.store.name) / "config").iterdir()}
-            self.assertEqual(set(files) - {".vault.lock"}, {"secrets.vault", "master.key"})  # el cerrojo entre procesos no guarda nada
-            self.assertNotIn(b"PRIVATE KEY", files["secrets.vault"])
-            self.assertEqual(oct((Path(self.store.name) / "config" / "secrets.vault").stat().st_mode & 0o777), "0o600")
+            files = {path.name for path in (Path(self.store.name) / "config").iterdir()}
+            self.assertEqual(files, {"master.key"})  # the entries live in the database, sealed
+            self.assertIn("github_app", vault.names())
             state = github_app.config()
             self.assertEqual((state["configured"], state["slug"], state["owner"], state["source"]), (True, "appsec-de-acme", "acme", "vault"))
             self.assertNotIn("PRIVATE", json.dumps(state))
             github_app._app_jwt()  # firma con la clave descifrada del almacén
             self.assertTrue(github_app.forget_app())
             self.assertFalse(github_app.config()["configured"])
-        with patch.dict(os.environ, {}, clear=True), patch("tamandua.modules.integrations.github._get", side_effect=GitHubAppError("401")):
+        with patch.dict(os.environ, testenv.base(), clear=True), patch("tamandua.modules.integrations.github._get", side_effect=GitHubAppError("401")):
             with self.assertRaises(GitHubAppError):
                 github_app.verify_app("4242", pem)
 
@@ -104,7 +104,7 @@ class GitHubAppTests(unittest.TestCase):
             key_file.write_bytes(key.private_bytes(serialization.Encoding.PEM,
                                                    serialization.PrivateFormat.PKCS8,
                                                    serialization.NoEncryption()))
-            with patch.dict(os.environ, _environment(str(key_file)), clear=True):
+            with patch.dict(os.environ, testenv.base(**_environment(str(key_file))), clear=True):
                 token = github_app._app_jwt()
         header_raw, payload_raw, signature_raw = token.split(".")
         pad = lambda value: value + "=" * (-len(value) % 4)

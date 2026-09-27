@@ -143,5 +143,42 @@ class CraOptInMigrationTests(unittest.TestCase):
         self.assertEqual((cra.enabled(self.data_dir), cra.policy(self.data_dir)["history"]), (False, []))
 
 
+class VaultToDatabaseMigrationTests(unittest.TestCase):
+    """The vault file and the session key of earlier versions move to the database; nobody has to sign in again."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.data_dir = Path(self.directory.name) / "data"
+        self.config = Path(self.directory.name) / "config"
+        (self.data_dir / "auth").mkdir(parents=True)
+        patcher = patch.object(paths, "CONFIG_DIR", self.config)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        documents.save(self.data_dir, migrations.VERSION_DOCUMENT, {"version": 2, "history": []})
+
+    def tearDown(self):
+        self.directory.cleanup()
+
+    def test_vault_file_and_session_key_are_imported(self):
+        import base64
+        from tamandua.modules.identity.auth import SESSION_KEY, Sessions
+        from tamandua.shared import vault
+        vault.put("jira", {"token": "ATATT3xFfGF0-antiguo"})
+        from tamandua.shared import db
+        with db.separate_transaction(self.config) as connection:  # as an earlier version left it: only the file
+            rows = {row.name: {"nonce": row.nonce, "data": row.data} for row in connection.execute(
+                vault.vault_entries.select().with_only_columns(vault.vault_entries.c.name, vault.vault_entries.c.nonce,
+                                                               vault.vault_entries.c.data))}
+            connection.execute(vault.vault_entries.delete())
+        (self.config / "secrets.vault").write_text(json.dumps(rows))
+        key = base64.b64encode(b"s" * 32).decode()
+        (self.data_dir / "auth" / "session.key").write_text(key)
+        self.assertIn("vault_to_database", migrations.upgrade(self.data_dir))
+        self.assertEqual(vault.get("jira")["token"], "ATATT3xFfGF0-antiguo")
+        self.assertEqual(vault.get(SESSION_KEY)["session_key"], key)
+        self.assertEqual(Sessions(self.data_dir)._key, b"s" * 32)  # existing cookies stay valid
+        self.assertFalse((self.data_dir / "auth" / "session.key").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

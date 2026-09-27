@@ -68,9 +68,17 @@ def _seal_totp_seeds(data_dir: Path) -> int:
     return Users(data_dir).seal_clear_totp()
 
 
+def _vault_to_database(data_dir: Path) -> int:
+    """The secrets vault moved from config/secrets.vault to the database; the session key, from data/auth/."""
+    from tamandua.modules.identity.auth import import_session_key
+    from tamandua.shared import vault
+    return vault.import_file() + import_session_key(data_dir)
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration("cra_opt_in", (), _cra_opt_in),
     Migration("seal_totp_seeds", (), _seal_totp_seeds),
+    Migration("vault_to_database", (), _vault_to_database),
 )
 LATEST = len(MIGRATIONS)
 

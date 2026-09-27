@@ -1,8 +1,6 @@
 """Conector de Jira contra un Jira simulado: nunca sale a la red."""
 
 import json
-import os
-import stat
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -71,8 +69,8 @@ class JiraTests(unittest.TestCase):
         # Cifrado en el almacén: el token no aparece en ningún fichero de configuración.
         for path in (self.data_dir / "config").iterdir():
             self.assertNotIn(TOKEN.encode(), path.read_bytes(), path.name)
-        mode = stat.S_IMODE(os.stat(self.data_dir / "config" / "secrets.vault").st_mode)
-        self.assertEqual(mode, 0o600)
+        from tamandua.shared import vault
+        self.assertEqual(vault.get("jira")["token"], TOKEN)  # sealed in the database, readable only with the master key
         with self.assertRaises(jira.JiraError):
             jira.configure("acme.atlassian.net", "sec@acme.io", TOKEN, "SEC", "Epic", by="x", http=FakeJira())
 

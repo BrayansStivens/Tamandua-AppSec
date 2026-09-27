@@ -62,5 +62,9 @@
     "invalid_key": "{{name}} tiene que ser de 32 bytes aleatorios en base64. Genera uno con: openssl rand -base64 32",
     "short_token": "{{name}} es demasiado corto: usa al menos 32 caracteres (openssl rand -hex 32).",
     "ok": "Configuración: sin problemas."
+  },
+  "setup_code": {
+    "code": "Código de configuración: {{code}}",
+    "none": "Ya hay un administrador: inicia sesión con tu usuario."
   }
 }

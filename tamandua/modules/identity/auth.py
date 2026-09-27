@@ -22,7 +22,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import os
 import re
 import secrets
 import struct
@@ -421,25 +420,42 @@ def normalize_username(value, *, strict: bool = True) -> str:
 
 # ------------------------------------------------------------------- sesiones
 
+SESSION_KEY = "session-key"
+SETUP_CODE = "setup-code"
+
+
+def import_session_key(data_dir: Path) -> int:
+    """The session signing key of earlier versions (data/auth/session.key) moves to the vault, so signed-in people
+    stay signed in. Returns 1 if it was imported."""
+    path = data_dir / "auth" / "session.key"
+    try:
+        key = path.read_text(encoding="ascii").strip()
+    except FileNotFoundError:
+        return 0
+    stored = vault.put_if_absent(SESSION_KEY, {"session_key": key})
+    try:
+        path.rename(path.with_name("session.key.imported"))
+    except OSError:
+        pass
+    return int(stored["session_key"] == key)
+
+
 class Sessions:
     """Sesiones del lado del servidor (tabla sessions) con cookie firmada; el retén (`challenge`) cubre el paso TOTP.
     Validar una cookie es una búsqueda por clave primaria (antes se leía el archivo entero en cada petición)."""
 
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
-        self.key_path = data_dir / "auth" / "session.key"
         self._key = self._load_key()
 
     def _load_key(self) -> bytes:
-        try:
-            return base64.b64decode(self.key_path.read_text(encoding="ascii").strip())
-        except FileNotFoundError:
-            key = secrets.token_bytes(32)
-            self.key_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-            descriptor = os.open(self.key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(descriptor, "w", encoding="ascii") as handle:
-                handle.write(base64.b64encode(key).decode("ascii"))
-            return key
+        """TAMANDUA_SESSION_KEY, or one generated once and kept in the vault (sealed with the master key: whoever reads
+        the database alone can't sign sessions), shared by every instance of the API."""
+        configured = settings.text("TAMANDUA_SESSION_KEY")
+        if configured:
+            return base64.b64decode(configured)
+        stored = vault.put_if_absent(SESSION_KEY, {"session_key": base64.b64encode(secrets.token_bytes(32)).decode("ascii")})
+        return base64.b64decode(stored["session_key"])
 
     def _sign(self, session_id: str) -> str:
         return hmac.new(self._key, session_id.encode("ascii"), hashlib.sha256).hexdigest()[:32]
@@ -578,26 +594,25 @@ class Authenticator:
         return not self.users.any()
 
     def setup_code(self) -> str | None:
-        """Código de un solo uso para crear el primer administrador desde la web.
+        """One-time code to create the first administrator from the web.
 
-        Solo existe mientras no hay usuarios y solo en memoria: se imprime en la consola
-        del servidor, de modo que únicamente quien controla el servidor puede reclamarlo.
-        Evita que el primero que llegue a una instancia recién levantada se quede con ella.
+        It exists only while there are no users. It is printed on the server's console (and `tamandua setup-code`
+        shows it), so only whoever controls the server can claim a freshly started instance. It lives in the vault,
+        so every instance of the API accepts the same code.
         """
         if not self.setup_required():
-            self._setup = None
+            vault.delete(SETUP_CODE)
             return None
-        if getattr(self, "_setup", None) is None:
-            # `make setup-code` finds the code in the server log by this format (XXXX-XXXX-XXXX from this alphabet).
-            alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-            self._setup = "-".join("".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3))
-        return self._setup
+        # `make setup-code` and the logs show it in this format (XXXX-XXXX-XXXX from this alphabet).
+        alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+        code = "-".join("".join(secrets.choice(alphabet) for _ in range(4)) for _ in range(3))
+        return vault.put_if_absent(SETUP_CODE, {"code": code})["code"]
 
     def setup_admin(self, code, username, password, display_name, client: str) -> dict:
         wait = self.throttle.reserve("setup")
         if wait:
             raise Locked(wait)
-        expected = getattr(self, "_setup", None)
+        expected = (vault.get(SETUP_CODE) or {}).get("code")
         if not self.setup_required() or expected is None:
             raise AuthError(msg("auth.errors.workspace_has_admin"))
         given = str(code or "").strip().upper().replace(" ", "")
@@ -605,7 +620,7 @@ class Authenticator:
             raise AuthError(msg("auth.errors.wrong_setup_code"))
         created = self.users.create_first_admin(username, password, display_name)
         user = self.users.by_id(created["id"])  # the stored record: the session must carry its password_changed_at
-        self._setup = None
+        vault.delete(SETUP_CODE)
         self.throttle.succeeded("setup")
         _log.info("first_admin_created", extra={"user": user["username"], "client": client})
         return self._complete(user, client, mfa=False)

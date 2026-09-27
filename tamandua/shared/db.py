@@ -103,6 +103,13 @@ def transaction(data_dir: Path):
             _current.reset(token)
 
 
+@contextmanager
+def separate_transaction(data_dir: Path):
+    """A transaction of its own that commits on its own, even when called inside another one."""
+    with engine().begin() as connection:
+        yield _prepare(connection, schema_for(data_dir))
+
+
 def lock(connection: Connection, *parts: str) -> None:
     """Cerrojo exclusivo hasta el final de la transacción, por clave (entre procesos y réplicas)."""
     digest = hashlib.sha256("\x1f".join((TENANT, *parts)).encode()).digest()

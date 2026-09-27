@@ -6,6 +6,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from sqlalchemy import select
+
+import testenv
 from tamandua.shared import paths
 from tamandua.shared import log as logging_setup
 from tamandua.shared import vault
@@ -24,19 +27,32 @@ class VaultTests(unittest.TestCase):
         patcher = patch.object(paths, "CONFIG_DIR", self.config)
         patcher.start()
         self.addCleanup(patcher.stop)
-        environment = patch.dict(os.environ, {}, clear=True)
+        environment = patch.dict(os.environ, testenv.base(), clear=True)
         environment.start()
         self.addCleanup(environment.stop)
+
+    def rows(self) -> dict:
+        from tamandua.shared import db
+        with db.separate_transaction(self.config) as connection:
+            return {row.name: {"nonce": row.nonce, "data": row.data}
+                    for row in connection.execute(select(vault.vault_entries.c.name, vault.vault_entries.c.nonce, vault.vault_entries.c.data))}
+
+    def overwrite(self, name: str, entry: dict) -> None:
+        from sqlalchemy.dialects.postgresql import insert
+        from tamandua.shared import db
+        statement = insert(vault.vault_entries).values(name=name, **entry)
+        with db.separate_transaction(self.config) as connection:
+            connection.execute(statement.on_conflict_do_update(index_elements=["tenant_id", "name"],
+                                                               set_={"nonce": statement.excluded.nonce, "data": statement.excluded.data}))
 
     def test_round_trip_is_encrypted_and_bound_to_the_name(self):
         vault.put("ai_keys", {"openai": {"api_key": OPENAI_KEY, "last4": "-123"}})
         self.assertEqual(vault.get("ai_keys")["openai"]["api_key"], OPENAI_KEY)
-        raw = (self.config / "secrets.vault").read_text()
-        self.assertNotIn("valor-muy-secreto", raw)
-        # Mover el cifrado de una entrada a otra no descifra: el nombre va como dato asociado.
-        payload = json.loads(raw)
-        payload["jira"] = payload["ai_keys"]
-        (self.config / "secrets.vault").write_text(json.dumps(payload))
+        stored = self.rows()
+        self.assertNotIn("valor-muy-secreto", json.dumps(stored))
+        self.assertFalse((self.config / "secrets.vault").exists())  # nothing but the master key on disk
+        # Moving one entry's ciphertext to another doesn't decrypt: the name is associated data.
+        self.overwrite("jira", stored["ai_keys"])
         with self.assertRaises(vault.VaultError):
             vault.get("jira")
         self.assertIsNone(vault.get("inexistente"))
@@ -45,11 +61,10 @@ class VaultTests(unittest.TestCase):
 
     def test_tampering_or_another_key_fails_closed(self):
         vault.put("jira", {"token": "ATATT3xFfGF0-token-de-prueba"})
-        payload = json.loads((self.config / "secrets.vault").read_text())
-        data = bytearray(base64.b64decode(payload["jira"]["data"]))
+        entry = self.rows()["jira"]
+        data = bytearray(base64.b64decode(entry["data"]))
         data[0] ^= 1
-        payload["jira"]["data"] = base64.b64encode(bytes(data)).decode()
-        (self.config / "secrets.vault").write_text(json.dumps(payload))
+        self.overwrite("jira", {**entry, "data": base64.b64encode(bytes(data)).decode()})
         with self.assertRaises(vault.VaultError):
             vault.get("jira")
         vault.put("jira", {"token": "ATATT3xFfGF0-token-de-prueba"})
@@ -77,6 +92,24 @@ class VaultTests(unittest.TestCase):
         for leaked in (CLIENT_SECRET, "11ABCDEFG", "c2VjOnRva2Vu", "MIIE"):
             self.assertNotIn(leaked, line)
         self.assertIn("appsec", logging_setup.redact("slug appsec"))  # lo que no es secreto se conserva
+
+    def test_the_vault_file_of_earlier_versions_is_imported_once(self):
+        vault.put("jira", {"token": "ATATT3xFfGF0-nuevo"})
+        vault.put("ai_keys", {"openai": {"api_key": OPENAI_KEY}})
+        legacy = self.rows()
+        vault.delete("ai_keys")
+        vault.put("jira", {"token": "ATATT3xFfGF0-mas-nuevo"})
+        (self.config / "secrets.vault").write_text(json.dumps(legacy))
+        self.assertEqual(vault.import_file(), 1)  # ai_keys comes back; jira keeps the database's newer value
+        self.assertEqual((vault.get("jira")["token"], vault.get("ai_keys")["openai"]["api_key"]), ("ATATT3xFfGF0-mas-nuevo", OPENAI_KEY))
+        self.assertFalse((self.config / "secrets.vault").exists())
+        self.assertTrue((self.config / "secrets.vault.imported").exists())
+        self.assertEqual(vault.import_file(), 0)
+
+    def test_several_processes_agree_on_one_generated_value(self):
+        first = vault.put_if_absent("session-key", {"session_key": "uno"})
+        second = vault.put_if_absent("session-key", {"session_key": "dos"})
+        self.assertEqual((first, second), ({"session_key": "uno"}, {"session_key": "uno"}))
 
 
 if __name__ == "__main__":

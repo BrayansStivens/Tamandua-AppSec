@@ -60,7 +60,7 @@ jobs:
             exit 1
           fi
       - name: Tests
-        run: python -m unittest discover -s tests
+        run: TAMANDUA_CONFIG_DIR="$RUNNER_TEMP/config" python -m unittest discover -s tests
 
   panel:
     name: Panel (types, lint and build)

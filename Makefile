@@ -156,7 +156,9 @@ web: ## Build the panel into tamandua/app/static/
 	cd web && npm run build
 
 test: ## Backend tests (starts a throwaway test Postgres if needed)
-	@url=$$(sh scripts/test-db.sh) && TAMANDUA_DATABASE_URL="$$url" TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_DEFAULT_LOCALE=es $(VENV)/bin/python -m unittest discover -s tests
+	@url=$$(sh scripts/test-db.sh) && config=$$(mktemp -d) && trap 'rm -rf "$$config"' EXIT && \
+	TAMANDUA_DATABASE_URL="$$url" TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_CONFIG_DIR="$$config" TAMANDUA_DEFAULT_LOCALE=es \
+	$(VENV)/bin/python -m unittest discover -s tests
 
 openapi: ## API OpenAPI schema and the panel's TypeScript types (web/src/shared/api/)
 	@mkdir -p web/src/shared/api

@@ -5,7 +5,6 @@ import io
 import json
 import os
 import re
-import stat
 import tempfile
 import time
 import unittest
@@ -66,9 +65,12 @@ class AuthenticatorTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_stored_data_holds_no_plain_secret(self):
-        """La clave de firma es privada (0600); en la base, ni la contraseña ni el identificador de sesión en claro."""
+        """The signing key lives sealed in the vault, never on disk; the database holds neither the password nor a
+        session identifier in the clear."""
+        from tamandua.shared import vault
         result = self.auth.login("operadora", PASSWORD, "1.1.1.1")
-        self.assertEqual(stat.S_IMODE(os.stat(self.data_dir / "auth" / "session.key").st_mode), 0o600)
+        self.assertFalse((self.data_dir / "auth").exists())
+        self.assertIn("session-key", vault.names())
         stored = stored_identity(self.data_dir)
         self.assertNotIn(result["session"].split(".")[0], stored)
         self.assertNotIn(PASSWORD, stored)

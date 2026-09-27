@@ -6,6 +6,7 @@ import tempfile
 import time
 import unittest
 
+import testenv
 from tamandua.modules.runs.store import artifact as store_artifact
 from pathlib import Path
 from unittest.mock import patch
@@ -88,7 +89,7 @@ class HostPathTests(unittest.TestCase):
                 self.assertEqual(host_path(inside / "work" / "snap"), "/Users/dev/appsec/data/work/snap")
                 # Fuera del directorio de datos no se toca la ruta.
                 self.assertEqual(host_path(Path("/etc/hosts")), str(Path("/etc/hosts").resolve()))
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, testenv.base(), clear=True):
             self.assertEqual(host_path(Path("/tmp/x")), str(Path("/tmp/x").resolve()))
 
 

@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import testenv
 from tamandua.shared import paths
 from tamandua.modules.scanning import image as image_scan
 from tamandua.modules.identity.auth import Users
@@ -35,7 +36,7 @@ class ReferenceTests(unittest.TestCase):
                 parse_reference(bad)
 
     def test_private_registries_need_explicit_permission(self):
-        with patch.dict(os.environ, {}, clear=True):
+        with patch.dict(os.environ, testenv.base(), clear=True):
             for host in ("localhost:5000", "127.0.0.1:5000", "10.0.0.5:5000"):
                 with self.subTest(host=host), self.assertRaises(ImageError):
                     image_scan.check_registry_address(host)
