@@ -123,7 +123,10 @@ def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] 
         return []
     if run is None and not engines.docker_available():
         return None
-    with tempfile.TemporaryDirectory(prefix="advisory-watch-") as folder:
+    # Under data/ (a host bind mount): the engine runs as a sibling container and mounts it by its host path.
+    work = data_dir / "work"
+    work.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="advisory-watch-", dir=work) as folder:
         root = Path(folder)
         (root / "bom.cdx.json").write_text(json.dumps(document), encoding="utf-8")
         cache_dir = engines.writable_cache(data_dir / "osv-cache")

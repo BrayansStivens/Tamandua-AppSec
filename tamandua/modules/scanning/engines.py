@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 from tamandua.shared import paths
@@ -317,14 +318,25 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
     environment = [part for name, value in (env or {}).items() for part in ("-e", f"{name}={value}")]
     environment += [part for name in (secret_env or {}) for part in ("-e", name)]
     source = ["-v", f"{host_path(snapshot)}:/src:ro"] if snapshot is not None else []
-    command = [shutil.which("docker"), "run", "--rm", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+    docker = shutil.which("docker")
+    name = f"tamandua-{key}-{uuid.uuid4().hex[:12]}"
+    command = [docker, "run", "--rm", "--name", name, "--label", "tamandua.engine=1",
+               "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                *engine_user(), "--pids-limit", "512", "--memory", "3g", "--cpus", "2",
                "--network", "bridge" if network else "none",
                # An image built here has no digest: never let Docker fetch that name from a registry instead.
                *([] if "@sha256:" in IMAGES[key]["image"] else ["--pull", "never"]),
                *source, *environment, *(mounts or []), IMAGES[key]["image"], *arguments]
     process_env = {**os.environ, **(secret_env or {})} if secret_env else None
-    return subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=process_env)
+    try:
+        return subprocess.run(command, capture_output=True, text=True, timeout=timeout, env=process_env)
+    except subprocess.TimeoutExpired:
+        # The timeout only kills the docker client: the engine container would keep its CPU and memory.
+        try:
+            subprocess.run([docker, "rm", "--force", name], capture_output=True, text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        raise
 
 
 def _relative(path: str) -> str:

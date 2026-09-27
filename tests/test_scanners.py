@@ -122,6 +122,22 @@ class RunnerTests(unittest.TestCase):
                 self.assertIn("Docker", text(result["detail"]))
                 self.assertEqual(result["findings"], [])
 
+    def test_a_timed_out_engine_container_is_removed(self):
+        import subprocess
+        calls = []
+
+        def run(command, **kwargs):
+            calls.append(command)
+            if command[1] == "run":
+                raise subprocess.TimeoutExpired(command, kwargs.get("timeout"))
+            return subprocess.CompletedProcess(command, 0, "", "")
+        with patch("tamandua.modules.scanning.engines.shutil.which", return_value="docker"), \
+                patch("tamandua.modules.scanning.engines.subprocess.run", side_effect=run):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                scanners._run("gitleaks", ["version"], None, timeout=1)
+        name = calls[0][calls[0].index("--name") + 1]
+        self.assertEqual(calls[1], ["docker", "rm", "--force", name])
+
 
 if __name__ == "__main__":
     unittest.main()

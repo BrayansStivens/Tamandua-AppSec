@@ -66,6 +66,20 @@ class AdvisoryWatchTests(unittest.TestCase):
             self.assertTrue(all(entry["status"] == "fixed" for entry in state.values()))
             self.assertEqual(base["type"], "repository_scan")
 
+    def test_the_engine_mounts_a_folder_under_data_not_the_workers_private_tmp(self):
+        # In compose /tmp is a tmpfs of the worker: a sibling container mounting it by path would see an empty folder.
+        with tempfile.TemporaryDirectory() as folder:
+            data = Path(folder)
+            save_repository_scan(data, {**_scan("acme/api", [], "2026-09-20"), "dependencies": DEPENDENCIES})
+            seen = []
+
+            def run(key, arguments, snapshot, **kwargs):
+                seen.append(Path(snapshot))
+                return subprocess.CompletedProcess(arguments, 1, OSV_OUTPUT, "")
+            advisory_watch.check(data, run=run)
+            self.assertTrue(seen)
+            self.assertTrue(all(path.is_relative_to(data / "work") for path in seen))
+
     def test_nothing_runs_without_saved_dependencies_or_when_the_engine_fails(self):
         with tempfile.TemporaryDirectory() as folder:
             data = Path(folder)
