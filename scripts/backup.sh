@@ -1,6 +1,6 @@
 #!/bin/sh
 # Backup into backups/<date>/: database.dump, data.tgz (without rebuildable caches) and config.tgz.
-# config.tgz holds the master key and the encrypted vault: keep it apart and protected.
+# config.tgz holds the master key, which decrypts the secrets in database.dump: keep it apart and protected.
 # For a consistent copy the app stops for a few seconds. Usage: make backup
 set -eu
 

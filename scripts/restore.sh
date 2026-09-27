@@ -26,7 +26,7 @@ for archive in config.tgz data.tgz; do
     gzip -t "$from/$archive" || { echo "$from/$archive is damaged." >&2; exit 1; }
   fi
 done
-[ -f "$from/config.tgz" ] || echo "Warning: $from has no config.tgz; the current secrets and master key are kept."
+[ -f "$from/config.tgz" ] || echo "Warning: $from has no config.tgz; the current master key is kept."
 
 # 2. Stop what writes, keep PostgreSQL up.
 docker compose stop api worker backup >/dev/null 2>&1 || docker compose stop api worker >/dev/null

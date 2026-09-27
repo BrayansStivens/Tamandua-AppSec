@@ -218,10 +218,11 @@ def import_sqlite(data_dir: Path) -> int:
         return 0
     finally:
         source.close()
-    try:
-        path.rename(path.with_name("cves.sqlite.imported"))
-    except OSError:
-        pass
+    for suffix in ("", "-wal", "-shm"):  # SQLite's journal files go with it, so the renamed copy stays whole
+        try:
+            path.with_name(f"cves.sqlite{suffix}").rename(path.with_name(f"cves.sqlite.imported{suffix}"))
+        except OSError:
+            pass
     return copied
 
 
