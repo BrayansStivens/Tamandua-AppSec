@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import csv
 import gzip
-import hashlib
 import io
 import json
 import math
@@ -26,6 +25,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from tamandua.modules.intel import data_sources
+from tamandua.modules.intel.packages import dependency_fingerprint, fingerprint  # noqa: F401  (fingerprint re-exported)
 from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
@@ -387,8 +387,7 @@ def is_malicious(summary: dict) -> bool:
 def malicious_finding(dependency: dict, summary: dict) -> dict:
     """Un paquete malicioso no se «actualiza»: se elimina y se da por comprometido lo que lo instaló."""
     name, installed, path = dependency["name"], dependency["version"], dependency["path"]
-    digest = fingerprint("sca", summary["id"], dependency["ecosystem"], name, installed)
-    return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "rule_id": summary["id"],
+    return {**_dependency_digests(dependency, summary), "scanner": "sca", "rule_id": summary["id"],
             "title": msg("intel.malicious.title", package=name[:150], version=installed[:40]), "path": path, "line": 1, "severity": "critical",
             "confidence": 9, "verdict": "candidate", "malicious": True, "cwe": [506], "owasp": ["A03:2025"],
             "cve": [], "ghsa": sorted({alias for alias in summary["aliases"] if alias.startswith("GHSA-")}),
@@ -400,9 +399,12 @@ def malicious_finding(dependency: dict, summary: dict) -> dict:
             "reason": summary["summary"] or msg("intel.malicious.reason", id=summary["id"], package=name, version=installed),
             "remediation": msg("intel.malicious.remediation", package=name, version=installed, path=path)}
 
-def fingerprint(scanner: str, rule: str, ecosystem: str, name: str, version: str) -> str:
-    """Estable entre ejecuciones e independiente de la ruta: la clave para no duplicar tickets."""
-    return hashlib.sha256(f"{scanner}|{rule}|{ecosystem}|{name}|{version}".encode()).hexdigest()
+def _dependency_digests(dependency: dict, summary: dict) -> dict:
+    """The unified fingerprint, and the former one (the advisory's own id, the engine's ecosystem) while it differs."""
+    name, installed = dependency["name"], dependency["version"]
+    digest = dependency_fingerprint({summary["id"], *summary.get("aliases", [])}, summary["id"], dependency["ecosystem"], name, installed)
+    former = fingerprint("sca", summary["id"], dependency["ecosystem"], name, installed)
+    return {"finding_id": digest[:16], "fingerprint": digest, **({"previous_fingerprint": former} if former != digest else {})}
 
 
 def dependency_finding(dependency: dict, advisory: dict, feeds: dict) -> dict:
@@ -421,9 +423,8 @@ def dependency_finding(dependency: dict, advisory: dict, feeds: dict) -> dict:
         remediation = msg("intel.dependency.update", package=name, installed=installed, version=fixed, path=path)
     else:
         remediation = msg("intel.dependency.no_fix", package=name)
-    digest = fingerprint("sca", summary["id"], dependency["ecosystem"], name, installed)
     title = f"{name} {installed}: {summary['summary']}" if summary["summary"] else f"{name} {installed}: {summary['id']}"
-    return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "rule_id": summary["id"],
+    return {**_dependency_digests(dependency, summary), "scanner": "sca", "rule_id": summary["id"],
             "title": title[:200], "path": path, "line": 1, "severity": summary["severity"],
             "confidence": 8 if summary["cvss_score"] is not None else 6, "verdict": "candidate",
             "cwe": summary["cwe"], "owasp": ["A03:2025"], "cve": sorted(set(cves)), "ghsa": sorted(set(ghsas)),

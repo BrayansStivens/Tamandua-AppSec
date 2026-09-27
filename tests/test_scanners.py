@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import testenv
+
 from tamandua.modules.scanning import engines as scanners
 from tamandua.modules.scanning.engines import _pick_fixed, merge_secrets, parse_gitleaks, parse_opengrep, parse_trivy
 from tamandua.shared.i18n import text
@@ -112,6 +114,9 @@ class OpengrepParserTests(unittest.TestCase):
 
 
 class RunnerTests(unittest.TestCase):
+    def setUp(self):
+        testenv.docker_runner(self)
+
     def test_without_docker_each_engine_declares_not_tested_and_never_runs(self):
         with patch.dict(scanners._docker_state, {"ok": False}), \
                 patch("tamandua.modules.scanning.engines._run", side_effect=AssertionError("lanzó un contenedor")):

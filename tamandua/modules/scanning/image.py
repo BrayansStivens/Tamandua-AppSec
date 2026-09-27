@@ -32,6 +32,7 @@ from tamandua.modules.intel import data_sources
 from tamandua.shared import log as logging_setup, settings
 from tamandua.shared.i18n import default_locale, msg, text
 from tamandua.modules.intel.advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
+from tamandua.modules.intel.packages import OS_FAMILIES, canonical_id, dependency_fingerprint, family
 from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_image, run_checkov_image
 from tamandua.modules.scanning.engines import _pick_fixed, _result, _run, parse_trivy, trivy_packages, unavailable, writable_cache
@@ -46,14 +47,12 @@ REFERENCE = re.compile(rf"(?:(?P<registry>(?:[a-zA-Z0-9-]+\.)+[a-zA-Z0-9-]+(?::\
                        r"(?:@(?P<digest>sha256:[0-9a-f]{64}))?")
 HOST = re.compile(r"(?:[a-z0-9-]+\.)+[a-z0-9-]+(?::\d{1,5})?|localhost(?::\d{1,5})?|[a-z0-9-]+:\d{1,5}")
 
-# Ecosistema común a los dos motores, para reconocer el mismo paquete aunque cada uno lo nombre distinto.
-FAMILY = {"node-pkg": "npm", "npm": "npm", "yarn": "npm", "pnpm": "npm", "python-pkg": "pypi", "pip": "pypi", "pipenv": "pypi",
-          "poetry": "pypi", "python": "pypi", "gobinary": "go", "gomod": "go", "go-module": "go", "jar": "maven", "pom": "maven",
-          "gradle": "maven", "java-archive": "maven", "gemspec": "rubygems", "bundler": "rubygems", "gem": "rubygems",
-          "cargo": "cargo", "rust-binary": "cargo", "rust-crate": "cargo", "composer": "composer", "php-composer": "composer",
-          "nuget": "nuget", "dotnet-core": "nuget", "dotnet": "nuget", "deb": "os", "apk": "os", "rpm": "os"}
-OS_FAMILIES = {"debian", "ubuntu", "alpine", "redhat", "centos", "rocky", "alma", "amazon", "oracle", "photon", "suse",
-               "opensuse", "opensuse.leap", "sles", "wolfi", "chainguard", "mariner", "azurelinux", "fedora", "bitnami"}
+# The package families image fingerprints used before intel/packages.py unified them; only for `_former_fingerprint`.
+_FORMER_FAMILY = {"node-pkg": "npm", "npm": "npm", "yarn": "npm", "pnpm": "npm", "python-pkg": "pypi", "pip": "pypi", "pipenv": "pypi",
+                  "poetry": "pypi", "python": "pypi", "gobinary": "go", "gomod": "go", "go-module": "go", "jar": "maven", "pom": "maven",
+                  "gradle": "maven", "java-archive": "maven", "gemspec": "rubygems", "bundler": "rubygems", "gem": "rubygems",
+                  "cargo": "cargo", "rust-binary": "cargo", "rust-crate": "cargo", "composer": "composer", "php-composer": "composer",
+                  "nuget": "nuget", "dotnet-core": "nuget", "dotnet": "nuget", "deb": "os", "apk": "os", "rpm": "os"}
 GRYPE_SEVERITY = {"critical": "critical", "high": "high", "medium": "medium", "low": "low", "negligible": "low"}
 
 
@@ -162,14 +161,19 @@ def credentials_for(registry: str) -> dict | None:
 
 # --- motores ------------------------------------------------------------------------------
 
-def _canonical_id(identifiers: set[str], fallback: str) -> str:
-    cves = sorted(item for item in identifiers if item.startswith("CVE-"))
-    return cves[0] if cves else fallback
-
-
-def _family(ecosystem: str) -> str:
+def _former_fingerprint(identifiers: set[str], fallback: str, ecosystem: str, name: str, version: str) -> str:
+    """The image fingerprint before it was unified with the repository one (intel/packages.py): kept as
+    `previous_fingerprint` so the registry carries state and triage over."""
     value = (ecosystem or "").lower()
-    return "os" if value in OS_FAMILIES else FAMILY.get(value, value or "unknown")
+    kind = "os" if value in OS_FAMILIES else _FORMER_FAMILY.get(value, value or "unknown")
+    return sca_fingerprint("sca", canonical_id(identifiers | {fallback}, fallback), kind, name, version)
+
+
+def _with_fingerprint(finding: dict, identifiers: set[str], fallback: str, ecosystem: str, name: str, version: str) -> dict:
+    digest = dependency_fingerprint(identifiers, fallback, ecosystem, name, version)
+    former = _former_fingerprint(identifiers, fallback, ecosystem, name, version)
+    rest = {key: value for key, value in finding.items() if key != "previous_fingerprint"}
+    return {**rest, "fingerprint": digest, "finding_id": digest[:16], **({"previous_fingerprint": former} if former != digest else {})}
 
 
 def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None) -> tuple[dict, dict]:
@@ -222,8 +226,7 @@ def _grype_finding(match: dict, feeds: dict) -> dict:
     ecosystem = str(artifact.get("type") or "unknown")
     cwe = sorted({int(found.group(1)) for item in vulnerability.get("cwes") or [] if (found := re.fullmatch(r"CWE-(\d+)", str(item.get("cwe"))))})
     references = [url for url in vulnerability.get("urls") or [] if isinstance(url, str) and url.startswith("https://")][:8]
-    digest = sca_fingerprint("sca", _canonical_id(aliases, identifier), _family(ecosystem), name, installed)
-    return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "tool": "grype", "rule_id": identifier,
+    return _with_fingerprint({"scanner": "sca", "tool": "grype", "rule_id": identifier,
             "title": f"{name} {installed}: {summary.splitlines()[0]}"[:200], "path": location.lstrip("/"), "line": 1,
             "severity": severity, "confidence": 8 if score is not None else 6, "verdict": "candidate", "cwe": cwe,
             "owasp": ["A03:2025"], "cve": cves, "ghsa": ghsas,
@@ -232,7 +235,8 @@ def _grype_finding(match: dict, feeds: dict) -> dict:
                          "cvss_vector": vector, "cvss_score": score, "published": None, "modified": None, "references": references},
             "kev": kev, "epss": {"score": epss[0], "percentile": epss[1]} if epss else None,
             "source": data_sources.from_grype(vulnerability),
-            "priority": prioritize(severity, score, kev, epss, fixed), "reason": summary[:300], "remediation": ""}
+            "priority": prioritize(severity, score, kev, epss, fixed), "reason": summary[:300], "remediation": ""},
+        aliases, identifier, ecosystem, name, installed)
 
 
 def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None, registry: str) -> dict:
@@ -378,17 +382,17 @@ def _finish_package(finding: dict) -> dict:
     """Huella estable para imágenes (CVE canónico + familia de ecosistema) y remediación en términos de imagen."""
     package = finding.get("package") or {}
     aliases = {finding["rule_id"], *finding.get("cve", []), *finding.get("ghsa", [])}
-    family = _family(package.get("ecosystem", ""))
-    digest = sca_fingerprint("sca", _canonical_id(aliases, finding["rule_id"]), family, package.get("name", ""), package.get("version", ""))
+    kind = family(package.get("ecosystem", ""))
     fixed = package.get("fixed_version")
     name = package.get("name")
-    if family == "os":
+    if kind == "os":
         remediation = (msg("scanning.image.remediation.os_upgrade", package=name, fixed=fixed) if fixed
                        else msg("scanning.image.remediation.os_no_fix", package=name))
     else:
         remediation = (msg("scanning.image.remediation.app_upgrade", package=name, fixed=fixed) if fixed
                        else msg("scanning.image.remediation.app_no_fix", package=name))
-    return {**finding, "fingerprint": digest, "finding_id": digest[:16], "remediation": remediation}
+    return _with_fingerprint({**finding, "remediation": remediation}, aliases, finding["rule_id"], package.get("ecosystem", ""),
+                             package.get("name", ""), package.get("version", ""))
 
 
 # --- análisis completo --------------------------------------------------------------------

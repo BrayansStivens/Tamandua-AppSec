@@ -61,7 +61,8 @@ def load(data_dir: Path, key: str) -> dict:
     return {"asset": key, "name": head.name if head else None, "findings": entries, "applied": list(head.applied) if head else []}
 
 
-def _save(data_dir: Path, payload: dict) -> None:
+def _save(data_dir: Path, payload: dict, gone: set[str] = frozenset()) -> None:
+    """`gone`: fingerprints whose rows go away (the entry moved to a new fingerprint)."""
     key = payload["asset"]
     head = insert(registry_assets).values(tenant_id=TENANT, asset_key=key, name=payload.get("name"), applied=payload.get("applied") or [])
     rows = [{"tenant_id": TENANT, "asset_key": key, "fingerprint": digest, "status": entry.get("status") or "open",
@@ -75,6 +76,9 @@ def _save(data_dir: Path, payload: dict) -> None:
                 index_elements=[registry_findings.c.tenant_id, registry_findings.c.asset_key, registry_findings.c.fingerprint],
                 set_={"status": statement.excluded.status, "cves": statement.excluded.cves, "entry": statement.excluded.entry,
                       "updated_at": func.now()}), rows)
+        if gone:
+            connection.execute(delete(registry_findings).where(registry_findings.c.tenant_id == TENANT, registry_findings.c.asset_key == key,
+                                                               registry_findings.c.fingerprint.in_(sorted(gone))))
 
 
 @contextmanager
@@ -122,6 +126,30 @@ def _reopen_manual(data_dir: Path, record: dict, fingerprints: set[str]) -> None
                       user={"username": "sistema", "role": "admin"})
 
 
+def _rekey(entries: dict, findings: list[dict]) -> dict[str, str]:
+    """Findings whose fingerprint changed formula (they carry the former one in `previous_fingerprint`) keep their
+    entry: it moves to the new fingerprint, unless the new one already has its own. Returns {former: new}."""
+    moved = {}
+    for finding in findings:
+        former, digest = finding.get("previous_fingerprint"), finding["fingerprint"]
+        if former and former != digest and former in entries and digest not in entries:
+            entries[digest] = entries.pop(former)
+            moved[former] = digest
+    return moved
+
+
+def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
+    """What hangs off a finding's former fingerprint (triage, Jira issue, requested verification) also answers to
+    the new one. Copied, not moved: older runs still show the former fingerprint."""
+    if not moved:
+        return
+    from tamandua.modules.findings import tickets, verifications
+    triage.carry_over(data_dir, key, moved)
+    tickets.carry_over(data_dir, key, moved)
+    verifications.carry_over(data_dir, key, moved)
+    _log.info("registry_rekeyed", extra={"reason": f"{key}: {len(moved)}"})
+
+
 def apply(data_dir: Path, record: dict) -> dict:
     """Incorpora una ejecución terminada al registro de su repositorio. Idempotente por ejecución."""
     if record.get("type") not in FINDING_RUNS or record.get("status") not in ("completed", "incomplete"):
@@ -134,6 +162,7 @@ def apply(data_dir: Path, record: dict) -> dict:
             return {"opened": 0, "fixed": 0}
         state["name"] = (record.get("source") or {}).get("name") or state.get("name")
         entries = state["findings"]
+        moved = _rekey(entries, [*record.get("findings", []), *(record.get("excluded_findings") or [])])
         present = {item["fingerprint"]: item for item in record.get("findings", [])}
         opened = fixed = 0
         new: list[str] = []
@@ -185,7 +214,8 @@ def apply(data_dir: Path, record: dict) -> dict:
             entry.pop("excluded", None)
             fixed += 1
         state["applied"] = state["applied"][-500:] + [record["id"]]
-        _save(data_dir, state)
+        _save(data_dir, state, set(moved))
+    carry_over(data_dir, key, moved)
     _reopen_manual(data_dir, record, set(present))
     if opened or fixed:
         _log.info("registry_updated", extra={"run_id": record["id"], "reason": f"{key}: {opened} abiertos, {fixed} remediados"})

@@ -11,6 +11,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
+import testenv
+
 from tamandua.app import wiring
 from tamandua.modules.identity.auth import Users
 from tamandua.modules.scanning import engines
@@ -216,6 +218,7 @@ class EngineWiringTests(unittest.TestCase):
         docker = patch.dict(engines._docker_state, {"ok": True})
         docker.start()
         self.addCleanup(docker.stop)
+        testenv.docker_runner(self)
         self.addCleanup(self.folder.cleanup)
 
     def gitleaks(self, report=None, returncode=0, stderr=""):

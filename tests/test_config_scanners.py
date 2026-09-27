@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import testenv
+
 from tamandua.modules.scanning import config_engines as cs
 from tamandua.modules.scanning.image import config_findings, parse_reference
 from tamandua.modules.scanning.engines import IMAGES, parse_trivy
@@ -185,6 +187,9 @@ class OpengrepDuplicatesTests(unittest.TestCase):
 
 class EngineUserTests(unittest.TestCase):
     """En Linux, root sin capacidades no entra en las carpetas 0700 de la app: los motores corren con su UID."""
+
+    def setUp(self):
+        testenv.docker_runner(self)
 
     def test_engines_run_as_the_app_user(self):
         import os

@@ -44,6 +44,18 @@ def record(data_dir: Path, key: str, fingerprint: str, run_id: str, *, by: str) 
     return entry
 
 
+def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
+    """Findings with a new fingerprint (former → new) keep the verification asked for them."""
+    requested = load(data_dir).get(key) or {}
+    if not any(former in requested for former in moved):
+        return
+    with documents.edit(data_dir, "verifications", {}) as payload:
+        asset = payload.setdefault(key, {})
+        for former, new in moved.items():
+            if former in asset and new not in asset:
+                asset[new] = asset[former]
+
+
 def use_runs(lookup: Callable[[Path], list[dict]]) -> None:
     """Wired by the composition root (`tamandua/app/wiring.py`): how to read the run rows, whose status says how a
     verification went. Findings sit below runs, so they are handed the reader instead of importing it."""

@@ -7,42 +7,9 @@ normaliza todo eso para reconocer el mismo aviso sobre el mismo paquete y la mis
 
 from __future__ import annotations
 
-import re
 from urllib.parse import quote
 
-from tamandua.modules.intel.advisories import fingerprint
-
-# Tipo de paquete de cada motor → familia común.
-FAMILY = {
-    # JavaScript
-    "npm": "npm", "yarn": "npm", "pnpm": "npm", "bun": "npm", "node-pkg": "npm",
-    # Python
-    "pypi": "pypi", "pip": "pypi", "pipenv": "pypi", "poetry": "pypi", "uv": "pypi", "pdm": "pypi",
-    "python": "pypi", "python-pkg": "pypi", "conda-pkg": "pypi",
-    # .NET
-    "nuget": "nuget", "dotnet-core": "nuget", "dotnet": "nuget", "packages-props": "nuget",
-    # Go, Rust, PHP, Ruby
-    "go": "go", "gomod": "go", "gobinary": "go", "go-module": "go",
-    "crates.io": "cargo", "cargo": "cargo", "rust-binary": "cargo", "rust-crate": "cargo",
-    "packagist": "composer", "composer": "composer", "php-composer": "composer",
-    "rubygems": "rubygems", "bundler": "rubygems", "gemspec": "rubygems", "gem": "rubygems",
-    # JVM
-    "maven": "maven", "pom": "maven", "gradle": "maven", "sbt": "maven", "jar": "maven", "java-archive": "maven",
-    # Otros
-    "pub": "pub", "hex": "hex", "mix": "hex", "swifturl": "swift", "swift": "swift", "cocoapods": "cocoapods",
-    "conancenter": "conan", "conan": "conan",
-}
-
-
-def family(ecosystem: str) -> str:
-    value = (ecosystem or "").lower()
-    return FAMILY.get(value, value or "unknown")
-
-
-def package_name(ecosystem: str, name: str) -> str:
-    """PyPI no distingue `-`, `_` ni `.` (PEP 503); los demás, solo mayúsculas en la práctica."""
-    value = (name or "").strip().lower()
-    return re.sub(r"[-_.]+", "-", value) if family(ecosystem) == "pypi" else value
+from tamandua.modules.intel.packages import FAMILY, canonical_id, dependency_fingerprint, family, package_name  # noqa: F401  (re-exported)
 
 
 # Package family → purl type (https://github.com/package-url/purl-spec).
@@ -66,12 +33,6 @@ def purl(dependency: dict) -> str | None:
     return f"pkg:{kind}/{path}@{quote(version, safe='')}"
 
 
-def canonical_id(identifiers: set[str], fallback: str) -> str:
-    """El CVE si lo hay (es el nombre común entre bases de datos); si no, el identificador propio."""
-    cves = sorted(item for item in identifiers if item.startswith("CVE-"))
-    return cves[0] if cves else fallback
-
-
 def identifiers(finding: dict) -> set[str]:
     advisory = finding.get("advisory") or {}
     return {item for item in (finding.get("rule_id"), advisory.get("id"), *(advisory.get("aliases") or []),
@@ -79,9 +40,7 @@ def identifiers(finding: dict) -> set[str]:
 
 
 def stable_fingerprint(identifier: str, aliases: set[str], ecosystem: str, name: str, version: str) -> str:
-    """Huella de un aviso para motores nuevos: no depende de cómo nombre el aviso cada motor."""
-    return fingerprint("sca", canonical_id(aliases | {identifier}, identifier), family(ecosystem),
-                       package_name(ecosystem, name), version)
+    return dependency_fingerprint(aliases, identifier, ecosystem, name, version)
 
 
 def _key(finding: dict) -> tuple[str, str, str]:

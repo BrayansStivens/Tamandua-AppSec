@@ -56,6 +56,18 @@ def rename_assets(data_dir: Path, moved: dict[str, str]) -> None:
                 payload[uid] = {**merged, **payload.get(uid, {})}
 
 
+def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
+    """Findings with a new fingerprint (former → new) keep their issue, so none is created twice."""
+    links = load_links(data_dir).get(key) or {}
+    if not any(former in links for former in moved):
+        return
+    with documents.edit(data_dir, "jira-links", {}) as payload:
+        asset = payload.setdefault(key, {})
+        for former, new in moved.items():
+            if former in asset and new not in asset:
+                asset[new] = asset[former]
+
+
 def forget_asset(data_dir: Path, key: str) -> None:
     with documents.edit(data_dir, "jira-links", {}) as payload:
         payload.pop(key, None)

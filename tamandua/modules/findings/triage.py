@@ -104,6 +104,14 @@ def rename_asset(data_dir: Path, old: str, new: str) -> None:
         _save_asset(data_dir, new, merged)
 
 
+def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
+    """Findings with a new fingerprint (former → new) keep their decisions; one already under the new one wins."""
+    with db.transaction(data_dir) as connection:
+        db.lock(connection, "triage", key)
+        asset = load_asset(data_dir, key)
+        _save_asset(data_dir, key, {new: asset[former] for former, new in moved.items() if former in asset and new not in asset})
+
+
 def _clean_text(value, *, limit: int, field: str) -> str:
     if value is None:
         return ""

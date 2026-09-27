@@ -67,7 +67,8 @@ def classify(findings: list[dict], changed: dict[str, set[int] | None], baseline
     for finding in findings:
         if not _touches(finding, changed):
             continue
-        if baseline is not None and finding["fingerprint"] in baseline:
+        # A baseline scanned before a fingerprint changed formula knows the finding by its former one.
+        if baseline is not None and (finding["fingerprint"] in baseline or finding.get("previous_fingerprint") in baseline):
             preexisting.append(finding)
         else:
             introduced.append(finding)

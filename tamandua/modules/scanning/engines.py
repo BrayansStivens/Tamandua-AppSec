@@ -38,6 +38,7 @@ from tamandua.shared.i18n import msg
 from tamandua.modules.intel import data_sources
 from tamandua.modules.intel.advisories import compare_versions, cvss3_base_score, prioritize, severity_from_score
 from tamandua.modules.intel.advisories import fingerprint as sca_fingerprint
+from tamandua.modules.intel.packages import dependency_fingerprint
 from tamandua.modules.scanning import secret_rules
 
 RULES_DIR = paths.RULES_DIR
@@ -670,8 +671,10 @@ def _trivy_vulnerability(entry: dict, target: str, ecosystem: str, feeds: dict, 
             priority["action"] = "track"
         remediation = msg("scanning.sca.dev_remediation", remediation=remediation)
     relationship = meta.get("Relationship")
-    digest = sca_fingerprint("sca", identifier, ecosystem, name, installed)
-    return {"finding_id": digest[:16], "fingerprint": digest, "scanner": "sca", "tool": "trivy", "rule_id": identifier,
+    digest = dependency_fingerprint({identifier, *cves, *ghsas}, identifier, ecosystem, name, installed)
+    previous = sca_fingerprint("sca", identifier, ecosystem, name, installed)
+    return {"finding_id": digest[:16], "fingerprint": digest, **({"previous_fingerprint": previous} if previous != digest else {}),
+            "scanner": "sca", "tool": "trivy", "rule_id": identifier,
             "title": f"{name} {installed}: {summary}"[:200], "path": target, "line": 1, "severity": severity,
             "confidence": 8 if score is not None else 6, "verdict": "candidate", "cwe": cwe, "owasp": ["A03:2025"],
             "cve": cves, "ghsa": ghsas,
@@ -756,7 +759,7 @@ def trivy_packages(payload: dict, *, system: bool = False) -> list[dict]:
 
 
 def parse_trivy(payload: dict, feeds: dict, custom: dict | None = None) -> list[dict]:
-    findings = []
+    findings, secrets = [], []
     for result in payload.get("Results", []) or []:
         target = _relative(str(result.get("Target", "")))
         ecosystem = str(result.get("Type") or "").lower() or "unknown"
@@ -767,7 +770,13 @@ def parse_trivy(payload: dict, feeds: dict, custom: dict | None = None) -> list[
             if str(entry.get("Status", "FAIL")).upper() == "FAIL":
                 findings.append(_trivy_misconfiguration(entry, target))
         for entry in result.get("Secrets") or []:
-            findings.append(_trivy_secret(entry, target, custom))
+            # Trivy masks every secret on the line in `Match`: what comes before the first `*` is this one's context.
+            match = entry.get("Match")
+            context = secret_context(match.split("*", 1)[0]) if isinstance(match, str) and "*" in match else None
+            secrets.append((len(findings), (_trivy_secret(entry, target, custom), context, (target, int(entry.get("StartLine") or 1)))))
+            findings.append(None)
+    for (position, _), finding in zip(secrets, with_secret_identities([item for _, item in secrets])):
+        findings[position] = finding
     seen, unique = set(), []
     for finding in findings:
         if finding["fingerprint"] not in seen:
@@ -898,6 +907,7 @@ def parse_osv_scanner(payload: dict, feeds: dict) -> list[dict]:
                 if digest in seen:
                     continue
                 seen.add(digest)
+                finding.pop("previous_fingerprint", None)  # OSV-Scanner already used this fingerprint
                 finding.update(fingerprint=digest, finding_id=digest[:16], tool="osv-scanner")
                 findings.append(finding)
     return findings
@@ -960,6 +970,91 @@ def secret_title(rule: str) -> dict:
     return SECRET_TITLES.get(rule) or msg("scanning.secrets.exposed_rule", rule=rule)
 
 
+SECRET_CONTEXT = 30  # characters before a secret that identify it (Trivy keeps 30 around a secret on long lines)
+
+
+def secret_context(prefix: str | None) -> str | None:
+    """What precedes a secret on its line (`GITHUB_TOKEN = "`), other secrets masked: identifies where it lives
+    without a trace of its value. None when unknown."""
+    if prefix is None:
+        return None
+    return " ".join(prefix.split())[-SECRET_CONTEXT:]
+
+
+LEAD_WINDOW = 256  # characters read before a secret to find its context: bounded, whatever the line's length
+
+
+def masked_lead(text: str, start: int, spans: list[tuple[int, int]]) -> str:
+    """The text before offset `start` on a line (at most LEAD_WINDOW characters), with every span in `spans`
+    (the secrets found on that line) masked by `*`."""
+    begin = max(0, start - LEAD_WINDOW)
+    lead = list(text[begin:start])
+    for span_start, span_end in spans:
+        for position in range(max(span_start, begin), min(span_end, start)):
+            lead[position - begin] = "*"
+    return "".join(lead)
+
+
+def with_secret_identities(items: list[tuple[dict, str | None, tuple]]) -> list[dict]:
+    """Secrets' fingerprints without their line number: rule, file, what precedes each on its line and, among identical
+    ones, their order in the file (`items`: finding, context, position). A line added above a secret no longer makes
+    it look fixed and new. The former, line-based fingerprint stays in `previous_fingerprint` so the registry carries
+    state and triage over (findings/registry.py). Without a context, a secret keeps the line-based one."""
+    result, seen = [finding for finding, _, _ in items], {}
+    for index in sorted(range(len(items)), key=lambda position: items[position][2]):
+        finding, context, _ = items[index]
+        if context is None:
+            continue
+        identity = (finding["rule_id"], finding["path"], context)
+        order = seen[identity] = seen.get(identity, -1) + 1
+        digest = _stable("secrets", finding["rule_id"], finding["path"], "context", context, str(order))
+        result[index] = {**finding, "fingerprint": digest, "finding_id": digest[:16], "previous_fingerprint": finding["fingerprint"]}
+    return result
+
+
+def _gitleaks_span(entry: dict) -> tuple[int, int] | None:
+    """Where a Gitleaks match sits on its line, as 0-based offsets [start, end). Gitleaks 8 counts columns from 1 on
+    the first line of a file and from 2 on the rest (checked with 8.30.1)."""
+    try:
+        line, start, end = int(entry.get("StartLine") or 0), int(entry.get("StartColumn") or 0), int(entry.get("EndColumn") or 0)
+    except (TypeError, ValueError):
+        return None
+    shift = 1 if line == 1 else 2
+    if line < 1 or start - shift < 0:
+        return None
+    return start - shift, max(start - shift, end - shift + 1)
+
+
+def _gitleaks_contexts(payload: list, root: Path | None) -> dict[int, str]:
+    """The context of each Gitleaks entry (by its position in `payload`) read from the snapshot: the line before
+    the match with every other match on it masked, plus the redacted match's own lead (`api_key = "`)."""
+    if root is None:
+        return {}
+    wanted: dict[str, dict[int, list[tuple[int, tuple[int, int]]]]] = {}
+    for index, entry in enumerate(payload):
+        span = _gitleaks_span(entry) if isinstance(entry, dict) else None
+        if span:
+            wanted.setdefault(_relative(str(entry.get("File", ""))), {}).setdefault(int(entry["StartLine"]), []).append((index, span))
+    contexts: dict[int, str] = {}
+    base = root.resolve()
+    for path, lines in wanted.items():
+        try:
+            target = (root / path).resolve()
+            target.relative_to(base)  # never outside the snapshot
+            with target.open("r", encoding="utf-8", errors="replace") as handle:
+                for number, text in enumerate(handle, 1):
+                    if number > max(lines):
+                        break
+                    spans = [span for _, span in lines.get(number, [])]
+                    for index, (start, _) in lines.get(number, []):
+                        match = str(payload[index].get("Match") or "")
+                        lead = match.split("REDACTED", 1)[0] if "REDACTED" in match else ""
+                        contexts[index] = masked_lead(text, start, spans) + lead
+        except (OSError, ValueError):
+            continue
+    return contexts
+
+
 def _custom_secret(rule: dict, rule_id: str, path: str, line: int, *, tool: str, confidence: int) -> dict:
     """A finding from a custom rule: its description (as written, one language) as the title."""
     return _base("secrets", rule_id, rule["description"], path, line, SECRET_SEVERITY, tool=tool,
@@ -968,25 +1063,27 @@ def _custom_secret(rule: dict, rule_id: str, path: str, line: int, *, tool: str,
                  digest=_stable("secrets", rule_id, path, str(line)))
 
 
-def parse_gitleaks(payload: list, custom: dict | None = None) -> list[dict]:
-    findings = []
-    for entry in payload or []:
-        if not isinstance(entry, dict):
-            continue
+def parse_gitleaks(payload: list, custom: dict | None = None, root: Path | None = None) -> list[dict]:
+    """`root`: the snapshot, to read what precedes each secret on its line (Gitleaks redacts the whole match)."""
+    entries = [entry for entry in payload or [] if isinstance(entry, dict)]
+    contexts = _gitleaks_contexts(entries, root)
+    items = []
+    for index, entry in enumerate(entries):
         rule = str(entry.get("RuleID") or "secret")
         path = _relative(str(entry.get("File", "")))
         line = int(entry.get("StartLine") or 1)
         entropy = float(entry.get("Entropy") or 0)
         if rule in (custom or {}):
-            findings.append(_custom_secret(custom[rule], rule, path, line, tool="gitleaks", confidence=8 if entropy >= 3.5 else 6))
-            continue
-        # El valor nunca se lee: gitleaks corre con --redact y aquí solo se toman regla, archivo y línea.
-        findings.append(_base("secrets", rule, secret_title(rule), path, line, SECRET_SEVERITY, tool="gitleaks",
-                              reason=msg("scanning.secrets.gitleaks_reason", rule=rule, path=path, line=line, entropy=f"{entropy:.1f}"),
-                              remediation=msg("scanning.secrets.rotate"),
-                              cwe=[798], owasp="A04:2025", confidence=8 if entropy >= 3.5 else 6,
-                              digest=_stable("secrets", rule, path, str(line))))
-    return findings
+            finding = _custom_secret(custom[rule], rule, path, line, tool="gitleaks", confidence=8 if entropy >= 3.5 else 6)
+        else:
+            # The value never reaches the finding: gitleaks runs with --redact and the context stops where the secret starts.
+            finding = _base("secrets", rule, secret_title(rule), path, line, SECRET_SEVERITY, tool="gitleaks",
+                            reason=msg("scanning.secrets.gitleaks_reason", rule=rule, path=path, line=line, entropy=f"{entropy:.1f}"),
+                            remediation=msg("scanning.secrets.rotate"),
+                            cwe=[798], owasp="A04:2025", confidence=8 if entropy >= 3.5 else 6,
+                            digest=_stable("secrets", rule, path, str(line)))
+        items.append((finding, secret_context(contexts.get(index)), (path, line, int(entry.get("StartColumn") or 0))))
+    return with_secret_identities(items)
 
 
 def _gitleaks_report(snapshot: Path, settings: dict | None, started: float, *, strict: bool = False) -> tuple[list | None, dict | None]:
@@ -1033,13 +1130,13 @@ def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
     payload, failure = _gitleaks_report(snapshot, settings, started)
     if failure:
         return failure
-    findings = parse_gitleaks(payload, secret_rules.custom_rules(settings))
+    findings = parse_gitleaks(payload, secret_rules.custom_rules(settings), snapshot)
     detail = msg("scanning.gitleaks.detail_configured", secrets=len(findings), **secret_rules.counts(settings)) if settings \
         else msg("scanning.gitleaks.detail", secrets=len(findings))
 
     def reference(unfiltered: dict | None) -> list[dict] | None:
         report, failed = _gitleaks_report(snapshot, unfiltered, started, strict=True)
-        return None if failed else parse_gitleaks(report, secret_rules.custom_rules(unfiltered))
+        return None if failed else parse_gitleaks(report, secret_rules.custom_rules(unfiltered), snapshot)
     return _withhold(_result("gitleaks", "completed", detail, findings, started), settings, reference)
 
 

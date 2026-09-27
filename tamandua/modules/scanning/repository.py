@@ -18,7 +18,7 @@ from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
 from tamandua.modules.scanning import secret_rules
-from tamandua.modules.scanning.engines import IMAGES, SECRET_SEVERITY, SEVERITY_NAME, and_list, engines_available, joined as join_messages, host_mount_problem, run_osv_scanner, runner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy
+from tamandua.modules.scanning.engines import IMAGES, SECRET_SEVERITY, SEVERITY_NAME, and_list, engines_available, joined as join_messages, host_mount_problem, run_osv_scanner, runner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy, masked_lead, secret_context, with_secret_identities
 from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
@@ -95,14 +95,15 @@ def _secret_candidates(path: Path, relative: str) -> list[dict]:
         content = path.read_text(encoding="utf-8")
     except (UnicodeError, OSError):
         return []
-    result = []
+    items = []
     for number, line in enumerate(content.splitlines(), 1):
+        spans = [found.span() for _, pattern in SECRET_RULES for found in pattern.finditer(line)]
         for name, pattern in SECRET_RULES:
-            if pattern.search(line):
-                result.append(_finding("secrets", name.upper().replace(" ", "-"),
-                                       SECRET_TITLES[name], relative, number, SECRET_SEVERITY,
-                                       msg("scanning.internal.secret_reason"), 798, "A04:2025"))
-    return result
+            if found := pattern.search(line):
+                items.append((_finding("secrets", name.upper().replace(" ", "-"), SECRET_TITLES[name], relative, number,
+                                       SECRET_SEVERITY, msg("scanning.internal.secret_reason"), 798, "A04:2025"),
+                              secret_context(masked_lead(line, found.start(), spans)), (number, found.start())))
+    return with_secret_identities(items)
 
 
 def _dependencies(root: Path) -> tuple[list[dict], list[str]]:
