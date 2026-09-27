@@ -49,19 +49,35 @@ class RoundTests(unittest.TestCase):
             later = periodic.run_round(self.data_dir, self.jobs, here_only=False, now=NOW + timedelta(seconds=301))
         self.assertEqual(again["ran"], ["outbox"])  # the outbox goes every round; PRs wait their interval
         self.assertIn("pull_requests", later["ran"])
+        with patch.dict(os.environ, {"TAMANDUA_CVE_SYNC": "on"}):
+            first = periodic.run_round(self.data_dir, self.jobs, here_only=True, now=NOW)
+            soon = periodic.run_round(self.data_dir, self.jobs, here_only=True, now=NOW + timedelta(minutes=1))
+        self.assertEqual(("nvd" in first["queued"], "nvd" in soon["queued"]), (True, False))  # never piles up
         self.assertNotIn("nvd", self.calls)  # off
 
 
 class CronRouteTests(HttpCase):
     def test_off_without_a_token_and_bearer_only(self):
         self.assertEqual(self.call("GET", "/api/cron")[0], 404)
-        with patch.dict(os.environ, {"CRON_SECRET": TOKEN}), \
+        with patch.dict(os.environ, {"CRON_SECRET": TOKEN}):  # leader mode: the leader runs them, never twice
+            self.assertEqual(self.call("GET", "/api/cron", headers={"Authorization": f"Bearer {TOKEN}"})[0], 404)
+        with patch.dict(os.environ, {"CRON_SECRET": TOKEN, "TAMANDUA_PERIODIC": "external"}), \
                 patch.object(periodic, "run_round", return_value={"ran": ["outbox"], "queued": [], "failed": []}) as round_:
             self.assertEqual(self.call("GET", "/api/cron")[0], 401)
             self.assertEqual(self.call("GET", "/api/cron", headers={"Authorization": "Bearer " + "x" * 40})[0], 401)
             status, body, _ = self.call("GET", "/api/cron", headers={"Authorization": f"Bearer {TOKEN}"})
         self.assertEqual((status, body["ran"]), (200, ["outbox"]))
         self.assertTrue(round_.call_args.kwargs["here_only"])
+
+
+class NvdTaskTests(unittest.TestCase):
+    def test_nvd_throttling_ends_the_round_quietly(self):
+        from urllib.error import HTTPError
+        with tempfile.TemporaryDirectory() as folder, \
+                patch("tamandua.modules.intel.advisories.load_feeds", return_value={}), \
+                patch("tamandua.modules.intel.cve_db.load_signals"), \
+                patch("tamandua.modules.intel.cve_db.sync_step", side_effect=HTTPError("https://nvd", 403, "Forbidden", None, None)):
+            self.assertEqual(periodic._nvd(Path(folder), None), 0)
 
 
 if __name__ == "__main__":

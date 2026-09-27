@@ -1,6 +1,7 @@
 #!/bin/sh
 # Scheduled backups inside the `backup` service (compose profile `backup`); not meant to be run on the host.
-# Every BACKUP_INTERVAL_HOURS: /backups/auto-<date>/ with database.dump (pg_dump -Fc), config.tgz and data.tgz
+# Every BACKUP_INTERVAL_HOURS: /backups/auto-<date>/ with database.dump (pg_dump -Fc), config.tgz (when there is a
+# config/: not with TAMANDUA_MASTER_KEY in the environment) and data.tgz
 # (the same layout as `make backup`), written to a hidden folder first and renamed when complete. Deletes its own
 # auto-* folders older than BACKUP_KEEP_DAYS; manual backups are never touched.
 #   --check   exit 0 if the newest complete backup is younger than two intervals (the container healthcheck)
@@ -23,7 +24,7 @@ backup() {
   partial="/backups/.auto-$stamp.partial"
   rm -rf "$partial" && mkdir -m 700 "$partial" || return 1
   pg_dump -Fc -f "$partial/database.dump" || return 1
-  tar czf "$partial/config.tgz" -C /source config || return 1
+  if [ -d /source/config ]; then tar czf "$partial/config.tgz" -C /source config || return 1; fi
   tar czf "$partial/data.tgz" -C /source --exclude=data/feeds --exclude=data/trivy-cache --exclude=data/grype-cache \
     --exclude=data/work --exclude=data/tmp data || return 1
   chmod 600 "$partial"/* && mv "$partial" "/backups/auto-$stamp" || return 1

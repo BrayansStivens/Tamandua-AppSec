@@ -38,7 +38,7 @@ export DOCKER_SOCKET_GID
 ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' tamandua/modules/scanning/engines.py
 
 .DEFAULT_GOAL := help
-.PHONY: arch openapi help doctor setup build up down restart status logs ps setup-code engines scan demo update backup restore \
+.PHONY: arch openapi standalone help doctor setup build up down restart status logs ps setup-code engines scan demo update backup restore \
         verify-images shell cli clean purge dev-setup dev test lint web check
 
 ## —— Usage —————————————————————————————————————————————————————————————
@@ -159,6 +159,9 @@ test: ## Backend tests (starts a throwaway test Postgres if needed)
 	@url=$$(sh scripts/test-db.sh) && config=$$(mktemp -d) && trap 'rm -rf "$$config"' EXIT && \
 	TAMANDUA_DATABASE_URL="$$url" TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_CONFIG_DIR="$$config" TAMANDUA_DEFAULT_LOCALE=es \
 	$(VENV)/bin/python -m unittest discover -s tests
+
+standalone: ## Regenerate deploy/compose.yaml (one file, published images, no Docker socket)
+	python3 scripts/standalone-compose.py
 
 openapi: ## API OpenAPI schema and the panel's TypeScript types (web/src/shared/api/)
 	@mkdir -p web/src/shared/api

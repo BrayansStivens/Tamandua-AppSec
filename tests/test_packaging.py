@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -127,6 +128,34 @@ class PackagingTests(unittest.TestCase):
         undocumented = [name for name in targets if name != "ps" and not re.search(rf"^{name}:.*## ", makefile, re.M)]
         self.assertEqual(undocumented, [])
         self.assertIn("up", targets)
+
+
+class StandaloneComposeTests(unittest.TestCase):
+    """deploy/compose.yaml: one file for any server or platform, generated from the repository's own files."""
+
+    def test_it_is_current(self):
+        completed = subprocess.run([sys.executable, str(ROOT / "scripts" / "standalone-compose.py"), "--check"],
+                                   capture_output=True, text=True, timeout=30)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    @unittest.skipUnless(shutil.which("docker"), "needs docker compose")
+    def test_it_is_valid_and_never_touches_the_hosts_docker(self):
+        env = {**os.environ, "TAMANDUA_DB_PASSWORD": "x", "TAMANDUA_MASTER_KEY": "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=",
+               "TAMANDUA_PUBLIC_URL": "https://tamandua.example.com", "COMPOSE_FILE": "", "COMPOSE_PROFILES": ""}
+        completed = subprocess.run(["docker", "compose", "-f", str(ROOT / "deploy" / "compose.yaml"), "--profile", "https",
+                                    "--profile", "backup", "config", "--format", "json"], capture_output=True, text=True, env=env, timeout=60)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        document = json.loads(completed.stdout)
+        services = document["services"]
+        self.assertNotIn("docker.sock", completed.stdout)
+        self.assertTrue(all(volume["type"] == "volume" or volume["target"] == "/backups"
+                            for service in services.values() for volume in service.get("volumes", [])))
+        self.assertEqual(services["worker"]["image"], f"ghcr.io/brayansstivens/tamandua-worker:{VERSION}")
+        # `config` shows the content still escaped; when the service starts, Compose turns $$ into $ (checked by hand
+        # with a throwaway container), so Caddy reads {$TAMANDUA_PUBLIC_URL} and the script its own variables.
+        self.assertIn("{$$TAMANDUA_PUBLIC_URL}", document["configs"]["caddyfile"]["content"])
+        self.assertEqual(document["configs"]["backup"]["content"],
+                         (ROOT / "scripts" / "backup-service.sh").read_text().replace("$", "$$"))
 
 
 class StandaloneWorkerImageTests(unittest.TestCase):

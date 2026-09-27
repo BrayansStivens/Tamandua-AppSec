@@ -1,6 +1,7 @@
 """One round of the periodic tasks, for an external scheduler (TAMANDUA_PERIODIC=external), e.g. Vercel Cron.
 
-Off unless `TAMANDUA_CRON_TOKEN` (or `CRON_SECRET`, what Vercel sends) is set: until then the route answers 404. The
+Off unless TAMANDUA_PERIODIC=external and `TAMANDUA_CRON_TOKEN` (or `CRON_SECRET`, what Vercel sends) is set: until
+then the route answers 404. The
 scheduler sends `Authorization: Bearer <token>`, compared in constant time. No session and no CSRF: it's a GET (as
 Vercel Cron calls it) that only runs what is due and answers task names, never data. Tasks that need the engines are
 queued for a worker.
@@ -35,10 +36,10 @@ def _tokens() -> list[str]:
 
 @router.get("/api/cron", response_model=Round, openapi_extra={"security": [{"cron": []}]},
             responses={401: {"description": "Missing or wrong bearer token"},
-                       404: {"description": "Off: no TAMANDUA_CRON_TOKEN / CRON_SECRET"}})
+                       404: {"description": "Off: not TAMANDUA_PERIODIC=external, or no TAMANDUA_CRON_TOKEN / CRON_SECRET"}})
 def cron(request: Request):
     tokens = _tokens()
-    if not tokens:
+    if not tokens or not periodic.external():  # in leader mode the leader worker already runs them: never twice
         raise ApiError(404, msg("api.not_found"))
     scheme, _, presented = (request.headers.get("authorization") or "").partition(" ")
     if scheme.lower() != "bearer" or not any(hmac.compare_digest(presented.strip().encode(), token.encode()) for token in tokens):

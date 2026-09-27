@@ -655,7 +655,7 @@
             "description": "Missing or wrong bearer token"
           },
           "404": {
-            "description": "Off: no TAMANDUA_CRON_TOKEN / CRON_SECRET"
+            "description": "Off: not TAMANDUA_PERIODIC=external, or no TAMANDUA_CRON_TOKEN / CRON_SECRET"
           }
         },
         "security": [

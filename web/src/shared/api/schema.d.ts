@@ -3226,7 +3226,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Off: no TAMANDUA_CRON_TOKEN / CRON_SECRET */
+            /** @description Off: not TAMANDUA_PERIODIC=external, or no TAMANDUA_CRON_TOKEN / CRON_SECRET */
             404: {
                 headers: {
                     [name: string]: unknown;

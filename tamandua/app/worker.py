@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import signal
+import tempfile
 import threading
 from pathlib import Path
 
@@ -71,7 +72,8 @@ def _lead(data_dir: Path, jobs: ScanJobs, stop: threading.Event) -> None:
         try:
             if connection.execute(text("SELECT pg_try_advisory_lock(:key)"), {"key": LEADER_KEY}).scalar():
                 connection.commit()
-                log.info("worker_leader", extra={"reason": "este worker corre las tareas periódicas y avanza los lotes"})
+                log.info("worker_leader", extra={"reason": "this worker advances the batches" + (
+                    "; a scheduler triggers the periodic tasks" if periodic.external() else " and runs the periodic tasks")})
                 jobs.leader = True
                 if not periodic.external():  # external: a scheduler triggers the rounds (tamandua periodic, /api/cron)
                     start_periodic(data_dir, jobs)
@@ -85,6 +87,9 @@ def _lead(data_dir: Path, jobs: ScanJobs, stop: threading.Event) -> None:
 
 
 def run(data_dir: Path) -> None:
+    # The standalone compose points TMPDIR at data/tmp (disk, not the small in-memory /tmp) for the engines' files.
+    (data_dir / "tmp").mkdir(parents=True, exist_ok=True)
+    tempfile.tempdir = None  # look at TMPDIR again, now that the folder exists
     wiring.configure()
     data_migrations.upgrade(data_dir)
     logging_setup.configure(data_dir)
