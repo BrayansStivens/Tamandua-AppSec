@@ -1,9 +1,9 @@
-"""Logs estructurados de la aplicación: JSON por línea, rotados, sin secretos.
+"""Structured application logs, without secrets.
 
-Una línea por evento con hora, nivel, componente y campos propios. El fichero
-vive en `data/logs/app.log`; en consola sale legible. El nivel se controla con
-`TAMANDUA_LOG_LEVEL` (DEBUG para depurar). Nunca se registran cuerpos de
-petición, cabeceras ni tokens: `redact()` existe para lo que pudiera colarse.
+One event per line, on standard error (what every platform collects): human-readable by default, or one JSON object
+per line with TAMANDUA_LOG_FORMAT=json. TAMANDUA_LOG_FILE also writes JSON to a rotated file (a relative path is
+under the data folder). TAMANDUA_LOG_LEVEL=DEBUG to debug. Bodies, headers and tokens are never logged; `redact()`
+masks whatever might slip into a message.
 """
 
 from __future__ import annotations
@@ -73,16 +73,19 @@ def configure(data_dir: Path) -> logging.Logger:
     root = logging.getLogger("tamandua")
     if _configured:
         return root
-    level = getattr(logging, settings.text("TAMANDUA_LOG_LEVEL").upper(), logging.INFO)
-    root.setLevel(level)
+    root.setLevel(getattr(logging, settings.text("TAMANDUA_LOG_LEVEL").upper(), logging.INFO))
     root.propagate = False
-    logs = data_dir / "logs"
-    logs.mkdir(parents=True, exist_ok=True)
-    file_handler = RotatingFileHandler(logs / "app.log", maxBytes=10_000_000, backupCount=5, encoding="utf-8")
-    file_handler.setFormatter(JsonFormatter())
     console = logging.StreamHandler(sys.stderr)
-    console.setFormatter(ConsoleFormatter())
-    root.handlers = [file_handler, console]
+    console.setFormatter(JsonFormatter() if settings.text("TAMANDUA_LOG_FORMAT") == "json" else ConsoleFormatter())
+    handlers: list[logging.Handler] = [console]
+    configured = settings.text("TAMANDUA_LOG_FILE")
+    if configured:
+        path = Path(configured) if Path(configured).is_absolute() else data_dir / configured
+        path.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = RotatingFileHandler(path, maxBytes=10_000_000, backupCount=5, encoding="utf-8")
+        file_handler.setFormatter(JsonFormatter())
+        handlers.append(file_handler)
+    root.handlers = handlers
     _configured = True
     return root
 

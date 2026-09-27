@@ -58,6 +58,8 @@ x-app-env: &app-env
   TAMANDUA_PUBLIC_URL: ${TAMANDUA_PUBLIC_URL:-http://127.0.0.1:8766}
   TAMANDUA_ALLOWED_ORIGINS: ${TAMANDUA_ALLOWED_ORIGINS:-http://127.0.0.1:8766,http://localhost:8766}
   TAMANDUA_LOG_LEVEL: ${TAMANDUA_LOG_LEVEL:-INFO}
+  # Logs go to the container output (docker logs); this also keeps a rotated JSON copy in data/logs/.
+  TAMANDUA_LOG_FILE: ${TAMANDUA_LOG_FILE-logs/app.log}
   TAMANDUA_DEFAULT_LOCALE: ${TAMANDUA_DEFAULT_LOCALE:-en}
   # admins (default): TOTP required for administrators · all: for everyone · none: optional
   TAMANDUA_REQUIRE_TOTP: ${TAMANDUA_REQUIRE_TOTP:-admins}
