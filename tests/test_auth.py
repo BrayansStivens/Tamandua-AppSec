@@ -15,15 +15,15 @@ import asgi
 from pathlib import Path
 from unittest.mock import patch
 
-# Contraseña de prueba armada por partes: un literal así lo marcaría (con razón) un detector de secretos.
-NEW_PASSWORD = "-".join(("otra", "frase", "muy", "larga", "99"))
-
 from tamandua.modules.identity import auth
 from tamandua.modules.identity.auth import AuthError, Authenticator, Locked, Users, totp_code
 from tamandua.cli.main import main as cli
 from fastapi.routing import APIRoute
 from tamandua.app.api import ROUTERS
 from tamandua.app.api.server import build_state
+
+# Contraseña de prueba armada por partes: un literal así lo marcaría (con razón) un detector de secretos.
+NEW_PASSWORD = "-".join(("otra", "frase", "muy", "larga", "99"))
 
 PASSWORD = "correcto-caballo-bateria"
 ORIGIN = "http://127.0.0.1:8766"
@@ -257,9 +257,9 @@ class GateTests(HttpCase):
             path = re.sub(r"\{[^}]+\}", "x", entry.path)
             if entry.method == "POST":
                 self.assertTrue(entry.action, entry.path)
-                call = lambda cookie=None: self.post(path, entry.action, {}, cookie)
+                call = lambda cookie=None, path=path, action=entry.action: self.post(path, action, {}, cookie)
             else:
-                call = lambda cookie=None: self.call("GET", path, headers={"Cookie": cookie} if cookie else {})
+                call = lambda cookie=None, path=path: self.call("GET", path, headers={"Cookie": cookie} if cookie else {})
             if not entry.public:
                 self.assertEqual(call()[0], 401, f"{entry.method} {entry.path} sin sesión")
             if entry.admin:

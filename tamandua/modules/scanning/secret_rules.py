@@ -367,7 +367,8 @@ def _check_ids(data_dir: Path, settings: dict, asset: str | None) -> None:
         stored = documents.load(data_dir, name, {})
         own = {rule.get("id") for rule in (stored.get("rules") or [])} if isinstance(stored, dict) else set()
         repository = (stored.get("name") if isinstance(stored, dict) else None) or name.removeprefix(ASSET_PREFIX)
-        _clash(settings["rules"], own, lambda rule: msg("scanning.secret_rules.errors.rule_id_repository", id=rule, repository=repository))
+        _clash(settings["rules"], own,
+               lambda rule, repository=repository: msg("scanning.secret_rules.errors.rule_id_repository", id=rule, repository=repository))
 
 
 def save(data_dir: Path, raw, *, reason: str | None, user: dict, asset: str | None = None, name: str | None = None) -> dict:

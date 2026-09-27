@@ -55,9 +55,9 @@ def load(data_dir: Path, key: str) -> dict:
     with db.transaction(data_dir) as connection:
         head = connection.execute(select(registry_assets.c.name, registry_assets.c.applied)
                                   .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key == key)).first()
-        entries = {digest: entry for digest, entry in connection.execute(
+        entries = dict(connection.execute(
             select(registry_findings.c.fingerprint, registry_findings.c.entry)
-            .where(registry_findings.c.tenant_id == TENANT, registry_findings.c.asset_key == key))}
+            .where(registry_findings.c.tenant_id == TENANT, registry_findings.c.asset_key == key)).all())
     return {"asset": key, "name": head.name if head else None, "findings": entries, "applied": list(head.applied) if head else []}
 
 
@@ -301,7 +301,7 @@ def summarize(data_dir: Path, key: str) -> dict:
     """Abiertos (pendientes de verdad), remediados y descartados, contando el triage."""
     state = load(data_dir, key)
     decisions = triage.load(data_dir).get(key, {})
-    counts = {"open": 0, "fixed": 0, "suppressed": 0, "excluded": 0, "by_severity": {level: 0 for level in ("critical", "high", "medium", "low")}, "from_pr": 0}
+    counts = {"open": 0, "fixed": 0, "suppressed": 0, "excluded": 0, "by_severity": dict.fromkeys(("critical", "high", "medium", "low"), 0), "from_pr": 0}
     for digest, entry in state["findings"].items():
         manual = (triage.effective(decisions.get(digest)) or {}).get("status", "open")
         if entry["status"] == "excluded":

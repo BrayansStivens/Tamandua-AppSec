@@ -90,7 +90,8 @@ def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "", loc
         if line.startswith("|"):
             group = []
             while index < len(lines) and lines[index].strip().startswith("|"):
-                group.append(lines[index]); index += 1
+                group.append(lines[index])
+                index += 1
             if len(group) >= 2:
                 story += [_table(group), Spacer(1, 7)]
             continue

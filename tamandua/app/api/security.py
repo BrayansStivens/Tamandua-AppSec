@@ -9,6 +9,7 @@ Todas las rutas la aplican con `deps.guard(Policy)`, que llama a
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -39,7 +40,7 @@ def host_allowed(port: int, host: str | None) -> bool:
 class State:
     """Lo que comparten todas las peticiones de un servidor."""
     data_dir: Path
-    log: object
+    log: logging.Logger
     jobs: ScanJobs
     auth: Authenticator
 

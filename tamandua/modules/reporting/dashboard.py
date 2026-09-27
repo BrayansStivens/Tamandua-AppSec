@@ -234,7 +234,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                  "mttr_days": round(sum(mttr) / len(mttr), 1) if mttr else None,
                  "runs_in_window": sum(1 for row in rows if row["created_at"] >= since.isoformat()),
                  "assets": len(by_asset), "kev_open": len(kev_items),
-                 "sla": {**sla.counts(list({"sla": due, "severity": due["severity"]} for due in deadlines.values())), "days": policy_days},
+                 "sla": {**sla.counts([{"sla": due, "severity": due["severity"]} for due in deadlines.values()]), "days": policy_days},
                  "triage": {status: triage_totals.get(status, 0) for status in ("open", "in_progress", "false_positive", "accepted")}},
         "issues_over_time": [{"day": _day((now - timedelta(days=offset)).isoformat()),
                               **{level: over_time.get(_day((now - timedelta(days=offset)).isoformat()), Counter()).get(level, 0) for level in SEVERITIES}}

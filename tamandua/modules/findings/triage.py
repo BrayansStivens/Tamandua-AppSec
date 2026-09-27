@@ -73,9 +73,9 @@ def load(data_dir: Path) -> dict:
 
 def load_asset(data_dir: Path, key: str) -> dict:
     with db.transaction(data_dir) as connection:
-        return {digest: decision for digest, decision in connection.execute(
+        return dict(connection.execute(
             select(triage_decisions.c.fingerprint, triage_decisions.c.decision)
-            .where(triage_decisions.c.tenant_id == TENANT, triage_decisions.c.asset_key == key))}
+            .where(triage_decisions.c.tenant_id == TENANT, triage_decisions.c.asset_key == key)).all())
 
 
 def _save_asset(data_dir: Path, key: str, decisions: dict) -> None:
@@ -147,7 +147,7 @@ def annotate(data_dir: Path, record: dict, decisions: dict | None = None) -> dic
         return record
     key = asset_key(record)
     asset = decisions.get(key, {}) if decisions is not None else load_asset(data_dir, key)
-    counts = {status: 0 for status in STATUSES}
+    counts = dict.fromkeys(STATUSES, 0)
     findings = []
     for finding in record.get("findings", []):
         state = effective(asset.get(finding["fingerprint"]))

@@ -375,8 +375,9 @@ def render_portfolio_pdf(items: list[dict], options: dict, *, version: str, scop
         # What to handle first, grouped by fix within each repository.
         open_items += [(item["name"], entry) for entry in fix_groups([finding for finding in pending if finding.get("severity") in ("critical", "high")])]
         exceptions += [(item["name"], finding) for finding, state in zip(findings, states) if state in ("accepted", "false_positive")]
-        totals["critical"] += counts["critical"]; totals["high"] += counts["high"]; totals["open"] += len(pending)
-        totals["fixed"] += fixed; totals["excepted"] += excepted
+        for name, amount in (("critical", counts["critical"]), ("high", counts["high"]), ("open", len(pending)),
+                             ("fixed", fixed), ("excepted", excepted)):
+            totals[name] += amount
     rows.sort(key=lambda row: (-row[1]["critical"], -row[1]["high"], -row[2], row[0]))
     open_items.sort(key=lambda pair: (not pair[1]["kev"], ORDER.get(pair[1]["severity"], 9), -len(pair[1]["items"]), pair[0]))
     analysed = sum(1 for row in rows if row[5])

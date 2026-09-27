@@ -134,7 +134,7 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
             target = exc.headers.get("Location", "")
             parsed = urlsplit(target)
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
-                raise SourceError(msg("sources.errors.redirect_not_allowed"))
+                raise SourceError(msg("sources.errors.redirect_not_allowed")) from None
             # La URL temporal se consulta sin la credencial original.
             response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=20)
         with response:
@@ -176,7 +176,7 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
             target = exc.headers.get("Location", "")
             parsed = urlsplit(target)
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
-                raise SourceError(msg("sources.errors.redirect_not_allowed"))
+                raise SourceError(msg("sources.errors.redirect_not_allowed")) from None
             # La URL temporal se consulta sin la credencial original.
             response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=180)
         written, reported = 0, time.monotonic()

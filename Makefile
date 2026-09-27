@@ -39,7 +39,7 @@ ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' 
 
 .DEFAULT_GOAL := help
 .PHONY: arch openapi standalone help doctor setup build up down restart status logs ps setup-code engines scan demo update backup restore \
-        verify-images shell cli clean purge dev-setup dev test lint web check
+        verify-images shell cli clean purge dev-setup dev test lint lint-py web check
 
 ## —— Usage —————————————————————————————————————————————————————————————
 
@@ -171,7 +171,11 @@ openapi: ## API OpenAPI schema and the panel's TypeScript types (web/src/shared/
 arch: ## Architecture contracts (import-linter, see pyproject.toml)
 	$(VENV)/bin/lint-imports
 
+lint-py: ## Backend lint (ruff) and types (mypy), see pyproject.toml
+	$(VENV)/bin/ruff check tamandua tests scripts api
+	$(VENV)/bin/mypy
+
 lint: ## Panel lint and types
 	cd web && npx tsc -b && npm run lint
 
-check: test arch lint ## Tests, architecture contracts and lint (required before a PR)
+check: test arch lint-py lint ## Tests, architecture contracts and lint (required before a PR)

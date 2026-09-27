@@ -8,6 +8,85 @@ license = "AGPL-3.0-only"
 [tool.setuptools.dynamic]
 version = { attr = "tamandua.version.VERSION" }
 
+# Lint (`make lint-py`, CI): rules that find bugs rather than style.
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["web", "docs", "deploy", "skills"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "C4"]
+# E731: short named lambdas read fine. B905: several zips pair a list with its own tail on purpose.
+ignore = ["E731", "B905"]
+
+[tool.ruff.lint.per-file-ignores]
+"tamandua/app/api/*" = ["B008"]  # FastAPI's Depends() and Query() are declared as defaults
+
+# Types (`make typecheck`, CI). A ratchet: every module type-checks except the ones listed below, which had errors
+# when the check arrived. Fix one, take it off the list; the list only shrinks.
+[tool.mypy]
+python_version = "3.12"
+files = ["tamandua"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "tamandua.app.alembic.env",
+    "tamandua.app.api.assets",
+    "tamandua.app.api.auth",
+    "tamandua.app.api.compliance",
+    "tamandua.app.api.deps",
+    "tamandua.app.api.findings",
+    "tamandua.app.api.images",
+    "tamandua.app.api.notifications",
+    "tamandua.app.api.onboarding",
+    "tamandua.app.api.pullrequests",
+    "tamandua.app.api.reporting",
+    "tamandua.app.api.repositories",
+    "tamandua.app.api.runs",
+    "tamandua.app.api.scanning",
+    "tamandua.app.api.sources",
+    "tamandua.app.api.threats",
+    "tamandua.app.worker",
+    "tamandua.cli.main",
+    "tamandua.modules.compliance.cra",
+    "tamandua.modules.compliance.sbom",
+    "tamandua.modules.findings.exclusions",
+    "tamandua.modules.findings.registry",
+    "tamandua.modules.findings.remediation",
+    "tamandua.modules.findings.sla",
+    "tamandua.modules.identity.auth",
+    "tamandua.modules.integrations.ai_providers",
+    "tamandua.modules.integrations.github",
+    "tamandua.modules.integrations.jira",
+    "tamandua.modules.integrations.notifications",
+    "tamandua.modules.intel.advisories",
+    "tamandua.modules.intel.cve_db",
+    "tamandua.modules.pullrequests.watch",
+    "tamandua.modules.reporting.audit",
+    "tamandua.modules.reporting.dashboard",
+    "tamandua.modules.reporting.design",
+    "tamandua.modules.runs.advisory_watch",
+    "tamandua.modules.runs.jobs",
+    "tamandua.modules.runs.local",
+    "tamandua.modules.runs.store",
+    "tamandua.modules.scanning.config_engines",
+    "tamandua.modules.scanning.engines",
+    "tamandua.modules.scanning.image",
+    "tamandua.modules.scanning.inventory",
+    "tamandua.modules.scanning.plan",
+    "tamandua.modules.scanning.repository",
+    "tamandua.modules.scanning.secret_rules",
+    "tamandua.modules.scanning.unused_deps",
+    "tamandua.modules.sources.domains",
+    "tamandua.modules.sources.repositories",
+    "tamandua.modules.threats.diagram",
+    "tamandua.modules.threats.methods",
+    "tamandua.modules.threats.model",
+    "tamandua.modules.threats.report",
+]
+ignore_errors = true
+
 # Contratos de arquitectura (import-linter): los comprueba `make arch` y el CI.
 [tool.importlinter]
 root_packages = ["tamandua"]

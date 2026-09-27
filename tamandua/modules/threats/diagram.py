@@ -122,7 +122,7 @@ def _group_ranks(ids: list[str], edges: list[tuple[str, str]], seed: dict[str, i
             targets[a].append(b)
     fed = {b for _, b in edges}
     starts = [item for item in ids if seed[item] == 0] or [item for item in ids if item not in fed] or ids[:1]
-    distance = {item: 0 for item in starts}
+    distance = dict.fromkeys(starts, 0)
     queue = list(starts)
     while queue:
         item = queue.pop(0)
@@ -263,7 +263,7 @@ def auto_layout(model: dict) -> dict:
     for _ in range(4):
         centre = {key: point["y"] + node_size(components[key])[1] / 2 for key, point in nodes.items()}
         for column in columns:
-            def outside(group: dict) -> float:
+            def outside(group: dict, centre: dict = centre) -> float:
                 own = {item["id"] for item in group["members"]}
                 around = [centre[other] for item in group["members"] for other in neighbours[item["id"]] if other not in own]
                 return sum(around) / len(around) if around else sum(centre[item["id"]] for item in group["members"]) / len(group["members"])
@@ -272,7 +272,7 @@ def auto_layout(model: dict) -> dict:
                 if group["boundary"] is None:
                     continue
                 for stack in group["cols"]:
-                    stack.sort(key=lambda item: (sum(centre[other] for other in neighbours[item["id"]]) / len(neighbours[item["id"]])
+                    stack.sort(key=lambda item, centre=centre: (sum(centre[other] for other in neighbours[item["id"]]) / len(neighbours[item["id"]])
                                                  if neighbours[item["id"]] else centre[item["id"]]))
         nodes, boxes = _place(columns)
     del by_id
@@ -478,7 +478,7 @@ def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | Non
         tip = f"{number}. {names} · {flow['protocol'].upper()}" + (f" · {flow['name']}" if flow.get("name") else "") + (f" · {t('threats.diagram.unencrypted_flow', locale)}" if plain else "")
         items += [{"t": "curve", "points": (start, c1, c2, base), "stroke": stroke, "sw": 1.4, "dash": (5, 4) if plain else None, "tip": tip},
                   {"t": "poly", "points": (end, (base[0] - uy * 4.5, base[1] + ux * 4.5), (base[0] + uy * 4.5, base[1] - ux * 4.5)), "fill": stroke}]
-    for flow, number, curve in curves:
+    for flow, number, _ in curves:
         x, y = spots[flow["id"]]
         text = flow_label(number, flow)
         width = label_width(text) - 10

@@ -52,6 +52,10 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
       - name: Architecture contracts
         run: lint-imports
+      - name: Lint
+        run: ruff check tamandua tests scripts api
+      - name: Types
+        run: mypy
       - name: The panel's OpenAPI schema matches the API
         run: |
           python -c "from tamandua.app.api import openapi_document; print(openapi_document(), end='')" > /tmp/openapi.json

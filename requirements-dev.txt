@@ -1,5 +1,7 @@
 # Solo para desarrollo y CI: no van en la imagen.
 -r requirements.txt
 import-linter==2.15
+ruff==0.16.9
+mypy==1.18.2
 # Cliente HTTP de las pruebas (TestClient de Starlette).
 httpx==0.28.1

@@ -63,7 +63,7 @@ def _package(spec: str) -> str | None:
 
 def _npm_manifests(root: Path) -> list[tuple[Path, dict[str, int]]]:
     result = []
-    for path, relative in _files(root):
+    for path, _ in _files(root):
         if path.name != "package.json":
             continue
         text = _read(path)
@@ -81,7 +81,7 @@ def _npm_manifests(root: Path) -> list[tuple[Path, dict[str, int]]]:
 
 def _python_manifests(root: Path) -> list[tuple[Path, dict[str, int]]]:
     result = []
-    for path, relative in _files(root):
+    for path, _ in _files(root):
         name = path.name
         if name == "pyproject.toml":
             text = _read(path)
@@ -111,7 +111,7 @@ def analyze(root: Path) -> dict:
     """Dependencias de ejecución sin uso encontrado, por manifiesto."""
     root = root.resolve()
     js_used, py_used, mentions = set(), set(), []
-    for path, relative in _files(root):
+    for path, _ in _files(root):
         suffix = path.suffix.lower()
         if suffix in JS_SUFFIXES:
             js_used.update(filter(None, (_package(spec) for spec in JS_IMPORT.findall(_read(path)))))

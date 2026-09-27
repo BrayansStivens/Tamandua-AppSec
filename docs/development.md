@@ -46,7 +46,7 @@ cd ..
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-The tests need PostgreSQL: `make test` starts a throwaway one in Docker (data in memory) and gives each test its own schema (`TAMANDUA_DB_ISOLATE=data-dir`). To run a single file: `TAMANDUA_DATABASE_URL=$(sh scripts/test-db.sh) TAMANDUA_DB_ISOLATE=data-dir .venv/bin/python -m unittest discover -s tests -p 'test_x.py'`.
+The tests need PostgreSQL: `make test` starts a throwaway one in Docker (data in memory) and gives each test its own schema (`TAMANDUA_DB_ISOLATE=data-dir`). To run a single file: `TAMANDUA_DATABASE_URL=$(sh scripts/test-db.sh) TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_CONFIG_DIR=$(mktemp -d) .venv/bin/python -m unittest discover -s tests -p 'test_x.py'` (the temporary configuration folder keeps the tests from creating a master key in yours). `make lint-py` runs ruff and mypy, and `make arch` the architecture contracts; CI runs all three. mypy skips the modules listed in `pyproject.toml`, which had type errors when it arrived: fixing one means taking it off the list.
 
 ### Adding or migrating an API route
 

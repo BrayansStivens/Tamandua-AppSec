@@ -899,7 +899,7 @@ def to_threat_dragon(model: dict, rows: list[dict], *, locale: str | None = None
     locale = locale or default_locale()
     rows = localize(rows, locale)
     shapes = {"actor": ("actor", "tm.Actor"), "external": ("actor", "tm.Actor"), "identity": ("actor", "tm.Actor"),
-              **{kind: ("store", "tm.Store") for kind in STORES}, **{kind: ("process", "tm.Process") for kind in PROCESSES}}
+              **dict.fromkeys(STORES, ("store", "tm.Store")), **dict.fromkeys(PROCESSES, ("process", "tm.Process"))}
     status = {"evidenced": "Open", "open": "Open", "accepted": "Open", "mitigated": "Mitigated", "not_applicable": "NA"}
     by_element: dict[str, list[dict]] = {}
     for number, row in enumerate(rows, 1):
@@ -910,7 +910,7 @@ def to_threat_dragon(model: dict, rows: list[dict], *, locale: str | None = None
             "mitigation": "; ".join(row["mitigations"]), "modelType": "STRIDE", "score": ""})
     layout = _layout(model)
     cells = []
-    for index, boundary in enumerate(model.get("boundaries", [])):
+    for boundary in model.get("boundaries", []):
         box = layout["boundaries"].get(boundary["id"])
         if box:
             cells.append({"id": f"b-{boundary['id']}", "shape": "trust-boundary-box", "zIndex": -1,
@@ -970,7 +970,7 @@ def to_pytm(model: dict, *, locale: str | None = None) -> str:
     boundary_vars = {item["id"]: "b_" + item["id"].replace("-", "_") for item in model.get("boundaries", [])}
     member_of = {member: boundary["id"] for boundary in model.get("boundaries", []) for member in boundary["components"]}
     classes = {"actor": "Actor", "external": "ExternalEntity", "identity": "ExternalEntity", "web_app": "Server",
-               "api": "Server", "service": "Process", "function": "Lambda", **{kind: "Datastore" for kind in STORES}}
+               "api": "Server", "service": "Process", "function": "Lambda", **dict.fromkeys(STORES, "Datastore")}
     comment = lambda value: "# " + " ".join(value.split())  # noqa: E731
     lines = ["#!/usr/bin/env python3", comment(t("threats.exports.pytm_generated", locale, name=name(model["name"]))),
              comment(t("threats.exports.pytm_requires", locale)),

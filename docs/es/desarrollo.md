@@ -46,7 +46,7 @@ cd ..
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Las pruebas necesitan PostgreSQL: `make test` arranca uno efímero en Docker (datos en memoria) y da a cada prueba su propio esquema (`TAMANDUA_DB_ISOLATE=data-dir`). Para correr una sola: `TAMANDUA_DATABASE_URL=$(sh scripts/test-db.sh) TAMANDUA_DB_ISOLATE=data-dir .venv/bin/python -m unittest discover -s tests -p 'test_x.py'`.
+Las pruebas necesitan PostgreSQL: `make test` arranca uno efímero en Docker (datos en memoria) y da a cada prueba su propio esquema (`TAMANDUA_DB_ISOLATE=data-dir`). Para correr una sola: `TAMANDUA_DATABASE_URL=$(sh scripts/test-db.sh) TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_CONFIG_DIR=$(mktemp -d) .venv/bin/python -m unittest discover -s tests -p 'test_x.py'` (la carpeta de configuración temporal evita que las pruebas creen una clave maestra en la tuya). `make lint-py` pasa ruff y mypy, y `make arch` los contratos de arquitectura; la CI corre los tres. mypy se salta los módulos listados en `pyproject.toml`, que tenían errores de tipos cuando llegó: arreglar uno es sacarlo de la lista.
 
 ### Añadir o migrar una ruta de la API
 
