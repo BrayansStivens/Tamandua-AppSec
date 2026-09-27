@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
+from tamandua.shared import settings
 from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, guard, json_body
 from tamandua.app.api.repositories import QUEUE_LIMIT, BatchSummary
 from tamandua.app.api.deps import problem
@@ -84,7 +84,7 @@ def image_batch(context: Context = Depends(guard(Policy(action="scan-image-batch
 @router.get("/api/registries")
 def registry_list(context: Context = Depends(guard())) -> dict[str, Any]:
     """Registries with saved credentials (never the token), and whether private addresses are allowed."""
-    return context.render({"registries": registries(), "allow_private": os.environ.get("TAMANDUA_ALLOW_PRIVATE_REGISTRIES", "").strip() == "1"})
+    return context.render({"registries": registries(), "allow_private": settings.flag("TAMANDUA_ALLOW_PRIVATE_REGISTRIES")})
 
 
 class RegistryIn(BaseModel):

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
-import os
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -20,6 +19,7 @@ from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, available_sources, snapshot_source
 from tamandua.app.api.server import serve
 from tamandua.modules.runs.store import list_runs, save_repository_scan
+from tamandua.shared import settings
 from tamandua.shared.i18n import localize, msg, t, text
 from tamandua.shared.vault import VaultError
 
@@ -126,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     integrity.add_argument("--fix", action="store_true", help="Delete the orphan rows that are leftovers and print a summary")
     worker = commands.add_parser("worker", help="Run queued analyses and periodic tasks (the compose `worker` service)")
     worker.add_argument("--check", action="store_true", help="Health: 0 if this worker showed signs of life recently (healthcheck)")
+    commands.add_parser("check-config", help="Check the settings in the environment (exit 1 if any is invalid)")
     panel = commands.add_parser("serve", help="Open the web panel")
     panel.add_argument("--port", type=int, default=8766)
     panel.add_argument("--bind", default=None, help="Listening interface; default 127.0.0.1 (or TAMANDUA_BIND)")
@@ -138,10 +139,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "scan":
         # Se ejecuta dentro del repositorio del usuario: sus datos (y la caché de avisos) no van a parar a él.
-        args.data_dir = args.data_dir or (Path(os.environ["TAMANDUA_DATA_DIR"]) if os.environ.get("TAMANDUA_DATA_DIR")
+        args.data_dir = args.data_dir or (Path(settings.text("TAMANDUA_DATA_DIR")) if settings.is_set("TAMANDUA_DATA_DIR")
                                           else Path.home() / ".cache" / "tamandua")
         return _scan_command(args)
-    args.data_dir = args.data_dir or Path("data")
+    args.data_dir = args.data_dir or Path(settings.text("TAMANDUA_DATA_DIR") or "data")
+    if args.command == "check-config" or args.command == "serve" or (args.command == "worker" and not args.check):
+        problems = settings.problems()
+        if problems:
+            print("\n".join([t("cli.settings.header"), *(f"  - {text(problem)}" for problem in problems)]), file=sys.stderr)
+            return 1
+        if args.command == "check-config":
+            print(t("cli.settings.ok"))
+            return 0
     try:
         if not (args.command == "worker" and args.check):  # el healthcheck no migra nada: solo mira el latido
             upgrade_data(args.data_dir)

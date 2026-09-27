@@ -13,10 +13,9 @@ ejecución, presupuesto y redacción de secretos.
 from __future__ import annotations
 
 import json
-import os
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
-from tamandua.shared import http
+from tamandua.shared import http, settings
 from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
@@ -54,7 +53,7 @@ def _key(name: str) -> str | None:
     stored = _load().get(name)
     if isinstance(stored, dict) and isinstance(stored.get("api_key"), str) and stored["api_key"]:
         return stored["api_key"]
-    return os.environ.get(PROVIDERS[name]["env"]) or None
+    return settings.text(PROVIDERS[name]["env"]) or None
 
 
 def provider_status() -> list[dict]:
@@ -64,7 +63,7 @@ def provider_status() -> list[dict]:
         entry = stored.get(name) if isinstance(stored.get(name), dict) else None
         from_user = bool(entry and entry.get("api_key"))
         rows.append({"id": name, "configured": bool(_key(name)),
-                     "owner": "user" if from_user else "server" if os.environ.get(config["env"]) else None,
+                     "owner": "user" if from_user else "server" if settings.is_set(config["env"]) else None,
                      "last4": entry.get("last4") if from_user else None,
                      "saved_at": entry.get("saved_at") if from_user else None,
                      "env": config["env"]})

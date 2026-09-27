@@ -8,14 +8,13 @@ returns aggregates only (no identifiers, repository names or findings).
 from __future__ import annotations
 
 import hmac
-import os
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 from tamandua.app.api.deps import ApiError
 from tamandua.modules.runs import metrics
-from tamandua.shared import log as logging_setup
+from tamandua.shared import log as logging_setup, settings
 from tamandua.shared.i18n import localize, msg, negotiate
 from tamandua.version import VERSION
 
@@ -32,7 +31,7 @@ class Exposition(PlainTextResponse):
 
 def configured_token() -> str | None:
     """The token, or None when metrics are off (unset, or too short to be a secret)."""
-    token = os.environ.get("TAMANDUA_METRICS_TOKEN", "").strip()
+    token = settings.text("TAMANDUA_METRICS_TOKEN")
     if len(token) >= MIN_TOKEN:
         return token
     if token and "short" not in _warned:

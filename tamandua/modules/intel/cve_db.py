@@ -17,7 +17,6 @@ opcional (`TAMANDUA_NVD_API_KEY`) va en cabecera y nunca se registra.
 from __future__ import annotations
 
 import json
-import os
 import re
 import sqlite3
 import threading
@@ -28,7 +27,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from tamandua.shared import log as logging_setup
+from tamandua.shared import log as logging_setup, settings
 from tamandua.shared.i18n import msg
 from tamandua.version import USER_AGENT
 
@@ -141,7 +140,7 @@ def upsert(connection: sqlite3.Connection, entries: list[dict]) -> int:
 
 def _nvd_get(params: dict) -> dict:
     headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-    key = os.environ.get("TAMANDUA_NVD_API_KEY", "").strip()
+    key = settings.text("TAMANDUA_NVD_API_KEY")
     if key:
         headers["apiKey"] = key
     with urlopen(Request(f"{NVD_URL}?{urlencode(params)}", headers=headers), timeout=120) as response:
@@ -153,7 +152,7 @@ def _nvd_get(params: dict) -> dict:
 
 def pause() -> float:
     # Límite público de NVD: 5 peticiones / 30 s sin key, 50 / 30 s con key.
-    return 0.8 if os.environ.get("TAMANDUA_NVD_API_KEY", "").strip() else 6.5
+    return 0.8 if settings.is_set("TAMANDUA_NVD_API_KEY") else 6.5
 
 
 def _stamp(value: datetime) -> str:
@@ -237,7 +236,7 @@ class Syncer:
         self._thread = threading.Thread(target=self._loop, name="tamandua-cve-sync", daemon=True)
 
     def start(self) -> None:
-        if os.environ.get("TAMANDUA_CVE_SYNC", "on").lower() in ("off", "0", "false", "no"):
+        if not settings.flag("TAMANDUA_CVE_SYNC"):
             return
         self._thread.start()
 

@@ -17,6 +17,8 @@ from pathlib import Path
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
+from tamandua.shared import settings
+
 API = "https://euvdservices.enisa.europa.eu/api/search?text={cve}&size=5"
 PAGE = "https://euvd.enisa.europa.eu/vulnerability/{id}"
 CVE = re.compile(r"CVE-\d{4}-\d{4,7}")
@@ -26,7 +28,7 @@ _lock = threading.Lock()
 
 
 def enabled() -> bool:
-    return os.environ.get("TAMANDUA_EUVD", "on").lower() not in ("off", "0", "false", "no")
+    return settings.flag("TAMANDUA_EUVD")
 
 
 def _cache_path(data_dir: Path) -> Path:

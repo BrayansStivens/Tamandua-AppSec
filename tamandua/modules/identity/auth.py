@@ -37,7 +37,7 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from tamandua.modules.identity.tables import auth_challenges, sessions, users
-from tamandua.shared import db, vault
+from tamandua.shared import db, settings, vault
 from tamandua.shared.db import TENANT
 from urllib.parse import quote
 
@@ -612,7 +612,7 @@ class Authenticator:
 
     @staticmethod
     def totp_policy() -> str:
-        value = os.environ.get("TAMANDUA_REQUIRE_TOTP", "admins").strip().lower()
+        value = settings.text("TAMANDUA_REQUIRE_TOTP").lower()
         return value if value in TOTP_POLICIES else "admins"
 
     def needs_totp(self, user: dict) -> bool:

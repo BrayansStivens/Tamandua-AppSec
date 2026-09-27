@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import sys
 import threading
 import time
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+from tamandua.shared import settings
 
 SECRET_PATTERN = re.compile(r"(ghp_|ghs_|ghu_|gho_|ghr_|github_pat_|sk-[A-Za-z0-9-]|xox[abp]-|AKIA|ATATT|eyJ[A-Za-z0-9_-]{10,}"
                             r"|tamandua-verify=|Bearer |Basic |token=|apiKey=|client_secret=)[A-Za-z0-9_\-./+=]*")
@@ -72,7 +73,7 @@ def configure(data_dir: Path) -> logging.Logger:
     root = logging.getLogger("tamandua")
     if _configured:
         return root
-    level = getattr(logging, os.environ.get("TAMANDUA_LOG_LEVEL", "INFO").upper(), logging.INFO)
+    level = getattr(logging, settings.text("TAMANDUA_LOG_LEVEL").upper(), logging.INFO)
     root.setLevel(level)
     root.propagate = False
     logs = data_dir / "logs"

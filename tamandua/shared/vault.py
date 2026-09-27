@@ -26,7 +26,7 @@ import threading
 from contextlib import contextmanager
 from pathlib import Path
 
-from tamandua.shared import paths
+from tamandua.shared import paths, settings
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import msg, text
 
@@ -69,7 +69,7 @@ def _write_private(path: Path, content: bytes, mode: int = stat.S_IRUSR | stat.S
 
 
 def _master_key() -> bytes:
-    configured = os.environ.get("TAMANDUA_MASTER_KEY", "").strip()
+    configured = settings.text("TAMANDUA_MASTER_KEY")
     if configured:
         try:
             key = base64.b64decode(configured, validate=True)

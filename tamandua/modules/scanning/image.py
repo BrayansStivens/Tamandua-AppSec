@@ -21,7 +21,6 @@ los motores por variable de entorno, no por la línea de comandos.
 from __future__ import annotations
 
 import json
-import os
 import re
 import socket
 import subprocess
@@ -30,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from tamandua.modules.intel import data_sources
-from tamandua.shared import log as logging_setup
+from tamandua.shared import log as logging_setup, settings
 from tamandua.shared.i18n import default_locale, msg, text
 from tamandua.modules.intel.advisories import cvss3_base_score, fingerprint as sca_fingerprint, prioritize, severity_from_score
 from tamandua.modules.scanning.coverage import owasp_coverage
@@ -99,7 +98,7 @@ def check_registry_address(registry: str) -> None:
     Evita que el formulario sirva para que el servidor hable con servicios internos (SSRF).
     Para registros propios en la red local: TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.
     """
-    if os.environ.get("TAMANDUA_ALLOW_PRIVATE_REGISTRIES", "").strip() == "1":
+    if settings.flag("TAMANDUA_ALLOW_PRIVATE_REGISTRIES"):
         return
     import ipaddress
     host = _host_only(registry)

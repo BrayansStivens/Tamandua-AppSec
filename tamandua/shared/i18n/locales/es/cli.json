@@ -50,5 +50,17 @@
     "clean": "Todo en orden: no hay filas huérfanas.",
     "run_fix_one": "Se puede borrar 1 fila huérfana: ejecuta tamandua integrity --fix.",
     "run_fix_other": "Se pueden borrar {{count}} filas huérfanas: ejecuta tamandua integrity --fix."
+  },
+  "settings": {
+    "header": "Tamandua no puede arrancar: corrige estos ajustes del entorno (.env).",
+    "missing": "Falta {{name}}.",
+    "invalid_flag": "{{name}}={{value}} no es un valor de sí o no: usa 1 o 0 (también true/false, on/off).",
+    "invalid_integer": "{{name}}={{value}} no es un número entero.",
+    "below_minimum": "{{name}}={{value}} está por debajo del mínimo, {{minimum}}.",
+    "invalid_choice": "{{name}}={{value}} no es válido. Usa uno de estos: {{choices}}.",
+    "invalid_url": "{{name}}={{value}} no es un origen como https://tamandua.example.com (esquema y dominio, sin ruta).",
+    "invalid_key": "{{name}} tiene que ser de 32 bytes aleatorios en base64. Genera uno con: openssl rand -base64 32",
+    "short_token": "{{name}} es demasiado corto: usa al menos 32 caracteres (openssl rand -hex 32).",
+    "ok": "Configuración: sin problemas."
   }
 }

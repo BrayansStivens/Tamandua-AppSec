@@ -27,7 +27,7 @@ import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request
-from tamandua.shared import http
+from tamandua.shared import http, settings
 from tamandua.shared.i18n import default_locale, msg, text
 from tamandua.version import USER_AGENT
 
@@ -67,10 +67,10 @@ def _stored() -> dict:
 def _resolved() -> dict:
     """El entorno manda sobre el almacén, para que un despliegue monte sus secretos."""
     stored = _stored()
-    key_file = os.environ.get("GITHUB_APP_PRIVATE_KEY_FILE", "").strip()
-    from_env = bool(os.environ.get("GITHUB_APP_ID", "").strip())
-    return {"app_id": os.environ.get("GITHUB_APP_ID", "").strip() or str(stored.get("app_id") or ""),
-            "slug": os.environ.get("GITHUB_APP_SLUG", "").strip() or str(stored.get("slug") or ""),
+    key_file = settings.text("GITHUB_APP_PRIVATE_KEY_FILE")
+    from_env = settings.is_set("GITHUB_APP_ID")
+    return {"app_id": settings.text("GITHUB_APP_ID") or str(stored.get("app_id") or ""),
+            "slug": settings.text("GITHUB_APP_SLUG") or str(stored.get("slug") or ""),
             "key_file": key_file, "pem": "" if key_file else str(stored.get("pem") or ""),
             "owner": stored.get("owner"), "name": stored.get("name"), "html_url": stored.get("html_url"),
             "source": "environment" if from_env else "vault" if stored else None}

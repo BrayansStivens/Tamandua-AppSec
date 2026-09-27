@@ -16,13 +16,13 @@ per branch, a few per round and only with an almost empty queue: manual scans an
 
 from __future__ import annotations
 
-import os
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from tamandua.shared import documents
+from tamandua.shared import settings as env_settings
 from tamandua.shared import events
 from tamandua.shared import log as logging_setup
 from tamandua.modules.pullrequests.review import GATES
@@ -191,11 +191,11 @@ def mark_branch(data_dir: Path, key: str, head_sha: str, run_id: str, branch: st
 
 
 def branch_min_seconds() -> int:
-    return 60 * max(10, int(os.environ.get("TAMANDUA_BRANCH_MIN_MINUTES", "60") or 60))
+    return 60 * env_settings.integer("TAMANDUA_BRANCH_MIN_MINUTES")
 
 
 def interval() -> int:
-    return max(60, int(os.environ.get("TAMANDUA_PR_POLL_SECONDS", "300") or 300))
+    return env_settings.integer("TAMANDUA_PR_POLL_SECONDS")
 
 
 def mark_closed(data_dir: Path, key: str, number: int) -> None:

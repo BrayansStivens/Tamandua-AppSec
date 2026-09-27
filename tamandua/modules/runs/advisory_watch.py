@@ -15,7 +15,6 @@ reanalizar la imagen.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import tempfile
 import threading
@@ -29,7 +28,7 @@ from tamandua.modules.runs.store import list_runs, load_run, save_repository_sca
 from tamandua.modules.scanning import engines
 from tamandua.modules.scanning.dependency_merge import family, identifiers, package_name, purl
 from tamandua.modules.sources.assets import asset_key
-from tamandua.shared import documents
+from tamandua.shared import documents, settings
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import INLINE, MARK, msg
 
@@ -39,7 +38,7 @@ _log = logging_setup.get("advisory_watch")
 def hours() -> int:
     """Cada cuántas horas se contrasta (TAMANDUA_ADVISORY_WATCH_HOURS; 0 lo apaga)."""
     try:
-        return max(0, int(os.environ.get("TAMANDUA_ADVISORY_WATCH_HOURS", "24") or 24))
+        return settings.integer("TAMANDUA_ADVISORY_WATCH_HOURS")
     except ValueError:
         return 24
 

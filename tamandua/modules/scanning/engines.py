@@ -32,7 +32,7 @@ import time
 import uuid
 from pathlib import Path
 
-from tamandua.shared import paths
+from tamandua.shared import paths, settings
 from tamandua.shared.i18n import msg
 from tamandua.modules.intel import data_sources
 from tamandua.modules.intel.advisories import compare_versions, cvss3_base_score, prioritize, severity_from_score
@@ -108,8 +108,8 @@ def own_mounts() -> dict[str, str]:
 def _host_pairs() -> list[tuple[str, str]]:
     detected = own_mounts()
     pairs = []
-    for inside, configured in ((os.environ.get("TAMANDUA_DATA_DIR"), os.environ.get("TAMANDUA_HOST_DATA_DIR")),
-                               (str(RULES_DIR), os.environ.get("TAMANDUA_HOST_RULES_DIR"))):
+    for inside, configured in ((settings.text("TAMANDUA_DATA_DIR"), settings.text("TAMANDUA_HOST_DATA_DIR")),
+                               (str(RULES_DIR), settings.text("TAMANDUA_HOST_RULES_DIR"))):
         if not inside:
             continue
         outside = detected.get(str(Path(inside)).rstrip("/")) or (configured if _usable(inside, configured) else None)
@@ -157,7 +157,7 @@ def cause(completed: subprocess.CompletedProcess | None) -> str:
 
 def _clean_cause(line: str) -> str:
     text = _TOKENS.sub("[token]", line)
-    host = os.environ.get("TAMANDUA_HOST_DATA_DIR", "")
+    host = settings.text("TAMANDUA_HOST_DATA_DIR")
     if len(host) > 1:
         text = text.replace(host, "<datos>")
     return " ".join(text.split())[:240]
@@ -199,7 +199,7 @@ def and_list(items):
 def host_mount_problem() -> dict | None:
     """Dentro del contenedor, los motores montan la carpeta de datos *del host*. Si no se pudo
     averiguar (ni preguntando a Docker ni por el entorno), los motores fallarían sin explicación."""
-    inside = os.environ.get("TAMANDUA_DATA_DIR")
+    inside = settings.text("TAMANDUA_DATA_DIR")
     if not inside or not in_container():
         return None
     if any(pair[0] == inside for pair in _host_pairs()):

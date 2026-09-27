@@ -8,7 +8,6 @@ live in `locales/<locale>/<namespace>.json` (same format as the panel's i18next 
 from __future__ import annotations
 
 import json
-import os
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -22,7 +21,8 @@ _PARAM = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 
 def default_locale() -> str:
     """Locale for text nobody requests in person (PR comments, notifications, CLI): TAMANDUA_DEFAULT_LOCALE or en."""
-    value = os.environ.get("TAMANDUA_DEFAULT_LOCALE", "").strip().lower()[:2]
+    from tamandua.shared import settings  # settings renders its errors with this module
+    value = settings.text("TAMANDUA_DEFAULT_LOCALE").lower()[:2]
     return value if value in LOCALES else "en"
 
 

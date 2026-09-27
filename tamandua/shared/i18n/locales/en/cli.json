@@ -50,5 +50,17 @@
     "clean": "All consistent: no orphan rows.",
     "run_fix_one": "1 orphan row can be deleted: run tamandua integrity --fix.",
     "run_fix_other": "{{count}} orphan rows can be deleted: run tamandua integrity --fix."
+  },
+  "settings": {
+    "header": "Tamandua can't start: fix these settings in the environment (.env).",
+    "missing": "{{name}} is required.",
+    "invalid_flag": "{{name}}={{value}} isn't a yes/no value: use 1 or 0 (also true/false, on/off).",
+    "invalid_integer": "{{name}}={{value}} isn't a whole number.",
+    "below_minimum": "{{name}}={{value}} is below the minimum of {{minimum}}.",
+    "invalid_choice": "{{name}}={{value}} isn't valid. Use one of: {{choices}}.",
+    "invalid_url": "{{name}}={{value}} isn't an origin such as https://tamandua.example.com (scheme and host, no path).",
+    "invalid_key": "{{name}} must be 32 random bytes in base64. Generate one with: openssl rand -base64 32",
+    "short_token": "{{name}} is too short: use at least 32 characters (openssl rand -hex 32).",
+    "ok": "Configuration: no problems found."
   }
 }

@@ -18,7 +18,6 @@ import hashlib
 import hmac
 import ipaddress
 import json
-import os
 import re
 import secrets as token_source
 import socket
@@ -35,7 +34,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from tamandua.modules.integrations.tables import outbox
-from tamandua.shared import db, http
+from tamandua.shared import db, http, settings
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import default_locale, msg, t, text
 
@@ -97,7 +96,7 @@ def check_url(kind: str, url: str) -> str:
         raise NotificationError(msg("integrations.notifications.errors.https_only"))
     if kind in HOSTS and not HOSTS[kind].fullmatch(host):
         raise NotificationError(msg("integrations.notifications.errors.wrong_host", kind=KINDS[kind], host=host))
-    if os.environ.get("TAMANDUA_ALLOW_PRIVATE_WEBHOOKS", "").strip() != "1":
+    if not settings.flag("TAMANDUA_ALLOW_PRIVATE_WEBHOOKS"):
         # El servidor hará la petición: una dirección interna convertiría el formulario en un SSRF.
         try:
             addresses = {info[4][0] for info in socket.getaddrinfo(host, parts.port or 443, proto=socket.IPPROTO_TCP)}
@@ -156,7 +155,7 @@ def _record_delivery(identifier: str, ok: bool, detail) -> None:
 # ------------------------------------------------------------------ mensajes
 
 def panel_link(run_id: str | None = None) -> str | None:
-    base = os.environ.get("TAMANDUA_PUBLIC_URL", "").strip().rstrip("/")
+    base = settings.text("TAMANDUA_PUBLIC_URL").rstrip("/")
     if not base.startswith(("https://", "http://")):
         return None
     return f"{base}/#/hallazgos?run={run_id}" if run_id else base

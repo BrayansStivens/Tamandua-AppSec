@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import contextvars
 import hashlib
-import os
 import threading
 from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import Connection, Engine, MetaData, create_engine, text
+
+from tamandua.shared import settings
 
 TENANT = "default"
 metadata = MetaData(naming_convention={
@@ -39,7 +40,7 @@ class DatabaseNotConfigured(RuntimeError):
 
 
 def url() -> str:
-    value = os.environ.get("TAMANDUA_DATABASE_URL", "").strip()
+    value = settings.text("TAMANDUA_DATABASE_URL")
     if not value:
         raise DatabaseNotConfigured("TAMANDUA_DATABASE_URL is missing: Tamandua stores runs and findings in PostgreSQL "
                                     "(`make up` configures it for you).")
@@ -66,7 +67,7 @@ def reset() -> None:
 
 
 def schema_for(data_dir: Path) -> str | None:
-    if os.environ.get("TAMANDUA_DB_ISOLATE") != "data-dir":
+    if settings.text("TAMANDUA_DB_ISOLATE") != "data-dir":
         return None
     return "t_" + hashlib.sha256(str(Path(data_dir).resolve()).encode()).hexdigest()[:20]
 

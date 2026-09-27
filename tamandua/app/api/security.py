@@ -9,12 +9,12 @@ Todas las rutas la aplican con `deps.guard(Policy)`, que llama a
 
 from __future__ import annotations
 
-import os
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from tamandua.shared import settings
 from tamandua.modules.identity.auth import Authenticator
 from tamandua.shared.i18n import msg
 from tamandua.modules.runs.jobs import ScanJobs
@@ -24,12 +24,12 @@ DEFAULT_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; font-sr
 
 
 def allowed_origins(port: int) -> list[str]:
-    configured = [item.strip().rstrip("/") for item in os.environ.get("TAMANDUA_ALLOWED_ORIGINS", "").split(",") if item.strip()]
+    configured = settings.items("TAMANDUA_ALLOWED_ORIGINS")
     return configured or [f"http://127.0.0.1:{port}", f"http://localhost:{port}"]
 
 
 def public_url(port: int) -> str:
-    return os.environ.get("TAMANDUA_PUBLIC_URL", "").strip().rstrip("/") or allowed_origins(port)[0]
+    return settings.text("TAMANDUA_PUBLIC_URL").rstrip("/") or allowed_origins(port)[0]
 
 
 def host_allowed(port: int, host: str | None) -> bool:

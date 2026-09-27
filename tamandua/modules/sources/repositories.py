@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
 from urllib.request import Request
-from tamandua.shared import http
+from tamandua.shared import http, settings
 from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
@@ -148,7 +148,7 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
 
 def _download_timeout() -> int:
     try:
-        return max(60, int(os.environ.get("TAMANDUA_DOWNLOAD_TIMEOUT", "900")))
+        return settings.integer("TAMANDUA_DOWNLOAD_TIMEOUT")
     except ValueError:
         return 900
 
@@ -206,7 +206,7 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
 def list_repositories(provider: str, token: str | None = None) -> list[dict]:
     if provider not in ("github", "gitlab"):
         raise SourceError(msg("sources.errors.invalid_provider"))
-    token = token or os.environ.get("GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN")
+    token = token or settings.text("GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN")
     if not token:
         return []
     url = ("https://api.github.com/user/repos?per_page=50&sort=updated"
@@ -258,7 +258,7 @@ def available_sources(tokens: dict[str, str] | None = None, installation_id: int
     for provider, env in (("github", "GITHUB_TOKEN"), ("gitlab", "GITLAB_TOKEN")):
         if provider in statuses:
             continue
-        origin = "session" if tokens.get(provider) else "environment" if os.environ.get(env) else None
+        origin = "session" if tokens.get(provider) else "environment" if settings.is_set(env) else None
         statuses[provider] = {"configured": bool(origin), "origin": origin}
         if statuses[provider]["configured"]:
             try:
@@ -326,7 +326,7 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
     for name, env in (("github", "GITHUB_TOKEN"), ("gitlab", "GITLAB_TOKEN")):
         if name in statuses:
             continue
-        origin = "session" if tokens.get(name) else "environment" if os.environ.get(env) else None
+        origin = "session" if tokens.get(name) else "environment" if settings.is_set(env) else None
         statuses[name] = {"configured": bool(origin), "origin": origin}
         if origin and provider in (None, name) and not account:
             try:
@@ -525,7 +525,7 @@ def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | 
         except GitHubAppError as exc:
             raise SourceError(exc.message) from exc
     else:
-        token = (tokens or {}).get(provider) or os.environ.get("GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN")
+        token = (tokens or {}).get(provider) or settings.text("GITHUB_TOKEN" if provider == "github" else "GITLAB_TOKEN")
         entries = list_repositories(provider, token)
         selected = next((entry for entry in entries if entry["id"] == source_id), None)
     if selected is None:

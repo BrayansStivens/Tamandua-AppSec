@@ -21,7 +21,7 @@ from typing import Callable
 import uuid
 
 from tamandua.modules.findings import registry as findings_registry
-from tamandua.shared import log as logging_setup
+from tamandua.shared import log as logging_setup, settings
 from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import SourceError, snapshot_source
 from tamandua.modules.sources.assets import asset_key, scan_branch
@@ -455,7 +455,6 @@ class ScanJobs:
     def _deliver(self, installation, repository, pull, outcome, run_id, baseline, config, progress) -> dict:
         """Publica el resultado en GitHub si el repositorio lo tiene activado y la App tiene permiso."""
         from tamandua.modules.pullrequests import review as pr_review
-        import os
         from tamandua.modules.integrations.github import GitHubAppError, installation_details, set_commit_status, upsert_pr_comment
         if not config.get("post_comment"):
             return {"comment": msg("runs.delivery.disabled"), "status": msg("runs.delivery.disabled")}
@@ -470,7 +469,7 @@ class ScanJobs:
                                                 gate=config["gate"], tools=outcome.get("tools"),
                                                 # Solo se enlaza un panel público declarado: nunca el host interno.
                                                 panel_url=(lambda url: url if url.startswith("https://") else None)(
-                                                    os.environ.get("TAMANDUA_PUBLIC_URL", "").strip()))
+                                                    settings.text("TAMANDUA_PUBLIC_URL")))
                 delivery["comment"] = upsert_pr_comment(installation, repository, pull["number"], body)
                 progress("ok", msg("runs.progress.comment_posted"))
                 unused = outcome.get("unused") or {}
