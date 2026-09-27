@@ -8,7 +8,7 @@ With a fresh server and a DNS record already pointing at it, it's four commands:
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9                                   # the release you want (see Upgrades)
+git checkout v0.9.0                                   # the release you want (see Upgrades)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS with Caddy + published images
 make up                                             # prints https://tamandua.example.com and the setup code
 ```
@@ -101,7 +101,7 @@ As the `tamandua` user:
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9
+git checkout v0.9.0
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
 ```
