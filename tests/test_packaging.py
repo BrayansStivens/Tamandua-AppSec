@@ -173,6 +173,13 @@ class StandaloneWorkerImageTests(unittest.TestCase):
             pattern = re.compile(rf"^ARG {name}=(\S+)$", re.M)
             self.assertEqual(pattern.findall(app), pattern.findall(engine), name)
         self.assertEqual(re.search(r"^ARG CHECKOV_VERSION=(\S+)$", app, re.M).group(1), IMAGES["checkov"]["version"])
+        # Checkov and its dependencies are installed by hash: the lock pins the same version, and every package has one.
+        lock = (root / "docker" / "checkov" / "requirements.txt").read_text(encoding="utf-8")
+        self.assertIn(f"checkov=={IMAGES['checkov']['version']} \\", lock)
+        self.assertIn(f"checkov=={IMAGES['checkov']['version']}", (root / "docker" / "checkov" / "requirements.in").read_text(encoding="utf-8"))
+        packages = re.findall(r"^([A-Za-z0-9_.-]+)==\S+ \\\n((?:\s+--hash=sha256:[0-9a-f]{64}(?: \\)?\n)+)", lock, re.M)
+        self.assertEqual(len(packages), len(re.findall(r"^[A-Za-z0-9_.-]+==", lock, re.M)))
+        self.assertIn("--require-hashes", app)
         self.assertEqual(re.search(r"^ARG OPENGREP_VERSION=(\S+)$", app, re.M).group(1), IMAGES["opengrep"]["version"])
 
 

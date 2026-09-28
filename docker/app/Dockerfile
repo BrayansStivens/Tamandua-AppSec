@@ -80,6 +80,7 @@ RUN set -eu; \
 FROM app AS worker-standalone
 ARG CHECKOV_VERSION=3.3.19
 USER root
+COPY docker/checkov/requirements.txt /tmp/checkov-requirements.txt
 COPY --from=trivy --chmod=0755 /usr/local/bin/trivy /usr/local/bin/trivy
 COPY --from=osv-scanner --chmod=0755 /osv-scanner /usr/local/bin/osv-scanner
 COPY --from=gitleaks --chmod=0755 /usr/bin/gitleaks /usr/local/bin/gitleaks
@@ -87,9 +88,13 @@ COPY --from=grype --chmod=0755 /grype /usr/local/bin/grype
 COPY --from=zizmor --chmod=0755 /usr/bin/zizmor /usr/local/bin/zizmor
 COPY --from=opengrep --chmod=0755 /opengrep /usr/local/bin/opengrep
 # Checkov is Python: its image's interpreter (3.11, Debian 13) can't be copied here, so it gets its own virtual
-# environment at the pinned version. Its dependencies come from PyPI without hashes: the one engine not pinned by digest.
+# environment. It and every dependency are pinned with their hashes (docker/checkov/requirements.txt), wheels only:
+# nothing is built from source.
 RUN python -m venv /opt/checkov \
- && /opt/checkov/bin/pip install --no-cache-dir --disable-pip-version-check "checkov==${CHECKOV_VERSION}" \
+ && /opt/checkov/bin/pip install --no-cache-dir --disable-pip-version-check --require-hashes --no-deps --only-binary :all: \
+      -r /tmp/checkov-requirements.txt \
+ && rm /tmp/checkov-requirements.txt \
+ && /opt/checkov/bin/checkov --version | grep -qx "${CHECKOV_VERSION}" \
  && ln -s /opt/checkov/bin/checkov /usr/local/bin/checkov \
  && trivy --version >/dev/null && osv-scanner --version >/dev/null && gitleaks version >/dev/null && grype version >/dev/null \
  && zizmor --version >/dev/null && opengrep --version >/dev/null && checkov --version >/dev/null
