@@ -58,6 +58,11 @@ with `guard(Policy(public=…, admin=…, action=…))` (CSRF, session, second f
 the logic in the business module, never in the route. Request bodies are read after the guard with `deps.body(Model,
 invalid_message)`, so an unauthenticated request never reaches validation.
 
+Every JSON route declares its `response_model`. For a wide result (a run, a GitHub status), subclass `Open` from
+`app/api/schemas.py` with the fields readers rely on and pass `**AS_RETURNED`: the other fields go through as the module
+returned them, and a missing one is never added as null. Every list declares its maximum (`Field(max_length=…)`), the
+module's own limit when it has one: the response model checks it, and `tests/test_api.py` fails on an unbounded array.
+
 Then `make openapi` regenerates the schema and the panel's TypeScript types (`web/src/shared/api/`), used through
 `apiGet('/api/…')`: if the API and the panel disagree, `tsc` fails. CI checks that the schema is up to date.
 

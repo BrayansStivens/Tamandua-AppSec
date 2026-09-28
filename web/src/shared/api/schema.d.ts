@@ -1320,7 +1320,7 @@ export interface paths {
         };
         /**
          * Runs
-         * @description Every run's row, newest first (the panel pages with /api/runs/page).
+         * @description The rows of the newest runs (at most 10 000), newest first. To go through all of them, /api/runs/page.
          */
         get: operations["runs_api_runs_get"];
         put?: never;
@@ -1742,6 +1742,32 @@ export interface components {
             rules: components["schemas"]["BuiltinRule"][];
         };
         /**
+         * ChannelSaved
+         * @description A saved channel and, for a webhook, its signing secret: shown this once.
+         */
+        ChannelSaved: {
+            /** Channel */
+            channel: {
+                [key: string]: unknown;
+            };
+            /** Secret */
+            secret: string | null;
+        };
+        /**
+         * ChannelTested
+         * @description Whether the test delivery worked (a 200 also when it didn't), why, and the channels with their last result.
+         */
+        ChannelTested: {
+            /** Ok */
+            ok: boolean;
+            /** Detail */
+            detail: string;
+            /** Channels */
+            channels: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
          * Channels
          * @description Never the channel's URL nor its signing secret: the host and what it is sent.
          */
@@ -1762,6 +1788,24 @@ export interface components {
             thresholds: string[];
             /** Links */
             links: boolean;
+        };
+        /** ChannelsLeft */
+        ChannelsLeft: {
+            /** Channels */
+            channels: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** CodeConnection */
+        CodeConnection: {
+            /** Provider */
+            provider: string;
+            /** Connected */
+            connected: boolean;
+            /** Repositories */
+            repositories?: number | null;
+        } & {
+            [key: string]: unknown;
         };
         /** CraAssessment */
         CraAssessment: {
@@ -2003,6 +2047,31 @@ export interface components {
             score_source: string | null;
             euvd: components["schemas"]["Euvd"] | null;
         };
+        /**
+         * CveOverview
+         * @description The local NVD copy: its size, per year and per day, the latest KEV additions and how its sync goes.
+         */
+        CveOverview: {
+            /** Count */
+            count: number;
+            /** Kev Total */
+            kev_total: number;
+            /** Years */
+            years: {
+                [key: string]: unknown;
+            }[];
+            /** Latest Kev */
+            latest_kev: {
+                [key: string]: unknown;
+            }[];
+            /** Daily */
+            daily: {
+                [key: string]: unknown;
+            }[];
+            sync: components["schemas"]["CveSync"];
+        } & {
+            [key: string]: unknown;
+        };
         /** CvePage */
         CvePage: {
             /** Items */
@@ -2043,6 +2112,21 @@ export interface components {
              * @default false
              */
             affects: boolean;
+        };
+        /** CveSync */
+        CveSync: {
+            /** Phase */
+            phase: string;
+            /** Progress */
+            progress: number;
+            /** Nvd Total */
+            nvd_total: number | null;
+            /** Synced At */
+            synced_at: string | null;
+            /** Running */
+            running: boolean;
+            /** Error */
+            error: string | null;
         };
         /** Dashboard */
         Dashboard: {
@@ -2099,6 +2183,36 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        /** Deleted */
+        Deleted: {
+            /** Deleted */
+            deleted: boolean;
+        };
+        /** Domain */
+        Domain: {
+            /** Id */
+            id: string;
+            /** Host */
+            host: string;
+            /** Url */
+            url: string;
+            /** Kind */
+            kind?: string | null;
+            /** Context */
+            context?: string | null;
+            /** Txt Name */
+            txt_name: string;
+            /** Txt Value */
+            txt_value: string;
+            /** Verified */
+            verified: boolean;
+            /** Registered At */
+            registered_at?: string | null;
+            /** Verified At */
+            verified_at?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** Euvd */
         Euvd: {
             /** Id */
@@ -2152,6 +2266,182 @@ export interface components {
             /** Complete */
             complete: number;
         };
+        /** ExclusionChange */
+        ExclusionChange: {
+            /** At */
+            at: string;
+            /** By */
+            by: string;
+            /** Patterns */
+            patterns?: string[] | null;
+            /** Reason */
+            reason?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * Exclusions
+         * @description A repository's excluded paths, who set them last and why, and their history.
+         */
+        Exclusions: {
+            /** Patterns */
+            patterns: string[];
+            /** At */
+            at: string | null;
+            /** By */
+            by: string | null;
+            /** Reason */
+            reason: string | null;
+            /** History */
+            history: components["schemas"]["ExclusionChange"][];
+        } & {
+            [key: string]: unknown;
+        };
+        /** ExclusionsMoved */
+        ExclusionsMoved: {
+            /** Excluded */
+            excluded: number;
+            /** Reopened */
+            reopened: number;
+        };
+        /** ExclusionsSaved */
+        ExclusionsSaved: {
+            /** Patterns */
+            patterns: string[];
+            /** At */
+            at: string | null;
+            /** By */
+            by: string | null;
+            /** Reason */
+            reason: string | null;
+            /** History */
+            history: components["schemas"]["ExclusionChange"][];
+            moved: components["schemas"]["ExclusionsMoved"];
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * FindingOut
+         * @description A finding as served: messages rendered in the reader's language, with its triage, fix and lifecycle.
+         */
+        FindingOut: {
+            /** Finding Id */
+            finding_id: string;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Scanner */
+            scanner: string;
+            /** Rule Id */
+            rule_id: string;
+            /** Title */
+            title?: string | null;
+            /** Path */
+            path: string;
+            /** Line */
+            line?: number | null;
+            /** Severity */
+            severity: string;
+            /** Confidence */
+            confidence?: number | null;
+            /** Tool */
+            tool?: string | null;
+            /** Cwe */
+            cwe?: number[] | null;
+            /** Owasp */
+            owasp?: string[] | null;
+            /** Cve */
+            cve?: string[] | null;
+            /** Ghsa */
+            ghsa?: string[] | null;
+            /** Package */
+            package?: {
+                [key: string]: unknown;
+            } | null;
+            /** Advisory */
+            advisory?: {
+                [key: string]: unknown;
+            } | null;
+            /** Priority */
+            priority?: {
+                [key: string]: unknown;
+            } | null;
+            /** Reason */
+            reason?: string | null;
+            /** Remediation */
+            remediation?: string | null;
+            /** Triage */
+            triage?: {
+                [key: string]: unknown;
+            } | null;
+            /** Fix */
+            fix?: {
+                [key: string]: unknown;
+            } | null;
+            /** Lifecycle */
+            lifecycle?: {
+                [key: string]: unknown;
+            } | null;
+            /** Ticket */
+            ticket?: {
+                [key: string]: unknown;
+            } | null;
+            /** Verification */
+            verification?: {
+                [key: string]: unknown;
+            } | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * GitHubStatus
+         * @description What the GitHub App needs, whether it's connected, its installations and, read live, their permissions.
+         */
+        GitHubStatus: {
+            /** Configured */
+            configured: boolean;
+            /** Connected */
+            connected: boolean;
+            /** Missing */
+            missing: string[];
+            /** App Id */
+            app_id?: string | null;
+            /** Slug */
+            slug?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Owner */
+            owner?: string | null;
+            /** Html Url */
+            html_url?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Public Url */
+            public_url: string;
+            /** Installation */
+            installation: {
+                [key: string]: unknown;
+            } | null;
+            /** Installations */
+            installations: {
+                [key: string]: unknown;
+            }[];
+            /** Required Permissions */
+            required_permissions: {
+                [key: string]: string;
+            };
+            /** Permissions */
+            permissions?: {
+                [key: string]: unknown;
+            } | null;
+            /** Events */
+            events?: string[] | null;
+            /** Available Installations */
+            available_installations?: {
+                [key: string]: unknown;
+            }[] | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** Health */
         Health: {
             /** Status */
@@ -2164,6 +2454,80 @@ export interface components {
             workers?: number | null;
             /** Queued */
             queued?: number | null;
+        };
+        /**
+         * ImportCheck
+         * @description What an import would create, counted, without creating it.
+         */
+        ImportCheck: {
+            /** Name */
+            name: string;
+            /** Methodology */
+            methodology: string;
+            /** Components */
+            components: number;
+            /** Flows */
+            flows: number;
+            /** Boundaries */
+            boundaries: number;
+            /** Repository Refs */
+            repository_refs: number;
+            /** Manual Threats */
+            manual_threats: number;
+            /** Attack Trees */
+            attack_trees: number;
+            /** Attack Mappings */
+            attack_mappings: number;
+            /** Pasta Stages */
+            pasta_stages: number;
+            /** Relayout */
+            relayout: boolean;
+        };
+        /** InstallLink */
+        InstallLink: {
+            /** Url */
+            url: string;
+        };
+        /**
+         * JiraExport
+         * @description Each finding exported: an issue created, one that already existed, or why it failed.
+         */
+        JiraExport: {
+            /** Created */
+            created: {
+                [key: string]: unknown;
+            }[];
+            /** Existing */
+            existing: {
+                [key: string]: unknown;
+            }[];
+            /** Failed */
+            failed: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** JiraStatus */
+        JiraStatus: {
+            /** Configured */
+            configured: boolean;
+            /** Site */
+            site?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Project */
+            project?: string | null;
+            /** Project Name */
+            project_name?: string | null;
+            /** Issue Type */
+            issue_type?: string | null;
+            /** Last4 */
+            last4?: string | null;
+            /** Saved At */
+            saved_at?: string | null;
+            /** Saved By */
+            saved_by?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** LinkInfo */
         LinkInfo: {
@@ -2244,6 +2608,55 @@ export interface components {
             name: string;
             /** Support Until */
             support_until: string | null;
+        };
+        /**
+         * Proposal
+         * @description The model with the proposed components merged in, and which ones are new.
+         */
+        Proposal: {
+            /** Model */
+            model: {
+                [key: string]: unknown;
+            };
+            /** Added */
+            added: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** ProviderCheck */
+        ProviderCheck: {
+            /** Status */
+            status: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** ProviderKeys */
+        ProviderKeys: {
+            /** Providers */
+            providers: components["schemas"]["ProviderStatus"][];
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** ProviderStatus */
+        ProviderStatus: {
+            /** Id */
+            id: string;
+            /** Configured */
+            configured: boolean;
+            /** Env */
+            env?: string | null;
+            /** Owner */
+            owner?: string | null;
+            /** Last4 */
+            last4?: string | null;
+            /** Saved At */
+            saved_at?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** PublicUser */
         PublicUser: {
@@ -2353,6 +2766,19 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** Reachability */
+        Reachability: {
+            /** Host */
+            host: string;
+            /** Reachable */
+            reachable: boolean;
+            /** Status */
+            status: string;
+            /** Detail */
+            detail?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** RecentCves */
         RecentCves: {
             /** Query */
@@ -2367,6 +2793,33 @@ export interface components {
             sources: {
                 [key: string]: unknown;
             };
+        };
+        /** Registries */
+        Registries: {
+            /** Registries */
+            registries: components["schemas"]["RegistryRow"][];
+            /** Allow Private */
+            allow_private?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * RegistryRow
+         * @description A registry's saved credentials: the user and the last four characters of the token, never the token.
+         */
+        RegistryRow: {
+            /** Registry */
+            registry: string;
+            /** Username */
+            username: string;
+            /** Last4 */
+            last4: string;
+            /** Saved At */
+            saved_at?: string | null;
+            /** Saved By */
+            saved_by?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** ReopenIn */
         ReopenIn: {
@@ -2432,18 +2885,124 @@ export interface components {
             /** Failed */
             failed: string[];
         };
+        /**
+         * RunDetail
+         * @description A whole run record, or a repository's state served in the same shape (`type` asset_state).
+         */
+        RunDetail: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at: string;
+            /** Target */
+            target?: string | null;
+            /** Summary */
+            summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Source */
+            source?: {
+                [key: string]: unknown;
+            } | null;
+            /** Variant */
+            variant?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Pull Request */
+            pull_request?: {
+                [key: string]: unknown;
+            } | null;
+            /** Trigger */
+            trigger?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Findings
+             * @default []
+             */
+            findings: components["schemas"]["FindingOut"][];
+            /**
+             * Steps
+             * @default []
+             */
+            steps: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Limitations
+             * @default []
+             */
+            limitations: string[];
+            /**
+             * Owasp Coverage
+             * @default []
+             */
+            owasp_coverage: unknown[];
+            /** Progress */
+            progress?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Context */
+            context?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** RunPage */
         RunPage: {
             /** Items */
-            items: {
-                [key: string]: unknown;
-            }[];
+            items: components["schemas"]["RunRow"][];
             /** Total */
             total: number;
             /** Limit */
             limit: number;
             /** Offset */
             offset: number;
+        };
+        /**
+         * RunRow
+         * @description A run's list row (no findings).
+         */
+        RunRow: {
+            /** Id */
+            id: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /** Created At */
+            created_at: string;
+            /** Target */
+            target?: string | null;
+            /** Summary */
+            summary?: {
+                [key: string]: unknown;
+            } | null;
+            /** Source */
+            source?: {
+                [key: string]: unknown;
+            } | null;
+            /** Variant */
+            variant?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Pull Request */
+            pull_request?: {
+                [key: string]: unknown;
+            } | null;
+            /** Trigger */
+            trigger?: {
+                [key: string]: unknown;
+            } | null;
+        } & {
+            [key: string]: unknown;
         };
         /** ScanBranch */
         ScanBranch: {
@@ -2462,6 +3021,38 @@ export interface components {
             uid: string;
             /** Branch */
             branch: string | null;
+        };
+        /**
+         * ScanPlan
+         * @description What a scan will do, from the repository's real tree and the engines this installation can run.
+         */
+        ScanPlan: {
+            /** Source Id */
+            source_id: string;
+            /** Languages */
+            languages: {
+                [key: string]: unknown;
+            }[];
+            /** Engines */
+            engines: {
+                [key: string]: unknown;
+            }[];
+            /** Manifests */
+            manifests: string[];
+            /** Iac */
+            iac: string[];
+            /** Pipelines */
+            pipelines: string[];
+            /** Runs */
+            runs: string[];
+            /** Skips */
+            skips: string[];
+            /** Osv Needed */
+            osv_needed: boolean;
+            /** Files */
+            files: number | null;
+        } & {
+            [key: string]: unknown;
         };
         /**
          * SecretAllowlist
@@ -2618,6 +3209,59 @@ export interface components {
             /** Updated At */
             updated_at: string | null;
         };
+        /**
+         * SourcePage
+         * @description A page of repositories (or the one asked for by `id`), with the connected accounts and providers.
+         */
+        SourcePage: {
+            /** Sources */
+            sources: components["schemas"]["SourceRow"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page?: number | null;
+            /** Per Page */
+            per_page?: number | null;
+            /** Partial */
+            partial?: boolean | null;
+            /** Accounts */
+            accounts?: string[] | null;
+            /** Providers */
+            providers?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            } | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** SourceRow */
+        SourceRow: {
+            /** Id */
+            id: string;
+            /** Uid */
+            uid?: string | null;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /** Private */
+            private?: boolean | null;
+            /** Branch */
+            branch?: string | null;
+            /** Default Branch */
+            default_branch?: string | null;
+            /** Scan Branch */
+            scan_branch?: string | null;
+            /** Archived */
+            archived?: boolean | null;
+            /** Installation Id */
+            installation_id?: number | null;
+            /** Account */
+            account?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
         /** TargetBranches */
         TargetBranches: {
             /** Uid */
@@ -2633,6 +3277,99 @@ export interface components {
             uid: string;
             /** Branches */
             branches: string[];
+        };
+        /**
+         * ThreatCatalog
+         * @description The models, the assets a component can link to, and the catalogs the editor offers.
+         */
+        ThreatCatalog: {
+            /** Models */
+            models: components["schemas"]["ThreatModelRow"][];
+            /** Assets */
+            assets: {
+                [key: string]: unknown;
+            }[];
+            /** Kinds */
+            kinds: {
+                [key: string]: string;
+            };
+            /** Protocols */
+            protocols: string[];
+            /** Classifications */
+            classifications: {
+                [key: string]: string;
+            };
+            /** Methods */
+            methods: {
+                [key: string]: unknown;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        /** ThreatModelRow */
+        ThreatModelRow: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Methodology */
+            methodology?: string | null;
+            /** Components */
+            components?: number | null;
+            /** Flows */
+            flows?: number | null;
+            /** Repositories */
+            repositories?: number | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Updated By */
+            updated_by?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * ThreatModelView
+         * @description A model with its threats (evidence from the linked assets' scans), their summary and the linked assets.
+         */
+        ThreatModelView: {
+            /** Model */
+            model: {
+                [key: string]: unknown;
+            };
+            /** Threats */
+            threats: {
+                [key: string]: unknown;
+            }[];
+            summary: components["schemas"]["ThreatSummary"];
+            /** Assets */
+            assets: {
+                [key: string]: unknown;
+            }[];
+        } & {
+            [key: string]: unknown;
+        };
+        /** ThreatSummary */
+        ThreatSummary: {
+            /** Total */
+            total: number;
+            /** By Status */
+            by_status: {
+                [key: string]: number;
+            };
+            /** By Stride */
+            by_stride: {
+                [key: string]: number;
+            };
+            /** By Severity */
+            by_severity: {
+                [key: string]: number;
+            };
+        } & {
+            [key: string]: unknown;
         };
         /** TotpDisabled */
         TotpDisabled: {
@@ -3361,9 +4098,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CveOverview"];
                 };
             };
         };
@@ -4151,9 +4886,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ScanPlan"];
                 };
             };
             /** @description Invalid parameters */
@@ -4447,7 +5180,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["SourcePage"];
                 };
             };
             /** @description Invalid parameters */
@@ -4496,7 +5229,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CodeConnection"];
                 };
             };
         };
@@ -4516,7 +5249,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Domain"][];
                 };
             };
         };
@@ -4553,7 +5286,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Domain"];
                 };
             };
         };
@@ -4580,7 +5313,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Domain"];
                 };
             };
         };
@@ -4607,7 +5340,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Reachability"];
                 };
             };
         };
@@ -4627,7 +5360,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProviderStatus"][];
                 };
             };
         };
@@ -4664,7 +5397,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProviderKeys"];
                 };
             };
         };
@@ -4691,7 +5424,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ProviderCheck"];
                 };
             };
         };
@@ -4711,7 +5444,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["GitHubStatus"];
                 };
             };
         };
@@ -4743,7 +5476,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["GitHubStatus"] | components["schemas"]["InstallLink"];
                 };
             };
         };
@@ -4772,7 +5505,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["GitHubStatus"];
                 };
             };
         };
@@ -4823,7 +5556,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["JiraStatus"];
                 };
             };
         };
@@ -4872,7 +5605,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["JiraStatus"];
                 };
             };
         };
@@ -4901,7 +5634,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["JiraExport"];
                 };
             };
         };
@@ -4921,7 +5654,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ThreatCatalog"];
                 };
             };
         };
@@ -4958,7 +5691,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ThreatModelView"];
                 };
             };
         };
@@ -4980,7 +5713,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ThreatModelView"];
                 };
             };
             /** @description Invalid parameters */
@@ -5049,7 +5782,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ThreatModelView"];
                 };
             };
         };
@@ -5073,7 +5806,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ImportCheck"];
                 };
             };
         };
@@ -5102,7 +5835,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Proposal"];
                 };
             };
         };
@@ -5135,7 +5868,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ThreatModelView"];
                 };
             };
         };
@@ -5162,7 +5895,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["Deleted"];
                 };
             };
         };
@@ -5182,7 +5915,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["RunRow"][];
                 };
             };
         };
@@ -5240,9 +5973,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["RunDetail"];
                 };
             };
             /** @description Invalid parameters */
@@ -5353,9 +6084,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["RunDetail"];
                 };
             };
             /** @description Invalid parameters */
@@ -5431,9 +6160,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Exclusions"];
                 };
             };
             /** @description Invalid parameters */
@@ -5473,9 +6200,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ExclusionsSaved"];
                 };
             };
         };
@@ -5559,9 +6284,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Registries"];
                 };
             };
         };
@@ -5597,9 +6320,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Registries"];
                 };
             };
         };
@@ -5673,9 +6394,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ChannelSaved"] | components["schemas"]["ChannelTested"] | components["schemas"]["ChannelsLeft"];
                 };
             };
         };

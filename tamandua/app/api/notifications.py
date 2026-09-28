@@ -49,7 +49,28 @@ class ChannelIn(BaseModel):
     id: str
 
 
-@router.post("/api/notifications", openapi_extra=documented(ChannelSaveIn, ChannelIn))
+class ChannelSaved(BaseModel):
+    """A saved channel and, for a webhook, its signing secret: shown this once."""
+    model_config = ConfigDict(extra="forbid")  # one answer per operation: the union picks it by shape
+    channel: dict[str, Any]
+    secret: str | None
+
+
+class ChannelsLeft(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # one answer per operation: the union picks it by shape
+    channels: list[dict[str, Any]] = Field(max_length=notifications.MAX_CHANNELS)
+
+
+class ChannelTested(BaseModel):
+    """Whether the test delivery worked (a 200 also when it didn't), why, and the channels with their last result."""
+    model_config = ConfigDict(extra="forbid")  # one answer per operation: the union picks it by shape
+    ok: bool
+    detail: str
+    channels: list[dict[str, Any]] = Field(max_length=notifications.MAX_CHANNELS)
+
+
+@router.post("/api/notifications", openapi_extra=documented(ChannelSaveIn, ChannelIn),
+             response_model=ChannelSaved | ChannelTested | ChannelsLeft)
 def channel_change(context: Context = Depends(guard(Policy(admin=True, action="notifications", body=4096))),
                    data: Any = Depends(json_body)) -> dict[str, Any]:
     """`save` answers the channel and, for a webhook, its signing secret (shown once); `remove` the channels left;

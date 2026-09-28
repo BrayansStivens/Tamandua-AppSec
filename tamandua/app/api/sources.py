@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import html
 import json
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import Response
@@ -12,12 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 
 from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, guard
 from tamandua.app.api.deps import problem
+from tamandua.app.api.schemas import AS_RETURNED, MANY, Open
 from tamandua.app.api.security import public_url
 from tamandua.modules.findings import triage
 from tamandua.modules.runs.registry import resolve
 from tamandua.modules.findings import tickets
 from tamandua.modules.integrations import code_tokens, jira
-from tamandua.modules.integrations.ai_providers import ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
+from tamandua.modules.integrations.ai_providers import PROVIDERS, ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
 from tamandua.modules.integrations.github import (REQUIRED_PERMISSIONS, GitHubAppError, app_installations, app_permissions,
                                                   config as github_config, forget as forget_installation, forget_app, forget_catalog,
                                                   install_url, installation_details, permission_review, save_credentials, verify_app)
@@ -31,6 +32,120 @@ from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import default_locale, msg, t, text
 
 router = APIRouter(tags=["sources"])
+
+
+# --- responses ---------------------------------------------------------------------------------------------------
+
+class SourceRow(Open):
+    id: str
+    uid: str | None = None
+    name: str
+    provider: str
+    private: bool | None = None
+    branch: str | None = None
+    default_branch: str | None = None
+    scan_branch: str | None = None
+    archived: bool | None = None
+    installation_id: int | None = None
+    account: str | None = None
+
+
+class SourcePage(Open):
+    """A page of repositories (or the one asked for by `id`), with the connected accounts and providers."""
+    sources: list[SourceRow] = Field(max_length=100)  # a page (per_page 1–100), or the one asked for
+    total: int
+    page: int | None = None
+    per_page: int | None = None
+    partial: bool | None = None
+    accounts: list[str] | None = Field(None, max_length=MANY)
+    providers: dict[str, dict[str, Any]] | None = None
+
+
+class CodeConnection(Open):
+    provider: str
+    connected: bool
+    repositories: int | None = None
+
+
+class Domain(Open):
+    id: str
+    host: str
+    url: str
+    kind: str | None = None
+    context: str | None = None
+    txt_name: str
+    txt_value: str
+    verified: bool
+    registered_at: str | None = None
+    verified_at: str | None = None
+
+
+class Reachability(Open):
+    host: str
+    reachable: bool
+    status: str
+    detail: str | None = None
+
+
+class ProviderStatus(Open):
+    id: str
+    configured: bool
+    env: str | None = None
+    owner: str | None = None
+    last4: str | None = None
+    saved_at: str | None = None
+
+
+class ProviderKeys(Open):
+    providers: list[ProviderStatus] = Field(max_length=len(PROVIDERS))
+    result: dict[str, Any] | None = None
+
+
+class ProviderCheck(Open):
+    status: str
+
+
+class GitHubStatus(Open):
+    """What the GitHub App needs, whether it's connected, its installations and, read live, their permissions."""
+    configured: bool
+    connected: bool
+    missing: list[str] = Field(max_length=10)  # what the App still needs, of a handful
+    app_id: str | None = None
+    slug: str | None = None
+    name: str | None = None
+    owner: str | None = None
+    html_url: str | None = None
+    source: str | None = None
+    public_url: str
+    installation: dict[str, Any] | None
+    installations: list[dict[str, Any]] = Field(max_length=MANY)
+    required_permissions: dict[str, str]
+    permissions: dict[str, Any] | None = None
+    events: list[str] | None = Field(None, max_length=MANY)
+    available_installations: list[dict[str, Any]] | None = Field(None, max_length=MANY)
+
+
+class InstallLink(BaseModel):
+    url: str
+
+
+class JiraStatus(Open):
+    configured: bool
+    site: str | None = None
+    email: str | None = None
+    project: str | None = None
+    project_name: str | None = None
+    issue_type: str | None = None
+    last4: str | None = None
+    saved_at: str | None = None
+    saved_by: str | None = None
+
+
+class JiraExport(BaseModel):
+    """Each finding exported: an issue created, one that already existed, or why it failed."""
+    created: list[dict[str, Any]] = Field(max_length=jira.MAX_BATCH)
+    existing: list[dict[str, Any]] = Field(max_length=jira.MAX_BATCH)
+    failed: list[dict[str, Any]] = Field(max_length=jira.MAX_BATCH)
 
 
 def server_port(request: Request) -> int:
@@ -47,7 +162,7 @@ def _page(page: str | None, per_page: str | None) -> tuple[int, int] | None:
     return (page_number, size) if 1 <= size <= 100 and 1 <= page_number and page_number * size <= 10_000 else None
 
 
-@router.get("/api/sources")
+@router.get("/api/sources", response_model=SourcePage, **AS_RETURNED)
 def sources(source_id: str | None = Query(None, alias="id"), q: str | None = None, account: str | None = None,
             provider: str | None = None, page: str | None = None, per_page: str | None = None, refresh: str | None = None,
             context: Context = Depends(guard())) -> Any:
@@ -80,7 +195,7 @@ class CodeDisconnectIn(BaseModel):
     disconnect: Any
 
 
-@router.post("/api/integrations/code", openapi_extra=documented(CodeTokenIn, CodeDisconnectIn))
+@router.post("/api/integrations/code", openapi_extra=documented(CodeTokenIn, CodeDisconnectIn), response_model=CodeConnection, **AS_RETURNED)
 def connect_code(context: Context = Depends(guard(Policy(admin=True, action="connect-code", body=1024))),
                  data: CodeTokenIn | CodeDisconnectIn = Depends(body(CodeTokenIn | CodeDisconnectIn,
                                                                      msg("integrations.code.invalid_provider")))) -> Any:
@@ -121,12 +236,12 @@ class DomainUrlIn(BaseModel):
     url: str
 
 
-@router.get("/api/domains")
+@router.get("/api/domains", response_model=Annotated[list[Domain], Field(max_length=MANY)], **AS_RETURNED)
 def domains(context: Context = Depends(guard())) -> Any:
     return context.render(list_domains(context.data_dir))
 
 
-@router.post("/api/domains", openapi_extra=documented(DomainIn))
+@router.post("/api/domains", openapi_extra=documented(DomainIn), response_model=Domain, **AS_RETURNED)
 def add_domain(context: Context = Depends(guard(Policy(action="register-domain", body=1024))),
                data: DomainIn = Depends(body(DomainIn, msg("sources.domains.invalid_request")))) -> Any:
     with locked(context.data_dir):
@@ -137,7 +252,7 @@ def add_domain(context: Context = Depends(guard(Policy(action="register-domain",
     return context.render(record)
 
 
-@router.post("/api/domains/verify", openapi_extra=documented(DomainIdIn))
+@router.post("/api/domains/verify", openapi_extra=documented(DomainIdIn), response_model=Domain, **AS_RETURNED)
 def verify(context: Context = Depends(guard(Policy(action="verify-domain"))),
            data: DomainIdIn = Depends(body(DomainIdIn, msg("sources.domains.invalid_request")))) -> Any:
     with locked(context.data_dir):
@@ -148,7 +263,7 @@ def verify(context: Context = Depends(guard(Policy(action="verify-domain"))),
     return context.render(record)
 
 
-@router.post("/api/domains/check", openapi_extra=documented(DomainUrlIn))
+@router.post("/api/domains/check", openapi_extra=documented(DomainUrlIn), response_model=Reachability, **AS_RETURNED)
 def reachability(context: Context = Depends(guard(Policy(action="check-domain", body=512))),
                  data: DomainUrlIn = Depends(body(DomainUrlIn, msg("sources.domains.invalid_request")))) -> Any:
     try:
@@ -171,12 +286,12 @@ class ProviderIn(BaseModel):
     provider: Any
 
 
-@router.get("/api/providers")
+@router.get("/api/providers", response_model=Annotated[list[ProviderStatus], Field(max_length=len(PROVIDERS))], **AS_RETURNED)
 def providers(context: Context = Depends(guard())) -> Any:
     return context.render(provider_status())
 
 
-@router.post("/api/providers/keys", openapi_extra=documented(ProviderKeyIn))
+@router.post("/api/providers/keys", openapi_extra=documented(ProviderKeyIn), response_model=ProviderKeys, **AS_RETURNED)
 def provider_keys(context: Context = Depends(guard(Policy(admin=True, action="save-ai-key", body=768))),
                   data: ProviderKeyIn = Depends(body(ProviderKeyIn, msg("integrations.ai.invalid_request")))) -> Any:
     """Saves (after checking it with the provider) or removes the workspace's own key; the key never comes back."""
@@ -194,7 +309,7 @@ def provider_keys(context: Context = Depends(guard(Policy(admin=True, action="sa
     return context.render({"result": result, "providers": provider_status()})
 
 
-@router.post("/api/providers/check", openapi_extra=documented(ProviderIn))
+@router.post("/api/providers/check", openapi_extra=documented(ProviderIn), response_model=ProviderCheck, **AS_RETURNED)
 def provider_check(context: Context = Depends(guard(Policy(action="check-provider"))),
                    data: ProviderIn = Depends(body(ProviderIn, msg("integrations.code.invalid_provider")))) -> Any:
     try:
@@ -260,7 +375,7 @@ def _attach(context: Context, installation_id: int) -> dict | None:
     return chosen
 
 
-@router.get("/api/integrations/github")
+@router.get("/api/integrations/github", response_model=GitHubStatus, **AS_RETURNED)
 def github(context: Context = Depends(guard()), port: int = Depends(server_port)) -> Any:
     return context.render(github_status(context.data_dir, port, live=True))
 
@@ -271,7 +386,7 @@ class GitHubAppIn(BaseModel):
     private_key: Any
 
 
-@router.post("/api/integrations/github/app", openapi_extra=documented(GitHubAppIn))
+@router.post("/api/integrations/github/app", openapi_extra=documented(GitHubAppIn), response_model=GitHubStatus, **AS_RETURNED)
 def github_app_credentials(context: Context = Depends(guard(Policy(admin=True, action="save-github-app", body=20_000))),
                            data: GitHubAppIn = Depends(body(GitHubAppIn, msg("api.invalid_request"))),
                            port: int = Depends(server_port)) -> Any:
@@ -305,7 +420,7 @@ class GitHubActionIn(BaseModel):
         return self
 
 
-@router.post("/api/integrations/github", openapi_extra=documented(GitHubActionIn))
+@router.post("/api/integrations/github", openapi_extra=documented(GitHubActionIn), response_model=GitHubStatus | InstallLink, **AS_RETURNED)
 def github_action(context: Context = Depends(guard(Policy(admin=True, action="connect-github", body=256))),
                   data: GitHubActionIn = Depends(body(GitHubActionIn, msg("integrations.github.invalid_action"))),
                   port: int = Depends(server_port)) -> Any:
@@ -386,12 +501,12 @@ class JiraExportIn(BaseModel):
     fingerprints: Any
 
 
-@router.get("/api/integrations/jira")
+@router.get("/api/integrations/jira", response_model=JiraStatus, **AS_RETURNED)
 def jira_status(context: Context = Depends(guard())) -> Any:
     return context.render(jira.status())
 
 
-@router.post("/api/integrations/jira", openapi_extra=documented(JiraSaveIn, JiraRemoveIn))
+@router.post("/api/integrations/jira", openapi_extra=documented(JiraSaveIn, JiraRemoveIn), response_model=JiraStatus, **AS_RETURNED)
 def jira_configure(context: Context = Depends(guard(Policy(admin=True, action="connect-jira", body=1024))),
                    data: JiraSaveIn | JiraRemoveIn = Depends(body(JiraSaveIn | JiraRemoveIn,
                                                                   msg("integrations.jira.invalid_request")))) -> Any:
@@ -407,7 +522,7 @@ def jira_configure(context: Context = Depends(guard(Policy(admin=True, action="c
         raise ApiError(500, msg("api.save_settings_failed")) from exc
 
 
-@router.post("/api/integrations/jira/issues", openapi_extra=documented(JiraExportIn))
+@router.post("/api/integrations/jira/issues", openapi_extra=documented(JiraExportIn), response_model=JiraExport, **AS_RETURNED)
 def jira_export(context: Context = Depends(guard(Policy(action="export-jira", body=6000))),
                 data: JiraExportIn = Depends(body(JiraExportIn, msg("integrations.jira.invalid_export")))) -> Any:
     try:

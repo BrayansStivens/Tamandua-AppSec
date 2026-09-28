@@ -86,7 +86,7 @@ class ServerTests(unittest.TestCase):
 
     def test_unexpected_error_does_not_leak_a_trace(self):
         client = asgi.TestClient(self.client.app, base_url=str(self.client.base_url), raise_server_exceptions=False)
-        with patch("tamandua.app.api.runs.list_runs", side_effect=RuntimeError("secreto interno")):
+        with patch("tamandua.app.api.runs.find_runs", side_effect=RuntimeError("secreto interno")):
             response = asgi.request(client, "GET", "/api/runs", headers={"Cookie": self.cookie})
         self.assertEqual((response.status_code, response.json()), (500, {"error": "Error interno del servidor"}))
         self.assertEqual(response.headers["x-content-type-options"], "nosniff")

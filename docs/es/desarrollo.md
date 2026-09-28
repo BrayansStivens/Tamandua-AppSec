@@ -58,6 +58,12 @@ seguridad con `guard(Policy(public=…, admin=…, action=…))` (CSRF, sesión,
 `app/api/security.py`) y la lógica en el módulo de negocio, nunca en la ruta. El cuerpo de la petición se lee después
 de la protección con `deps.body(Modelo, mensaje_inválido)`, así una petición sin sesión nunca llega a validarse.
 
+Toda ruta JSON declara su `response_model`. Para un resultado amplio (una ejecución, el estado de GitHub), hereda de
+`Open` en `app/api/schemas.py` con los campos en los que se apoyan los lectores y pasa `**AS_RETURNED`: el resto de
+campos sale tal como lo devolvió el módulo, y uno que falte nunca se añade como null. Toda lista declara su máximo
+(`Field(max_length=…)`), el límite del propio módulo si lo tiene: el modelo de respuesta lo comprueba, y
+`tests/test_api.py` falla ante un array sin cota.
+
 Después, `make openapi` regenera el esquema y los tipos TypeScript del panel (`web/src/shared/api/`), que se usan con
 `apiGet('/api/…')`: si la API y el panel no cuadran, falla `tsc`. El CI comprueba que el esquema está al día.
 

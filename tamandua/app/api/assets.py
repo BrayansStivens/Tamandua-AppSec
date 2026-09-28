@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from tamandua.app.api.deps import ApiError, Context, Policy, documented, guard, json_body
 from tamandua.app.api.deps import problem
 from tamandua.app.api.runs import DOWNLOADS, PROFILE_REPORTS, SBOM_FILE, VEX_FILE, download
+from tamandua.app.api.schemas import AS_RETURNED, Open, RunDetail
 from tamandua.modules.findings import exclusions
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.findings import tickets
@@ -44,7 +45,7 @@ def assets(q: str = "", key: str = "", limit: str = "50", offset: str = "0", con
     return context.render({"items": rows[start:start + size], "total": len(rows), "limit": size, "offset": start})
 
 
-@router.get("/api/assets/state")
+@router.get("/api/assets/state", response_model=RunDetail, **AS_RETURNED)
 def asset_state(key: str = "", status: str = "open", context: Context = Depends(guard())) -> dict[str, Any]:
     """An asset's findings registry (scans and PRs): open, fixed, excluded or all."""
     key, status = key[:200], status or "open"
@@ -75,7 +76,32 @@ def asset_export(key: str = "", status: str = "open", artifact: str = "", title:
         raise ApiError(400, problem(exc)) from exc
 
 
-@router.get("/api/assets/exclusions")
+class ExclusionChange(Open):
+    at: str
+    by: str
+    patterns: list[str] | None = Field(None, max_length=exclusions.MAX_PATTERNS)
+    reason: str | None = None
+
+
+class Exclusions(Open):
+    """A repository's excluded paths, who set them last and why, and their history."""
+    patterns: list[str] = Field(max_length=exclusions.MAX_PATTERNS)
+    at: str | None
+    by: str | None
+    reason: str | None
+    history: list[ExclusionChange] = Field(max_length=exclusions.HISTORY)
+
+
+class ExclusionsMoved(BaseModel):
+    excluded: int
+    reopened: int
+
+
+class ExclusionsSaved(Exclusions):
+    moved: ExclusionsMoved
+
+
+@router.get("/api/assets/exclusions", response_model=Exclusions, **AS_RETURNED)
 def asset_exclusions(key: str = "", context: Context = Depends(guard())) -> dict[str, Any]:
     """A repository's excluded paths: anyone sees them; only an administrator changes them."""
     if not exclusions.ASSET_KEY.fullmatch(key):
@@ -93,7 +119,7 @@ class ExclusionsIn(BaseModel):
 EXCLUSION_FIELDS = set(ExclusionsIn.model_fields)
 
 
-@router.post("/api/assets/exclusions", openapi_extra=documented(ExclusionsIn))
+@router.post("/api/assets/exclusions", openapi_extra=documented(ExclusionsIn), response_model=ExclusionsSaved, **AS_RETURNED)
 def save_asset_exclusions(context: Context = Depends(guard(Policy(admin=True, action="save-exclusions", body=20_000))),
                           data: Any = Depends(json_body)) -> dict[str, Any]:
     """Replaces the excluded paths; findings under them move to excluded, and the ones no longer covered reopen."""

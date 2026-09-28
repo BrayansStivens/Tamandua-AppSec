@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, guard, json_body
+from tamandua.app.api.schemas import AS_RETURNED, MANY, Open
 from tamandua.modules.integrations import code_tokens
 from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.integrations.installations import github_installations
@@ -24,6 +25,71 @@ from tamandua.shared.i18n import msg
 from tamandua.version import VERSION
 
 router = APIRouter(tags=["threats"])
+
+
+# --- responses ---------------------------------------------------------------------------------------------------
+
+class ThreatModelRow(Open):
+    id: str
+    name: str
+    description: str | None = None
+    methodology: str | None = None
+    components: int | None = None
+    flows: int | None = None
+    repositories: int | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    updated_by: str | None = None
+
+
+class ThreatCatalog(Open):
+    """The models, the assets a component can link to, and the catalogs the editor offers."""
+    models: list[ThreatModelRow] = Field(max_length=MANY)
+    assets: list[dict[str, Any]] = Field(max_length=MANY)
+    kinds: dict[str, str]
+    protocols: list[str] = Field(max_length=len(tm.PROTOCOLS))
+    classifications: dict[str, str]
+    methods: dict[str, Any]
+
+
+class ThreatSummary(Open):
+    total: int
+    by_status: dict[str, int]
+    by_stride: dict[str, int]
+    by_severity: dict[str, int]
+
+
+class ThreatModelView(Open):
+    """A model with its threats (evidence from the linked assets' scans), their summary and the linked assets."""
+    model: dict[str, Any]
+    threats: list[dict[str, Any]] = Field(max_length=MANY)
+    summary: ThreatSummary
+    assets: list[dict[str, Any]] = Field(max_length=MANY)
+
+
+class ImportCheck(BaseModel):
+    """What an import would create, counted, without creating it."""
+    name: str
+    methodology: str
+    components: int
+    flows: int
+    boundaries: int
+    repository_refs: int
+    manual_threats: int
+    attack_trees: int
+    attack_mappings: int
+    pasta_stages: int
+    relayout: bool
+
+
+class Proposal(Open):
+    """The model with the proposed components merged in, and which ones are new."""
+    model: dict[str, Any]
+    added: list[str] = Field(max_length=tm.LIMITS["components"])
+
+
+class Deleted(BaseModel):
+    deleted: bool
 
 
 def _model_keys(model) -> list[str]:
@@ -94,7 +160,7 @@ def _read_repositories(context: Context, assets: dict, chosen) -> list[dict] | d
     return repositories
 
 
-@router.get("/api/threat-models")
+@router.get("/api/threat-models", response_model=ThreatCatalog, **AS_RETURNED)
 def models(context: Context = Depends(guard())) -> Any:
     return context.render({"models": tm.list_models(context.data_dir), "assets": list(_assets(context).values()),
                            "kinds": tm.KINDS, "protocols": tm.PROTOCOLS, "classifications": tm.CLASSIFICATION_LABELS,
@@ -108,7 +174,7 @@ def _stored_view(context: Context, model_id: str) -> dict:
         raise ApiError(404, exc.message) from exc
 
 
-@router.get("/api/threat-models/{model_id}")
+@router.get("/api/threat-models/{model_id}", response_model=ThreatModelView, **AS_RETURNED)
 def model_detail(model_id: str, context: Context = Depends(guard())) -> Any:
     return context.render(_stored_view(context, model_id))
 
@@ -183,7 +249,7 @@ class ModelIdIn(BaseModel):
 ANY_JSON = {"requestBody": {"required": True, "content": {"application/json": {"schema": {}}}}}
 
 
-@router.post("/api/threat-models", openapi_extra=documented(ThreatModelIn))
+@router.post("/api/threat-models", openapi_extra=documented(ThreatModelIn), response_model=ThreatModelView, **AS_RETURNED)
 def save_model(context: Context = Depends(guard(Policy(action="save-threat-model", body=600_000))),
                data: ThreatModelIn = Depends(body(ThreatModelIn, msg("api.invalid_request")))) -> Any:
     suggested = data.suggest if isinstance(data.suggest, list) else []
@@ -210,7 +276,7 @@ def save_model(context: Context = Depends(guard(Policy(action="save-threat-model
         raise ApiError(400, msg("threats.errors.save_failed")) from exc
 
 
-@router.post("/api/threat-models/import", openapi_extra=ANY_JSON)
+@router.post("/api/threat-models/import", openapi_extra=ANY_JSON, response_model=ThreatModelView, **AS_RETURNED)
 def import_model(context: Context = Depends(guard(Policy(action="import-threat-model", body=600_000))),
                  data: Any = Depends(json_body)) -> Any:
     """Creates a model from the portable format (model.json)."""
@@ -224,7 +290,7 @@ def import_model(context: Context = Depends(guard(Policy(action="import-threat-m
         raise ApiError(400, msg("threats.errors.import_failed")) from exc
 
 
-@router.post("/api/threat-models/validate", openapi_extra=ANY_JSON)
+@router.post("/api/threat-models/validate", openapi_extra=ANY_JSON, response_model=ImportCheck, **AS_RETURNED)
 def validate_import(context: Context = Depends(guard(Policy(action="validate-threat-model", body=600_000))),
                     data: Any = Depends(json_body)) -> Any:
     """Checks the portable format without creating or changing a model."""
@@ -245,7 +311,7 @@ def validate_import(context: Context = Depends(guard(Policy(action="validate-thr
     }
 
 
-@router.post("/api/threat-models/propose", openapi_extra=documented(ProposeIn))
+@router.post("/api/threat-models/propose", openapi_extra=documented(ProposeIn), response_model=Proposal, **AS_RETURNED)
 def propose(context: Context = Depends(guard(Policy(action="propose-components", body=600_000))),
             data: ProposeIn = Depends(body(ProposeIn, msg("api.invalid_request")))) -> Any:
     """Components proposed from repositories, merged into the draft being edited. Saves nothing."""
@@ -264,7 +330,7 @@ def propose(context: Context = Depends(guard(Policy(action="propose-components",
     return context.render({"model": merged, "added": added})
 
 
-@router.post("/api/threat-models/decide", openapi_extra=documented(DecisionIn))
+@router.post("/api/threat-models/decide", openapi_extra=documented(DecisionIn), response_model=ThreatModelView, **AS_RETURNED)
 def decide(context: Context = Depends(guard(Policy(action="threat-decision", body=1024))),
            data: DecisionIn = Depends(body(DecisionIn, msg("api.invalid_request")))) -> Any:
     try:
@@ -274,7 +340,7 @@ def decide(context: Context = Depends(guard(Policy(action="threat-decision", bod
     return context.render(_view(context, model))
 
 
-@router.post("/api/threat-models/delete", openapi_extra=documented(ModelIdIn))
+@router.post("/api/threat-models/delete", openapi_extra=documented(ModelIdIn), response_model=Deleted, **AS_RETURNED)
 def remove(context: Context = Depends(guard(Policy(admin=True, action="delete-threat-model", body=128))),
            data: ModelIdIn = Depends(body(ModelIdIn, msg("api.invalid_request")))) -> Any:
     try:

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr
 
 from tamandua.shared import settings
 from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, guard, json_body
+from tamandua.app.api.schemas import AS_RETURNED, MANY, Open
 from tamandua.app.api.repositories import QUEUE_LIMIT, BatchSummary
 from tamandua.app.api.deps import problem
 from tamandua.modules.runs import batches
@@ -81,7 +82,21 @@ def image_batch(context: Context = Depends(guard(Policy(action="scan-image-batch
     return context.render(batches.summary(context.data_dir, batch))
 
 
-@router.get("/api/registries")
+class RegistryRow(Open):
+    """A registry's saved credentials: the user and the last four characters of the token, never the token."""
+    registry: str
+    username: str
+    last4: str
+    saved_at: str | None = None
+    saved_by: str | None = None
+
+
+class Registries(Open):
+    registries: list[RegistryRow] = Field(max_length=MANY)
+    allow_private: bool | None = None
+
+
+@router.get("/api/registries", response_model=Registries, **AS_RETURNED)
 def registry_list(context: Context = Depends(guard())) -> dict[str, Any]:
     """Registries with saved credentials (never the token), and whether private addresses are allowed."""
     return context.render({"registries": registries(), "allow_private": settings.flag("TAMANDUA_ALLOW_PRIVATE_REGISTRIES")})
@@ -96,7 +111,7 @@ class RegistryIn(BaseModel):
     token: str | None = None
 
 
-@router.post("/api/registries", openapi_extra=documented(RegistryIn))
+@router.post("/api/registries", openapi_extra=documented(RegistryIn), response_model=Registries, **AS_RETURNED)
 def registry_save(context: Context = Depends(guard(Policy(admin=True, action="save-registry", body=6000))),
                   data: Any = Depends(json_body)) -> dict[str, Any]:
     """Read-only credentials of a private registry: stored encrypted, never sent back to the browser."""

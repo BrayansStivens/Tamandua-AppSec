@@ -9,6 +9,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr
 
 from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, guard, json_body
+from tamandua.app.api.schemas import AS_RETURNED, MANY, Open
+from tamandua.modules.scanning.plan import PLAN_FILES
 from tamandua.app.api.deps import problem
 from tamandua.modules.integrations import code_tokens
 from tamandua.modules.integrations.github import BranchNotFound, GitHubAppError, branch_head, valid_branch
@@ -71,7 +73,21 @@ def scan_branch(body: ScanBranchIn,
 QUEUE_LIMIT = 20
 
 
-@router.get("/api/repositories/plan")
+class ScanPlan(Open):
+    """What a scan will do, from the repository's real tree and the engines this installation can run."""
+    source_id: str
+    languages: list[dict[str, Any]] = Field(max_length=MANY)
+    engines: list[dict[str, Any]] = Field(max_length=MANY)
+    manifests: list[str] = Field(max_length=PLAN_FILES)
+    iac: list[str] = Field(max_length=PLAN_FILES)
+    pipelines: list[str] = Field(max_length=PLAN_FILES)
+    runs: list[str] = Field(max_length=MANY)
+    skips: list[str] = Field(max_length=MANY)
+    osv_needed: bool
+    files: int | None
+
+
+@router.get("/api/repositories/plan", response_model=ScanPlan, **AS_RETURNED)
 def plan(source_id: str = "", context: Context = Depends(guard())) -> dict[str, Any]:
     """What the scan will do, worked out from the repository's real tree and the available engines."""
     tokens = code_tokens.current()

@@ -1008,9 +1008,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Overview Api Cve Db Overview Get"
+                  "$ref": "#/components/schemas/CveOverview"
                 }
               }
             }
@@ -2313,9 +2311,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Plan Api Repositories Plan Get"
+                  "$ref": "#/components/schemas/ScanPlan"
                 }
               }
             }
@@ -2819,7 +2815,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Sources Api Sources Get"
+                  "$ref": "#/components/schemas/SourcePage"
                 }
               }
             }
@@ -2906,7 +2902,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Connect Code Api Integrations Code Post"
+                  "$ref": "#/components/schemas/CodeConnection"
                 }
               }
             }
@@ -2927,6 +2923,11 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Domain"
+                  },
+                  "type": "array",
+                  "maxItems": 10000,
                   "title": "Response Domains Api Domains Get"
                 }
               }
@@ -2977,7 +2978,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Add Domain Api Domains Post"
+                  "$ref": "#/components/schemas/Domain"
                 }
               }
             }
@@ -3019,7 +3020,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Verify Api Domains Verify Post"
+                  "$ref": "#/components/schemas/Domain"
                 }
               }
             }
@@ -3061,7 +3062,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Reachability Api Domains Check Post"
+                  "$ref": "#/components/schemas/Reachability"
                 }
               }
             }
@@ -3082,6 +3083,11 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderStatus"
+                  },
+                  "type": "array",
+                  "maxItems": 2,
                   "title": "Response Providers Api Providers Get"
                 }
               }
@@ -3137,7 +3143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Provider Keys Api Providers Keys Post"
+                  "$ref": "#/components/schemas/ProviderKeys"
                 }
               }
             }
@@ -3178,7 +3184,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Provider Check Api Providers Check Post"
+                  "$ref": "#/components/schemas/ProviderCheck"
                 }
               }
             }
@@ -3199,7 +3205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Github Api Integrations Github Get"
+                  "$ref": "#/components/schemas/GitHubStatus"
                 }
               }
             }
@@ -3251,6 +3257,14 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/GitHubStatus"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InstallLink"
+                    }
+                  ],
                   "title": "Response Github Action Api Integrations Github Post"
                 }
               }
@@ -3297,7 +3311,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Github App Credentials Api Integrations Github App Post"
+                  "$ref": "#/components/schemas/GitHubStatus"
                 }
               }
             }
@@ -3357,7 +3371,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Jira Status Api Integrations Jira Get"
+                  "$ref": "#/components/schemas/JiraStatus"
                 }
               }
             }
@@ -3437,7 +3451,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Jira Configure Api Integrations Jira Post"
+                  "$ref": "#/components/schemas/JiraStatus"
                 }
               }
             }
@@ -3483,7 +3497,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Jira Export Api Integrations Jira Issues Post"
+                  "$ref": "#/components/schemas/JiraExport"
                 }
               }
             }
@@ -3504,7 +3518,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Models Api Threat Models Get"
+                  "$ref": "#/components/schemas/ThreatCatalog"
                 }
               }
             }
@@ -3556,7 +3570,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Save Model Api Threat Models Post"
+                  "$ref": "#/components/schemas/ThreatModelView"
                 }
               }
             }
@@ -3588,7 +3602,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Model Detail Api Threat Models  Model Id  Get"
+                  "$ref": "#/components/schemas/ThreatModelView"
                 }
               }
             }
@@ -3680,7 +3694,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Import Model Api Threat Models Import Post"
+                  "$ref": "#/components/schemas/ThreatModelView"
                 }
               }
             }
@@ -3710,7 +3724,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Validate Import Api Threat Models Validate Post"
+                  "$ref": "#/components/schemas/ImportCheck"
                 }
               }
             }
@@ -3756,7 +3770,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Propose Api Threat Models Propose Post"
+                  "$ref": "#/components/schemas/Proposal"
                 }
               }
             }
@@ -3808,7 +3822,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Decide Api Threat Models Decide Post"
+                  "$ref": "#/components/schemas/ThreatModelView"
                 }
               }
             }
@@ -3849,7 +3863,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "title": "Response Remove Api Threat Models Delete Post"
+                  "$ref": "#/components/schemas/Deleted"
                 }
               }
             }
@@ -3863,14 +3877,21 @@
           "runs"
         ],
         "summary": "Runs",
-        "description": "Every run's row, newest first (the panel pages with /api/runs/page).",
+        "description": "The rows of the newest runs (at most 10 000), newest first. To go through all of them, /api/runs/page.",
         "operationId": "runs_api_runs_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunRow"
+                  },
+                  "type": "array",
+                  "maxItems": 10000,
+                  "title": "Response Runs Api Runs Get"
+                }
               }
             }
           }
@@ -3995,9 +4016,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Run Detail Api Runs  Run Id  Get"
+                  "$ref": "#/components/schemas/RunDetail"
                 }
               }
             }
@@ -4216,9 +4235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Asset State Api Assets State Get"
+                  "$ref": "#/components/schemas/RunDetail"
                 }
               }
             }
@@ -4365,9 +4382,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Asset Exclusions Api Assets Exclusions Get"
+                  "$ref": "#/components/schemas/Exclusions"
                 }
               }
             }
@@ -4397,9 +4412,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Save Asset Exclusions Api Assets Exclusions Post"
+                  "$ref": "#/components/schemas/ExclusionsSaved"
                 }
               }
             }
@@ -4565,9 +4578,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Registry List Api Registries Get"
+                  "$ref": "#/components/schemas/Registries"
                 }
               }
             }
@@ -4642,9 +4653,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Registry Save Api Registries Post"
+                  "$ref": "#/components/schemas/Registries"
                 }
               }
             }
@@ -4780,8 +4789,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/ChannelSaved"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ChannelTested"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ChannelsLeft"
+                    }
+                  ],
                   "title": "Response Channel Change Api Notifications Post"
                 }
               }
@@ -5301,6 +5319,64 @@
         ],
         "title": "BuiltinRules"
       },
+      "ChannelSaved": {
+        "properties": {
+          "channel": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Channel"
+          },
+          "secret": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secret"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "channel",
+          "secret"
+        ],
+        "title": "ChannelSaved",
+        "description": "A saved channel and, for a webhook, its signing secret: shown this once."
+      },
+      "ChannelTested": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "channels": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Channels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ok",
+          "detail",
+          "channels"
+        ],
+        "title": "ChannelTested",
+        "description": "Whether the test delivery worked (a 200 also when it didn't), why, and the channels with their last result."
+      },
       "Channels": {
         "properties": {
           "channels": {
@@ -5349,6 +5425,55 @@
         ],
         "title": "Channels",
         "description": "Never the channel's URL nor its signing secret: the host and what it is sent."
+      },
+      "ChannelsLeft": {
+        "properties": {
+          "channels": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Channels"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "channels"
+        ],
+        "title": "ChannelsLeft"
+      },
+      "CodeConnection": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "connected": {
+            "type": "boolean",
+            "title": "Connected"
+          },
+          "repositories": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repositories"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "provider",
+          "connected"
+        ],
+        "title": "CodeConnection"
       },
       "CraAssessment": {
         "properties": {
@@ -6226,6 +6351,60 @@
         ],
         "title": "CveDetail"
       },
+      "CveOverview": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "kev_total": {
+            "type": "integer",
+            "title": "Kev Total"
+          },
+          "years": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Years"
+          },
+          "latest_kev": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Latest Kev"
+          },
+          "daily": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 155,
+            "title": "Daily"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/CveSync"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "count",
+          "kev_total",
+          "years",
+          "latest_kev",
+          "daily",
+          "sync"
+        ],
+        "title": "CveOverview",
+        "description": "The local NVD copy: its size, per year and per day, the latest KEV additions and how its sync goes."
+      },
       "CvePage": {
         "properties": {
           "items": {
@@ -6374,6 +6553,65 @@
         ],
         "title": "CveRow"
       },
+      "CveSync": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "progress": {
+            "type": "number",
+            "title": "Progress"
+          },
+          "nvd_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nvd Total"
+          },
+          "synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Synced At"
+          },
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phase",
+          "progress",
+          "nvd_total",
+          "synced_at",
+          "running",
+          "error"
+        ],
+        "title": "CveSync"
+      },
       "Dashboard": {
         "properties": {
           "window_days": {
@@ -6495,6 +6733,102 @@
           "tools"
         ],
         "title": "Dashboard"
+      },
+      "Deleted": {
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "Deleted"
+      },
+      "Domain": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "txt_name": {
+            "type": "string",
+            "title": "Txt Name"
+          },
+          "txt_value": {
+            "type": "string",
+            "title": "Txt Value"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "registered_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered At"
+          },
+          "verified_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified At"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "host",
+          "url",
+          "txt_name",
+          "txt_value",
+          "verified"
+        ],
+        "title": "Domain"
       },
       "Euvd": {
         "properties": {
@@ -6687,6 +7021,636 @@
         ],
         "title": "EvidenceOverview"
       },
+      "ExclusionChange": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "patterns": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patterns"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "at",
+          "by"
+        ],
+        "title": "ExclusionChange"
+      },
+      "Exclusions": {
+        "properties": {
+          "patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Patterns"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionChange"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "History"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "patterns",
+          "at",
+          "by",
+          "reason",
+          "history"
+        ],
+        "title": "Exclusions",
+        "description": "A repository's excluded paths, who set them last and why, and their history."
+      },
+      "ExclusionsMoved": {
+        "properties": {
+          "excluded": {
+            "type": "integer",
+            "title": "Excluded"
+          },
+          "reopened": {
+            "type": "integer",
+            "title": "Reopened"
+          }
+        },
+        "type": "object",
+        "required": [
+          "excluded",
+          "reopened"
+        ],
+        "title": "ExclusionsMoved"
+      },
+      "ExclusionsSaved": {
+        "properties": {
+          "patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Patterns"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ExclusionChange"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "History"
+          },
+          "moved": {
+            "$ref": "#/components/schemas/ExclusionsMoved"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "patterns",
+          "at",
+          "by",
+          "reason",
+          "history",
+          "moved"
+        ],
+        "title": "ExclusionsSaved"
+      },
+      "FindingOut": {
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "title": "Finding Id"
+          },
+          "fingerprint": {
+            "type": "string",
+            "title": "Fingerprint"
+          },
+          "scanner": {
+            "type": "string",
+            "title": "Scanner"
+          },
+          "rule_id": {
+            "type": "string",
+            "title": "Rule Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "tool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool"
+          },
+          "cwe": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array",
+                "maxItems": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cwe"
+          },
+          "owasp": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owasp"
+          },
+          "cve": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cve"
+          },
+          "ghsa": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ghsa"
+          },
+          "package": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package"
+          },
+          "advisory": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Advisory"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "remediation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remediation"
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage"
+          },
+          "fix": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fix"
+          },
+          "lifecycle": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifecycle"
+          },
+          "ticket": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticket"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "finding_id",
+          "fingerprint",
+          "scanner",
+          "rule_id",
+          "path",
+          "severity"
+        ],
+        "title": "FindingOut",
+        "description": "A finding as served: messages rendered in the reader's language, with its triage, fix and lifecycle."
+      },
+      "GitHubStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "connected": {
+            "type": "boolean",
+            "title": "Connected"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Missing"
+          },
+          "app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "App Id"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "html_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Html Url"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "public_url": {
+            "type": "string",
+            "title": "Public Url"
+          },
+          "installation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installation"
+          },
+          "installations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Installations"
+          },
+          "required_permissions": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Required Permissions"
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permissions"
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events"
+          },
+          "available_installations": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Installations"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "configured",
+          "connected",
+          "missing",
+          "public_url",
+          "installation",
+          "installations",
+          "required_permissions"
+        ],
+        "title": "GitHubStatus",
+        "description": "What the GitHub App needs, whether it's connected, its installations and, read live, their permissions."
+      },
       "Health": {
         "properties": {
           "status": {
@@ -6737,6 +7701,224 @@
           "version"
         ],
         "title": "Health"
+      },
+      "ImportCheck": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "methodology": {
+            "type": "string",
+            "title": "Methodology"
+          },
+          "components": {
+            "type": "integer",
+            "title": "Components"
+          },
+          "flows": {
+            "type": "integer",
+            "title": "Flows"
+          },
+          "boundaries": {
+            "type": "integer",
+            "title": "Boundaries"
+          },
+          "repository_refs": {
+            "type": "integer",
+            "title": "Repository Refs"
+          },
+          "manual_threats": {
+            "type": "integer",
+            "title": "Manual Threats"
+          },
+          "attack_trees": {
+            "type": "integer",
+            "title": "Attack Trees"
+          },
+          "attack_mappings": {
+            "type": "integer",
+            "title": "Attack Mappings"
+          },
+          "pasta_stages": {
+            "type": "integer",
+            "title": "Pasta Stages"
+          },
+          "relayout": {
+            "type": "boolean",
+            "title": "Relayout"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "methodology",
+          "components",
+          "flows",
+          "boundaries",
+          "repository_refs",
+          "manual_threats",
+          "attack_trees",
+          "attack_mappings",
+          "pasta_stages",
+          "relayout"
+        ],
+        "title": "ImportCheck",
+        "description": "What an import would create, counted, without creating it."
+      },
+      "InstallLink": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "InstallLink"
+      },
+      "JiraExport": {
+        "properties": {
+          "created": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Created"
+          },
+          "existing": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Existing"
+          },
+          "failed": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Failed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "existing",
+          "failed"
+        ],
+        "title": "JiraExport",
+        "description": "Each finding exported: an issue created, one that already existed, or why it failed."
+      },
+      "JiraStatus": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
+          "project_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Name"
+          },
+          "issue_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issue Type"
+          },
+          "last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last4"
+          },
+          "saved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved At"
+          },
+          "saved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved By"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "configured"
+        ],
+        "title": "JiraStatus"
       },
       "LinkInfo": {
         "properties": {
@@ -6935,6 +8117,138 @@
           "support_until"
         ],
         "title": "ProductIn"
+      },
+      "Proposal": {
+        "properties": {
+          "model": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Model"
+          },
+          "added": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 60,
+            "title": "Added"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "model",
+          "added"
+        ],
+        "title": "Proposal",
+        "description": "The model with the proposed components merged in, and which ones are new."
+      },
+      "ProviderCheck": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "ProviderCheck"
+      },
+      "ProviderKeys": {
+        "properties": {
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderStatus"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "title": "Providers"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "providers"
+        ],
+        "title": "ProviderKeys"
+      },
+      "ProviderStatus": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last4"
+          },
+          "saved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved At"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "configured"
+        ],
+        "title": "ProviderStatus"
       },
       "PublicUser": {
         "properties": {
@@ -7282,6 +8596,41 @@
         ],
         "title": "QueuedScan"
       },
+      "Reachability": {
+        "properties": {
+          "host": {
+            "type": "string",
+            "title": "Host"
+          },
+          "reachable": {
+            "type": "boolean",
+            "title": "Reachable"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "host",
+          "reachable",
+          "status"
+        ],
+        "title": "Reachability"
+      },
       "RecentCves": {
         "properties": {
           "query": {
@@ -7315,6 +8664,82 @@
           "sources"
         ],
         "title": "RecentCves"
+      },
+      "Registries": {
+        "properties": {
+          "registries": {
+            "items": {
+              "$ref": "#/components/schemas/RegistryRow"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Registries"
+          },
+          "allow_private": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Private"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "registries"
+        ],
+        "title": "Registries"
+      },
+      "RegistryRow": {
+        "properties": {
+          "registry": {
+            "type": "string",
+            "title": "Registry"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "last4": {
+            "type": "string",
+            "title": "Last4"
+          },
+          "saved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved At"
+          },
+          "saved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved By"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "registry",
+          "username",
+          "last4"
+        ],
+        "title": "RegistryRow",
+        "description": "A registry's saved credentials: the user and the last four characters of the token, never the token."
       },
       "ReopenIn": {
         "properties": {
@@ -7499,12 +8924,195 @@
         ],
         "title": "Round"
       },
+      "RunDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "pull_request": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pull Request"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/FindingOut"
+            },
+            "type": "array",
+            "maxItems": 100000,
+            "title": "Findings",
+            "default": []
+          },
+          "steps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Steps",
+            "default": []
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Limitations",
+            "default": []
+          },
+          "owasp_coverage": {
+            "items": {},
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Owasp Coverage",
+            "default": []
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status",
+          "created_at"
+        ],
+        "title": "RunDetail",
+        "description": "A whole run record, or a repository's state served in the same shape (`type` asset_state)."
+      },
       "RunPage": {
         "properties": {
           "items": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/RunRow"
             },
             "type": "array",
             "maxItems": 200,
@@ -7531,6 +9139,128 @@
           "offset"
         ],
         "title": "RunPage"
+      },
+      "RunRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "pull_request": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pull Request"
+          },
+          "trigger": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "status",
+          "created_at"
+        ],
+        "title": "RunRow",
+        "description": "A run's list row (no findings)."
       },
       "ScanBranch": {
         "properties": {
@@ -7608,6 +9338,103 @@
           "branch"
         ],
         "title": "ScanBranchIn"
+      },
+      "ScanPlan": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "languages": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Languages"
+          },
+          "engines": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Engines"
+          },
+          "manifests": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Manifests"
+          },
+          "iac": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Iac"
+          },
+          "pipelines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Pipelines"
+          },
+          "runs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Runs"
+          },
+          "skips": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Skips"
+          },
+          "osv_needed": {
+            "type": "boolean",
+            "title": "Osv Needed"
+          },
+          "files": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Files"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "source_id",
+          "languages",
+          "engines",
+          "manifests",
+          "iac",
+          "pipelines",
+          "runs",
+          "skips",
+          "osv_needed",
+          "files"
+        ],
+        "title": "ScanPlan",
+        "description": "What a scan will do, from the repository's real tree and the engines this installation can run."
       },
       "SecretAllowlist": {
         "properties": {
@@ -8115,6 +9942,205 @@
         ],
         "title": "SlaPolicy"
       },
+      "SourcePage": {
+        "properties": {
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRow"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Sources"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page"
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Page"
+          },
+          "partial": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partial"
+          },
+          "accounts": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 10000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accounts"
+          },
+          "providers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Providers"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "sources",
+          "total"
+        ],
+        "title": "SourcePage",
+        "description": "A page of repositories (or the one asked for by `id`), with the connected accounts and providers."
+      },
+      "SourceRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "private": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Private"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "default_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Branch"
+          },
+          "scan_branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scan Branch"
+          },
+          "archived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived"
+          },
+          "installation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Installation Id"
+          },
+          "account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "provider"
+        ],
+        "title": "SourceRow"
+      },
       "TargetBranches": {
         "properties": {
           "uid": {
@@ -8173,6 +10199,251 @@
           "branches"
         ],
         "title": "TargetBranchesIn"
+      },
+      "ThreatCatalog": {
+        "properties": {
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/ThreatModelRow"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Models"
+          },
+          "assets": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Assets"
+          },
+          "kinds": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Kinds"
+          },
+          "protocols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Protocols"
+          },
+          "classifications": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Classifications"
+          },
+          "methods": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Methods"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "models",
+          "assets",
+          "kinds",
+          "protocols",
+          "classifications",
+          "methods"
+        ],
+        "title": "ThreatCatalog",
+        "description": "The models, the assets a component can link to, and the catalogs the editor offers."
+      },
+      "ThreatModelRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "methodology": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Methodology"
+          },
+          "components": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Components"
+          },
+          "flows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flows"
+          },
+          "repositories": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repositories"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ThreatModelRow"
+      },
+      "ThreatModelView": {
+        "properties": {
+          "model": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Model"
+          },
+          "threats": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Threats"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ThreatSummary"
+          },
+          "assets": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 10000,
+            "title": "Assets"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "model",
+          "threats",
+          "summary",
+          "assets"
+        ],
+        "title": "ThreatModelView",
+        "description": "A model with its threats (evidence from the linked assets' scans), their summary and the linked assets."
+      },
+      "ThreatSummary": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Status"
+          },
+          "by_stride": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Stride"
+          },
+          "by_severity": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Severity"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "total",
+          "by_status",
+          "by_stride",
+          "by_severity"
+        ],
+        "title": "ThreatSummary"
       },
       "TotpDisabled": {
         "properties": {

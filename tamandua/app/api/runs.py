@@ -3,20 +3,21 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from tamandua.app.api.deps import ApiError, Context, guard
+from tamandua.app.api.schemas import AS_RETURNED, MANY, RunDetail, RunRow
 from tamandua.modules.compliance import sbom, vex
 from tamandua.modules.findings import triage
 from tamandua.modules.findings import tickets
 from tamandua.modules.reporting.pdf import render_pdf
 from tamandua.modules.reporting.technical import render_technical_pdf
 from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS
-from tamandua.modules.runs.store import artifact as store_artifact, list_runs, load_run, page_runs, profile_pdf_titles
+from tamandua.modules.runs.store import artifact as store_artifact, find_runs, load_run, page_runs, profile_pdf_titles
 from tamandua.modules.runs.store import render_asset_report, render_profile_report, render_repository_report, render_repository_sarif
 from tamandua.modules.runs.store import render_tickets
 from tamandua.shared.i18n import msg
@@ -85,19 +86,19 @@ def download(context: Context, record: dict, artifact: str, title: str) -> Respo
 
 
 class RunPage(BaseModel):
-    items: list[dict[str, Any]] = Field(max_length=PAGE_MAX)
+    items: list[RunRow] = Field(max_length=PAGE_MAX)
     total: int
     limit: int
     offset: int
 
 
-@router.get("/api/runs", response_model=None)
-def runs(context: Context = Depends(guard())) -> JSONResponse:
-    """Every run's row, newest first (the panel pages with /api/runs/page)."""
-    return JSONResponse(context.render(list_runs(context.data_dir)))
+@router.get("/api/runs", response_model=Annotated[list[RunRow], Field(max_length=MANY)], **AS_RETURNED)
+def runs(context: Context = Depends(guard())) -> list[dict]:
+    """The rows of the newest runs (at most 10 000), newest first. To go through all of them, /api/runs/page."""
+    return context.render(find_runs(context.data_dir, limit=MANY))
 
 
-@router.get("/api/runs/page", response_model=RunPage)
+@router.get("/api/runs/page", response_model=RunPage, **AS_RETURNED)
 def runs_page(limit: str = "25", offset: str = "0", status: str = "", kind: str = Query("", alias="type"), q: str = "",
               asset: str = "", context: Context = Depends(guard())) -> dict:
     """`type` accepts several kinds separated by commas. Paging values out of range are clamped."""
@@ -114,7 +115,7 @@ def _record(context: Context, run_id: str) -> dict:
     return tickets.annotate(context.data_dir, triage.annotate(context.data_dir, load_run(context.data_dir, run_id)))
 
 
-@router.get("/api/runs/{run_id}")
+@router.get("/api/runs/{run_id}", response_model=RunDetail, **AS_RETURNED)
 def run_detail(run_id: str, context: Context = Depends(guard())) -> dict[str, Any]:
     try:
         return context.render(_record(context, run_id))

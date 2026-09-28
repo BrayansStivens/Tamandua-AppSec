@@ -81,7 +81,8 @@ class GitHubRoutesTests(HttpCase):
             self.assertEqual({item["name"]: item["installation_id"] for item in listing["sources"]},
                              {"acme/api": 77, "beta/web": 88})
             with patch("tamandua.app.api.repositories.scan_plan", side_effect=lambda source, installation_id: {
-                    "source": source, "installation_id": installation_id}):
+                    "source_id": source, "languages": [], "engines": [], "manifests": [], "iac": [], "pipelines": [], "runs": [],
+                    "skips": [], "osv_needed": False, "files": None, "installation_id": installation_id}):
                 _, plan, _ = self.call("GET", "/api/repositories/plan?source_id=github:beta/web", headers={"Cookie": self.member})
                 self.assertEqual(plan["installation_id"], 88)
             with patch("tamandua.modules.runs.jobs.ScanJobs.enqueue_repository_scan", return_value={"id": "queued"}) as enqueue:

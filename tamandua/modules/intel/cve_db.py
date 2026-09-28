@@ -44,6 +44,8 @@ SYNC_EVERY = 2 * 3600
 WINDOW_DAYS = 120
 MAX_CWES = 20
 MAX_REFERENCES = 10
+LATEST_KEV = 8    # latest KEV additions in the overview
+DAILY_DAYS = 31   # days of published CVEs in the overview (a month, today included)
 SEVERITIES = ("critical", "high", "medium", "low", "none")
 SORTS = {"published": (cves.c.published.desc().nulls_last(),),
          "score": (cves.c.score.desc().nulls_last(), cves.c.published.desc().nulls_last()),
@@ -350,8 +352,8 @@ def overview(data_dir: Path, *, now: datetime | None = None) -> dict:
                        "severity": row.severity, "score": row.score} for row in connection.execute(
             select(exploited.c.id, exploited.c.date_added, exploited.c.name, exploited.c.ransomware, cves.c.severity, cves.c.score)
             .select_from(exploited.outerjoin(cves, cves.c.id == exploited.c.id))
-            .order_by(exploited.c.date_added.desc().nulls_last(), exploited.c.id.desc()).limit(8))]
-        since = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+            .order_by(exploited.c.date_added.desc().nulls_last(), exploited.c.id.desc()).limit(LATEST_KEV))]
+        since = (now - timedelta(days=DAILY_DAYS - 1)).strftime("%Y-%m-%d")
         daily = [{"day": row.day, "severity": row.severity, "count": row.count} for row in connection.execute(
             select(day, level, func.count().label("count")).where(cves.c.published >= since, NOT_REJECTED)
             .group_by(day, level).order_by(day))]

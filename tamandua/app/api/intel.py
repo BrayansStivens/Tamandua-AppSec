@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 
 from tamandua.app.api.deps import ApiError, Context, guard
+from tamandua.app.api.schemas import AS_RETURNED, Open
 from tamandua.app.api.paging import MAX_LIMIT, MAX_OFFSET, Page, Paging, paging
 from tamandua.modules.findings.registry import PACKAGES_SHOWN, assets_with_cve, open_cves
 from tamandua.modules.intel import cve_db, euvd
@@ -98,7 +99,26 @@ def search(q: str = "", severity: str | None = None, sort: str = "published", ye
     return context.render(page | {"mine_total": len(own)})
 
 
-@router.get("/api/cve-db/overview")
+class CveSync(BaseModel):
+    phase: str  # pending · backfill · ready
+    progress: float
+    nvd_total: int | None
+    synced_at: str | None
+    running: bool
+    error: str | None
+
+
+class CveOverview(Open):
+    """The local NVD copy: its size, per year and per day, the latest KEV additions and how its sync goes."""
+    count: int
+    kev_total: int
+    years: list[dict[str, Any]] = Field(max_length=200)        # one per year with CVEs
+    latest_kev: list[dict[str, Any]] = Field(max_length=cve_db.LATEST_KEV)
+    daily: list[dict[str, Any]] = Field(max_length=cve_db.DAILY_DAYS * len(cve_db.SEVERITIES))  # per day and severity
+    sync: CveSync
+
+
+@router.get("/api/cve-db/overview", response_model=CveOverview, **AS_RETURNED)
 def overview(context: Context = Depends(guard())) -> dict[str, Any]:
     return context.render(cve_db.overview(context.data_dir))
 

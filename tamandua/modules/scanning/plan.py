@@ -68,6 +68,9 @@ def files_of(source_id: str, *, installation_id: int | None) -> list[str] | None
     return None
 
 
+PLAN_FILES = 50  # manifests, IaC files and pipelines the plan names, each
+
+
 def plan(source_id: str, *, installation_id: int | None) -> dict:
     paths = files_of(source_id, installation_id=installation_id)
     paths = [path for path in (paths or []) if not SKIP.intersection(path.split("/"))] if paths is not None else None
@@ -139,6 +142,6 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
     skips += [msg("scanning.plan.skips.no_dast"), msg("scanning.plan.skips.no_ai")]
     if paths is None:
         runs.insert(1, msg("scanning.plan.runs.languages_later"))
-    return {"source_id": source_id, "languages": detected, "engines": list(engines.values()), "manifests": manifests[:50],
-            "iac": iac[:50], "pipelines": pipelines[:50], "runs": runs, "skips": skips, "osv_needed": not trivy["available"],
+    return {"source_id": source_id, "languages": detected, "engines": list(engines.values()), "manifests": manifests[:PLAN_FILES],
+            "iac": iac[:PLAN_FILES], "pipelines": pipelines[:PLAN_FILES], "runs": runs, "skips": skips, "osv_needed": not trivy["available"],
             "files": len(paths) if paths is not None else None}
