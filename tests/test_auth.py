@@ -98,6 +98,42 @@ class AuthenticatorTests(unittest.TestCase):
         with self.assertRaises(Locked):
             Authenticator(self.data_dir).login("operadora", PASSWORD, "c")
 
+    def test_a_locked_out_address_adds_no_rows_for_made_up_usernames(self):
+        from sqlalchemy import func, select
+        from tamandua.modules.identity.tables import auth_throttle
+        from tamandua.shared import db
+        for index in range(auth.LOCK_AFTER):
+            with self.assertRaises(AuthError):
+                self.auth.login(f"nadie{index}", "incorrecta-del-todo", "atacante")
+        for index in range(40):
+            with self.assertRaises(Locked):
+                self.auth.login(f"inventado{index}", "incorrecta-del-todo", "atacante")
+        with db.transaction(self.data_dir) as connection:
+            rows = connection.execute(select(func.count()).select_from(auth_throttle)).scalar_one()
+        self.assertEqual(rows, auth.LOCK_AFTER + 1)  # the first usernames and the address, nothing after the lock-out
+
+    def test_idle_keys_are_forgotten_in_bounded_batches(self):
+        import time
+        from datetime import datetime, timedelta, timezone
+        from sqlalchemy import insert, select
+        from tamandua.modules.identity.tables import auth_throttle
+        from tamandua.shared import db
+        old, now = datetime.now(timezone.utc) - timedelta(hours=2), time.time()
+        rows = [{"key": f"user:idle{index}", "failures": 1, "until": 0, "updated_at": old} for index in range(auth.PRUNE_BATCH + 200)]
+        rows += [{"key": "client:still-locked", "failures": 9, "until": now + 600, "updated_at": old},
+                 {"key": "user:recent", "failures": 2, "until": 0, "updated_at": datetime.now(timezone.utc)}]
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(insert(auth_throttle), rows)
+
+        def left() -> set[str]:
+            with db.transaction(self.data_dir) as connection:
+                return set(connection.execute(select(auth_throttle.c.key)).scalars())
+        for expected in (202, 2, 2):
+            with db.transaction(self.data_dir) as connection:
+                auth.Throttle._prune(connection, now)
+            self.assertEqual(len(left()), expected)
+        self.assertEqual(left(), {"client:still-locked", "user:recent"})
+
     def test_code_tokens_are_shared_and_sealed(self):
         from tamandua.modules.integrations import code_tokens
         from tamandua.shared import vault

@@ -50,3 +50,5 @@ auth_throttle = Table(
     Column("until", Float, nullable=False, server_default="0"),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
+# Forgetting idle keys (auth.Throttle) reads by age: without it, each prune would read the whole table.
+Index("ix_auth_throttle_updated_at", auth_throttle.c.tenant_id, auth_throttle.c.updated_at)

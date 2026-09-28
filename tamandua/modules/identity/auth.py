@@ -64,6 +64,8 @@ BACKUP_CODES = 8
 LINK_TTL = 72 * 3600
 TOTP_POLICIES = ("admins", "all", "none")
 LOCK_BASE, LOCK_MAX, LOCK_AFTER = 30, 900, 5
+# A key with no attempt for this long (and no lock-out running) is forgotten; at most PRUNE_BATCH per prune.
+THROTTLE_IDLE, PRUNE_BATCH = timedelta(hours=1), 500
 COOKIE_NAME = "tamandua_session"
 _log = logging_setup.get("auth")
 _SCRYPT_SLOTS = threading.BoundedSemaphore(8)
@@ -574,10 +576,18 @@ class Throttle:
             count = row.failures + 1
             penalty = min(LOCK_MAX, LOCK_BASE * (2 ** max(0, count - LOCK_AFTER))) if count >= LOCK_AFTER else 0
             connection.execute(update(auth_throttle).where(*condition).values(failures=count, until=now + penalty, updated_at=func.now()))
-            if secrets.randbelow(100) == 0:  # now and then, forget keys nobody has used for a day
-                connection.execute(delete(auth_throttle).where(auth_throttle.c.tenant_id == TENANT,
-                                                               auth_throttle.c.updated_at < func.now() - timedelta(days=1)))
+            if secrets.randbelow(20) == 0:
+                self._prune(connection, now)
             return 0
+
+    @staticmethod
+    def _prune(connection, now: float) -> None:
+        """Forgets idle keys, a bounded batch at a time (indexed by age): the table can't grow without end, and no
+        single sign-in pays for clearing it."""
+        idle = (select(auth_throttle.c.key).where(auth_throttle.c.tenant_id == TENANT, auth_throttle.c.until < now,
+                                                  auth_throttle.c.updated_at < func.now() - THROTTLE_IDLE)
+                .order_by(auth_throttle.c.updated_at).limit(PRUNE_BATCH))
+        connection.execute(delete(auth_throttle).where(auth_throttle.c.tenant_id == TENANT, auth_throttle.c.key.in_(idle.scalar_subquery())))
 
     def succeeded(self, key: str) -> None:
         with db.transaction(self.data_dir) as connection:
@@ -649,7 +659,8 @@ class Authenticator:
         key = normalize_username(username, strict=False) if isinstance(username, str) else ""
         if not key or not isinstance(password, str) or len(password) > PASSWORD_MAX:
             raise AuthError(msg("auth.errors.bad_credentials"))
-        for scope in (f"user:{key}", f"client:{client}"):
+        # The address first: once it is locked out, made-up usernames from it add no rows.
+        for scope in (f"client:{client}", f"user:{key}"):
             wait = self.throttle.reserve(scope)
             if wait:
                 _log.warning("login_blocked", extra={"user": key, "client": client, "retry_in": wait})
