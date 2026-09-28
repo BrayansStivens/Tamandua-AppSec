@@ -40,6 +40,7 @@ from tamandua.modules.intel.advisories import compare_versions, cvss3_base_score
 from tamandua.modules.intel.advisories import fingerprint as sca_fingerprint
 from tamandua.modules.intel.packages import dependency_fingerprint
 from tamandua.modules.scanning import secret_rules
+from tamandua.shared.model import EngineResult, Finding
 
 RULES_DIR = paths.RULES_DIR
 IMAGES = {
@@ -344,7 +345,7 @@ def pull_engines(report=None) -> list[dict]:
     return results
 
 
-def _result(key: str, status: str, detail, findings: list | None = None, started: float | None = None) -> dict:
+def _result(key: str, status: str, detail, findings: list | None = None, started: float | None = None) -> EngineResult:
     meta = IMAGES[key]
     return {"tool": key, "name": meta["name"], "version": meta["version"], "image": meta["image"],
             "status": status, "detail": detail, "findings": findings or [],
@@ -499,7 +500,7 @@ SECRET_SEVERITY = "critical"  # an exposed secret is always critical, whatever t
 
 
 def _base(scanner: str, rule: str, title, path: str, line: int, severity: str, *, reason,
-          remediation, cwe: list[int], owasp: str, confidence: int, digest: str, tool: str) -> dict:
+          remediation, cwe: list[int], owasp: str, confidence: int, digest: str, tool: str) -> Finding:
     if scanner == "secrets":
         severity = SECRET_SEVERITY
     action = "act" if severity == "critical" else "attend" if severity == "high" else "track"
@@ -544,7 +545,7 @@ def _rule_id(check_id: str) -> str:
     return check_id[start:] if start >= 0 else check_id.removeprefix("rules.")
 
 
-def parse_opengrep(payload: dict) -> list[dict]:
+def parse_opengrep(payload: dict) -> list[Finding]:
     findings, seen = [], set()
     for result in payload.get("results", []):
         extra = result.get("extra") or {}
@@ -612,7 +613,7 @@ def _rules_for(snapshot: Path) -> Path:
     return target
 
 
-def run_opengrep(snapshot: Path) -> dict:
+def run_opengrep(snapshot: Path) -> EngineResult:
     started = time.time()
     if runner() == "local":
         if not engine_ready("opengrep"):
@@ -786,7 +787,7 @@ def trivy_packages(payload: dict, *, system: bool = False) -> list[dict]:
     return packages
 
 
-def parse_trivy(payload: dict, feeds: dict, custom: dict | None = None) -> list[dict]:
+def parse_trivy(payload: dict, feeds: dict, custom: dict | None = None) -> list[Finding]:
     findings, secrets = [], []
     for result in payload.get("Results", []) or []:
         target = _relative(str(result.get("Target", "")))
@@ -824,7 +825,7 @@ def _trivy_fs(snapshot: Path, cache_dir: Path, scanners: str, config_dir: Path |
                         *(["-v", f"{host_path(config_dir)}:/cfg:ro"] if config_dir else [])])
 
 
-def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict, secret_settings: dict | None = None) -> dict:
+def run_trivy(snapshot: Path, cache_dir: Path, feeds: dict, secret_settings: dict | None = None) -> EngineResult:
     """`secret_settings`: the organization's secret detection settings (secret_rules), applied through
     `--secret-config`. If Trivy rejects them, it runs again without secret detection so dependencies and IaC are
     still analyzed, and the step says secrets were not covered by Trivy."""
@@ -906,7 +907,7 @@ def _withhold(result: dict, settings: dict | None, reference) -> dict:
 
 # --- OSV-Scanner ---------------------------------------------------------------------
 
-def parse_osv_scanner(payload: dict, feeds: dict) -> list[dict]:
+def parse_osv_scanner(payload: dict, feeds: dict) -> list[Finding]:
     """Un hallazgo por aviso y paquete. OSV agrupa en `groups` los identificadores del mismo aviso
     (GHSA, PYSEC, CVE…); de cada grupo se toma uno como principal y el resto quedan como alias."""
     from tamandua.modules.intel.advisories import dependency_finding
@@ -941,7 +942,7 @@ def parse_osv_scanner(payload: dict, feeds: dict) -> list[dict]:
     return findings
 
 
-def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bool = False) -> dict:
+def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bool = False) -> EngineResult:
     """OSV-Scanner con las bases de avisos descargadas en local: la lista de dependencias no sale de aquí.
 
     Solo con `resolve` (el usuario autorizó consultas externas) resuelve dependencias transitivas de
@@ -1023,7 +1024,7 @@ def masked_lead(text: str, start: int, spans: list[tuple[int, int]]) -> str:
     return "".join(lead)
 
 
-def with_secret_identities(items: list[tuple[dict, str | None, tuple]]) -> list[dict]:
+def with_secret_identities(items: list[tuple[Finding, str | None, tuple]]) -> list[Finding]:
     """Secrets' fingerprints without their line number: rule, file, what precedes each on its line and, among identical
     ones, their order in the file (`items`: finding, context, position). A line added above a secret no longer makes
     it look fixed and new. The former, line-based fingerprint stays in `previous_fingerprint` so the registry carries
@@ -1091,7 +1092,7 @@ def _custom_secret(rule: dict, rule_id: str, path: str, line: int, *, tool: str,
                  digest=_stable("secrets", rule_id, path, str(line)))
 
 
-def parse_gitleaks(payload: list, custom: dict | None = None, root: Path | None = None) -> list[dict]:
+def parse_gitleaks(payload: list, custom: dict | None = None, root: Path | None = None) -> list[Finding]:
     """`root`: the snapshot, to read what precedes each secret on its line (Gitleaks redacts the whole match)."""
     entries = [entry for entry in payload or [] if isinstance(entry, dict)]
     contexts = _gitleaks_contexts(entries, root)
@@ -1149,7 +1150,7 @@ def _gitleaks_report(snapshot: Path, settings: dict | None, started: float, *, s
     return (payload if isinstance(payload, list) else []), None
 
 
-def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
+def run_gitleaks(snapshot: Path, settings: dict | None = None) -> EngineResult:
     """`settings`: the organization's secret detection settings (secret_rules). With them, Gitleaks gets a generated
     `--config` mounted read-only; if it rejects it, the step is inconclusive, never clean."""
     started = time.time()
@@ -1168,7 +1169,7 @@ def run_gitleaks(snapshot: Path, settings: dict | None = None) -> dict:
     return _withhold(_result("gitleaks", "completed", detail, findings, started), settings, reference)
 
 
-def merge_secrets(*groups: list[dict]) -> list[dict]:
+def merge_secrets(*groups: list[Finding]) -> list[Finding]:
     """Un mismo secreto lo ven dos motores: se conserva uno y se anota el otro."""
     by_location: dict[tuple[str, int], dict] = {}
     for group in groups:

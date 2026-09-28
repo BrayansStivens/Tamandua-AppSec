@@ -41,6 +41,7 @@ from tamandua.shared.i18n import msg, text
 from tamandua.modules.findings import sla
 from tamandua.modules.findings import triage
 from tamandua.modules.sources.assets import asset_key
+from tamandua.shared.model import Finding, RunRecord
 
 _log = logging_setup.get("findings")
 VIEW_PREFIX = "asset:"
@@ -126,7 +127,7 @@ def _reopen_manual(data_dir: Path, record: dict, fingerprints: set[str]) -> None
                       user={"username": "sistema", "role": "admin"})
 
 
-def _rekey(entries: dict, findings: list[dict]) -> dict[str, str]:
+def _rekey(entries: dict, findings: list[Finding]) -> dict[str, str]:
     """Findings whose fingerprint changed formula (they carry the former one in `previous_fingerprint`) keep their
     entry: it moves to the new fingerprint, unless the new one already has its own. Returns {former: new}."""
     moved = {}
@@ -150,7 +151,7 @@ def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
     _log.info("registry_rekeyed", extra={"reason": f"{key}: {len(moved)}"})
 
 
-def apply(data_dir: Path, record: dict) -> dict:
+def apply(data_dir: Path, record: RunRecord) -> dict:
     """Incorpora una ejecución terminada al registro de su repositorio. Idempotente por ejecución."""
     if record.get("type") not in FINDING_RUNS or record.get("status") not in ("completed", "incomplete"):
         return {}

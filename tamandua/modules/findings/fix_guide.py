@@ -19,6 +19,7 @@ import re
 from tamandua.modules.intel.advisories import compare_versions
 from tamandua.modules.findings.fix_examples import EXAMPLES
 from tamandua.shared.i18n import msg
+from tamandua.shared.model import Finding
 
 # Lo que entra en una orden: sin metacaracteres de shell y sin empezar por «-» (se leería como una opción del gestor).
 SAFE_NAME = re.compile(r"[A-Za-z0-9@._][A-Za-z0-9@/._:+-]{0,199}")
@@ -57,7 +58,7 @@ def manager(path: str, ecosystem: str) -> str | None:
             "amazon": "dnf", "oracle": "dnf", "centos": "dnf", "fedora": "dnf"}.get((ecosystem or "").lower())
 
 
-def _dependency(finding: dict, target: str | None) -> dict:
+def _dependency(finding: Finding, target: str | None) -> dict:
     package = finding.get("package") or {}
     name, version, path = str(package.get("name") or ""), str(package.get("version") or ""), str(finding.get("path") or "")
     tool = manager(path, str(package.get("ecosystem") or ""))
@@ -147,14 +148,14 @@ def _dependency(finding: dict, target: str | None) -> dict:
     return {"kind": "dependency", "steps": steps, "commands": commands, "example": example}
 
 
-def _secret(finding: dict) -> dict:
+def _secret(finding: Finding) -> dict:
     return {"kind": "secret", "commands": [], "example": None, "steps": [
         msg("findings.fix.secret.revoke"), msg("findings.fix.secret.review_use"), msg("findings.fix.secret.vault"),
         msg("findings.fix.secret.remove", path=str(finding.get("path") or "")), msg("findings.fix.secret.history"),
         msg("findings.fix.secret.verify")]}
 
 
-def guide(finding: dict, *, target: str | None = None) -> dict | None:
+def guide(finding: Finding, *, target: str | None = None) -> dict | None:
     scanner = finding.get("scanner")
     if finding.get("malicious"):
         # Nada que actualizar: se quita y se da por comprometido lo que lo instaló (ver advisories.malicious_finding).
@@ -173,7 +174,7 @@ def guide(finding: dict, *, target: str | None = None) -> dict | None:
     return None
 
 
-def attach(findings: list[dict]) -> list[dict]:
+def attach(findings: list[Finding]) -> list[Finding]:
     """Añade `fix` a cada hallazgo. En dependencias, la versión que cierra todos los avisos del mismo paquete."""
     targets: dict[tuple, str] = {}
     # Un paquete malicioso no se actualiza: sus otros avisos tampoco deben proponer «actualiza a…».

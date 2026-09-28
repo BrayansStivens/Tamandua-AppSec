@@ -15,6 +15,7 @@ from tamandua.modules.runs.tables import runs
 from tamandua.shared import db
 from tamandua.shared.db import TENANT
 from tamandua.shared.i18n import default_locale, localize, msg, t, text
+from tamandua.shared.model import RunRecord
 
 
 class ReportInputError(ValueError):
@@ -59,7 +60,7 @@ def _persist(data_dir: Path, record: dict, report: str, sarif: dict | None = Non
     return record
 
 
-def save_record(data_dir: Path, record: dict) -> None:
+def save_record(data_dir: Path, record: RunRecord) -> None:
     """Guarda el registro de una ejecución (progreso, estado, resultado) sin tocar su informe ni su SARIF."""
     values = _values(record)
     statement = insert(runs).values(tenant_id=TENANT, id=_check_id(record["id"]), **values)
@@ -118,7 +119,7 @@ def delete_runs(data_dir: Path, run_ids: list[str]) -> int:
         return connection.execute(delete(runs).where(runs.c.tenant_id == TENANT, runs.c.id.in_([_check_id(item) for item in run_ids]))).rowcount
 
 
-def save_repository_scan(data_dir: Path, scan: dict, *, run_id: str | None = None, created_at: str | None = None) -> dict:
+def save_repository_scan(data_dir: Path, scan: RunRecord, *, run_id: str | None = None, created_at: str | None = None) -> RunRecord:
     # Un escaneo en segundo plano ya tiene su identificador y su carpeta desde que se encoló.
     record = {"schema_version": "0.3.0", "id": run_id or uuid.uuid4().hex,
               "created_at": created_at or datetime.now(timezone.utc).isoformat(), **scan}
@@ -526,7 +527,7 @@ def render_profile_report(record: dict, profile: str, title: str = "", *, locale
 PROFILE_ROWS = {"soc2": ("design", "operation", "exceptions"), "iso27001": ("scope", "risk", "improvement"), "custom": ("scope", "result")}
 
 
-def load_run(data_dir: Path, run_id: str) -> dict:
+def load_run(data_dir: Path, run_id: str) -> RunRecord:
     with db.transaction(data_dir) as connection:
         record = connection.execute(select(runs.c.record).where(runs.c.tenant_id == TENANT, runs.c.id == _check_id(run_id))).scalar_one_or_none()
     if record is None:

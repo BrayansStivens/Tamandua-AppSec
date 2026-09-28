@@ -20,6 +20,7 @@ from tamandua.modules.scanning.dependency_merge import merge_dependencies
 from tamandua.modules.scanning import secret_rules
 from tamandua.modules.scanning.engines import IMAGES, SECRET_SEVERITY, SEVERITY_NAME, and_list, engines_available, joined as join_messages, host_mount_problem, run_osv_scanner, runner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy, masked_lead, secret_context, with_secret_identities
 from tamandua.shared.i18n import msg
+from tamandua.shared.model import RunRecord
 from tamandua.version import USER_AGENT
 
 
@@ -163,7 +164,7 @@ def _query_osv(dependencies: list[dict]) -> list[dict]:
 
 
 def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
-                    context: str = "", data_dir: Path | None = None, progress=None) -> dict:
+                    context: str = "", data_dir: Path | None = None, progress=None) -> RunRecord:
     def report(level: str, message) -> None:
         if progress is not None:
             progress(level, message)

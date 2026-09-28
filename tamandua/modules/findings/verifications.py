@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Callable
 
 from tamandua.shared import documents
+from tamandua.shared.model import Finding
 
 MAX_PER_ASSET = 500
 _runs: Callable[[Path, list[str]], list[dict]] | None = None
@@ -69,7 +70,7 @@ def _run_rows(data_dir: Path, ids: list[str]) -> list[dict]:
     return _runs(data_dir, ids)
 
 
-def annotate(data_dir: Path, key: str, findings: list[dict]) -> list[dict]:
+def annotate(data_dir: Path, key: str, findings: list[Finding]) -> list[Finding]:
     """Añade `verification` a los hallazgos con una verificación pedida."""
     requested = load(data_dir).get(key) or {}
     if not requested or not any(item.get("fingerprint") in requested for item in findings):

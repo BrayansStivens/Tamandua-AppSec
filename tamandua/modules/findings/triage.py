@@ -33,6 +33,7 @@ from tamandua.shared.i18n import is_msg, msg
 
 from tamandua.modules.findings.kinds import FINDING_RUNS
 from tamandua.modules.sources.assets import asset_key
+from tamandua.shared.model import Finding, RunRecord
 
 
 class TriageError(LocalizedError, ValueError):
@@ -141,14 +142,14 @@ def effective(entry: dict | None, today: date | None = None) -> dict:
     return view
 
 
-def annotate(data_dir: Path, record: dict, decisions: dict | None = None) -> dict:
+def annotate(data_dir: Path, record: RunRecord, decisions: dict | None = None) -> RunRecord:
     """Copia de la ejecución con el estado de triage en cada hallazgo y el recuento en el resumen."""
     if record.get("type") not in FINDING_RUNS:
         return record
     key = asset_key(record)
     asset = decisions.get(key, {}) if decisions is not None else load_asset(data_dir, key)
     counts = dict.fromkeys(STATUSES, 0)
-    findings = []
+    findings: list[Finding] = []
     for finding in record.get("findings", []):
         state = effective(asset.get(finding["fingerprint"]))
         counts[state["status"]] += 1
@@ -165,8 +166,8 @@ def is_active(finding: dict) -> bool:
     return (finding.get("triage") or {}).get("status", "open") not in SUPPRESSED
 
 
-def decide(data_dir: Path, record: dict, fingerprints, status, *, reason=None, note=None, expires_at=None,
-           user: dict, system_note: dict | None = None) -> dict:
+def decide(data_dir: Path, record: RunRecord, fingerprints, status, *, reason=None, note=None, expires_at=None,
+           user: dict, system_note: dict | None = None) -> RunRecord:
     """Aplica una decisión a varios hallazgos de una ejecución. Solo huellas que la ejecución contiene.
 
     `system_note`: a message written by Tamandua itself (never from a request), stored instead of `note`."""

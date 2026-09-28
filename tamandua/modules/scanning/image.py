@@ -36,6 +36,7 @@ from tamandua.modules.intel.packages import OS_FAMILIES, canonical_id, dependenc
 from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_image, run_checkov_image
 from tamandua.modules.scanning.engines import _pick_fixed, _result, _run, parse_trivy, trivy_packages, unavailable, writable_cache
+from tamandua.shared.model import RunRecord
 
 _log = logging_setup.get("images")
 VAULT_NAME = "registries"
@@ -407,7 +408,7 @@ def _finish_package(finding: dict) -> dict:
 
 # --- análisis completo --------------------------------------------------------------------
 
-def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None) -> dict:
+def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None) -> RunRecord:
     from tamandua.modules.intel.advisories import load_feeds
 
     def report(level: str, message) -> None:

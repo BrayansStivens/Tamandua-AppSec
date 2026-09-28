@@ -15,6 +15,8 @@ reconciliation against the runs and the purge are orchestrated by `runs/assets.p
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from collections.abc import Mapping
+from typing import Any
 from pathlib import Path
 
 from sqlalchemy import delete, func, select
@@ -29,7 +31,7 @@ GRACE = timedelta(hours=24)
 _log = logging_setup.get("assets")
 
 
-def asset_key(record: dict) -> str:
+def asset_key(record: Mapping[str, Any]) -> str:
     source = record.get("source") or {}
     return source.get("uid") or source.get("id") or source.get("name") or record.get("target") or "desconocido"
 

@@ -13,6 +13,8 @@ se reconstruye desde el ecosistema y la relación queda sin declarar.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
+from typing import Any
 from urllib.parse import quote
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,7 +31,7 @@ def _stamp(now: datetime | None) -> str:
     return (now or datetime.now(timezone.utc)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def root_ref(record: dict) -> str:
+def root_ref(record: Mapping[str, Any]) -> str:
     """Identificador estable del producto analizado, para el SBOM y para el VEX."""
     source = record.get("source") or {}
     image = source.get("image") or {}

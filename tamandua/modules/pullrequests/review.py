@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 
 from tamandua.shared.i18n import default_locale, msg, t, text
+from tamandua.shared.model import Finding
 
 SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
@@ -51,7 +52,7 @@ def changed_lines(files: list[dict]) -> dict[str, set[int] | None]:
     return result
 
 
-def _touches(finding: dict, changed: dict[str, set[int] | None]) -> bool:
+def _touches(finding: Finding, changed: dict[str, set[int] | None]) -> bool:
     path = finding.get("path")
     if path not in changed:
         return False
@@ -61,7 +62,7 @@ def _touches(finding: dict, changed: dict[str, set[int] | None]) -> bool:
     return lines is None or finding.get("line") in lines
 
 
-def classify(findings: list[dict], changed: dict[str, set[int] | None], baseline: set[str] | None) -> dict:
+def classify(findings: list[Finding], changed: dict[str, set[int] | None], baseline: set[str] | None) -> dict[str, list[Finding]]:
     """Separa lo que introduce el PR de lo que ya existía en el código que toca."""
     introduced, preexisting = [], []
     for finding in findings:
@@ -75,7 +76,7 @@ def classify(findings: list[dict], changed: dict[str, set[int] | None], baseline
     return {"introduced": introduced, "preexisting": preexisting}
 
 
-def verdict(introduced: list[dict], gate: str = "high") -> dict:
+def verdict(introduced: list[Finding], gate: str = "high") -> dict:
     """Estado del commit: falla si el PR introduce algo de la severidad del umbral o peor."""
     counts = {level: sum(1 for item in introduced if item["severity"] == level) for level in SEVERITY_ORDER}
     if gate == "never":
@@ -106,11 +107,11 @@ GATE_LABEL = {"critical": msg("pulls.gate.critical"), "high": msg("pulls.gate.hi
               "low": msg("pulls.gate.low"), "never": msg("pulls.gate.never")}
 
 
-def _rows(findings: list[dict], locale: str | None = None, limit: int = 25) -> list[str]:
+def _rows(findings: list[Finding], locale: str | None = None, limit: int = 25) -> list[str]:
     locale = locale or default_locale()
     lines = [t("pulls.table.header", locale), "|---|---|---|---|"]
     from tamandua.modules.findings.fix_guide import attach
-    ordered = attach([dict(item) for item in sorted(findings, key=lambda item: SEVERITY_ORDER.index(item["severity"]) if item["severity"] in SEVERITY_ORDER else 9)])
+    ordered = attach([Finding(**item) for item in sorted(findings, key=lambda item: SEVERITY_ORDER.index(item["severity"]) if item["severity"] in SEVERITY_ORDER else 9)])
     for finding in ordered[:limit]:
         package = finding.get("package") or {}
         line = finding.get("line") if isinstance(finding.get("line"), int) else 0

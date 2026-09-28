@@ -7,6 +7,7 @@ from pathlib import Path
 from tamandua.modules.findings import registry
 from tamandua.modules.findings.kinds import FINDING_RUNS
 from tamandua.modules.runs.store import find_runs, load_run
+from tamandua.shared.model import RunRecord
 
 
 def rebuild(data_dir: Path) -> int:
@@ -24,7 +25,7 @@ def rebuild(data_dir: Path) -> int:
     return applied
 
 
-def resolve(data_dir: Path, run_id: str) -> dict:
+def resolve(data_dir: Path, run_id: str) -> RunRecord | dict:
     """Una ejecución por su id, o el estado de un repositorio por `asset:<clave>`."""
     if isinstance(run_id, str) and run_id.startswith(registry.VIEW_PREFIX):
         return registry.view(data_dir, run_id[len(registry.VIEW_PREFIX):], status="all")
