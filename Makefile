@@ -39,7 +39,7 @@ ENGINE_IMAGES := sed -n 's/.*"image": "\([^"]*@sha256:[0-9a-f]\{64\}\)".*/\1/p' 
 
 .DEFAULT_GOAL := help
 .PHONY: arch openapi standalone help doctor setup build up down restart status logs ps setup-code engines scan demo update backup restore \
-        verify-images shell cli clean purge dev-setup dev test lint lint-py web check
+        verify-images shell cli clean purge dev-setup dev test lint lint-py test-web web check
 
 ## —— Usage —————————————————————————————————————————————————————————————
 
@@ -178,4 +178,7 @@ lint-py: ## Backend lint (ruff) and types (mypy), see pyproject.toml
 lint: ## Panel lint and types
 	cd web && npx tsc -b && npm run lint
 
-check: test arch lint-py lint ## Tests, architecture contracts and lint (required before a PR)
+test-web: ## Panel tests (vitest: sign-in, triage, launching an analysis)
+	cd web && npm test
+
+check: test arch lint-py lint test-web ## Tests, architecture contracts and lint (required before a PR)

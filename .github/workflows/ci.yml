@@ -88,6 +88,9 @@ jobs:
       - name: Lint
         working-directory: web
         run: npm run lint
+      - name: Tests
+        working-directory: web
+        run: npm test
       - name: The served panel is rebuilt
         run: |
           (cd web && npm run build)
