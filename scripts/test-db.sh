@@ -15,10 +15,11 @@ sql() { docker exec "$NAME" psql -v ON_ERROR_STOP=1 -qtAX -U tamandua -d tamandu
 if [ "${1:-}" = "drop" ]; then
   database=${2:-}
   database=${database##*/}
-  case "$database" in
-    tamandua_run_[0-9]*_[0-9]*) sql "DROP DATABASE IF EXISTS \"$database\" WITH (FORCE)" >/dev/null ;;
-    *) echo "Not a test run database: $database" >&2; exit 1 ;;
-  esac
+  # Only names this script makes (digits alone after the prefix): nothing else ever reaches the SQL.
+  if ! printf '%s' "$database" | grep -Eqx 'tamandua_run_[0-9]+_[0-9]+'; then
+    echo "Not a test run database: $database" >&2; exit 1
+  fi
+  sql "DROP DATABASE IF EXISTS \"$database\" WITH (FORCE)" >/dev/null
   exit 0
 fi
 
