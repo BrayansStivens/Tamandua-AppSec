@@ -205,8 +205,19 @@ class Users:
                     [{"tenant_id": TENANT, "id": row["id"], "username": row["username"], "position": index, "record": row}
                      for index, row in enumerate(rows)])
 
+    def _one(self, *conditions) -> dict | None:
+        with db.transaction(self.data_dir) as connection:
+            return connection.execute(select(users.c.record).where(users.c.tenant_id == TENANT, *conditions)).scalar_one_or_none()
+
+    def _store(self, user: dict) -> None:
+        """Writes one user's record, under the users lock."""
+        with db.transaction(self.data_dir) as connection:
+            connection.execute(update(users).where(users.c.tenant_id == TENANT, users.c.id == user["id"])
+                               .values(username=user["username"], record=user, updated_at=func.now()))
+
     def any(self) -> bool:
-        return bool(self._load())
+        with db.transaction(self.data_dir) as connection:
+            return connection.execute(select(users.c.id).where(users.c.tenant_id == TENANT).limit(1)).first() is not None
 
     def public(self, user: dict) -> dict:
         return {"id": user["id"], "username": user["username"], "display_name": user["display_name"],
@@ -219,11 +230,10 @@ class Users:
         return [self.public(user) for user in self._load()]
 
     def get(self, username: str) -> dict | None:
-        key = normalize_username(username, strict=False)
-        return next((user for user in self._load() if user["username"] == key), None)
+        return self._one(users.c.username == normalize_username(username, strict=False))
 
     def by_id(self, user_id: str) -> dict | None:
-        return next((user for user in self._load() if user["id"] == user_id), None)
+        return self._one(users.c.id == user_id) if isinstance(user_id, str) else None
 
     def create_first_admin(self, username: str, password: str, display_name: str = "") -> dict:
         """Como `create`, pero solo si no hay nadie: dos altas simultáneas no crean dos administradores."""
@@ -243,28 +253,29 @@ class Users:
         if any(unicodedata.category(character) == "Cc" for character in display_name):
             raise AuthError(msg("auth.errors.name_control"))
         with self._locked():
-            rows = self._load()
-            if any(user["username"] == key for user in rows):
+            if self.get(key) is not None:
                 raise AuthError(msg("auth.errors.user_exists"))
             user = {"id": secrets.token_hex(12), "username": key, "display_name": (display_name or key)[:80],
                     "role": role, "password": hash_password(password) if password is not None else None, "totp": {"enabled": False},
                     "identities": [{"provider": "local", "subject": key}],
                     "disabled": False, "created_at": _now(), "last_login_at": None, "password_changed_at": _now()}
-            rows.append(user)
-            self._save(rows)
+            with db.transaction(self.data_dir) as connection:
+                last = connection.execute(select(func.max(users.c.position)).where(users.c.tenant_id == TENANT)).scalar_one()
+                connection.execute(insert(users).values(tenant_id=TENANT, id=user["id"], username=key,
+                                                        position=0 if last is None else last + 1, record=user))
         _log.info("user_created", extra={"user": key, "role": role})
         return self.public(user)
 
     def _update(self, user_id: str, mutate, guard=None) -> dict:
+        """Changes one user under the users lock. `guard(every user, this one)` may refuse it (the last administrator)."""
         with self._locked():
-            rows = self._load()
-            user = next((row for row in rows if row["id"] == user_id), None)
+            user = self.by_id(user_id)
             if user is None:
                 raise AuthError(msg("auth.errors.user_not_found"))
             if guard is not None:
-                guard(rows, user)
+                guard(self._load(), user)
             mutate(user)
-            self._save(rows)
+            self._store(user)
             return user
 
     def set_password(self, user_id: str, password: str) -> None:
@@ -300,7 +311,10 @@ class Users:
         if not isinstance(token, str) or not 20 <= len(token) <= 64:
             return None
         digest = hashlib.sha256(token.encode("ascii", "ignore")).hexdigest()
-        for user in self._load():
+        with db.transaction(self.data_dir) as connection:
+            found = connection.execute(select(users.c.record).where(users.c.tenant_id == TENANT,
+                                                                    users.c.record["link"]["hash"].astext == digest)).scalars().all()
+        for user in found:
             link = user.get("link") or {}
             if link.get("hash") and hmac.compare_digest(link["hash"], digest) and link.get("expires_at", 0) > time.time() \
                     and not user.get("disabled"):

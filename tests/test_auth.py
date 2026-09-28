@@ -98,6 +98,25 @@ class AuthenticatorTests(unittest.TestCase):
         with self.assertRaises(Locked):
             Authenticator(self.data_dir).login("operadora", PASSWORD, "c")
 
+    def test_users_keep_their_order_and_changes_touch_only_their_row(self):
+        from sqlalchemy import select
+        from tamandua.modules.identity.tables import users
+        from tamandua.shared import db
+        users_ = self.auth.users
+        users_.create("segunda", PASSWORD)
+        third = users_.create("tercera", PASSWORD)
+        with db.transaction(self.data_dir) as connection:
+            before = dict(connection.execute(select(users.c.username, users.c.updated_at)).all())
+            positions = dict(connection.execute(select(users.c.username, users.c.position)).all())
+        self.assertEqual(sorted(positions, key=positions.get), ["operadora", "segunda", "tercera"])
+        self.assertEqual(positions["operadora"], 0)
+        users_.set_role(third["id"], "admin")
+        with db.transaction(self.data_dir) as connection:
+            after = dict(connection.execute(select(users.c.username, users.c.updated_at)).all())
+        self.assertEqual({name for name in after if after[name] != before[name]}, {"tercera"})
+        self.assertEqual((users_.get("TERCERA")["role"], users_.by_id(third["id"])["username"], users_.get("nadie")), ("admin", "tercera", None))
+        self.assertEqual([user["username"] for user in users_.list()], ["operadora", "segunda", "tercera"])
+
     def test_a_locked_out_address_adds_no_rows_for_made_up_usernames(self):
         from sqlalchemy import func, select
         from tamandua.modules.identity.tables import auth_throttle
