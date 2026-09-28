@@ -67,6 +67,19 @@ campos sale tal como lo devolvió el módulo, y uno que falte nunca se añade co
 Después, `make openapi` regenera el esquema y los tipos TypeScript del panel (`web/src/shared/api/`), que se usan con
 `apiGet('/api/…')`: si la API y el panel no cuadran, falla `tsc`. El CI comprueba que el esquema está al día.
 
+### Añadir un motor
+
+Un motor del análisis de código es un `Engine` (`tamandua/modules/scanning/engines.py`): su clave, si sin él la
+ejecución queda incompleta, el mensaje de progreso que se dice antes de correrlo y cómo corre sobre un `ScanContext`
+(snapshot, carpeta de datos, feeds de KEV/EPSS, ajustes de secretos, permiso para salir de la máquina). Para añadir uno:
+
+1. Su imagen fijada por digest en `IMAGES`, y el binario en la imagen del worker con los motores dentro
+   (`docker/app/Dockerfile`, `worker-standalone`; `tests/test_packaging.py` comprueba que cuadran).
+2. Una función `run_*` que responde un `EngineResult`: `inconclusive` con el motivo cuando no puede correr, nunca una
+   excepción.
+3. Su línea en `CODE_ENGINES` (`tamandua/modules/scanning/repository.py`), en el orden en que corre. Si se solapa con
+   otro motor, la fusión que une sus hallazgos va después de correr los motores, y el motor es `merged`.
+
 ### Cambiar el esquema de la base de datos
 
 Las tablas se definen en `tamandua/modules/<contexto>/tables.py`. Un cambio lleva su migración de Alembic:

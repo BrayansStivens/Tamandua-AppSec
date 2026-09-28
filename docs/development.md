@@ -66,6 +66,19 @@ module's own limit when it has one: the response model checks it, and `tests/tes
 Then `make openapi` regenerates the schema and the panel's TypeScript types (`web/src/shared/api/`), used through
 `apiGet('/api/…')`: if the API and the panel disagree, `tsc` fails. CI checks that the schema is up to date.
 
+### Adding an engine
+
+An engine of the code scan is an `Engine` (`tamandua/modules/scanning/engines.py`): its key, whether the run is
+incomplete without it, the progress message said before it runs, and how it runs over a `ScanContext` (snapshot, data
+folder, KEV/EPSS feeds, secret settings, consent to leave the machine). To add one:
+
+1. Its image pinned by digest in `IMAGES`, and the binary in the worker image with the engines inside
+   (`docker/app/Dockerfile`, `worker-standalone`; `tests/test_packaging.py` checks they match).
+2. A `run_*` function that answers an `EngineResult`: `inconclusive` with the reason when it can't run, never an
+   exception.
+3. Its line in `CODE_ENGINES` (`tamandua/modules/scanning/repository.py`), in the order it runs. If it overlaps
+   another engine, the merge that joins their findings goes after the engines run, and the engine is `merged`.
+
 ### Changing the database schema
 
 Tables are defined in `tamandua/modules/<context>/tables.py`. Every change comes with its Alembic migration:

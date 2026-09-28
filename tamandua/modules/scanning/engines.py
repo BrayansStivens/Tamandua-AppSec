@@ -31,7 +31,10 @@ import subprocess
 import tempfile
 import time
 import uuid
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from tamandua.shared import log as logging_setup, paths, settings
 from tamandua.shared.i18n import msg
@@ -343,6 +346,59 @@ def pull_engines(report=None) -> list[dict]:
         results.append({**row, "ready": done, "action": msg("scanning.engines.action.pulled") if done
                         else with_cause(msg("scanning.engines.action.pull_failed"), completed)})
     return results
+
+
+@dataclass(frozen=True)
+class ScanContext:
+    """What every engine of a scan may need: the snapshot, the data folder (caches), the KEV/EPSS feeds, the secret
+    detection settings of this repository and whether the person allowed queries that leave the machine."""
+    root: Path
+    data_dir: Path
+    feeds: dict
+    secret_settings: dict | None = None
+    allow_osv_upload: bool = False
+
+
+class Engine(Protocol):
+    """An engine a scan runs. `key` names it in IMAGES (version, image, how it's installed); `required`: without its
+    result the run is incomplete; `progress`: the message said before it runs; `merged`: its progress line waits for
+    the merge with other engines, which completes its detail."""
+    key: str
+    required: bool
+    progress: str
+    merged: bool
+
+    def run(self, context: ScanContext) -> EngineResult: ...
+
+
+@dataclass(frozen=True)
+class EngineStep:
+    """An `Engine` made of a function: how most engines are declared (`scanning/repository.py`, CODE_ENGINES)."""
+    key: str
+    call: Callable[[ScanContext], EngineResult]
+    progress: str
+    required: bool = True
+    merged: bool = False
+
+    def run(self, context: ScanContext) -> EngineResult:
+        return self.call(context)
+
+
+def run_engines(engines: Sequence[Engine], context: ScanContext, report: Callable[[str, object], None]) -> dict[str, EngineResult]:
+    """Runs each engine in order and reports it; returns their results by key. An engine that fails to run says so in
+    its result (`inconclusive`), never by raising."""
+    results: dict[str, EngineResult] = {}
+    for engine in engines:
+        report("info", msg(engine.progress, version=IMAGES[engine.key]["version"]))
+        result = results[engine.key] = engine.run(context)
+        if not engine.merged:
+            report_done(report, result)
+    return results
+
+
+def report_done(report: Callable[[str, object], None], result: EngineResult) -> None:
+    report("ok" if result["status"] != "inconclusive" else "warn",
+           msg("scanning.progress.engine", engine=IMAGES[result["tool"]]["name"], detail=result.get("detail")))
 
 
 def _result(key: str, status: str, detail, findings: list | None = None, started: float | None = None) -> EngineResult:

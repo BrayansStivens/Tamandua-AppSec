@@ -292,6 +292,42 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class EngineRegistryTests(unittest.TestCase):
+    """The code scan runs the engines of CODE_ENGINES, in order, and only the required ones leave it incomplete."""
+
+    def test_every_engine_is_known_and_runs_once_in_order(self):
+        from tamandua.modules.scanning import repository as repository_scan
+        from tamandua.modules.scanning.engines import IMAGES, ScanContext, _result, run_engines
+        keys = [engine.key for engine in repository_scan.CODE_ENGINES]
+        self.assertEqual(len(keys), len(set(keys)))
+        self.assertTrue(set(keys) <= set(IMAGES))
+        self.assertEqual(repository_scan.REQUIRED_ENGINES, {"opengrep", "gitleaks", "trivy", "osv-scanner"})
+        ran, lines = [], []
+        engines = [repository_scan.EngineStep(key, lambda context, key=key: ran.append(key) or _result(key, "completed", "ok"), "scanning.progress.trivy",
+                                              merged=key == "zizmor") for key in keys]
+        results = run_engines(engines, ScanContext(Path("."), Path("."), {}), lambda level, message: lines.append(level))
+        self.assertEqual((ran, list(results)), (keys, keys))
+        self.assertEqual(lines.count("ok"), len(keys) - 1)  # the merged one reports after its merge
+
+    def test_an_optional_engine_that_fails_does_not_make_the_run_incomplete(self):
+        from tamandua.modules.scanning import repository as repository_scan
+        from tamandua.modules.scanning.engines import _result
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(repository_scan, "engines_available", return_value=True), \
+                patch.object(repository_scan, "run_opengrep", side_effect=lambda *_: _result("opengrep", "completed", "ok")), \
+                patch.object(repository_scan, "run_gitleaks", side_effect=lambda *_: _result("gitleaks", "completed", "ok")), \
+                patch.object(repository_scan, "run_trivy", side_effect=lambda *_: _result("trivy", "completed", "ok")), \
+                patch.object(repository_scan, "run_osv_scanner", side_effect=lambda *_, **__: _result("osv-scanner", "completed", "ok")), \
+                patch.object(repository_scan, "run_checkov", side_effect=lambda *_: _result("checkov", "inconclusive", "failed")), \
+                patch.object(repository_scan, "run_zizmor", side_effect=lambda *_: _result("zizmor", "completed", "ok")), \
+                patch.object(repository_scan, "load_feeds", return_value={"kev": {}, "epss": {}}):
+            root = Path(temporary)
+            (root / "app.py").write_text("print('hola')\n", encoding="utf-8")
+            scan = repository_scan.scan_repository(root, {"id": "github:org/app", "name": "org/app", "provider": "github"}, data_dir=root)
+        self.assertEqual(scan["status"], "completed")
+        self.assertEqual([step["id"] for step in scan["steps"]][1:7], ["opengrep", "gitleaks", "trivy", "osv-scanner", "checkov", "zizmor"])
+
+
 class EnginesDownTests(unittest.TestCase):
     """Si los motores no corren (imágenes sin construir), la ejecución no puede presentarse como limpia."""
 

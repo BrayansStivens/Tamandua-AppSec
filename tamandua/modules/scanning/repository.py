@@ -18,7 +18,7 @@ from tamandua.modules.scanning.coverage import owasp_coverage
 from tamandua.modules.scanning.config_engines import merge_repository, run_checkov, run_zizmor
 from tamandua.modules.scanning.dependency_merge import merge_dependencies
 from tamandua.modules.scanning import secret_rules
-from tamandua.modules.scanning.engines import IMAGES, SECRET_SEVERITY, SEVERITY_NAME, and_list, engines_available, joined as join_messages, host_mount_problem, run_osv_scanner, runner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy, masked_lead, secret_context, with_secret_identities
+from tamandua.modules.scanning.engines import SECRET_SEVERITY, EngineStep, ScanContext, report_done, run_engines, SEVERITY_NAME, and_list, engines_available, joined as join_messages, host_mount_problem, run_osv_scanner, runner, socket_problem, merge_secrets, run_gitleaks, run_opengrep, run_trivy, masked_lead, secret_context, with_secret_identities
 from tamandua.shared.i18n import msg
 from tamandua.shared.model import RunRecord
 from tamandua.version import USER_AGENT
@@ -163,6 +163,23 @@ def _query_osv(dependencies: list[dict]) -> list[dict]:
     return data["results"]
 
 
+# The engines of a code scan, in the order they run. Each is looked up here when it runs (so a test can replace one).
+# `required`: without its result the run is incomplete. `merged`: its progress line waits for the merge below.
+# Adding an engine: its image in engines.IMAGES, its run_* function, a line here and, if it overlaps others, its merge.
+CODE_ENGINES: tuple[EngineStep, ...] = (
+    EngineStep("opengrep", lambda context: run_opengrep(context.root), "scanning.progress.opengrep"),
+    EngineStep("gitleaks", lambda context: run_gitleaks(context.root, context.secret_settings), "scanning.progress.gitleaks"),
+    EngineStep("trivy", lambda context: run_trivy(context.root, context.data_dir / "trivy-cache", context.feeds, context.secret_settings),
+               "scanning.progress.trivy"),
+    EngineStep("osv-scanner", lambda context: run_osv_scanner(context.root, context.data_dir / "osv-cache", context.feeds,
+                                                              resolve=context.allow_osv_upload),
+               "scanning.progress.osv", merged=True),
+    EngineStep("checkov", lambda context: run_checkov(context.root), "scanning.progress.checkov", required=False, merged=True),
+    EngineStep("zizmor", lambda context: run_zizmor(context.root), "scanning.progress.zizmor", required=False, merged=True),
+)
+REQUIRED_ENGINES = frozenset(engine.key for engine in CODE_ENGINES if engine.required)
+
+
 def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                     context: str = "", data_dir: Path | None = None, progress=None) -> RunRecord:
     def report(level: str, message) -> None:
@@ -195,31 +212,18 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         # Docker está, pero este contenedor no puede usarlo: no es un análisis sin motores a propósito.
         report("warn", misconfigured)
     if engines:
-        # Cada motor corre en su contenedor pinneado por digest; el paso guarda versión, imagen y duración.
+        # Each engine runs in its container pinned by digest; the step keeps version, image and duration.
         mount_problem = host_mount_problem() if docker else None
         if mount_problem:
             report("warn", mount_problem)
-        report("info", msg("scanning.progress.opengrep", version=IMAGES["opengrep"]["version"]))
-        sast = run_opengrep(root)
-        report("ok" if sast["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Opengrep", detail=sast["detail"]))
-        report("info", msg("scanning.progress.gitleaks", version=IMAGES["gitleaks"]["version"]))
         # The defaults plus this repository's own entries apply to both secret engines.
         secret_settings = secret_rules.for_scan(data_dir, source.get("uid") or source.get("id") or source.get("name"))
-        secrets_gitleaks = run_gitleaks(root, secret_settings)
-        report("ok" if secrets_gitleaks["status"] != "inconclusive" else "warn",
-               msg("scanning.progress.engine", engine="Gitleaks", detail=secrets_gitleaks["detail"]))
-        report("info", msg("scanning.progress.trivy", version=IMAGES["trivy"]["version"]))
-        trivy = run_trivy(root, (data_dir or Path("data")) / "trivy-cache", feeds, secret_settings)
-        report("ok" if trivy["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Trivy", detail=trivy["detail"]))
-        report("info", msg("scanning.progress.osv", version=IMAGES["osv-scanner"]["version"]))
-        osv = run_osv_scanner(root, (data_dir or Path("data")) / "osv-cache", feeds, resolve=allow_osv_upload)
-        report("info", msg("scanning.progress.checkov", version=IMAGES["checkov"]["version"]))
-        checkov = run_checkov(root)
-        report("info", msg("scanning.progress.zizmor", version=IMAGES["zizmor"]["version"]))
-        zizmor = run_zizmor(root)
-        tools = [sast, secrets_gitleaks, trivy, osv, checkov, zizmor]
-        # Un motor que no corrió no es «cero hallazgos»: se dice en claro y la ejecución queda incompleta.
-        failed = [tool["name"] for tool in (sast, secrets_gitleaks, trivy, osv) if tool["status"] == "inconclusive"]
+        results = run_engines(CODE_ENGINES, ScanContext(root, data_dir or Path("data"), feeds, secret_settings, allow_osv_upload), report)
+        sast, secrets_gitleaks, trivy = results["opengrep"], results["gitleaks"], results["trivy"]
+        osv, checkov, zizmor = results["osv-scanner"], results["checkov"], results["zizmor"]
+        tools = list(results.values())
+        # An engine that didn't run isn't "zero findings": it's said plainly and the run is incomplete.
+        failed = [results[engine.key]["name"] for engine in CODE_ENGINES if engine.required and results[engine.key]["status"] == "inconclusive"]
         if failed:
             report("warn", msg("scanning.progress.engines_failed", engines=", ".join(failed)))
         findings.extend(sast["findings"])
@@ -234,7 +238,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         if osv["status"] == "completed" and osv["findings"]:
             osv["detail"] = msg("scanning.repository.osv_merged", detail=osv["detail"], joined=dependency_merge["joined"],
                                 new=dependency_merge["new"])
-        report("ok" if osv["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="OSV-Scanner", detail=osv["detail"]))
+        report_done(report, osv)
         # Lo que Trivy y Checkov (o zizmor y Checkov) ven a la vez queda como un solo hallazgo con los dos motores.
         configuration, joined = merge_repository([item for item in trivy["findings"] if item["scanner"] == "iac"],
                                                  checkov["findings"], zizmor["findings"])
@@ -242,8 +246,8 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         if checkov["status"] == "completed" and checkov["findings"]:
             checkov["detail"] = msg("scanning.repository.checkov_merged", detail=checkov["detail"], joined=joined["joined"],
                                     new=joined["checkov_new"])
-        report("ok" if checkov["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="Checkov", detail=checkov["detail"]))
-        report("ok" if zizmor["status"] != "inconclusive" else "warn", msg("scanning.progress.engine", engine="zizmor", detail=zizmor["detail"]))
+        report_done(report, checkov)
+        report_done(report, zizmor)
         for tool in tools:
             steps.append({"id": tool["tool"], "name": f"{tool['name']} {tool['version']}", "status": tool["status"],
                           "detail": tool["detail"], "tool": {"name": tool["tool"], "version": tool["version"],
@@ -365,7 +369,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     return {"type": "repository_scan",
             # Sin Docker no corrió ningún motor: las reglas internas no bastan para dar el repositorio por revisado.
             "status": "incomplete" if not engines or sca_status == "inconclusive" or truncated or misconfigured or any(
-                tool["tool"] in ("opengrep", "gitleaks", "trivy", "osv-scanner") and tool["status"] == "inconclusive" for tool in tools)
+                tool["tool"] in REQUIRED_ENGINES and tool["status"] == "inconclusive" for tool in tools)
                 # Allowlisted secrets not identified: one that stopped appearing may only be silenced.
                 or any("withheld" in tool and tool["withheld"] is None for tool in tools) else "completed",
             "source": source, "target": source["name"], "variant": "code", "context": declared,
