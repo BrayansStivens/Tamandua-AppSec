@@ -80,7 +80,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
     _day = _day_in(where)  # los días se cuentan en la zona de quien mira
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=days)
-    rows = list_runs(data_dir)
+    rows = list_runs(data_dir)  # every run: the activity chart counts them all
     records = []
     decisions = load_triage(data_dir)
     triage_totals: Counter = Counter()

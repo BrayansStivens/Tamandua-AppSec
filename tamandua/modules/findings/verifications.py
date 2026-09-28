@@ -23,7 +23,7 @@ from typing import Callable
 from tamandua.shared import documents
 
 MAX_PER_ASSET = 500
-_runs: Callable[[Path], list[dict]] | None = None
+_runs: Callable[[Path, list[str]], list[dict]] | None = None
 
 
 def load(data_dir: Path) -> dict:
@@ -56,17 +56,17 @@ def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
                 asset[new] = asset[former]
 
 
-def use_runs(lookup: Callable[[Path], list[dict]]) -> None:
-    """Wired by the composition root (`tamandua/app/wiring.py`): how to read the run rows, whose status says how a
-    verification went. Findings sit below runs, so they are handed the reader instead of importing it."""
+def use_runs(lookup: Callable[[Path, list[str]], list[dict]]) -> None:
+    """Wired by the composition root (`tamandua/app/wiring.py`): how to read the rows of some runs (by id), whose
+    status says how a verification went. Findings sit below runs, so they are handed the reader instead of importing it."""
     global _runs
     _runs = lookup
 
 
-def _run_rows(data_dir: Path) -> list[dict]:
+def _run_rows(data_dir: Path, ids: list[str]) -> list[dict]:
     if _runs is None:
         raise RuntimeError("verifications: no run reader wired in this process (see tamandua/app/wiring.py)")
-    return _runs(data_dir)
+    return _runs(data_dir, ids)
 
 
 def annotate(data_dir: Path, key: str, findings: list[dict]) -> list[dict]:
@@ -75,7 +75,7 @@ def annotate(data_dir: Path, key: str, findings: list[dict]) -> list[dict]:
     if not requested or not any(item.get("fingerprint") in requested for item in findings):
         return findings
     from tamandua.modules.findings.registry import load as registry
-    runs = {row["id"]: row for row in _run_rows(data_dir)}
+    runs = {row["id"]: row for row in _run_rows(data_dir, [entry["run_id"] for entry in requested.values() if entry.get("run_id")])}
     entries = registry(data_dir, key).get("findings", {})
     for finding in findings:
         asked = requested.get(finding.get("fingerprint"))

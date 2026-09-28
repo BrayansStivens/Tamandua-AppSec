@@ -141,8 +141,8 @@ def attach(data_dir: Path, batch_id: str, index: int, *, run_id: str | None = No
 
 def summary(data_dir: Path, batch: dict) -> dict:
     """Progreso derivado de las ejecuciones reales, con estimación del tiempo restante."""
-    from tamandua.modules.runs.store import list_runs
-    runs = {row["id"]: row for row in list_runs(data_dir)}
+    from tamandua.modules.runs.store import find_runs
+    runs = {row["id"]: row for row in find_runs(data_dir, ids=[item["run_id"] for item in batch["items"] if item.get("run_id")])}
     counts = {"pending": 0, "running": 0, "done": 0, "failed": 0}
     critical = high = 0
     durations = []

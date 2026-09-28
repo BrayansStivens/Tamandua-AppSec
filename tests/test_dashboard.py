@@ -50,6 +50,26 @@ class IndexAndPagingTests(unittest.TestCase):
             self.assertEqual(page_runs(data_dir, status="completed", asset="github:org/repo-1")["total"], 10)
             self.assertEqual(len(list_runs(data_dir)), 30)
 
+    def test_find_runs_filters_in_the_database(self):
+        from tamandua.modules.runs.store import find_runs
+        with tempfile.TemporaryDirectory() as temporary:
+            data_dir = Path(temporary)
+            now = datetime.now(timezone.utc)
+            for index, (name, status) in enumerate([("org/a_b", "completed"), ("org/a%b", "incomplete"), ("org/axb", "completed")]):
+                save_repository_scan(data_dir, {**_scan(name, [], now.isoformat()), "status": status},
+                                     created_at=(now - timedelta(minutes=index)).isoformat())
+            names = lambda rows: [row["source"]["name"] for row in rows]
+            self.assertEqual(names(find_runs(data_dir, statuses=("completed",))), ["org/a_b", "org/axb"])
+            self.assertEqual(names(find_runs(data_dir, assets=["github:org/axb"])), ["org/axb"])
+            # The prefix is literal: `_` and `%` match only themselves.
+            self.assertEqual(names(find_runs(data_dir, asset_prefix="github:org/a_")), ["org/a_b"])
+            self.assertEqual(names(find_runs(data_dir, asset_prefix="github:org/a%")), ["org/a%b"])
+            self.assertEqual(names(find_runs(data_dir, types=("pr_review",))), [])
+            self.assertEqual(len(find_runs(data_dir, limit=2)), 2)
+            first = find_runs(data_dir)[0]["id"]
+            self.assertEqual([row["id"] for row in find_runs(data_dir, ids=[first, None])], [first])
+            self.assertEqual(find_runs(data_dir, ids=[]), [])
+
 
 class ConcurrentIndexTests(unittest.TestCase):
     def test_concurrent_writers_do_not_fail_or_lose_rows(self):

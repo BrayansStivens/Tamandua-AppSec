@@ -28,7 +28,7 @@ from tamandua.modules.sources.assets import asset_key, scan_branch
 from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.runs import queue
 from tamandua.modules.runs import registry as run_registry
-from tamandua.modules.runs.store import list_runs, load_run, save_record, save_repository_scan
+from tamandua.modules.runs.store import find_runs, load_run, save_record, save_repository_scan
 from tamandua.shared import db, vault
 from tamandua.shared.i18n import msg, text
 
@@ -82,7 +82,7 @@ class ScanJobs:
         self._recover(everything=embedded)
         batches.release_taken(self.data_dir)
         # El registro de hallazgos se deriva de las ejecuciones: si está vacío y hay ejecuciones, se reconstruye.
-        if findings_registry.is_empty(self.data_dir) and list_runs(self.data_dir):
+        if findings_registry.is_empty(self.data_dir) and find_runs(self.data_dir, limit=1):
             run_registry.rebuild(self.data_dir)
 
     def stop(self) -> None:
@@ -102,8 +102,8 @@ class ScanJobs:
                 interrupted |= {row.run_id for row in rows if row.run_id}
             active = set(connection.execute(select(jobs.c.run_id).where(jobs.c.tenant_id == db.TENANT,
                                                                        jobs.c.status.in_(("queued", "running")))).scalars())
-        for row in list_runs(self.data_dir):
-            if row["status"] in ("queued", "running") and (row["id"] in interrupted or row["id"] not in active):
+        for row in find_runs(self.data_dir, statuses=("queued", "running")):
+            if row["id"] in interrupted or row["id"] not in active:
                 try:
                     record = load_run(self.data_dir, row["id"])
                 except (ValueError, OSError):
@@ -379,16 +379,14 @@ class ScanJobs:
         """Latest full scan of the PR's base branch: what was already there before the PR.
 
         Scans that don't record their branch read the default branch."""
-        for row in list_runs(self.data_dir):
-            if (row["type"] == "repository_scan" and row["status"] in ("completed", "incomplete")
-                    and asset_key(row) in {source_id, uid}):
-                scanned = (row.get("source") or {}).get("branch") or default_branch
-                if branch and scanned and scanned != branch:
-                    continue
-                try:
-                    return load_run(self.data_dir, row["id"])
-                except (ValueError, OSError):
-                    return None
+        for row in find_runs(self.data_dir, types=("repository_scan",), statuses=("completed", "incomplete"), assets=(source_id, uid)):
+            scanned = (row.get("source") or {}).get("branch") or default_branch
+            if branch and scanned and scanned != branch:
+                continue
+            try:
+                return load_run(self.data_dir, row["id"])
+            except (ValueError, OSError):
+                return None
         return None
 
     def _execute_pr(self, job: dict) -> None:

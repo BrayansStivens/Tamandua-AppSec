@@ -5,14 +5,17 @@ from __future__ import annotations
 from pathlib import Path
 
 from tamandua.modules.findings import registry
-from tamandua.modules.runs.store import list_runs, load_run
+from tamandua.modules.findings.kinds import FINDING_RUNS
+from tamandua.modules.runs.store import find_runs, load_run
 
 
 def rebuild(data_dir: Path) -> int:
     """Reconstruye todos los registros desde las ejecuciones, en orden cronológico."""
     registry.reset(data_dir)
     applied = 0
-    for row in sorted(list_runs(data_dir), key=lambda item: item.get("finished_at") or item["created_at"]):
+    # Only the runs the registry takes (registry.apply ignores the rest), oldest first.
+    finished = find_runs(data_dir, types=FINDING_RUNS, statuses=("completed", "incomplete"))
+    for row in sorted(finished, key=lambda item: item.get("finished_at") or item["created_at"]):
         try:
             registry.apply(data_dir, load_run(data_dir, row["id"]))
             applied += 1

@@ -15,7 +15,7 @@ from pathlib import Path
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.findings import tickets, triage
 from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS
-from tamandua.modules.runs.store import delete_runs, list_runs, load_run, save_record
+from tamandua.modules.runs.store import delete_runs, find_runs, load_run, save_record
 from tamandua.modules.sources import assets as source_assets
 from tamandua.modules.sources.assets import asset_key
 from tamandua.shared import events
@@ -36,7 +36,7 @@ def backfill(data_dir: Path, repositories: list[dict]) -> int:
     uid_of = {item["id"]: item["uid"] for item in repositories if item.get("uid")}
     moved: dict[str, str] = {}
     updated = 0
-    for row in list_runs(data_dir):
+    for row in find_runs(data_dir, assets=list(uid_of)):  # still keyed by their old id
         source = row.get("source") or {}
         if source.get("uid") or source.get("id") not in uid_of:
             continue
@@ -61,8 +61,7 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
     """Compara lo analizado con la lista COMPLETA de la instalación. Devuelve qué se marcó y qué se borró."""
     now = now or datetime.now(timezone.utc)
     backfill(data_dir, repositories)
-    analysed = {asset_key(row): (row.get("source") or {}).get("name") for row in list_runs(data_dir)
-                if asset_key(row).startswith("github#")}
+    analysed = {asset_key(row): (row.get("source") or {}).get("name") for row in find_runs(data_dir, asset_prefix="github#")}
     result = source_assets.retire(data_dir, repositories, analysed, now=now, active_accounts=active_accounts)
     for uid in result["purged"]:
         purge(data_dir, uid)
@@ -71,7 +70,7 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
 
 def purge(data_dir: Path, uid: str) -> int:
     """Borra las ejecuciones de un repositorio y avisa para que cada contexto olvide lo suyo. Devuelve ejecuciones borradas."""
-    removed = delete_runs(data_dir, [row["id"] for row in list_runs(data_dir) if asset_key(row) == uid])
+    removed = delete_runs(data_dir, [row["id"] for row in find_runs(data_dir, assets=[uid])])
     events.publish(AssetPurged(data_dir, uid))
     _log.warning("repo_purged", extra={"reason": f"{uid}: {removed} ejecuciones borradas"})
     return removed
@@ -81,9 +80,7 @@ def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
     """Un renglón por repositorio analizado: su último escaneo completo, lo pendiente y si GitHub lo retiró."""
     registry = source_assets.load_registry(data_dir)
     groups: dict[str, dict] = {}
-    for row in list_runs(data_dir):  # del más reciente al más antiguo
-        if row["type"] not in FINDING_RUNS:
-            continue
+    for row in find_runs(data_dir, types=FINDING_RUNS):  # del más reciente al más antiguo
         key = asset_key(row)
         entry = groups.setdefault(key, {"key": key, "name": (row.get("source") or {}).get("name"), "provider": (row.get("source") or {}).get("provider"),
                                         "source_id": (row.get("source") or {}).get("id"), "scans": 0, "pr_reviews": 0,
@@ -107,10 +104,9 @@ def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
 
 def in_flight(data_dir: Path, key: str) -> dict | None:
     """Un análisis completo de ese activo que aún no terminó, si lo hay."""
-    return next((row for row in list_runs(data_dir) if row["type"] in FULL_SCANS and row["status"] in ("queued", "running")
-                 and asset_key(row) == key), None)
+    return next(iter(find_runs(data_dir, types=FULL_SCANS, statuses=("queued", "running"), assets=[key], limit=1)), None)
 
 
 def latest_scan(data_dir: Path, key: str) -> dict | None:
     """El último análisis completo del activo: de él sale cómo volver a analizarlo (repositorio o imagen)."""
-    return next((row for row in list_runs(data_dir) if row["type"] in FULL_SCANS and asset_key(row) == key), None)
+    return next(iter(find_runs(data_dir, types=FULL_SCANS, assets=[key], limit=1)), None)

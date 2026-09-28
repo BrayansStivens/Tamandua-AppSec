@@ -12,12 +12,10 @@ from pathlib import Path
 def catalog(data_dir: Path) -> list[dict]:
     """Analyzed assets, most recent first: key, latest name, kind and when each last finished a complete scan."""
     from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS
-    from tamandua.modules.runs.store import list_runs
+    from tamandua.modules.runs.store import find_runs
     from tamandua.modules.sources.assets import asset_key
     rows: dict[str, dict] = {}
-    for row in list_runs(data_dir):  # most recent first
-        if row["type"] not in FINDING_RUNS:
-            continue
+    for row in find_runs(data_dir, types=FINDING_RUNS):  # most recent first
         key = asset_key(row)
         entry = rows.setdefault(key, {"key": key, "name": (row.get("source") or {}).get("name") or key, "kind": None,
                                       "last_complete": None, "last_status": None})
@@ -59,12 +57,11 @@ def complete_scans(data_dir: Path) -> tuple[list[dict], int]:
     `{"key", "ref", "scan"}` with a ref unique in the portfolio; and how many assets have one."""
     from tamandua.modules.compliance import sbom
     from tamandua.modules.findings.kinds import FULL_SCANS
-    from tamandua.modules.runs.store import list_runs, load_run
+    from tamandua.modules.runs.store import find_runs, load_run
     from tamandua.modules.sources.assets import asset_key
     latest: dict[str, dict] = {}
-    for row in list_runs(data_dir):  # most recent first
-        if row["type"] in FULL_SCANS and row["status"] == "completed":
-            latest.setdefault(asset_key(row), row)
+    for row in find_runs(data_dir, types=FULL_SCANS, statuses=("completed",)):  # most recent first
+        latest.setdefault(asset_key(row), row)
     chosen, used = [], {"urn:tamandua:portfolio"}
     for key, row in list(latest.items())[:sbom.PORTFOLIO_ASSETS]:
         try:

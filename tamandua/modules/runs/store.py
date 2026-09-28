@@ -535,7 +535,21 @@ def load_run(data_dir: Path, run_id: str) -> dict:
 
 
 def list_runs(data_dir: Path) -> list[dict]:
-    """Las filas de listado, de la más reciente a la más antigua."""
+    """Las filas de listado, de la más reciente a la más antigua. To look for some of them, `find_runs`."""
+    return find_runs(data_dir)
+
+
+def find_runs(data_dir: Path, *, types=None, statuses=None, assets=None, asset_prefix: str | None = None,
+              ids=None, limit: int | None = None) -> list[dict]:
+    """The listing rows that match, newest first, filtered in the database (indexed type, status and asset columns)
+    instead of reading every run. Each filter is optional; `assets` are asset keys (`sources.assets.asset_key`)."""
+    conditions = [runs.c.tenant_id == TENANT]
+    for column, values in ((runs.c.type, types), (runs.c.status, statuses), (runs.c.asset_key, assets), (runs.c.id, ids)):
+        if values is not None:
+            conditions.append(column.in_([value for value in values if value]))
+    if asset_prefix:
+        escaped = asset_prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        conditions.append(runs.c.asset_key.like(f"{escaped}%", escape="\\"))
+    statement = select(runs.c.row).where(*conditions).order_by(runs.c.created_at.desc(), runs.c.id.desc())
     with db.transaction(data_dir) as connection:
-        return list(connection.execute(select(runs.c.row).where(runs.c.tenant_id == TENANT)
-                                       .order_by(runs.c.created_at.desc(), runs.c.id.desc())).scalars())
+        return list(connection.execute(statement.limit(limit) if limit else statement).scalars())

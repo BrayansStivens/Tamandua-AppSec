@@ -15,7 +15,7 @@ from tamandua.modules.pullrequests import watch as pr_watch
 from tamandua.modules.pullrequests.watch import RepositoriesListed
 from tamandua.modules.runs import assets as run_assets
 from tamandua.modules.runs.assets import AssetPurged
-from tamandua.modules.runs.store import list_runs
+from tamandua.modules.runs.store import find_runs
 from tamandua.modules.scanning import secret_rules
 from tamandua.modules.sources import assets as source_assets
 from tamandua.shared import events
@@ -45,7 +45,7 @@ def configure() -> None:
     with _lock:
         if _wired:
             return
-        verifications.use_runs(list_runs)
+        verifications.use_runs(lambda data_dir, ids: find_runs(data_dir, ids=ids))
         events.subscribe(RepositoriesListed, _reconcile)
         for forget in FORGET_ON_PURGE:
             events.subscribe(AssetPurged, _forgetting(forget))

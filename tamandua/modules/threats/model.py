@@ -864,14 +864,14 @@ def _manual_rows(model: dict, decisions: dict) -> list[dict]:
 
 def evidence_index(data_dir: Path, assets: set[str]) -> dict[str, list[dict]]:
     """Hallazgos activos del último escaneo completo de cada repositorio enlazado."""
-    from tamandua.modules.runs.store import list_runs, load_run
+    from tamandua.modules.runs.store import find_runs, load_run
     latest: dict[str, dict] = {}
     from tamandua.modules.sources.assets import asset_key
-    for row in list_runs(data_dir):
+    for row in find_runs(data_dir, types=("repository_scan",), statuses=("completed", "incomplete")):
         key = asset_key(row)
         source = (row.get("source") or {}).get("id")
         match = key if key in assets else source if source in assets else None
-        if row["type"] == "repository_scan" and row["status"] in ("completed", "incomplete") and match and match not in latest:
+        if match and match not in latest:
             latest[match] = row
     result = {}
     for asset, row in latest.items():

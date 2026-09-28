@@ -147,15 +147,13 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale
 
 def latest_scan(data_dir: Path, key: str) -> dict | None:
     """El último análisis completo de un activo: de él sale el SBOM del estado actual."""
-    from tamandua.modules.sources.assets import asset_key
     from tamandua.modules.findings.kinds import FULL_SCANS
-    from tamandua.modules.runs.store import list_runs, load_run
-    for row in list_runs(data_dir):  # de más reciente a más antiguo
-        if row["type"] in FULL_SCANS and row["status"] == "completed" and asset_key(row) == key:
-            try:
-                return load_run(data_dir, row["id"])
-            except (ValueError, OSError):
-                return None
+    from tamandua.modules.runs.store import find_runs, load_run
+    for row in find_runs(data_dir, types=FULL_SCANS, statuses=("completed",), assets=[key], limit=1):
+        try:
+            return load_run(data_dir, row["id"])
+        except (ValueError, OSError):
+            return None
     return None
 
 

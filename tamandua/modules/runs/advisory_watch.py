@@ -24,7 +24,7 @@ from pathlib import Path
 from tamandua.modules.findings import registry
 from tamandua.modules.findings.kinds import FULL_SCANS
 from tamandua.modules.intel.advisories import load_feeds
-from tamandua.modules.runs.store import list_runs, load_run, save_repository_scan
+from tamandua.modules.runs.store import find_runs, load_run, save_repository_scan
 from tamandua.modules.scanning import engines
 from tamandua.modules.scanning.dependency_merge import family, identifiers, package_name, purl
 from tamandua.modules.sources.assets import asset_key
@@ -65,9 +65,7 @@ def _save_state(data_dir: Path, state: dict) -> None:
 def latest_complete(data_dir: Path) -> list[dict]:
     """El último análisis completo de cada repositorio o imagen que guarda sus dependencias."""
     seen, result = set(), []
-    for row in list_runs(data_dir):  # de más reciente a más antiguo
-        if row["type"] not in FULL_SCANS or row["status"] != "completed":
-            continue
+    for row in find_runs(data_dir, types=FULL_SCANS, statuses=("completed",)):  # de más reciente a más antiguo
         key = asset_key(row)
         if key in seen:
             continue

@@ -13,7 +13,7 @@ from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, g
 from tamandua.modules.integrations import code_tokens
 from tamandua.modules.integrations.github import GitHubAppError
 from tamandua.modules.integrations.installations import github_installations
-from tamandua.modules.runs.store import list_runs, load_run
+from tamandua.modules.runs.store import find_runs, load_run
 from tamandua.modules.scanning.inventory import live as live_inventory
 from tamandua.modules.sources.assets import asset_key
 from tamandua.modules.sources.domains import list_domains
@@ -42,10 +42,10 @@ def _assets(context: Context, keys: list[str] = ()) -> dict[str, dict]:
     Those asked for are checked one by one against their credential: validating a model that uses three
     repositories does not list the whole organization."""
     assets: dict[str, dict] = {}
-    for row in list_runs(context.data_dir):
+    for row in find_runs(context.data_dir, types=("repository_scan",)):
         source = row.get("source") or {}
         key = asset_key(row)
-        if row["type"] == "repository_scan" and source.get("id"):
+        if source.get("id"):
             entry = assets.setdefault(key, {"id": key, "source_id": source["id"], "name": source.get("name"), "kind": "repository", "last_run": None})
             if entry["last_run"] is None and row["status"] in ("completed", "incomplete"):
                 entry["last_run"], entry["scanned_at"] = row["id"], row["created_at"]

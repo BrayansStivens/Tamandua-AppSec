@@ -16,7 +16,7 @@ from tamandua.modules.integrations.github import (GitHubAppError, installation_r
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.pullrequests import watch as pr_watch
 from tamandua.modules.pullrequests.review import GATES
-from tamandua.modules.runs.store import list_runs, load_run
+from tamandua.modules.runs.store import find_runs, load_run
 from tamandua.modules.sources.repositories import source_page
 from tamandua.shared.i18n import msg
 
@@ -191,7 +191,7 @@ def pulls(source_id: str | None = None, context: Context = Depends(guard())) -> 
         # The settings can be left ready even if GitHub doesn't let the App read the pull requests yet.
         return context.render({"settings": settings, "pulls": [], "pulls_error": problem(exc)})
     done = pr_watch.reviewed(data_dir, uid)
-    runs = {row["id"]: row for row in list_runs(data_dir) if row["type"] == "pr_review"}
+    runs = {row["id"]: row for row in find_runs(data_dir, types=("pr_review",), ids=[entry["run_id"] for entry in done.values() if entry.get("run_id")])}
     for row in rows:
         entry = done.get(str(row["number"]))
         run = runs.get(entry["run_id"]) if entry else None

@@ -11,7 +11,7 @@ from tamandua.modules.integrations import notifications
 from tamandua.modules.integrations.installations import github_installations
 from tamandua.modules.pullrequests import watch as pr_watch
 from tamandua.modules.findings.kinds import FULL_SCANS
-from tamandua.modules.runs.store import list_runs
+from tamandua.modules.runs.store import find_runs
 
 router = APIRouter(tags=["onboarding"])
 
@@ -29,7 +29,7 @@ class Onboarding(BaseModel):
 @router.get("/api/onboarding", response_model=Onboarding)
 def onboarding(context: Context = Depends(guard())) -> dict:
     user, data_dir = context.user, context.data_dir
-    runs = list_runs(data_dir)
+    runs = find_runs(data_dir, types=FULL_SCANS)
     try:
         alerts = bool(notifications.channels())
     except Exception:  # noqa: BLE001 — without a readable vault the step simply stays pending
