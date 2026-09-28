@@ -328,6 +328,24 @@ class BranchWatchTests(unittest.TestCase):
 
 
 class RouteTests(HttpCase):
+    def test_the_overview_shows_settings_saved_by_name_without_rewriting_them(self):
+        """Old settings are keyed by name until the watcher moves them: a GET reads them and writes nothing."""
+        from tamandua.shared import documents
+        with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
+            Users(self.data_dir).create("lectora", PASSWORD, role="member")
+            _, _, cookies = self.post("/api/auth/login", "login", {"username": "lectora", "password": PASSWORD})
+            cookie = cookies[0].split("; ")[0]
+            state = pr_watch.load(self.data_dir)
+            state["repositories"]["github:org/api"] = {**pr_watch.DEFAULTS, "enabled": True}
+            pr_watch._save(self.data_dir, state)
+            before = documents.load(self.data_dir, "pr-watch", {})
+            with patch("tamandua.app.api.pullrequests.github_installations", return_value=[7]), \
+                    fake_github({7: [(1, "org/api"), (2, "org/web")]}, {7: ("org", "selected")}):
+                status, overview, _ = self.call("GET", "/api/pull-requests/watch", headers={"Cookie": cookie})
+            self.assertEqual(status, 200)
+            self.assertEqual({row["name"]: row["enabled"] for row in overview["repositories"]}, {"org/api": True, "org/web": False})
+            self.assertEqual(documents.load(self.data_dir, "pr-watch", {}), before)
+
     def test_settings_survive_when_github_denies_reading_pulls(self):
         with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             Users(self.data_dir).create("operadora", PASSWORD, role="admin")

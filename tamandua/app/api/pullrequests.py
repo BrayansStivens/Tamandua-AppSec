@@ -224,8 +224,12 @@ class WatchPage(BaseModel):
 
 
 def _row(item: dict, state: dict) -> dict:
+    # Settings saved under the old key (the name) until the watcher moves them to the stable one (pr_watch.migrate):
+    # a GET only reads.
+    def saved(section: str) -> dict:
+        return state[section].get(item["uid"]) or state[section].get(item["id"]) or {}
     return {"id": item["id"], "uid": item["uid"], "name": item["name"], "private": item.get("private"),
-            **pr_watch.DEFAULTS, **state["repositories"].get(item["uid"], {}), "reviewed": len(state["reviewed"].get(item["uid"], {})),
+            **pr_watch.DEFAULTS, **saved("repositories"), "reviewed": len(saved("reviewed")),
             "branch_scan": pr_watch.latest_scan(state["branches"].get(item["uid"])), "default_branch": item.get("branch")}
 
 
@@ -271,8 +275,6 @@ def watch_overview(q: str = "", page: PageNumber = None, per_page: PageNumber = 
     else:
         listing = source_page(None, installations, query=q, provider="github", page=page_number, per_page=size)
         items, total, partial = listing["sources"], listing["total"], listing["partial"]
-        pr_watch.migrate(context.data_dir, items)
-        state = pr_watch.load(context.data_dir)
     return context.render({"repositories": [_row(item, state) for item in items], "total": total, "page": page_number,
                            "per_page": size, "partial": partial, "interval": pr_watch.interval(), "enabled": len(enabled),
                            "branch_min_minutes": pr_watch.branch_min_seconds() // 60})
