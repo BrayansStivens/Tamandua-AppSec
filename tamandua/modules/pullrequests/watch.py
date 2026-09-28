@@ -17,11 +17,17 @@ per branch, a few per round and only with an almost empty queue: manual scans an
 from __future__ import annotations
 
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from tamandua.shared import documents
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.dialects.postgresql import insert
+
+from tamandua.modules.pullrequests.tables import pr_reviews, pr_watch
+from tamandua.shared import db
+from tamandua.shared.db import TENANT
 from tamandua.shared import settings as env_settings
 from tamandua.shared import events
 from tamandua.shared import log as logging_setup
@@ -52,22 +58,77 @@ class WatchError(ValueError):
         self.message = message
 
 
-def load(data_dir: Path) -> dict:
-    payload = documents.load(data_dir, "pr-watch", {})
-    if not isinstance(payload, dict):
-        return {"repositories": {}, "reviewed": {}, "branches": {}}
-    payload.setdefault("repositories", {})
-    payload.setdefault("reviewed", {})
-    payload.setdefault("branches", {})
-    return payload
+@contextmanager
+def _locked(data_dir: Path):
+    """One transaction under the watch lock: read-modify-write of the settings never loses a concurrent change."""
+    with db.transaction(data_dir) as connection:
+        db.lock(connection, "pr-watch")
+        yield connection
+
+
+def _configs(connection, keys=None) -> dict[str, dict]:
+    statement = select(pr_watch.c.asset_key, pr_watch.c.config).where(pr_watch.c.tenant_id == TENANT, pr_watch.c.config.is_not(None))
+    if keys is not None:
+        statement = statement.where(pr_watch.c.asset_key.in_(list(keys)))
+    return {key: config for key, config in connection.execute(statement).all() if isinstance(config, dict)}
+
+
+def _branches_of(connection, key: str):
+    return connection.execute(select(pr_watch.c.branches).where(pr_watch.c.tenant_id == TENANT, pr_watch.c.asset_key == key)).scalar_one_or_none()
+
+
+def _put(connection, key: str, **values) -> None:
+    statement = insert(pr_watch).values(tenant_id=TENANT, asset_key=key, **values)
+    connection.execute(statement.on_conflict_do_update(index_elements=[pr_watch.c.tenant_id, pr_watch.c.asset_key],
+                                                       set_={**values, "updated_at": func.now()}))
+
+
+def _reviews(connection, keys=None) -> dict[str, dict]:
+    statement = select(pr_reviews.c.asset_key, pr_reviews.c.number, pr_reviews.c.head_sha, pr_reviews.c.run_id, pr_reviews.c.closed) \
+        .where(pr_reviews.c.tenant_id == TENANT)
+    if keys is not None:
+        statement = statement.where(pr_reviews.c.asset_key.in_(list(keys)))
+    result: dict[str, dict] = {}
+    for key, number, head_sha, run_id, closed in connection.execute(statement.order_by(pr_reviews.c.number)).all():
+        result.setdefault(key, {})[str(number)] = {"head_sha": head_sha, "run_id": run_id, **({"closed": True} if closed else {})}
+    return result
+
+
+def load(data_dir: Path, *, reviews: bool = True) -> dict:
+    """{"repositories": {key: settings}, "reviewed": {key: {number: review}}, "branches": {key: heads}}. Without
+    `reviews`, "reviewed" stays empty: the reviewed pull requests are what grows."""
+    with db.transaction(data_dir) as connection:
+        branches = dict(connection.execute(
+            select(pr_watch.c.asset_key, pr_watch.c.branches).where(pr_watch.c.tenant_id == TENANT, pr_watch.c.branches.is_not(None))).all())
+        return {"repositories": _configs(connection), "reviewed": _reviews(connection) if reviews else {}, "branches": branches}
+
+
+def review_counts(data_dir: Path, keys: list[str]) -> dict[str, int]:
+    """How many pull requests of each repository were reviewed."""
+    with db.transaction(data_dir) as connection:
+        return dict(connection.execute(select(pr_reviews.c.asset_key, func.count()).where(
+            pr_reviews.c.tenant_id == TENANT, pr_reviews.c.asset_key.in_(keys)).group_by(pr_reviews.c.asset_key)).all())
 
 
 def _save(data_dir: Path, payload: dict) -> None:
-    documents.save(data_dir, "pr-watch", payload)
+    """Replaces the whole watch state with `payload` (the shape `load` returns). For the data migration and tests."""
+    with _locked(data_dir) as connection:
+        connection.execute(delete(pr_reviews).where(pr_reviews.c.tenant_id == TENANT))
+        connection.execute(delete(pr_watch).where(pr_watch.c.tenant_id == TENANT))
+        repositories, branches = payload.get("repositories") or {}, payload.get("branches") or {}
+        for key in set(repositories) | set(branches):
+            _put(connection, key, config=repositories.get(key), branches=branches.get(key))
+        rows = [{"tenant_id": TENANT, "asset_key": key, "number": int(number), "head_sha": str(entry.get("head_sha") or ""),
+                 "run_id": str(entry.get("run_id") or "")[:32], "closed": bool(entry.get("closed"))}
+                for key, done in (payload.get("reviewed") or {}).items() if isinstance(done, dict)
+                for number, entry in done.items() if isinstance(entry, dict) and str(number).isdigit()]
+        if rows:
+            connection.execute(insert(pr_reviews), rows)
 
 
 def settings(data_dir: Path, source_id: str) -> dict:
-    return {**DEFAULTS, **load(data_dir)["repositories"].get(source_id, {})}
+    with db.transaction(data_dir) as connection:
+        return {**DEFAULTS, **_configs(connection, [source_id]).get(source_id, {})}
 
 
 def configure(data_dir: Path, source_id: str, *, enabled=None, post_comment=None, gate=None, branch=None, by: str) -> dict:
@@ -75,22 +136,21 @@ def configure(data_dir: Path, source_id: str, *, enabled=None, post_comment=None
 
 
 def configure_many(data_dir: Path, keys: list[str], *, enabled=None, post_comment=None, gate=None, branch=None, by: str) -> list[dict]:
-    """Varios repositorios con una sola escritura: activar cientos no reescribe el archivo cientos de veces."""
+    """Several repositories in one transaction; each writes only its own row."""
     if gate is not None and gate not in GATES:
         raise WatchError(msg("pulls.watch.invalid_gate"))
     results = []
-    with documents.lock(data_dir, "pr-watch"):
-        payload = load(data_dir)
+    with _locked(data_dir) as connection:
+        stored = _configs(connection, keys)
         when = datetime.now(timezone.utc).isoformat(timespec="seconds")
         for key in dict.fromkeys(keys):
-            current = {**DEFAULTS, **payload["repositories"].get(key, {})}
+            current = {**DEFAULTS, **stored.get(key, {})}
             for field, value in (("enabled", enabled), ("post_comment", post_comment), ("gate", gate), ("branch", branch)):
                 if value is not None:
                     current[field] = value
             current.update(updated_by=by, updated_at=when)
-            payload["repositories"][key] = current
+            _put(connection, key, config=current)
             results.append(current)
-        _save(data_dir, payload)
     reason = f"{keys[0]}: {results[0]['enabled']}" if len(results) == 1 else f"{len(results)} repositorios: {enabled}"
     _log.info("pr_watch_configured", extra={"user": by, "reason": reason})
     return results
@@ -104,57 +164,61 @@ def target_branches(config: dict, default_branch: str | None) -> list[str]:
 
 def set_base_branches(data_dir: Path, key: str, branches: list[str], *, default_branch: str | None, by: str) -> dict:
     """Stores the (already validated) target branches and drops the watch state of branches no longer targeted."""
-    with documents.lock(data_dir, "pr-watch"):
-        payload = load(data_dir)
-        current = {**DEFAULTS, **payload["repositories"].get(key, {})}
+    with _locked(data_dir) as connection:
+        current = {**DEFAULTS, **_configs(connection, [key]).get(key, {})}
         current.update(base_branches=list(branches), updated_by=by,
                        updated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-        payload["repositories"][key] = current
         keep = set(target_branches(current, default_branch))
-        heads = {name: state for name, state in _heads(payload["branches"].get(key), default_branch).items() if name in keep}
-        if heads:
-            payload["branches"][key] = {"heads": heads}
-        else:
-            payload["branches"].pop(key, None)
-        _save(data_dir, payload)
+        heads = {name: state for name, state in _heads(_branches_of(connection, key), default_branch).items() if name in keep}
+        _put(connection, key, config=current, branches={"heads": heads} if heads else None)
     _log.info("pr_branches_configured", extra={"user": by, "reason": f"{key}: {', '.join(branches) or 'default'}"})
     return current
 
 
 def forget(data_dir: Path, key: str) -> None:
-    with documents.lock(data_dir, "pr-watch"):
-        payload = load(data_dir)
-        changed = payload["repositories"].pop(key, None) is not None
-        changed = payload["reviewed"].pop(key, None) is not None or changed
-        changed = payload["branches"].pop(key, None) is not None or changed
-        if changed:
-            _save(data_dir, payload)
+    with _locked(data_dir) as connection:
+        connection.execute(delete(pr_reviews).where(pr_reviews.c.tenant_id == TENANT, pr_reviews.c.asset_key == key))
+        connection.execute(delete(pr_watch).where(pr_watch.c.tenant_id == TENANT, pr_watch.c.asset_key == key))
 
 
 def migrate(data_dir: Path, repositories: list[dict]) -> None:
-    """Configuración antigua guardada por nombre (`github:owner/repo`) → identidad estable."""
+    """Configuración antigua guardada por nombre (`github:owner/repo`) → identidad estable. What the stable key
+    already holds wins."""
     by_name = {item["id"]: item["uid"] for item in repositories if item.get("uid")}
-    with documents.lock(data_dir, "pr-watch"):
-        payload = load(data_dir)
-        changed = False
-        for section in ("repositories", "reviewed"):
-            for key in [key for key in payload[section] if key in by_name]:
-                payload[section].setdefault(by_name[key], payload[section][key])
-                del payload[section][key]
-                changed = True
-        if changed:
-            _save(data_dir, payload)
+    if not by_name:
+        return
+    with _locked(data_dir) as connection:
+        old_keys = set(connection.execute(select(pr_watch.c.asset_key).where(
+            pr_watch.c.tenant_id == TENANT, pr_watch.c.asset_key.in_(list(by_name)))).scalars())
+        old_keys |= set(connection.execute(select(pr_reviews.c.asset_key).where(
+            pr_reviews.c.tenant_id == TENANT, pr_reviews.c.asset_key.in_(list(by_name)))).scalars())
+        for old in old_keys:
+            new = by_name[old]
+            row = connection.execute(select(pr_watch.c.config, pr_watch.c.branches).where(
+                pr_watch.c.tenant_id == TENANT, pr_watch.c.asset_key == old)).first()
+            target = connection.execute(select(pr_watch.c.config, pr_watch.c.branches).where(
+                pr_watch.c.tenant_id == TENANT, pr_watch.c.asset_key == new)).first()
+            if row is not None:
+                _put(connection, new, config=(target.config if target and target.config is not None else row.config),
+                     branches=(target.branches if target and target.branches is not None else row.branches))
+                connection.execute(delete(pr_watch).where(pr_watch.c.tenant_id == TENANT, pr_watch.c.asset_key == old))
+            taken = select(pr_reviews.c.number).where(pr_reviews.c.tenant_id == TENANT, pr_reviews.c.asset_key == new)
+            connection.execute(update(pr_reviews).where(pr_reviews.c.tenant_id == TENANT, pr_reviews.c.asset_key == old,
+                                                        pr_reviews.c.number.not_in(taken.scalar_subquery())).values(asset_key=new))
+            connection.execute(delete(pr_reviews).where(pr_reviews.c.tenant_id == TENANT, pr_reviews.c.asset_key == old))
 
 
 def reviewed(data_dir: Path, source_id: str) -> dict:
-    return load(data_dir)["reviewed"].get(source_id, {})
+    with db.transaction(data_dir) as connection:
+        return _reviews(connection, [source_id]).get(source_id, {})
 
 
 def mark(data_dir: Path, source_id: str, number: int, head_sha: str, run_id: str) -> None:
-    with documents.lock(data_dir, "pr-watch"):
-        payload = load(data_dir)
-        payload["reviewed"].setdefault(source_id, {})[str(number)] = {"head_sha": head_sha, "run_id": run_id}
-        _save(data_dir, payload)
+    values = {"head_sha": head_sha, "run_id": run_id, "closed": False}
+    statement = insert(pr_reviews).values(tenant_id=TENANT, asset_key=source_id, number=int(number), **values)
+    with db.transaction(data_dir) as connection:
+        connection.execute(statement.on_conflict_do_update(
+            index_elements=[pr_reviews.c.tenant_id, pr_reviews.c.asset_key, pr_reviews.c.number], set_={**values, "updated_at": func.now()}))
 
 
 def _heads(entry, default_branch: str | None = None) -> dict[str, dict]:
@@ -175,19 +239,18 @@ def latest_scan(entry) -> dict | None:
 
 
 def branch_state(data_dir: Path, key: str, branch: str | None = None, *, default_branch: str | None = None) -> dict | None:
-    entry = load(data_dir)["branches"].get(key)
+    with db.transaction(data_dir) as connection:
+        entry = _branches_of(connection, key)
     if branch is None:
         return latest_scan(entry)
     return _heads(entry, default_branch).get(branch)
 
 
 def mark_branch(data_dir: Path, key: str, head_sha: str, run_id: str, branch: str, *, default_branch: str | None = None) -> None:
-    with documents.lock(data_dir, "pr-watch"):
-        payload = load(data_dir)
-        heads = _heads(payload["branches"].get(key), default_branch)
+    with _locked(data_dir) as connection:
+        heads = _heads(_branches_of(connection, key), default_branch)
         heads[branch] = {"head_sha": head_sha, "run_id": run_id, "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-        payload["branches"][key] = {"heads": heads}
-        _save(data_dir, payload)
+        _put(connection, key, branches={"heads": heads})
 
 
 def branch_min_seconds() -> int:
@@ -199,12 +262,9 @@ def interval() -> int:
 
 
 def mark_closed(data_dir: Path, key: str, number: int) -> None:
-    with documents.lock(data_dir, "pr-watch"):
-        payload = load(data_dir)
-        entry = payload["reviewed"].get(key, {}).get(str(number))
-        if entry is not None:
-            entry["closed"] = True
-            _save(data_dir, payload)
+    with db.transaction(data_dir) as connection:
+        connection.execute(update(pr_reviews).where(pr_reviews.c.tenant_id == TENANT, pr_reviews.c.asset_key == key,
+                                                    pr_reviews.c.number == int(number)).values(closed=True, updated_at=func.now()))
 
 
 class Watcher:
@@ -276,7 +336,7 @@ class Watcher:
         events.publish(RepositoriesListed(self.data_dir, repositories, accounts or None))
         by_uid = {item["uid"]: item for item in repositories}
         queued = 0
-        for key, config in load(self.data_dir)["repositories"].items():
+        for key, config in load(self.data_dir, reviews=False)["repositories"].items():
             if not config.get("enabled") or key not in by_uid:
                 continue
             source_id, repository = by_uid[key]["id"], by_uid[key]["name"]
@@ -300,7 +360,7 @@ class Watcher:
                                             default_branch=by_uid[key].get("branch"))
                 queued += 1
         rescans = self._branches(by_uid)
-        watched = sum(1 for config in load(self.data_dir)["repositories"].values() if config.get("enabled"))
+        watched = sum(1 for config in load(self.data_dir, reviews=False)["repositories"].values() if config.get("enabled"))
         _log.info("pr_watch_poll", extra={"reason": f"{watched} repositorios vigilados, {queued} revisiones de PR y {rescans} "
                                                     "reanálisis de rama principal encolados"})
         return queued + rescans
@@ -310,7 +370,7 @@ class Watcher:
         from tamandua.modules.integrations.github import GitHubAppError, branch_head
         queued = 0
         now = datetime.now(timezone.utc)
-        for key, config in load(self.data_dir)["repositories"].items():
+        for key, config in load(self.data_dir, reviews=False)["repositories"].items():
             if not config.get("enabled") or not {**DEFAULTS, **config}.get("branch") or key not in by_uid:
                 continue
             item = by_uid[key]

@@ -141,7 +141,7 @@ class PurgeFlowTests(unittest.TestCase):
         self.assertEqual(set(self.remembered("github#2").values()), {True})
 
     def test_a_failing_subscriber_stops_the_purge_after_the_runs_and_is_reported(self):
-        with patch.object(pr_watch, "load", side_effect=OSError("disk full")), self.assertRaises(OSError) as caught:
+        with patch.object(pr_watch, "_locked", side_effect=OSError("disk full")), self.assertRaises(OSError) as caught:
             run_assets.purge(self.data_dir, "github#1")
         self.assertTrue(any("AssetPurged" in note and "pullrequests.watch.forget" in note for note in caught.exception.__notes__))
         state = self.remembered("github#1")

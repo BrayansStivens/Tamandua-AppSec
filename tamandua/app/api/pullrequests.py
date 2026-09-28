@@ -226,10 +226,10 @@ class WatchPage(BaseModel):
 def _row(item: dict, state: dict) -> dict:
     # Settings saved under the old key (the name) until the watcher moves them to the stable one (pr_watch.migrate):
     # a GET only reads.
-    def saved(section: str) -> dict:
+    def saved(section: str):
         return state[section].get(item["uid"]) or state[section].get(item["id"]) or {}
     return {"id": item["id"], "uid": item["uid"], "name": item["name"], "private": item.get("private"),
-            **pr_watch.DEFAULTS, **saved("repositories"), "reviewed": len(saved("reviewed")),
+            **pr_watch.DEFAULTS, **saved("repositories"), "reviewed": saved("review_counts") or 0,
             "branch_scan": pr_watch.latest_scan(state["branches"].get(item["uid"])), "default_branch": item.get("branch")}
 
 
@@ -257,7 +257,7 @@ def watch_overview(q: str = "", page: PageNumber = None, per_page: PageNumber = 
     if paged is None or len(q) > 100 or only not in (None, "enabled"):
         raise ApiError(400, msg("api.invalid_search"))
     page_number, size = paged
-    state = pr_watch.load(context.data_dir)
+    state = pr_watch.load(context.data_dir, reviews=False)
     enabled = sorted(key for key, value in state["repositories"].items() if value.get("enabled"))
     partial = False
     if only == "enabled":
@@ -275,6 +275,7 @@ def watch_overview(q: str = "", page: PageNumber = None, per_page: PageNumber = 
     else:
         listing = source_page(None, installations, query=q, provider="github", page=page_number, per_page=size)
         items, total, partial = listing["sources"], listing["total"], listing["partial"]
+    state["review_counts"] = pr_watch.review_counts(context.data_dir, [key for item in items for key in (item["uid"], item["id"]) if key])
     return context.render({"repositories": [_row(item, state) for item in items], "total": total, "page": page_number,
                            "per_page": size, "partial": partial, "interval": pr_watch.interval(), "enabled": len(enabled),
                            "branch_min_minutes": pr_watch.branch_min_seconds() // 60})
@@ -326,7 +327,7 @@ def watch_settings(context: Context = Depends(guard(Policy(admin=True, action="p
                 except GitHubAppError as exc:
                     raise ApiError(502, problem(exc)) from exc
         else:
-            keys = [key for key, value in pr_watch.load(data_dir)["repositories"].items() if value.get("enabled")]
+            keys = [key for key, value in pr_watch.load(data_dir, reviews=False)["repositories"].items() if value.get("enabled")]
         results = pr_watch.configure_many(data_dir, keys, **options) if keys else []
         return {"updated": len(results)}
     chosen = [payload["source_id"]] if "source_id" in payload else payload["source_ids"]

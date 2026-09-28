@@ -81,11 +81,26 @@ def _cve_copy_to_database(data_dir: Path) -> int:
     return cve_db.import_sqlite(data_dir)
 
 
+def _watch_and_registry_to_tables(data_dir: Path) -> int:
+    """The `pr-watch` and `repo-registry` documents became tables: one row per repository and per reviewed PR."""
+    from tamandua.modules.pullrequests import watch
+    from tamandua.modules.sources import assets
+    moved = assets.import_document(data_dir)
+    payload = documents.load(data_dir, "pr-watch", None)
+    if isinstance(payload, dict):
+        watch._save(data_dir, {section: payload.get(section) if isinstance(payload.get(section), dict) else {}
+                               for section in ("repositories", "reviewed", "branches")})
+        documents.delete(data_dir, "pr-watch")
+        moved += 1
+    return moved
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration("cra_opt_in", (), _cra_opt_in),
     Migration("seal_totp_seeds", (), _seal_totp_seeds),
     Migration("vault_to_database", (), _vault_to_database),
     Migration("cve_copy_to_database", (), _cve_copy_to_database),
+    Migration("watch_and_registry_to_tables", (), _watch_and_registry_to_tables),
 )
 LATEST = len(MIGRATIONS)
 

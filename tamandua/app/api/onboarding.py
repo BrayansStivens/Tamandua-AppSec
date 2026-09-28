@@ -40,5 +40,5 @@ def onboarding(context: Context = Depends(guard())) -> dict:
         "analyzed": any(row["type"] in FULL_SCANS and row["status"] == "completed"
                         and (row.get("source") or {}).get("id") != DEMO_SOURCE_ID for row in runs),
         "demo": any((row.get("source") or {}).get("id") == DEMO_SOURCE_ID for row in runs),
-        "watching": any(config.get("enabled") for config in pr_watch.load(data_dir)["repositories"].values()),
+        "watching": any(config.get("enabled") for config in pr_watch.load(data_dir, reviews=False)["repositories"].values()),
         "alerts": alerts, "admin": user.get("role") == "admin"}

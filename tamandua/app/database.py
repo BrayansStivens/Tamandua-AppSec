@@ -18,7 +18,9 @@ def tables() -> None:
     import tamandua.modules.identity.tables  # noqa: F401
     import tamandua.modules.integrations.tables  # noqa: F401
     import tamandua.modules.intel.tables  # noqa: F401
+    import tamandua.modules.pullrequests.tables  # noqa: F401
     import tamandua.modules.runs.tables  # noqa: F401
+    import tamandua.modules.sources.tables  # noqa: F401
     import tamandua.shared.documents  # noqa: F401
     import tamandua.shared.vault  # noqa: F401
 

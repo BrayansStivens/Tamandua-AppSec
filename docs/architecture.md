@@ -145,8 +145,10 @@ PostgreSQL (tamandua-pg volume; schema managed by Alembic migrations in tamandua
   registry_*          findings registry per asset (state, CVE with a GIN index) and per-run idempotency
   triage_decisions    triage decisions with their history
   users, sessions, auth_challenges   identity: users (scrypt, encrypted TOTP), sessions and 2FA challenges (hashes only)
+  pr_watch, pr_reviews   PR watching: settings and branch heads per repository, one row per reviewed pull request
+  repo_registry       one row per repository: scan branch and retirement mark
   documents           JSONB settings, one document each: due dates, exclusions, integrations, domains, batches,
-                      threat models, PR and advisory watching, Jira links, CRA kit…
+                      threat models, advisory watching, Jira links, CRA kit…
   jobs, workers, outbox   scan queue, worker heartbeat and notification outbox with retries
   intel_*             local copy of NVD with KEV and EPSS for the CVE tracker (full-text search with a GIN index)
   vault_entries       encrypted secrets (AES-256-GCM with the master key), the session signing key and the setup code

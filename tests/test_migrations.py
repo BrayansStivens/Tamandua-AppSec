@@ -180,5 +180,37 @@ class VaultToDatabaseMigrationTests(unittest.TestCase):
         self.assertFalse((self.data_dir / "auth" / "session.key").exists())
 
 
+
+class WatchAndRegistryTablesTests(unittest.TestCase):
+    """The `pr-watch` and `repo-registry` documents of earlier versions move to their tables."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.data_dir = Path(self.directory.name) / "data"
+        self.data_dir.mkdir()
+        documents.save(self.data_dir, migrations.VERSION_DOCUMENT, {"version": 4, "history": []})
+
+    def test_the_documents_become_rows_once(self):
+        from tamandua.modules.pullrequests import watch
+        from tamandua.modules.sources import assets
+        documents.save(self.data_dir, "pr-watch", {
+            "repositories": {"github#1": {"enabled": True, "gate": "critical"}},
+            "reviewed": {"github#1": {"7": {"head_sha": "a" * 40, "run_id": "1" * 32}, "8": {"head_sha": "b" * 40, "run_id": "2" * 32, "closed": True}}},
+            "branches": {"github#1": {"heads": {"main": {"head_sha": "c" * 40, "run_id": "3" * 32, "at": "2026-09-01T00:00:00+00:00"}}}}})
+        documents.save(self.data_dir, "repo-registry", {"github#1": {"name": "org/api", "scan_branch": "develop"},
+                                                        "github#2": {"name": "org/old", "removed_at": "2026-09-01T00:00:00+00:00"}})
+        self.assertIn("watch_and_registry_to_tables", migrations.upgrade(self.data_dir))
+        self.assertEqual(watch.settings(self.data_dir, "github#1")["gate"], "critical")
+        self.assertEqual(watch.reviewed(self.data_dir, "github#1"), {"7": {"head_sha": "a" * 40, "run_id": "1" * 32},
+                                                                     "8": {"head_sha": "b" * 40, "run_id": "2" * 32, "closed": True}})
+        self.assertEqual(watch.branch_state(self.data_dir, "github#1", "main")["head_sha"], "c" * 40)
+        self.assertEqual(assets.scan_branch(self.data_dir, "github#1"), "develop")
+        self.assertEqual(set(assets.load_registry(self.data_dir)), {"github#1", "github#2"})
+        self.assertIsNone(documents.load(self.data_dir, "pr-watch"))
+        self.assertIsNone(documents.load(self.data_dir, "repo-registry"))
+        self.assertEqual(migrations.upgrade(self.data_dir), [])
+
+
 if __name__ == "__main__":
     unittest.main()

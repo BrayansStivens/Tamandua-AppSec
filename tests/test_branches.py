@@ -189,7 +189,7 @@ class WatcherTests(unittest.TestCase):
         pr_watch.configure(self.data_dir, "github#1", enabled=True, by="admin")
         pr_watch.set_base_branches(self.data_dir, "github#1", ["main", "develop"], default_branch="main", by="admin")
         # State written before branches were tracked one by one: it was the default branch's.
-        state = pr_watch.load(self.data_dir)
+        state = pr_watch.load(self.data_dir)  # the whole state, reviews included
         state["branches"]["github#1"] = {"head_sha": "a" * 40, "run_id": "0" * 32, "at": "2020-01-01T00:00:00+00:00"}
         pr_watch._save(self.data_dir, state)
         jobs = Jobs()

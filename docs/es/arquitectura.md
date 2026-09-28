@@ -150,8 +150,10 @@ PostgreSQL (volumen tamandua-pg; esquema con migraciones de Alembic en tamandua/
   registry_*          registro de hallazgos por activo (estado, CVE con índice GIN) e idempotencia por ejecución
   triage_decisions    decisiones de triage con su historial
   users, sessions, auth_challenges   identidad: usuarios (scrypt, TOTP cifrado), sesiones y retos de 2FA (solo hashes)
+  pr_watch, pr_reviews   vigilancia de PRs: configuración y cabezas de rama por repositorio, una fila por PR revisado
+  repo_registry       una fila por repositorio: rama de análisis y marca de retirada
   documents           configuración por documento JSONB: plazos, exclusiones, integraciones, dominios, lotes,
-                      modelos de amenazas, vigilancia de PRs y de avisos, enlaces con Jira, kit CRA…
+                      modelos de amenazas, vigilancia de avisos, enlaces con Jira, kit CRA…
   jobs, workers, outbox   cola de análisis, latido de los workers y buzón de avisos con reintentos
   intel_*             copia local de NVD con KEV y EPSS para el CVE tracker (búsqueda de texto con índice GIN)
   vault_entries       secretos cifrados (AES-256-GCM con la clave maestra), la clave de firma de sesiones y el código inicial
