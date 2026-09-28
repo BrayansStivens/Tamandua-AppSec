@@ -91,14 +91,18 @@ def _host_only(registry: str) -> str:
     return "registry-1.docker.io" if registry == DOCKER_HUB else registry.rsplit(":", 1)[0] if re.search(r":\d+$", registry) else registry
 
 
-def check_registry_address(registry: str) -> None:
+def check_registry_address(registry: str) -> dict[str, str]:
     """El motor se conectará a ese registro: si resuelve a una red interna, se exige permiso expreso.
 
     Evita que el formulario sirva para que el servidor hable con servicios internos (SSRF).
     Para registros propios en la red local: TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.
+
+    Returns the address to pin the registry's name to ({host: address}) so the engine can't resolve it again to
+    another one (DNS rebinding between this check and the scan). Empty for Docker Hub, whose name nobody here chooses,
+    and when private registries are allowed.
     """
     if settings.flag("TAMANDUA_ALLOW_PRIVATE_REGISTRIES"):
-        return
+        return {}
     import ipaddress
     host = _host_only(registry)
     try:
@@ -107,6 +111,10 @@ def check_registry_address(registry: str) -> None:
         raise ImageError(msg("scanning.image.errors.unresolvable", registry=registry)) from exc
     if not addresses or not all(ipaddress.ip_address(address.split("%")[0]).is_global for address in addresses):
         raise ImageError(msg("scanning.image.errors.private_address", registry=registry))
+    if registry == DOCKER_HUB:
+        return {}
+    # IPv4 first: engine containers on Docker's default bridge often have no IPv6 route.
+    return {host: sorted(addresses, key=lambda address: (":" in address, address))[0].split("%")[0]}
 
 
 # --- credenciales de registros ------------------------------------------------------------
@@ -176,7 +184,8 @@ def _with_fingerprint(finding: dict, identifiers: set[str], fallback: str, ecosy
     return {**rest, "fingerprint": digest, "finding_id": digest[:16], **({"previous_fingerprint": former} if former != digest else {})}
 
 
-def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None) -> tuple[dict, dict]:
+def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None,
+                    hosts: dict[str, str] | None = None) -> tuple[dict, dict]:
     started = time.time()
     if problem := unavailable("trivy", msg("scanning.image.no_docker", engine="Trivy")):
         return _result("trivy", "not_tested", problem), {}
@@ -186,7 +195,7 @@ def run_trivy_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
         completed = _run("trivy", ["image", "--image-src", "remote", "--scanners", "vuln,secret", "--list-all-pkgs",
                                    "--image-config-scanners", "misconfig,secret", "--cache-dir", "/cache", "--format", "json", "--quiet",
                                    "--timeout", "14m", reference], None, network=True, secret_env=secrets,
-                         mounts=["-v", f"{_host(cache_dir)}:/cache"])
+                         mounts=["-v", f"{_host(cache_dir)}:/cache"], hosts=hosts)
         if completed.returncode != 0 and not completed.stdout.strip():
             return _result("trivy", "inconclusive", _registry_error(completed.stderr, credentials), started=started), {}
         payload = json.loads(completed.stdout or "{}")
@@ -239,7 +248,8 @@ def _grype_finding(match: dict, feeds: dict) -> dict:
         aliases, identifier, ecosystem, name, installed)
 
 
-def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None, registry: str) -> dict:
+def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: dict | None, registry: str,
+                    hosts: dict[str, str] | None = None) -> dict:
     started = time.time()
     if problem := unavailable("grype", msg("scanning.image.no_docker", engine="Grype")):
         return _result("grype", "not_tested", problem)
@@ -253,7 +263,7 @@ def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
                          # La imagen de Grype no trae un /tmp escribible para usuarios no root: sus temporales
                          # (capas de la imagen analizada) van a disco, dentro de su caché.
                          env={"GRYPE_DB_CACHE_DIR": "/cache", "GRYPE_CHECK_FOR_APP_UPDATE": "false", "TMPDIR": "/cache/tmp", "HOME": "/cache/tmp"},
-                         mounts=["-v", f"{_host(cache_dir)}:/cache"])
+                         mounts=["-v", f"{_host(cache_dir)}:/cache"], hosts=hosts)
         if completed.returncode != 0 and not completed.stdout.strip():
             return _result("grype", "inconclusive", _registry_error(completed.stderr, credentials), started=started)
         payload = json.loads(completed.stdout or "{}")
@@ -404,14 +414,16 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
         if progress:
             progress(level, message)
 
+    # Checked again here, when the engines are about to connect, and pinned: the request was checked minutes ago.
+    hosts = check_registry_address(image["registry"])
     feeds = load_feeds(data_dir)
     credentials = credentials_for(image["registry"])
     report("info", msg("scanning.image.progress.reading_credentials" if credentials else "scanning.image.progress.reading_public",
                        reference=image["reference"]))
-    trivy, metadata = run_trivy_image(image["reference"], data_dir / "trivy-cache", feeds, credentials)
+    trivy, metadata = run_trivy_image(image["reference"], data_dir / "trivy-cache", feeds, credentials, hosts)
     report("ok" if trivy["status"] == "completed" else "warn", msg("scanning.progress.engine", engine="Trivy", detail=trivy["detail"]))
     report("info", msg("scanning.image.progress.grype"))
-    grype = run_grype_image(image["reference"], data_dir / "grype-cache", feeds, credentials, image["registry"])
+    grype = run_grype_image(image["reference"], data_dir / "grype-cache", feeds, credentials, image["registry"], hosts)
     report("ok" if grype["status"] == "completed" else "warn", msg("scanning.progress.engine", engine="Grype", detail=grype["detail"]))
 
     if metadata:

@@ -54,7 +54,7 @@ Tamandua reads your repositories' code and stores GitHub, AI and Jira credential
 | `services.nvd.nist.gov` | Index and date ranges | Local CVE copy, in the background. |
 | `www.cisa.gov`, `epss.empiricalsecurity.com` | Nothing: full public feeds are downloaded | Once a day. They're downloaded whole so they don't reveal which CVEs you care about. |
 | Image registry and Trivy database | Nothing of yours | At build time and when Trivy updates its database. |
-| Container registries (Docker Hub, GHCR, ECR…) | A request for the image you asked to scan, with your token if you saved one | When scanning an image. Registries on private IPs are blocked unless `TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1`, so the form can't be used as a bridge into your internal network (SSRF). |
+| Container registries (Docker Hub, GHCR, ECR…) | A request for the image you asked to scan, with your token if you saved one | When scanning an image. Registries on private IPs are blocked unless `TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1`, so the form can't be used as a bridge into your internal network (SSRF). The check runs again when the scan starts, and the engine's container gets the checked address for the registry's name, so an answer that changes in between (DNS rebinding) isn't followed. |
 | `api.osv.dev` | Your dependencies' names and versions | **Only if you allow it**, per scan. Not used by default. |
 | Your Jira site | Title, description and priority of the issues you export | Only if you connect Jira and click export. |
 | `api.openai.com`, `api.anthropic.com` | Your key, to check that it's valid | Only when you save or test it. Today the AI receives no code and no findings. |
@@ -81,6 +81,7 @@ There's no telemetry.
 - **Master key on the same server** if you don't set `TAMANDUA_MASTER_KEY`. It protects against a stray copy of the database, not against someone with full access to the server.
 - **A single workspace** per installation: every user sees every connected repository.
 - **Registry token visible to root.** While a private image is being scanned, the token sits in the engine container's configuration: anyone with Docker access on the host (who is already root) can read it. Use read-only tokens.
+- **Registry redirects aren't checked.** Registries serve image layers from other hosts (a CDN, a bucket), so Trivy and Grype follow their redirects. A registry you ask to scan could point them at an internal address. They only request, and what comes back isn't shown. Scan images from registries you trust, or run the engines on a network without access to your internal one.
 
 ## Recommendations
 

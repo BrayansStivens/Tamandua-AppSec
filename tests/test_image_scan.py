@@ -44,6 +44,45 @@ class ReferenceTests(unittest.TestCase):
             image_scan.check_registry_address("localhost:5000")
 
 
+def resolving(*addresses):
+    return patch.object(image_scan.socket, "getaddrinfo", return_value=[(2, 1, 6, "", (address, 443)) for address in addresses])
+
+
+class RegistryPinningTests(unittest.TestCase):
+    """The engine connects to the address that was checked, not to whatever the name resolves to later."""
+
+    def test_a_checked_registry_is_pinned_to_its_address(self):
+        with patch.dict(os.environ, testenv.base(), clear=True):
+            with resolving("2606:50c0:8000::154", "140.82.113.33"):
+                self.assertEqual(image_scan.check_registry_address("ghcr.io"), {"ghcr.io": "140.82.113.33"})
+            with resolving("44.205.64.79"):
+                self.assertEqual(image_scan.check_registry_address("docker.io"), {})  # a name nobody here chooses
+            with resolving("140.82.113.33", "10.0.0.5"), self.assertRaises(ImageError):
+                image_scan.check_registry_address("registry.example.com")  # one private answer is enough
+
+    def test_the_engine_container_resolves_the_registry_to_the_pinned_address(self):
+        captured = {}
+
+        def fake_run(command, **kwargs):
+            captured["argv"] = command
+            return image_scan.subprocess.CompletedProcess(command, 0, json.dumps({"Results": [], "Metadata": {}}), "")
+        with patch("tamandua.modules.scanning.image.unavailable", return_value=None), \
+                patch.dict(os.environ, {"TAMANDUA_ENGINE_RUNNER": "docker"}), \
+                patch("tamandua.modules.scanning.engines.subprocess.run", side_effect=fake_run), \
+                tempfile.TemporaryDirectory() as folder:
+            image_scan.run_trivy_image("ghcr.io/acme/api:1", Path(folder), {}, None, {"ghcr.io": "140.82.113.33"})
+        position = captured["argv"].index("--add-host")
+        self.assertEqual(captured["argv"][position + 1], "ghcr.io:140.82.113.33")
+        self.assertLess(position, captured["argv"].index("ghcr.io/acme/api:1"))  # a docker option, not an engine argument
+
+    def test_a_name_that_now_resolves_inside_is_refused_when_the_scan_starts(self):
+        image = parse_reference("registry.example.com/acme/api:1")
+        with patch.dict(os.environ, testenv.base(), clear=True), resolving("169.254.169.254"), \
+                patch.object(image_scan, "run_trivy_image", side_effect=AssertionError("engine started")), \
+                tempfile.TemporaryDirectory() as folder, self.assertRaises(ImageError):
+            image_scan.scan_image(image, data_dir=Path(folder))
+
+
 class CredentialTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()

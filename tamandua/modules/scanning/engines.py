@@ -373,9 +373,10 @@ def writable_cache(preferred: Path) -> Path:
 
 def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool = False,
          mounts: list[str] | None = None, timeout: int = 900, env: dict[str, str] | None = None,
-         secret_env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
+         secret_env: dict[str, str] | None = None, hosts: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     """Contenedor efímero del motor. `secret_env` viaja por el entorno del cliente de Docker
-    (`-e NOMBRE` sin valor), nunca en la línea de comandos, para que no se vea en `ps` ni en los logs."""
+    (`-e NOMBRE` sin valor), nunca en la línea de comandos, para que no se vea en `ps` ni en los logs.
+    `hosts`: names the container resolves to a fixed address ({name: address}), already checked by the caller."""
     if runner() == "local":
         return _run_local(key, arguments, snapshot, mounts=mounts, timeout=timeout, env=env, secret_env=secret_env)
     environment = [part for name, value in (env or {}).items() for part in ("-e", f"{name}={value}")]
@@ -387,6 +388,7 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
                "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
                *engine_user(), "--pids-limit", "512", "--memory", "3g", "--cpus", "2",
                "--network", "bridge" if network else "none",
+               *[part for host, address in (hosts or {}).items() for part in ("--add-host", f"{host}:{address}")],
                # An image built here has no digest: never let Docker fetch that name from a registry instead.
                *([] if "@sha256:" in IMAGES[key]["image"] else ["--pull", "never"]),
                *source, *environment, *(mounts or []), IMAGES[key]["image"], *arguments]
@@ -408,7 +410,8 @@ def _run_local(key: str, arguments: list[str], snapshot: Path | None, *, mounts:
     /cache, /rules…) become the real folders, and back in its output, so parsers see what they always saw.
 
     It gets a fresh HOME and only PATH from this process: never the database URL, the master key or any other
-    setting. There is no network isolation here (that needs the Docker runner); engines run with their offline flags.
+    setting. There is no network isolation here, nor pinned names (`hosts`): that needs the Docker runner. Engines run
+    with their offline flags.
     """
     binary = shutil.which(BINARIES[key])
     if binary is None:

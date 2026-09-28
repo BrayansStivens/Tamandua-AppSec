@@ -54,7 +54,7 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 | `services.nvd.nist.gov` | Rangos de índices y de fechas | Copia local de CVE, en segundo plano. |
 | `www.cisa.gov`, `epss.empiricalsecurity.com` | Nada: descarga de feeds públicos completos | Una vez al día. Se descargan enteros para no revelar qué CVE te interesan. |
 | Registro de imágenes y base de Trivy | Nada propio | Al construir y cuando Trivy actualiza su base. |
-| Registros de contenedores (Docker Hub, GHCR, ECR…) | Petición de la imagen que pides analizar, con tu token si lo guardaste | Al analizar una imagen. Los registros con IP privada se bloquean salvo `TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1`, para que el formulario no sirva de puente a tu red interna (SSRF). |
+| Registros de contenedores (Docker Hub, GHCR, ECR…) | Petición de la imagen que pides analizar, con tu token si lo guardaste | Al analizar una imagen. Los registros con IP privada se bloquean salvo `TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1`, para que el formulario no sirva de puente a tu red interna (SSRF). La comprobación se repite al empezar el análisis, y el contenedor del motor recibe la dirección comprobada para el nombre del registro, así que una respuesta que cambie entre medias (DNS rebinding) no se sigue. |
 | `api.osv.dev` | Nombres y versiones de tus dependencias | **Solo si lo autorizas** en cada análisis. Por defecto no se usa. |
 | Tu sitio de Jira | Título, descripción y prioridad de las incidencias que exportas | Solo si conectas Jira y pulsas exportar. |
 | `api.openai.com`, `api.anthropic.com` | Tu clave, para comprobar que es válida | Solo al guardarla o probarla. Hoy la IA no recibe código ni hallazgos. |
@@ -81,6 +81,7 @@ No hay telemetría.
 - **Clave maestra en el mismo servidor** si no defines `TAMANDUA_MASTER_KEY`. Protege frente a una copia suelta de la base, no frente a alguien con acceso completo al servidor.
 - **Un solo workspace** por instalación: todos los usuarios ven todos los repositorios conectados.
 - **Token de registro visible para root.** Mientras dura el análisis de una imagen privada, el token está en la configuración del contenedor del motor: lo puede leer quien tenga acceso a Docker en el host (que ya es root). Usa tokens de solo lectura.
+- **No se comprueban las redirecciones del registro.** Los registros sirven las capas de la imagen desde otros hosts (una CDN, un bucket), así que Trivy y Grype siguen sus redirecciones. Un registro que pidas analizar podría mandarlos a una dirección interna. Solo hacen la petición, y lo que vuelve no se muestra. Analiza imágenes de registros de confianza, o corre los motores en una red sin acceso a la interna.
 
 ## Recomendaciones
 

@@ -324,7 +324,7 @@ class ScanJobs:
             del exc
 
     def _execute_image(self, job: dict) -> None:
-        from tamandua.modules.scanning.image import scan_image
+        from tamandua.modules.scanning.image import ImageError, scan_image
         run_id = job["run_id"]
         record = load_run(self.data_dir, run_id)
         record["status"] = "running"
@@ -346,6 +346,9 @@ class ScanJobs:
                                                          "started_at": record["started_at"], "finished_at": _now()},
                                          run_id=run_id, created_at=record["created_at"])
             log.info("análisis de imagen terminado", extra={"run_id": run_id, "status": final["status"]})
+        except ImageError as exc:  # e.g. the registry now resolves to a private address
+            log.warning("image_scan_refused", extra={"run_id": run_id, "reason": str(exc)})
+            self._fail(record, exc.message)
         except Exception as exc:  # noqa: BLE001
             log.error("análisis de imagen fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
             self._fail(record, msg("runs.failure.image_internal"))
