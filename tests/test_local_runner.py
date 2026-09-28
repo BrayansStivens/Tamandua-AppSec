@@ -84,5 +84,58 @@ class LocalRunnerTests(unittest.TestCase):
         self.assertEqual(completed.stdout.strip(), "dir|/src|--report-path|a b; echo pwned|$(id)|`id`|*|0")
 
 
+
+PREFIX = ["/usr/bin/unshare", "--user", "--map-current-user", "--net", "--"]
+
+
+class NetworkIsolationTests(unittest.TestCase):
+    """Local engines that need no network get an empty network namespace where the platform allows it."""
+
+    def setUp(self):
+        engines._netns_state.clear()
+        self.addCleanup(engines._netns_state.clear)
+
+    def launched(self, network: bool) -> list[str]:
+        seen = {}
+
+        class Process:
+            pid, returncode = 1, 0
+
+            def __init__(self, command, **_):
+                seen["command"] = command
+
+            def communicate(self, timeout=None):
+                return "", ""
+        with patch.dict(os.environ, {"TAMANDUA_ENGINE_RUNNER": "local"}), \
+                patch.object(engines.shutil, "which", return_value="/usr/local/bin/gitleaks"), \
+                patch.object(engines, "network_isolation", return_value=PREFIX), \
+                patch.object(engines.subprocess, "Popen", Process):
+            engines._run("gitleaks", ["dir", "/src"], Path("/tmp"), network=network)
+        return seen["command"]
+
+    def test_only_engines_without_network_are_isolated(self):
+        self.assertEqual(self.launched(network=False)[:len(PREFIX)], PREFIX)
+        self.assertEqual(self.launched(network=True)[0], "/bin/sh")
+
+    def test_the_probe_falls_back_and_is_asked_once(self):
+        answers = [subprocess.CompletedProcess([], 1), subprocess.CompletedProcess([], 0)]
+        with patch.object(engines.shutil, "which", return_value="/usr/bin/unshare"), \
+                patch.object(engines.subprocess, "run", side_effect=answers) as run:
+            self.assertEqual(engines.network_isolation(), ["/usr/bin/unshare", "--user", "--map-root-user", "--net", "--"])
+            engines.network_isolation()
+        self.assertEqual(run.call_count, 2)
+
+    def test_without_unshare_engines_run_as_before_and_it_is_logged(self):
+        with patch.object(engines.shutil, "which", return_value=None), self.assertLogs("tamandua.engines", "WARNING") as logs:
+            self.assertEqual(engines.network_isolation(), [])
+        self.assertIn("local_engines_share_the_network", logs.output[0])
+
+    def test_an_isolated_engine_cannot_reach_the_network(self):
+        if not engines.network_isolation():
+            self.skipTest("this platform doesn't allow user and network namespaces")
+        probe = "import socket\ntry:\n    socket.create_connection(('1.1.1.1', 53), 3)\nexcept OSError as exc:\n    print(exc.errno)\nelse:\n    print('reached')\n"
+        completed = subprocess.run([*engines.network_isolation(), "python3", "-c", probe], capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(completed.stdout.strip(), "reached")
+
 if __name__ == "__main__":
     unittest.main()

@@ -33,7 +33,7 @@ import time
 import uuid
 from pathlib import Path
 
-from tamandua.shared import paths, settings
+from tamandua.shared import log as logging_setup, paths, settings
 from tamandua.shared.i18n import msg
 from tamandua.modules.intel import data_sources
 from tamandua.modules.intel.advisories import compare_versions, cvss3_base_score, prioritize, severity_from_score
@@ -378,7 +378,7 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
     (`-e NOMBRE` sin valor), nunca en la línea de comandos, para que no se vea en `ps` ni en los logs.
     `hosts`: names the container resolves to a fixed address ({name: address}), already checked by the caller."""
     if runner() == "local":
-        return _run_local(key, arguments, snapshot, mounts=mounts, timeout=timeout, env=env, secret_env=secret_env)
+        return _run_local(key, arguments, snapshot, mounts=mounts, timeout=timeout, env=env, secret_env=secret_env, network=network)
     environment = [part for name, value in (env or {}).items() for part in ("-e", f"{name}={value}")]
     environment += [part for name in (secret_env or {}) for part in ("-e", name)]
     source = ["-v", f"{host_path(snapshot)}:/src:ro"] if snapshot is not None else []
@@ -404,14 +404,38 @@ def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool
         raise
 
 
+_log = logging_setup.get("engines")
+_netns_state: dict[str, list[str]] = {}
+
+
+def network_isolation() -> list[str]:
+    """The prefix that runs a local engine in its own, empty network namespace (`unshare`), or [] where the platform
+    doesn't allow it: most containers without extra privileges have no user namespaces. Asked once per process."""
+    if "prefix" not in _netns_state:
+        found: list[str] = []
+        binary = shutil.which("unshare")
+        for mapping in ("--map-current-user", "--map-root-user") if binary else ():
+            prefix = [binary, "--user", mapping, "--net", "--"]
+            try:
+                if subprocess.run([*prefix, "true"], capture_output=True, timeout=10).returncode == 0:
+                    found = prefix
+                    break
+            except (OSError, subprocess.TimeoutExpired):
+                break
+        if not found:
+            _log.warning("local_engines_share_the_network", extra={"reason": "unshare --user --net is not allowed here"})
+        _netns_state["prefix"] = found
+    return _netns_state["prefix"]
+
+
 def _run_local(key: str, arguments: list[str], snapshot: Path | None, *, mounts: list[str] | None, timeout: int,
-               env: dict[str, str] | None, secret_env: dict[str, str] | None) -> subprocess.CompletedProcess:
+               env: dict[str, str] | None, secret_env: dict[str, str] | None, network: bool = False) -> subprocess.CompletedProcess:
     """The engine installed next to the worker, with the same arguments as its container. Container paths (/src,
     /cache, /rules…) become the real folders, and back in its output, so parsers see what they always saw.
 
     It gets a fresh HOME and only PATH from this process: never the database URL, the master key or any other
-    setting. There is no network isolation here, nor pinned names (`hosts`): that needs the Docker runner. Engines run
-    with their offline flags.
+    setting. An engine that needs no network gets an empty network namespace where the platform allows it
+    (`network_isolation`); elsewhere it runs with its offline flags. Pinned names (`hosts`) need the Docker runner.
     """
     binary = shutil.which(BINARIES[key])
     if binary is None:
@@ -441,7 +465,8 @@ def _run_local(key: str, arguments: list[str], snapshot: Path | None, *, mounts:
                        **(secret_env or {})}
         # `ulimit -c 0`: a crashing engine never dumps repository contents to disk. Through sh rather than preexec_fn,
         # which isn't safe in a process with threads (the worker has them); "$@" passes the arguments untouched.
-        command = ["/bin/sh", "-c", 'ulimit -c 0 && exec "$0" "$@"', binary, *(local(argument) for argument in arguments)]
+        isolated = [] if network else network_isolation()
+        command = [*isolated, "/bin/sh", "-c", 'ulimit -c 0 && exec "$0" "$@"', binary, *(local(argument) for argument in arguments)]
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment,
                                    cwd=home, start_new_session=True)
         try:

@@ -120,7 +120,7 @@ The base images (`node`, `python`, `debian`) are pinned by digest, so two builds
 
 Engines are launched per scan as ephemeral containers (`--rm`) with the code mounted read-only, `--cap-drop ALL`, `no-new-privileges`, and a cap of 3 GB of memory, 2 CPUs and 512 processes; Gitleaks, Opengrep, Checkov and zizmor run with no network.
 
-**The remaining trade-off:** to launch the engines this way, the worker mounts `/var/run/docker.sock`, which is equivalent to root on the host. That's why the panel only listens on `127.0.0.1` by default. The alternative is the worker image with the engines inside (`TAMANDUA_ENGINE_RUNNER=local`): no socket, each engine a process of the worker with its own home folder and no inherited settings, but without a container or network isolation per engine.
+**The remaining trade-off:** to launch the engines this way, the worker mounts `/var/run/docker.sock`, which is equivalent to root on the host. That's why the panel only listens on `127.0.0.1` by default. The alternative is the worker image with the engines inside (`TAMANDUA_ENGINE_RUNNER=local`): no socket, each engine a process of the worker with its own home folder and no inherited settings, but without a container per engine. The engines that need no network get an empty network namespace where the platform allows user namespaces (not in a container with Docker's default seccomp profile).
 
 ## Isolation between scans
 

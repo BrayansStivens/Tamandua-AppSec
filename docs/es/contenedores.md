@@ -120,7 +120,7 @@ Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos c
 
 Los motores se lanzan por cada análisis como contenedores efímeros (`--rm`) con el código en solo lectura, `--cap-drop ALL`, `no-new-privileges`, 3 GB de memoria, 2 CPU y 512 procesos como máximo; Gitleaks, Opengrep, Checkov y zizmor sin red.
 
-**La concesión que queda:** para lanzar así los motores, el worker monta `/var/run/docker.sock`, lo que equivale a root en el host. Por eso el panel solo escucha en `127.0.0.1` por defecto. La alternativa es la imagen del worker con los motores dentro (`TAMANDUA_ENGINE_RUNNER=local`): sin socket, cada motor como un proceso del worker con su propia carpeta personal y sin heredar la configuración, pero sin un contenedor ni aislamiento de red por motor.
+**La concesión que queda:** para lanzar así los motores, el worker monta `/var/run/docker.sock`, lo que equivale a root en el host. Por eso el panel solo escucha en `127.0.0.1` por defecto. La alternativa es la imagen del worker con los motores dentro (`TAMANDUA_ENGINE_RUNNER=local`): sin socket, cada motor como un proceso del worker con su propia carpeta personal y sin heredar la configuración, pero sin un contenedor por motor. Los motores que no necesitan red reciben un espacio de nombres de red vacío donde la plataforma permite espacios de nombres de usuario (no en un contenedor con el perfil seccomp por defecto de Docker).
 
 ## Aislamiento entre análisis
 
