@@ -72,7 +72,7 @@ class BaselineTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.data_dir = Path(self.directory.name)
-        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
+        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         engines.start()
         self.addCleanup(engines.stop)
 
@@ -95,7 +95,7 @@ class PinnedScanTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.data_dir = Path(self.directory.name)
-        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
+        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         engines.start()
         self.addCleanup(engines.stop)
         self.refs = []

@@ -32,7 +32,7 @@ class JobsTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.data_dir = Path(self.directory.name)
-        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
+        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         engines.start()
         self.addCleanup(engines.stop)
         self.addCleanup(self.directory.cleanup)

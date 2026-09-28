@@ -118,7 +118,7 @@ class RunnerTests(unittest.TestCase):
         testenv.docker_runner(self)
 
     def test_without_docker_each_engine_declares_not_tested_and_never_runs(self):
-        with patch.dict(scanners._docker_state, {"ok": False}), \
+        with patch.dict(scanners._docker_state, {"ok": False}, clear=True), \
                 patch("tamandua.modules.scanning.engines._run", side_effect=AssertionError("lanzó un contenedor")):
             for runner in (lambda: scanners.run_opengrep(Path(".")), lambda: scanners.run_gitleaks(Path(".")),
                            lambda: scanners.run_trivy(Path("."), Path("/tmp/x"), {})):

@@ -21,7 +21,8 @@ class RepositoryWorkflowTests(unittest.TestCase):
     def setUp(self):
         # Estas pruebas cubren el camino interno (sin motores en contenedor). Con Docker
         # presente lanzarían Trivy/Opengrep de verdad: lento y con otro resultado.
-        patcher = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
+        # clear=True: a real check left behind (its time stamp) would make Docker be asked again.
+        patcher = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -304,6 +305,7 @@ class EnginesDownTests(unittest.TestCase):
                 patch.object(repository_scan, "run_opengrep", side_effect=lambda *_: down("opengrep")), \
                 patch.object(repository_scan, "run_gitleaks", side_effect=lambda *_: down("gitleaks")), \
                 patch.object(repository_scan, "run_trivy", side_effect=lambda *_: down("trivy")), \
+                patch.object(repository_scan, "run_osv_scanner", side_effect=lambda *_, **__: down("osv-scanner")), \
                 patch.object(repository_scan, "run_checkov", side_effect=lambda *_: down("checkov")), \
                 patch.object(repository_scan, "run_zizmor", side_effect=lambda *_: down("zizmor")), \
                 patch.object(repository_scan, "load_feeds", return_value={"kev": {}, "epss": {}}):

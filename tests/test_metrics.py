@@ -28,7 +28,7 @@ class MetricsTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.data_dir = Path(self.directory.name)
         for patcher in (patch("tamandua.shared.paths.CONFIG_DIR", self.data_dir / "config"),
-                        patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}),
+                        patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True),
                         patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"})):
             patcher.start()
             self.addCleanup(patcher.stop)

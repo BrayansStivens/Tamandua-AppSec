@@ -20,7 +20,7 @@ For each file in scope:
 
 Before you finish, run the checks relevant to your scope and fix what fails:
 - panel: `cd web && npx tsc -b && npx oxlint <your files>`
-- server: `TAMANDUA_DATABASE_URL=$(sh scripts/test-db.sh) TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_DEFAULT_LOCALE=es .venv/bin/python -m unittest discover -s tests -p '<relevant tests>'`
+- server: `TAMANDUA_DATABASE_URL=$(sh scripts/test-db.sh) TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_CONFIG_DIR=$(mktemp -d) DOCKER_HOST=unix:///nonexistent/docker.sock TAMANDUA_DEFAULT_LOCALE=es .venv/bin/python -m unittest discover -s tests -p '<relevant tests>'`
 - always: `... -p test_i18n.py` (same env).
 
 Report briefly: files changed, namespaces/keys added, anything you left untranslated and why, and any test you

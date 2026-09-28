@@ -64,7 +64,8 @@ jobs:
             exit 1
           fi
       - name: Tests
-        run: TAMANDUA_CONFIG_DIR="$RUNNER_TEMP/config" python -m unittest discover -s tests
+        # No Docker daemon for the tests: none of them may start a real engine (they mock what they need).
+        run: DOCKER_HOST=unix:///nonexistent/docker.sock TAMANDUA_CONFIG_DIR="$RUNNER_TEMP/config" python -m unittest discover -s tests
 
   panel:
     name: Panel (types, lint and build)

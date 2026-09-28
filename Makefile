@@ -156,9 +156,9 @@ web: ## Build the panel into tamandua/app/static/
 	cd web && npm run build
 
 test: ## Backend tests (starts a throwaway test Postgres if needed)
-	@url=$$(sh scripts/test-db.sh) && config=$$(mktemp -d) && trap 'rm -rf "$$config"' EXIT && \
+	@url=$$(sh scripts/test-db.sh) && config=$$(mktemp -d) && trap 'rm -rf "$$config"; sh scripts/test-db.sh drop "$$url"' EXIT && \
 	TAMANDUA_DATABASE_URL="$$url" TAMANDUA_DB_ISOLATE=data-dir TAMANDUA_CONFIG_DIR="$$config" TAMANDUA_DEFAULT_LOCALE=es \
-	$(VENV)/bin/python -m unittest discover -s tests
+	DOCKER_HOST=unix:///nonexistent/docker.sock $(VENV)/bin/python -m unittest discover -s tests
 
 standalone: ## Regenerate deploy/compose.yaml (one file, published images, no Docker socket)
 	python3 scripts/standalone-compose.py

@@ -179,7 +179,7 @@ class HttpCase(unittest.TestCase):
         store = patch("tamandua.shared.paths.CONFIG_DIR", self.data_dir / "config")
         store.start()
         self.addCleanup(store.stop)
-        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
+        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.
         policy = patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"})
         policy.start()

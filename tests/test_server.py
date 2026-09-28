@@ -24,7 +24,7 @@ class ServerTests(unittest.TestCase):
         store.start()
         self.addCleanup(store.stop)
         # El camino con motores en contenedor se prueba en test_scanners; aquí no se lanza Docker.
-        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False})
+        engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         engines.start()
         self.addCleanup(engines.stop)
         # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.

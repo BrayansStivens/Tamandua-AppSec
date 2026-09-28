@@ -215,7 +215,7 @@ class EngineWiringTests(unittest.TestCase):
         self.snapshot.mkdir()
         self.settings = sr.normalize(settings(rules=[RULE], allowlist={"regexes": [], "paths": ["fixtures/"], "stopwords": []}))
         self.calls = []
-        docker = patch.dict(engines._docker_state, {"ok": True})
+        docker = patch.dict(engines._docker_state, {"ok": True}, clear=True)
         docker.start()
         self.addCleanup(docker.stop)
         testenv.docker_runner(self)
@@ -608,7 +608,7 @@ class WithheldSecretsTests(unittest.TestCase):
         self.data_dir = Path(self.folder.name)
         self.snapshot = self.data_dir / "snapshot"
         self.snapshot.mkdir()
-        docker = patch.dict(engines._docker_state, {"ok": True})
+        docker = patch.dict(engines._docker_state, {"ok": True}, clear=True)
         docker.start()
         self.addCleanup(docker.stop)
         self.clock = datetime.now(timezone.utc)
