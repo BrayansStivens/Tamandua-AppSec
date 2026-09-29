@@ -1,4 +1,4 @@
-[English](THIRD_PARTY_NOTICES.md) · Español
+[English](../third-party-notices.md) · Español
 
 # Software y datos de terceros
 
@@ -125,8 +125,8 @@ el CSS y no se distribuye.
 ## Al ofrecer Tamandua como servicio gestionado
 
 - **La AGPL-3.0 de Tamandua** obliga a ofrecer el código fuente de la versión que se ejecuta a quien la usa por
-  red. Las funciones de la edición comercial que no sean AGPL deben vivir fuera de este repositorio; el CLA
-  (`CLA.md`) permite al titular distribuir las contribuciones también bajo licencia comercial.
+  red. Las funciones de la edición comercial que no sean AGPL deben vivir fuera de este repositorio; el
+  [CLA](../../.github/CLA.es.md) permite al titular distribuir las contribuciones también bajo licencia comercial.
 - **Los motores** permiten el uso como servicio. **Los datos**, no todos: ver «Datos que agregan `trivy-db` y
   `grype-db`» (Wolfi, Chainguard y Minimus son no comerciales).
 - **Modelos de IA**: los términos comerciales del proveedor que se use rigen el reenvío de consumo a clientes.

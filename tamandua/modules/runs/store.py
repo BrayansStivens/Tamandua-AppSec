@@ -377,7 +377,7 @@ def _findings_sections(active: list[dict], locale: str) -> list[str]:
 
 
 def _sources_section(findings: list[dict], locale: str | None = None) -> list[str]:
-    """Attribution of the advisory databases used (licenses in THIRD_PARTY_NOTICES.md)."""
+    """Attribution of the advisory databases used (licenses in docs/third-party-notices.md)."""
     from tamandua.modules.intel.data_sources import attribution
     locale = locale or default_locale()
     lines = attribution(findings, locale=locale)

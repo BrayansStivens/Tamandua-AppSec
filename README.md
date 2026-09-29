@@ -67,7 +67,7 @@ The panel follows your browser's language and has a language switch in the sideb
 | [Architecture](docs/architecture.md) | Components, how a scan flows, and data on disk |
 | [Troubleshooting](docs/troubleshooting.md) | Common errors |
 | [Development](docs/development.md) | Running without containers, the CLI and tests |
-| [Third-party software](THIRD_PARTY_NOTICES.md) | Licenses for the engines, advisory databases and dependencies |
+| [Third-party software](docs/third-party-notices.md) | Licenses for the engines, advisory databases and dependencies |
 
 ## Security in brief
 
@@ -78,7 +78,7 @@ The panel follows your browser's language and has a language switch in the sideb
 - No telemetry. Advisory databases are downloaded and queried locally; your dependency list only goes to OSV if you allow it for a scan. Alerts only go to the channels you configure.
 - **Trade-off** with the repository's `compose.yaml`: the worker launches the engines through the Docker socket, which is equivalent to root on the host. The worker image with the engines inside (`deploy/compose.yaml`) needs no socket.
 
-To report a vulnerability: [SECURITY.md](SECURITY.md).
+To report a vulnerability: [SECURITY.md](.github/SECURITY.md).
 
 ## Run it on a server (HTTPS)
 
@@ -97,7 +97,7 @@ The API is then reachable only through Caddy, HTTP redirects to HTTPS and the ce
 
 ## Contributing
 
-Issues and PRs are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md). On your first PR you sign the [CLA](CLA.md) with a comment. Tamandua's SAST rules live in `rules/`.
+Issues and PRs are welcome: read [CONTRIBUTING.md](.github/CONTRIBUTING.md). On your first PR you sign the [CLA](.github/CLA.md) with a comment. Tamandua's SAST rules live in `rules/`.
 
 ## License
 

@@ -17,3 +17,4 @@ scripts
 skills
 *.md
 !README.md
+.cache

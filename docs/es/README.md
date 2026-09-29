@@ -17,3 +17,4 @@
 | [Solución de problemas](solucion-problemas.md) | Errores frecuentes y cómo resolverlos. |
 | [Desarrollo](desarrollo.md) | Ejecutar sin contenedores, CLI, pruebas y textos bilingües. |
 | [Marca](marca.md) | Nombre, mascota, logo, colores y voz de Tamandua. |
+| [Software de terceros](avisos-de-terceros.md) | Licencias de los motores, las bases de avisos y las dependencias. |

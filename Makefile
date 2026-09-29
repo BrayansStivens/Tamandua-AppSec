@@ -169,7 +169,7 @@ openapi: ## API OpenAPI schema and the panel's TypeScript types (web/src/shared/
 	cd web && npx --yes openapi-typescript@7.13.0 src/shared/api/openapi.json -o src/shared/api/schema.d.ts
 
 arch: ## Architecture contracts (import-linter, see pyproject.toml)
-	$(VENV)/bin/lint-imports
+	$(VENV)/bin/lint-imports --cache-dir .cache/import-linter
 
 lint-py: ## Backend lint (ruff) and types (mypy), see pyproject.toml
 	$(VENV)/bin/ruff check tamandua tests scripts api

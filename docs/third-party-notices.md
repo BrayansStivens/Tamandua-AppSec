@@ -1,4 +1,4 @@
-English · [Español](THIRD_PARTY_NOTICES.es.md)
+English · [Español](es/avisos-de-terceros.md)
 
 # Third-party software and data
 
@@ -125,8 +125,8 @@ the CSS and is not distributed.
 ## When offering Tamandua as a managed service
 
 - **Tamandua's AGPL-3.0** requires offering the source code of the running version to anyone who uses it over a
-  network. Commercial-edition features that are not AGPL must live outside this repository; the CLA
-  (`CLA.md`) lets the owner also distribute contributions under a commercial license.
+  network. Commercial-edition features that are not AGPL must live outside this repository; the
+  [CLA](../.github/CLA.md) lets the owner also distribute contributions under a commercial license.
 - **The engines** allow use as a service. **The data** does not, not all of it: see "Data aggregated by `trivy-db`
   and `grype-db`" (Wolfi, Chainguard and Minimus are non-commercial).
 - **AI models**: the commercial terms of the provider in use govern passing usage through to customers. Review

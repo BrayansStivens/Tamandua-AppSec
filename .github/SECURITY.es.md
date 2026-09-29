@@ -20,4 +20,4 @@ Solo la última versión de la rama `main`.
 
 ## Alcance
 
-Entra en el alcance cualquier fallo del propio Tamandua: autenticación, sesiones, almacén de secretos, API, panel y ejecución de motores. Quedan fuera los fallos de las herramientas de terceros (Trivy, Gitleaks, Opengrep): repórtalos a sus proyectos. El uso del socket de Docker es una concesión documentada en [docs/es/seguridad.md](docs/es/seguridad.md#concesiones-conocidas).
+Entra en el alcance cualquier fallo del propio Tamandua: autenticación, sesiones, almacén de secretos, API, panel y ejecución de motores. Quedan fuera los fallos de las herramientas de terceros (Trivy, Gitleaks, Opengrep): repórtalos a sus proyectos. El uso del socket de Docker es una concesión documentada en [docs/es/seguridad.md](../docs/es/seguridad.md#concesiones-conocidas).

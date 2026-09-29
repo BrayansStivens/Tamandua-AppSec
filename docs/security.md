@@ -2,7 +2,7 @@ English · [Español](es/seguridad.md)
 
 # Security
 
-Tamandua reads your repositories' code and stores GitHub, AI and Jira credentials. This document explains how it protects that information, what leaves your machine and which trade-offs it makes. To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+Tamandua reads your repositories' code and stores GitHub, AI and Jira credentials. This document explains how it protects that information, what leaves your machine and which trade-offs it makes. To report a vulnerability, see [SECURITY.md](../.github/SECURITY.md).
 
 ## Secrets
 

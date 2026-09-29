@@ -2,7 +2,7 @@
 
 # Seguridad
 
-Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA y Jira. Este documento explica cómo protege esa información, qué sale de tu máquina y qué concesiones hace. Para reportar una vulnerabilidad, ve a [SECURITY.es.md](../../SECURITY.es.md).
+Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA y Jira. Este documento explica cómo protege esa información, qué sale de tu máquina y qué concesiones hace. Para reportar una vulnerabilidad, ve a [SECURITY.es.md](../../.github/SECURITY.es.md).
 
 ## Secretos
 

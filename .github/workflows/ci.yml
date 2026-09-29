@@ -51,7 +51,7 @@ jobs:
       - name: Dependencies
         run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
       - name: Architecture contracts
-        run: lint-imports
+        run: lint-imports --cache-dir .cache/import-linter
       - name: Lint
         run: ruff check tamandua tests scripts api
       - name: Types

@@ -1,6 +1,6 @@
 """Source of each dependency advisory: which database it comes from and under what license.
 
-The advisories Tamandua shows come from public databases with different licenses (see THIRD_PARTY_NOTICES.md).
+The advisories Tamandua shows come from public databases with different licenses (see docs/third-party-notices.md).
 Each finding keeps its source so it can be attributed in the panel and in reports, and so a managed service
 knows which sources don't allow commercial use. Licenses reviewed on 2026-09-25.
 """

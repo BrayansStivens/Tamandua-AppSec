@@ -2,7 +2,7 @@ English · [Español](es/desarrollo.md)
 
 # Development
 
-For contributing, or for running Tamandua without containers. Read [CONTRIBUTING.md](../CONTRIBUTING.md) too.
+For contributing, or for running Tamandua without containers. Read [CONTRIBUTING.md](../.github/CONTRIBUTING.md) too.
 
 ## Without containers
 

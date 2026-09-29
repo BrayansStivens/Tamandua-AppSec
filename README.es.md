@@ -67,7 +67,7 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 | [Arquitectura](docs/es/arquitectura.md) | Componentes, flujo de un análisis y datos en disco |
 | [Solución de problemas](docs/es/solucion-problemas.md) | Errores frecuentes |
 | [Desarrollo](docs/es/desarrollo.md) | Sin contenedores, CLI y pruebas |
-| [Software de terceros](THIRD_PARTY_NOTICES.es.md) | Licencias de los motores, las bases de avisos y las dependencias |
+| [Software de terceros](docs/es/avisos-de-terceros.md) | Licencias de los motores, las bases de avisos y las dependencias |
 
 ## Seguridad, en corto
 
@@ -78,7 +78,7 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 - Sin telemetría. Las bases de avisos se descargan y se consultan en local; tus dependencias solo salen hacia OSV si lo autorizas en un análisis. Los avisos solo van a los canales que configures.
 - **Concesión** con el `compose.yaml` del repositorio: el worker lanza los motores por el socket de Docker, lo que equivale a root en el host. La imagen del worker con los motores dentro (`deploy/compose.yaml`) no necesita el socket.
 
-Para reportar una vulnerabilidad: [SECURITY.es.md](SECURITY.es.md).
+Para reportar una vulnerabilidad: [SECURITY.es.md](.github/SECURITY.es.md).
 
 ## Llevarlo a un servidor (HTTPS)
 
@@ -97,7 +97,7 @@ A partir de ahí solo se llega a la API a través de Caddy, HTTP redirige a HTTP
 
 ## Contribuir
 
-Issues y PRs son bienvenidos: lee [CONTRIBUTING.es.md](CONTRIBUTING.es.md). En el primer PR se firma el [CLA](CLA.es.md) con un comentario. Las reglas SAST propias están en `rules/`.
+Issues y PRs son bienvenidos: lee [CONTRIBUTING.es.md](.github/CONTRIBUTING.es.md). En el primer PR se firma el [CLA](.github/CLA.es.md) con un comentario. Las reglas SAST propias están en `rules/`.
 
 ## Licencia
 

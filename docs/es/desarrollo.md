@@ -2,7 +2,7 @@
 
 # Desarrollo
 
-Para contribuir o ejecutar Tamandua sin contenedores. Lee también [CONTRIBUTING.es.md](../../CONTRIBUTING.es.md).
+Para contribuir o ejecutar Tamandua sin contenedores. Lee también [CONTRIBUTING.es.md](../../.github/CONTRIBUTING.es.md).
 
 ## Sin contenedores
 

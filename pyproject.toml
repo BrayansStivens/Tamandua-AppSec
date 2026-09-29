@@ -11,6 +11,7 @@ version = { attr = "tamandua.version.VERSION" }
 # Lint (`make lint-py`, CI): rules that find bugs rather than style.
 [tool.ruff]
 target-version = "py312"
+cache-dir = ".cache/ruff"  # every tool cache in one ignored folder, not one per tool at the root
 extend-exclude = ["web", "docs", "deploy", "skills"]
 
 [tool.ruff.lint]
@@ -25,6 +26,7 @@ ignore = ["E731", "B905"]
 # when the check arrived. Fix one, take it off the list; the list only shrinks.
 [tool.mypy]
 python_version = "3.12"
+cache_dir = ".cache/mypy"
 files = ["tamandua"]
 ignore_missing_imports = true
 warn_unused_ignores = true

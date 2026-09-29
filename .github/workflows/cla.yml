@@ -1,4 +1,4 @@
-# Asks for the CLA signature (CLA.md) on pull requests and records it in the `cla-signatures` branch
+# Asks for the CLA signature (.github/CLA.md) on pull requests and records it in the `cla-signatures` branch
 # (signatures/v1/cla.json). Replaces contributor-assistant/github-action, archived in March 2026:
 # the script is ours and only uses actions/github-script, maintained by GitHub and pinned by commit.
 #
@@ -45,7 +45,7 @@ jobs:
             const BRANCH = 'cla-signatures'
             const FILE = 'signatures/v1/cla.json'
             const MARKER = '<!-- tamandua-cla -->'
-            const DOCUMENT = 'https://github.com/BrayansStivens/appsec-agent/blob/main/CLA.md'
+            const DOCUMENT = 'https://github.com/BrayansStivens/appsec-agent/blob/main/.github/CLA.md'
             const ALLOWLIST = new Set(['BrayansStivens'])
             const { owner, repo } = context.repo
             const number = context.payload.pull_request ? context.payload.pull_request.number : context.payload.issue.number

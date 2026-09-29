@@ -17,3 +17,4 @@ English · [Español](es/README.md)
 | [Troubleshooting](troubleshooting.md) | Common errors and how to fix them. |
 | [Development](development.md) | Running without containers, the CLI, tests and bilingual text. |
 | [Brand](brand.md) | Tamandua's name, mascot, logo, colors and voice. |
+| [Third-party software](third-party-notices.md) | Licenses of the engines, advisory databases and dependencies. |

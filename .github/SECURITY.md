@@ -20,4 +20,4 @@ Only the latest version on the `main` branch.
 
 ## Scope
 
-Any flaw in Tamandua itself is in scope: authentication, sessions, the secret store, the API, the panel and how engines are run. Flaws in third-party tools (Trivy, Gitleaks, Opengrep) are out of scope: report them to their projects. Using the Docker socket is a documented trade-off in [docs/security.md](docs/security.md#known-trade-offs).
+Any flaw in Tamandua itself is in scope: authentication, sessions, the secret store, the API, the panel and how engines are run. Flaws in third-party tools (Trivy, Gitleaks, Opengrep) are out of scope: report them to their projects. Using the Docker socket is a documented trade-off in [docs/security.md](../docs/security.md#known-trade-offs).
