@@ -1,9 +1,9 @@
-"""Inventario de arquitectura de un snapshot: qué usa el código, no qué versión.
+"""Architecture inventory of a snapshot: what the code uses, not which version.
 
-Alimenta la propuesta del modelo de amenazas. Solo se guardan **nombres**:
-dependencias directas por ecosistema (no transitivas, que no dicen nada de la
-arquitectura) e imágenes de servicios de docker-compose. No se lee ningún valor
-de configuración ni de ``.env``.
+It feeds the threat model proposal. Only **names** are stored: direct
+dependencies per ecosystem (not transitive ones, which say nothing about the
+architecture) and docker-compose service images. No configuration or ``.env``
+value is read.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import re
 import tomllib
 from pathlib import Path
 
-# Fixtures y tests declaran dependencias de ejemplo que no son la arquitectura del producto.
+# Fixtures and tests declare sample dependencies that are not the product's architecture.
 SKIP = {"node_modules", ".git", ".venv", "venv", "vendor", "dist", "build", "__pycache__", ".next", "fixtures", "test", "tests"}
 MAX_NAMES = 600
 
@@ -78,7 +78,7 @@ def _cargo(path: Path) -> set[str]:
 
 
 def _compose(path: Path) -> set[str]:
-    """Imágenes declaradas en compose: `postgres:16` → `postgres`. Sin parsear YAML completo."""
+    """Images declared in compose: `postgres:16` → `postgres`. Without parsing the full YAML."""
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
@@ -92,7 +92,7 @@ def _compose(path: Path) -> set[str]:
 
 
 def collect(root: Path) -> dict:
-    """Además de los nombres, dónde se vio cada uno: la propuesta cita su origen para poder comprobarla."""
+    """Besides the names, where each one was seen: the proposal cites its origin so it can be checked."""
     packages: dict[str, set[str]] = {"npm": set(), "pypi": set(), "go": set(), "cargo": set()}
     found_in: dict[str, str] = {}
     manifests: list[str] = []
@@ -130,7 +130,7 @@ def collect(root: Path) -> dict:
 
 
 def live(source_id: str, *, installation_id: int | None) -> dict | None:
-    """Inventario leído en el momento, sin escanear: de GitHub solo los manifiestos; del workspace, en disco."""
+    """Inventory read on the spot, without scanning: from GitHub only the manifests; from the workspace, on disk."""
     import tempfile
     if not source_id.startswith("github:") or installation_id is None:
         return None
@@ -145,7 +145,7 @@ def live(source_id: str, *, installation_id: int | None) -> dict | None:
         for relative, content in files:
             target = (root / relative).resolve()
             if root not in target.parents:
-                continue  # ruta que intenta salir del directorio: se ignora
+                continue  # a path that tries to escape the directory: ignored
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(content)
         return collect(root)

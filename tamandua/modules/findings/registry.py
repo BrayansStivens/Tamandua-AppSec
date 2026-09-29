@@ -1,26 +1,26 @@
-"""Registro de hallazgos por repositorio: el estado actual y su ciclo de vida.
+"""Findings registry per repository: the current state and its lifecycle.
 
-Una ejecución es una foto; el registro es la película. Cada hallazgo (por su huella
-estable) vive aquí con su origen, cuándo se vio por primera y por última vez y si
-sigue abierto. Se actualiza solo al terminar cada ejecución:
+A run is a snapshot; the registry is the film. Each finding (by its stable fingerprint)
+lives here with its origin, when it was first and last seen, and whether it is still
+open. It is updated only when a run finishes:
 
-* **Escaneo completo** (rama principal): lo que aparece queda abierto (y se reabre si
-  estaba remediado); lo que estaba abierto desde la rama principal y ya no aparece
-  queda **remediado automáticamente**. Solo si el escaneo terminó entero: en uno
-  **incompleto** (un motor no corrió, snapshot truncado) no aparecer no prueba nada, así
-  que abre y actualiza pero nunca remedia.
-* **Rutas excluidas** (`exclusions`): lo que cae en ellas queda **excluido**, ni abierto ni
-  remediado. Si la ruta deja de estar excluida, el siguiente escaneo lo vuelve a abrir.
+* **Full scan** (main branch): what shows up stays open (and reopens if it had been
+  fixed); what was open from the main branch and no longer shows up is **fixed
+  automatically**. Only if the scan finished entirely: in an **incomplete** one (an
+  engine didn't run, truncated snapshot) not showing up proves nothing, so it opens and
+  updates but never fixes.
+* **Excluded paths** (`exclusions`): whatever falls under them is **excluded**, neither open
+  nor fixed. If the path stops being excluded, the next scan reopens it.
 * **Secrets withheld by the secret detection settings** (allowlist, disabled rule): excluded with the reason, never
   fixed. They reopen when the settings stop withholding them, and are fixed only once a complete scan no longer
   sees them even without the filters.
-* **Revisión de PR**: lo que introduce el PR queda abierto con origen «PR #n»; lo que
-  ese mismo PR había introducido y ya no está en su commit nuevo queda remediado.
-  Un PR cerrado sin merge retira sus hallazgos; uno mergeado los deja a la espera
-  del siguiente escaneo completo, que confirma si llegaron a la rama principal.
+* **PR review**: what the PR introduces stays open with origin "PR #n"; what that same
+  PR had introduced and is no longer in its new commit is fixed. A PR closed without
+  merging withdraws its findings; a merged one leaves them waiting for the next full
+  scan, which confirms whether they reached the main branch.
 
-La remediación manual es una decisión de triage con justificación obligatoria; si
-el hallazgo reaparece en una ejecución posterior, se reabre solo.
+Manual remediation is a triage decision with a mandatory justification; if the finding
+reappears in a later run, it reopens on its own.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def _cves(entry: dict) -> list[str]:
 
 
 def load(data_dir: Path, key: str) -> dict:
-    """El estado de un activo: {"asset", "name", "findings": {huella: entrada}, "applied": [ejecuciones]}."""
+    """An asset's state: {"asset", "name", "findings": {fingerprint: entry}, "applied": [runs]}."""
     with db.transaction(data_dir) as connection:
         head = connection.execute(select(registry_assets.c.name, registry_assets.c.applied)
                                   .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key == key)).first()
@@ -84,7 +84,7 @@ def _save(data_dir: Path, payload: dict, gone: set[str] = frozenset()) -> None:
 
 @contextmanager
 def _locked(data_dir: Path, key: str):
-    """Leer-modificar-guardar el estado de un activo en una transacción con cerrojo (entre procesos, no solo hilos)."""
+    """Read-modify-write an asset's state in a locked transaction (across processes, not just threads)."""
     with db.transaction(data_dir) as connection:
         db.lock(connection, "registry", key)
         yield load(data_dir, key)
@@ -116,10 +116,10 @@ def _withheld(entry: dict) -> bool:
 
 
 def _reopen_manual(data_dir: Path, record: dict, fingerprints: set[str]) -> None:
-    """Una remediación manual que reaparece no era tal: se reabre y queda en el historial."""
+    """A manual fix that reappears wasn't one: it reopens and stays in the history."""
     decisions = triage.load(data_dir).get(asset_key(record), {})
     stamp = record.get("finished_at") or record["created_at"]
-    # Solo cuenta si la remediación es anterior a esta ejecución (al reconstruir se reprocesan ejecuciones viejas).
+    # Only counts if the fix predates this run (a rebuild reprocesses old runs).
     back = [digest for digest in fingerprints if (decisions.get(digest) or {}).get("status") == "fixed"
             and (decisions[digest].get("at") or "") < stamp]
     if back:
@@ -152,7 +152,7 @@ def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
 
 
 def apply(data_dir: Path, record: RunRecord) -> dict:
-    """Incorpora una ejecución terminada al registro de su repositorio. Idempotente por ejecución."""
+    """Adds a finished run to its repository's registry. Idempotent per run."""
     if record.get("type") not in FINDING_RUNS or record.get("status") not in ("completed", "incomplete"):
         return {}
     key = asset_key(record)
@@ -181,7 +181,7 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
                 new.append(digest)
                 entry["reopened_at"] = stamp
             if record["type"] in FULL_SCANS:
-                entry["origin"] = {"kind": "scan"}  # ya está en la rama principal
+                entry["origin"] = {"kind": "scan"}  # already on the main branch
             entry.update(status="open", finding=_clean(finding), last_seen=stamp, last_run=record["id"])
             entry.pop("fixed", None)
             entry.pop("excluded", None)
@@ -195,7 +195,7 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
                 entry = entries.setdefault(digest, {"first_seen": stamp, "first_run": record["id"], "origin": {"kind": "scan"}})
                 entry.update(status="excluded", finding=_clean(finding), excluded=_exclusion(finding, stamp),
                              last_seen=stamp, last_run=record["id"])
-        # Un escaneo incompleto no puede demostrar que algo desapareció: no remedia nada.
+        # An incomplete scan can't prove something disappeared: it fixes nothing.
         complete = record.get("status") == "completed"
         for digest, entry in entries.items():
             if digest in present or not complete:
@@ -204,7 +204,7 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
             if entry["status"] != "open" and not (record["type"] in FULL_SCANS and _withheld(entry) and digest not in excluded_now):
                 continue
             origin = entry.get("origin") or {}
-            # Un aviso nuevo afecta a la rama principal: el siguiente análisis completo sin él lo da por corregido.
+            # A new advisory affects the main branch: the next full scan without it marks it fixed.
             if record["type"] in FULL_SCANS and (origin.get("kind") in ("scan", "advisory") or origin.get("merged")):
                 how = msg("findings.registry.gone_from_scan", date=stamp[:10])
             elif record["type"] == "pr_review" and origin.get("kind") == "pr" and origin.get("pr") == pull.get("number"):
@@ -224,7 +224,7 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
 
 
 def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) -> dict:
-    """Al cambiar las rutas excluidas: lo abierto que cae en ellas pasa a excluido y lo excluido que ya no cae vuelve a abierto."""
+    """Excluded paths changed: open findings under them become excluded; excluded ones no longer under them reopen."""
     from tamandua.modules.findings.exclusions import excluded
     moved = {"excluded": 0, "reopened": 0}
     with _locked(data_dir, key) as state:
@@ -243,7 +243,7 @@ def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) 
 
 
 def pull_closed(data_dir: Path, key: str, number: int, *, merged: bool, when: str) -> int:
-    """PR cerrado: sin merge, sus hallazgos se retiran; con merge, esperan al escaneo completo."""
+    """PR closed: unmerged, its findings are withdrawn; merged, they wait for the full scan."""
     changed = 0
     with _locked(data_dir, key) as state:
         for entry in state["findings"].values():
@@ -268,10 +268,10 @@ def reset(data_dir: Path) -> None:
 
 
 def view(data_dir: Path, key: str, *, status: str = "open") -> dict:
-    """El estado del repositorio con la forma de una ejecución, para verlo, triagearlo y exportarlo igual.
+    """The repository's state shaped like a run, so it is viewed, triaged and exported the same way.
 
-    `open`: lo que sigue ahí (incluido lo descartado en triage, que la tabla filtra aparte);
-    `fixed`: remediado, automática o manualmente; `excluded`: en rutas excluidas; `all`: todo.
+    `open`: what is still there (including what triage dismissed, which the table filters separately);
+    `fixed`: fixed, automatically or by hand; `excluded`: under excluded paths; `all`: everything.
     """
     state = load(data_dir, key)
     items = [{**entry["finding"], "lifecycle": {name: entry.get(name) for name in
@@ -299,7 +299,7 @@ def view(data_dir: Path, key: str, *, status: str = "open") -> dict:
 
 
 def summarize(data_dir: Path, key: str) -> dict:
-    """Abiertos (pendientes de verdad), remediados y descartados, contando el triage."""
+    """Open (really pending), fixed and dismissed, taking triage into account."""
     state = load(data_dir, key)
     decisions = triage.load(data_dir).get(key, {})
     counts = {"open": 0, "fixed": 0, "suppressed": 0, "excluded": 0, "by_severity": dict.fromkeys(("critical", "high", "medium", "low"), 0), "from_pr": 0}
@@ -325,7 +325,7 @@ PACKAGES_SHOWN = 5  # per affected repository in the CVE tracker
 
 
 def assets_with_cve(data_dir: Path, cve: str, *, limit: int, offset: int) -> dict:
-    """Repositorios con un hallazgo que cita este CVE, para responder «¿me afecta?» desde el tracker (índice GIN).
+    """Repositories with a finding that cites this CVE, to answer "does it affect me?" from the tracker (GIN index).
 
     One page of repositories, ordered by key: `{items, total, limit, offset}`."""
     cites = (registry_findings.c.tenant_id == TENANT, registry_findings.c.cves.any_() == cve)
@@ -356,7 +356,7 @@ def assets_with_cve(data_dir: Path, cve: str, *, limit: int, offset: int) -> dic
 
 
 def open_cves(data_dir: Path) -> frozenset[str]:
-    """Los CVE que siguen abiertos en algún activo (sin lo descartado en triage), para «solo los míos» en el tracker."""
+    """CVEs still open in some asset (minus what triage dismissed), for "only mine" in the tracker."""
     decisions = triage.load(data_dir)
     found: set[str] = set()
     with db.transaction(data_dir) as connection:

@@ -1,14 +1,14 @@
-"""Identidad de los repositorios y su registro (rama de análisis, retirada).
+"""Repository identity and registry (scan branch, removal).
 
-Un repositorio de GitHub se identifica por su id numérico (`github#123`), que no
-cambia al renombrarlo ni al transferirlo: así un rename no parte en dos sus
-hallazgos, su triage, sus tickets ni su vigilancia de PRs. Lo demás (workspace
-local, GitLab) usa el id de la fuente.
+A GitHub repository is identified by its numeric id (`github#123`), which doesn't
+change when it is renamed or transferred: that way a rename doesn't split its
+findings, triage, tickets or PR watch in two. Everything else (local workspace,
+GitLab) uses the source's id.
 
-Si un repositorio deja de estar en la instalación —se borró en GitHub o se quitó
-del acceso de la App— se marca como retirado y, pasado un margen, se borra todo lo
-suyo. El margen existe porque una lista incompleta o un error transitorio de GitHub
-no deben destruir datos: solo se reconcilia con una lista leída entera. The
+When a repository leaves the installation (deleted on GitHub or removed from the
+App's access) it is marked as removed and, after a grace period, everything it owns
+is deleted. The grace period exists because an incomplete list or a transient GitHub
+error must not destroy data: reconciliation only runs against a list read in full. The
 reconciliation against the runs and the purge are orchestrated by `runs/assets.py`.
 """
 
@@ -114,7 +114,7 @@ def retire(data_dir: Path, repositories: list[dict], analysed: dict[str, str | N
             known_name = (registry.get(uid) or {}).get("name") or analysed.get(uid)
             if (active_accounts is not None and isinstance(known_name, str) and "/" in known_name
                     and known_name.split("/", 1)[0].casefold() not in active_accounts):
-                # Desconectar una organización no equivale a borrar sus repositorios ni sus hallazgos.
+                # Disconnecting an organization doesn't mean deleting its repositories or findings.
                 continue
             before = registry.get(uid)
             entry = dict(before or {})

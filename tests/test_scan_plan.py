@@ -1,4 +1,4 @@
-"""El paso «Revisar y lanzar» sale de datos reales: lenguajes del árbol, motores disponibles y manifiestos."""
+"""The "Review and launch" step comes from real data: the tree's languages, the available engines and manifests."""
 
 import unittest
 from unittest.mock import patch
@@ -22,7 +22,7 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(languages["Python"]["files"], 2)
         self.assertGreater(languages["TypeScript"]["rules"], 0)
         self.assertEqual(languages["Rust"]["rules"], 0)
-        self.assertNotIn("JavaScript", languages)  # node_modules no cuenta
+        self.assertNotIn("JavaScript", languages)  # node_modules doesn't count
         self.assertEqual(result["manifests"], ["pyproject.toml", "uv.lock", "web/package-lock.json"])
         self.assertEqual(result["iac"], ["Dockerfile", "infra/main.tf"])
         self.assertTrue(any("Opengrep" in item and "Python (14 reglas, 2 archivos)" in item for item in result["runs"]))

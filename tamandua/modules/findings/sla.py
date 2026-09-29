@@ -1,11 +1,11 @@
-"""Plazos de corrección por severidad: cuántos días hay para corregir un hallazgo desde que se detectó.
+"""Remediation deadlines by severity: how many days there are to fix a finding from when it was detected.
 
-La política es del espacio de trabajo (`data/sla.json`) y la cambia un administrador; sin archivo, o con
-valores rotos, rigen los plazos por defecto. Un nivel sin plazo (`None`) no vence nunca.
+The policy belongs to the workspace (`data/sla.json`) and an administrator changes it; with no file, or with
+broken values, the default deadlines apply. A level with no deadline (`None`) is never overdue.
 
-Cuenta desde la **primera detección** en el registro (`first_seen`): reabrir un hallazgo no reinicia el
-reloj. Solo corre para lo pendiente de verdad: abierto o «en curso». Lo remediado, lo excluido, el falso
-positivo y el riesgo aceptado vigente no vencen; una aceptación caducada vuelve a abierto y su plazo con ella.
+It counts from the **first detection** in the registry (`first_seen`): reopening a finding doesn't restart the
+clock. It only runs for what is really pending: open or "in progress". Remediated, excluded, false positives
+and an active accepted risk are never overdue; an expired acceptance goes back to open, and its deadline with it.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ _log = logging_setup.get("sla")
 LEVELS = ("critical", "high", "medium", "low")
 DEFAULTS = {"critical": 7, "high": 30, "medium": 90, "low": 180}
 MAX_DAYS = 3650
-SOON_DAYS = 7  # «vence pronto»: dentro de una semana
+SOON_DAYS = 7  # "due soon": within a week
 
 
 class SlaError(LocalizedError, ValueError):
@@ -39,7 +39,7 @@ def _clean_days(value) -> int | None:
 
 
 def policy(data_dir: Path) -> dict:
-    """La política vigente. Tolerante: un nivel que falta o no es válido toma su valor por defecto."""
+    """The policy in force. Tolerant: a missing or invalid level takes its default value."""
     stored = documents.load(data_dir, "sla", {})
     stored = stored if isinstance(stored, dict) else {}
     raw = stored.get("days") if isinstance(stored.get("days"), dict) else {}
@@ -71,7 +71,7 @@ def _start(first_seen) -> date | None:
 
 
 def deadline(severity: str, first_seen, days: dict, *, today: date | None = None) -> dict | None:
-    """El plazo de un hallazgo pendiente, o None si su severidad no tiene plazo o no se sabe cuándo se detectó."""
+    """A pending finding's deadline, or None if its severity has none or when it was detected is unknown."""
     limit = days.get(severity)
     start = _start(first_seen)
     if not limit or start is None:
@@ -83,7 +83,7 @@ def deadline(severity: str, first_seen, days: dict, *, today: date | None = None
 
 
 def pending(finding: dict) -> bool:
-    """Si el reloj corre: abierto en el registro y sin una decisión de triage que lo saque del trabajo pendiente."""
+    """Whether the clock runs: open in the registry and no triage decision takes it out of pending work."""
     lifecycle = finding.get("lifecycle") or {}
     if lifecycle.get("status", "open") != "open":
         return False
@@ -91,7 +91,7 @@ def pending(finding: dict) -> bool:
 
 
 def annotate(findings: list[dict], days: dict, *, today: date | None = None) -> list[dict]:
-    """Añade `sla` a cada hallazgo con `lifecycle` (los del registro); None si no corre plazo."""
+    """Adds `sla` to each finding with `lifecycle` (the registry's); None when no deadline runs."""
     for finding in findings:
         if "lifecycle" in finding:
             finding["sla"] = deadline(finding.get("severity", ""), finding["lifecycle"].get("first_seen"), days, today=today) \

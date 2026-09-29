@@ -1,4 +1,4 @@
-"""Registro de objetivos HTTPS con prueba DNS TXT antes de cualquier DAST."""
+"""Registry of HTTPS targets, with DNS TXT proof before any DAST."""
 
 from __future__ import annotations
 
@@ -121,12 +121,12 @@ def _is_public(address: str) -> bool:
 
 
 def check_reachability(url: str) -> dict:
-    """Dice si el objetivo contesta por HTTPS antes de registrarlo.
+    """Tells whether the target answers over HTTPS before registering it.
 
-    No es una prueba de seguridad ni un pentest: es un HEAD de un solo salto,
-    sin redirecciones. Resuelve el host y exige que todas sus direcciones sean
-    públicas antes de conectar, y luego conecta a la IP ya resuelta para que el
-    sondeo no termine en una dirección interna.
+    Not a security test or a pentest: a single-hop HEAD, no redirects. It
+    resolves the host and requires every address to be public before
+    connecting, then connects to the already-resolved IP so the probe cannot
+    end up at an internal address.
     """
     host, normalized = _host(url)
     path = urlsplit(normalized).path or "/"
@@ -162,5 +162,5 @@ def check_reachability(url: str) -> dict:
 
 
 def locked(data_dir: Path):
-    """Cerrojo del registro de dominios (entre procesos) para leer-modificar-guardar."""
+    """Cross-process lock on the domain registry, for read-modify-write."""
     return documents.lock(data_dir, "domains")

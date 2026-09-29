@@ -16,7 +16,7 @@ from tamandua.shared.i18n import localize, msg, negotiate
 
 
 class ApiError(Exception):
-    """Error con la forma de siempre: {"error": mensaje, …extra}."""
+    """Error in the usual shape: {"error": message, …extra}."""
 
     def __init__(self, status: int, message, **extra):
         super().__init__(message)
@@ -35,7 +35,7 @@ class Policy:
 
 @dataclass(frozen=True)
 class Context:
-    """Petición ya autorizada: quién es y dónde están los datos. El negocio recibe esto, nunca el Request."""
+    """An authorized request: who is asking and where the data lives. Business code gets this, never the Request."""
     state: State
     user: dict | None
     session: dict | None
@@ -51,7 +51,7 @@ class Context:
 
 
 def guard(policy: Policy = Policy()):
-    """Dependencia FastAPI: aplica la política y devuelve el Context, o corta con el error de siempre."""
+    """FastAPI dependency: applies the policy and returns the Context, or stops with the usual error."""
     def dependency(request: Request) -> Context:
         state: State = request.app.state.core
         verdict = authorize(state, policy, method=request.method, port=request.app.state.port,

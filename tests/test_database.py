@@ -1,4 +1,4 @@
-"""Esquema de PostgreSQL: las migraciones de Alembic crean exactamente las tablas del código (sin cambios sin migración)."""
+"""PostgreSQL schema: the Alembic migrations create exactly the code's tables (no changes without a migration)."""
 
 import os
 import unittest
@@ -29,7 +29,7 @@ class MigrationDriftTests(unittest.TestCase):
                 with db.engine().connect() as connection:
                     differences = compare_metadata(MigrationContext.configure(connection, opts={"compare_type": True}), db.metadata)
                     tables = set(connection.execute(text("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")).scalars())
-                database.upgrade()  # repetirlo no hace nada
+                database.upgrade()  # running it again does nothing
                 db.reset()
         finally:
             db.reset()

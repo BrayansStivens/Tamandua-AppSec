@@ -1,17 +1,17 @@
-"""GitHub App propia de cada instalación: la creas en GitHub y la conectas aquí.
+"""Each installation's own GitHub App: you create it on GitHub and connect it here.
 
-Tamandua es autoalojado: cada persona o equipo crea **su** GitHub App ("Any account"
-si necesita varias organizaciones) siguiendo la guía del panel y pega aquí dos datos: el App ID
-y la clave privada (.pem). El panel las verifica contra GitHub antes de guardarlas y
-de ahí saca el nombre, la cuenta y los permisos; no hace falta client secret, OAuth
-ni ningún token personal.
+Tamandua is self-hosted: each person or team creates **their own** GitHub App ("Any account"
+if they need several organizations) following the panel's guide and pastes two values here: the App ID
+and the private key (.pem). The panel verifies them against GitHub before storing them and
+gets the name, account and permissions from there; no client secret, OAuth or personal
+token is needed.
 
-- **Clave privada de la App**: se guarda cifrada en el almacén (`vault`), nunca en
-  claro ni en `data/`. El entorno (`GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY_FILE`)
-  manda sobre el almacén para quien prefiera montarla como secreto.
-- **Token de instalación** (1 h). Es el que lee código. Se acuña en memoria firmando
-  un JWT con la clave privada; de la instalación solo se guarda su identificador,
-  que además se comprueba contra GitHub antes de aceptarlo.
+- **App private key**: stored encrypted in the store (`vault`), never in plain
+  text nor in `data/`. The environment (`GITHUB_APP_ID` + `GITHUB_APP_PRIVATE_KEY_FILE`)
+  wins over the store, for whoever prefers to mount it as a secret.
+- **Installation token** (1 h). This is the one that reads code. It is minted in memory by signing
+  a JWT with the private key; of the installation only its identifier is stored, and it is
+  checked against GitHub before being accepted.
 """
 
 from __future__ import annotations
@@ -33,13 +33,13 @@ from tamandua.version import USER_AGENT
 
 API = "https://api.github.com"
 WEB = "https://github.com"
-# Las credenciales de la App son nuestras y tienen que sobrevivir al reinicio.
-# Viven fuera del repositorio, con permisos restringidos; al contenerizar se
-# montan como secreto y el entorno tiene prioridad sobre este almacén.
-# El JWT de la App admite como máximo 10 minutos; damos margen por desfase de reloj.
+# The App's credentials are ours and must survive a restart.
+# They live outside the repository, with restricted permissions; when containerized they
+# are mounted as a secret and the environment takes precedence over this store.
+# The App JWT allows at most 10 minutes; we leave margin for clock skew.
 JWT_TTL = 540
 CLOCK_SKEW = 30
-# Se renueva antes de caducar para que un escaneo largo no se quede sin token a medias.
+# Renewed before it expires so a long scan doesn't run out of token halfway through.
 TOKEN_MARGIN = 300
 
 
@@ -55,7 +55,7 @@ VAULT_NAME = "github_app"
 
 
 def _stored() -> dict:
-    """Credenciales guardadas al crear la App desde el panel. Ausencia no es error."""
+    """Credentials stored when the App was created from the panel. Their absence is not an error."""
     from tamandua.shared.vault import VaultError, get
     try:
         data = get(VAULT_NAME)
@@ -65,7 +65,7 @@ def _stored() -> dict:
 
 
 def _resolved() -> dict:
-    """El entorno manda sobre el almacén, para que un despliegue monte sus secretos."""
+    """The environment wins over the store, so a deployment can mount its own secrets."""
     stored = _stored()
     key_file = settings.text("GITHUB_APP_PRIVATE_KEY_FILE")
     from_env = settings.is_set("GITHUB_APP_ID")
@@ -77,7 +77,7 @@ def _resolved() -> dict:
 
 
 def config() -> dict:
-    """Qué falta para poder conectar. Ningún secreto sale de aquí."""
+    """What is missing before connecting. No secret leaves this function."""
     values = _resolved()
     missing = []
     if not values["app_id"]:
@@ -118,7 +118,7 @@ def _load_key(material: bytes):
 
 
 def _jwt(app_id: str, key) -> str:
-    """JWT RS256 firmado con la clave privada de la App (autenticación como App)."""
+    """RS256 JWT signed with the App's private key (authentication as the App)."""
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import padding
     now = int(time.time())
@@ -130,10 +130,10 @@ def _jwt(app_id: str, key) -> str:
 
 
 def verify_app(app_id, private_key) -> dict:
-    """Comprueba contra GitHub que el App ID y la clave casan, y devuelve lo que GitHub dice de la App.
+    """Checks against GitHub that the App ID and the key match, and returns what GitHub says about the App.
 
-    Nada se guarda si falla. La clave solo viaja del navegador a este servidor; a GitHub
-    solo va un JWT firmado con ella, nunca la clave.
+    Nothing is stored if it fails. The key only travels from the browser to this server; GitHub
+    only gets a JWT signed with it, never the key.
     """
     app_id = str(app_id or "").strip()
     if not APP_ID.fullmatch(app_id):
@@ -154,21 +154,21 @@ def verify_app(app_id, private_key) -> dict:
 
 
 def save_credentials(credentials: dict) -> None:
-    """Guarda la App verificada, cifrada; la clave privada nunca toca el disco en claro."""
+    """Stores the verified App, encrypted; the private key never touches the disk in plain text."""
     from tamandua.shared.vault import put
     put(VAULT_NAME, {key: credentials.get(key) for key in ("app_id", "pem", "slug", "name", "owner", "html_url")})
     _tokens.clear()
 
 
 def forget_app() -> bool:
-    """Olvida la App en este servidor. En GitHub sigue existiendo: se borra allí."""
+    """Forgets the App on this server. It still exists on GitHub: delete it there."""
     from tamandua.shared.vault import delete
     _tokens.clear()
     return delete(VAULT_NAME)
 
 
 def install_url() -> str:
-    """Pantalla de GitHub donde eliges la cuenta y los repositorios concretos que se analizan."""
+    """GitHub page where you choose the account and the specific repositories to scan."""
     settings = _settings()
     if not re.fullmatch(r"[a-z0-9-]{1,100}", settings["slug"]):
         raise GitHubAppError(msg("integrations.github.invalid_slug"))
@@ -207,7 +207,7 @@ def _app_jwt() -> str:
 
 
 def app_installations() -> list[dict]:
-    """Todas las cuentas donde está instalada la App, incluidas páginas adicionales."""
+    """Every account where the App is installed, following additional pages."""
     token = _app_jwt()
     result = []
     for page in range(1, 101):
@@ -227,7 +227,7 @@ _tokens: dict[int, tuple[str, float]] = {}
 
 
 def installation_token(installation_id: int) -> str:
-    """Token de instalación de 1 h, cacheado en memoria y renovado antes de caducar."""
+    """1 h installation token, cached in memory and renewed before it expires."""
     if not isinstance(installation_id, int) or not 0 < installation_id < 2**63:
         raise GitHubAppError(msg("integrations.github.invalid_installation_id"))
     cached = _tokens.get(installation_id)
@@ -266,7 +266,7 @@ def forget(installation_id: int | None = None) -> None:
 
 
 def forget_catalog(installation_id: int | None = None) -> None:
-    """Descarta lo cacheado del catálogo («Actualizar lista» o al desconectar)."""
+    """Drops the cached catalog ("Refresh list" or on disconnect)."""
     with _repos_guard:
         targets = set(_repos_cache) | set(_repos_loading) | set(_info) if installation_id is None else [installation_id]
         for target in targets:
@@ -280,7 +280,7 @@ def forget_catalog(installation_id: int | None = None) -> None:
 
 
 def installation_details(installation_id: int) -> dict:
-    """Cuenta y alcance de la instalación, para mostrar qué se concedió."""
+    """The installation's account and scope, to show what was granted."""
     payload = _get(f"{API}/app/installations/{installation_id}", _app_jwt(), jwt=True)
     if not isinstance(payload, dict):
         raise GitHubAppError(msg("integrations.github.invalid_installation"))
@@ -300,7 +300,7 @@ _repos_loading: dict[int, dict] = {}
 _repos_errors: dict[int, tuple[float, dict]] = {}
 _repos_generation: dict[int, int] = {}
 REPOS_TTL = 300
-MAX_REPO_PAGES = 100  # 10 000 repositorios
+MAX_REPO_PAGES = 100  # 10 000 repositories
 REPOS_RETRY_AFTER = 30
 
 
@@ -353,7 +353,7 @@ def _fetch_repositories(installation_id: int, progress=None) -> list[dict]:
         if len(result) != expected:
             raise GitHubAppError(msg("integrations.github.list_changed"))
         return result
-    # Compatibilidad con respuestas sin total_count: aquí no se puede anticipar el número de páginas.
+    # Compatibility with responses without total_count: the number of pages can't be known in advance here.
     for page in range(2, MAX_REPO_PAGES + 1):
         if len(result) < (page - 1) * 100:
             return result
@@ -367,12 +367,12 @@ def _fetch_repositories(installation_id: int, progress=None) -> list[dict]:
 
 
 def installation_repositories(installation_id: int, *, fresh: bool = False, progress=None) -> list[dict]:
-    """Todos los repositorios que la cuenta concedió a la App, paginados (GitHub da 100 por página).
+    """Every repository the account granted to the App, paginated (GitHub gives 100 per page).
 
-    `uid` es el identificador numérico de GitHub: no cambia al renombrar ni al transferir
-    el repositorio, así que es la identidad con la que se agrupan hallazgos y decisiones.
-    Lanza error si no se pudo leer la lista entera: una lista a medias no debe tomarse
-    como «esos repositorios ya no existen».
+    `uid` is GitHub's numeric identifier: it doesn't change when the repository is renamed or
+    transferred, so it is the identity findings and decisions are grouped by.
+    Raises if the whole list couldn't be read: a partial list must not be taken
+    as "those repositories no longer exist".
     """
     with _repos_guard:
         lock = _repos_fetch_locks.setdefault(installation_id, threading.Lock())
@@ -391,7 +391,7 @@ def installation_repositories(installation_id: int, *, fresh: bool = False, prog
 
 
 def installation_repositories_snapshot(installation_id: int, *, fresh: bool = False) -> tuple[list[dict], bool, int | None, dict | None]:
-    """Devuelve lo disponible ya y sincroniza el resto fuera del hilo HTTP."""
+    """Returns what is already available and syncs the rest outside the HTTP thread."""
     start = False
     with _repos_guard:
         cached = _repos_cache.get(installation_id)
@@ -433,14 +433,14 @@ def installation_repositories_snapshot(installation_id: int, *, fresh: bool = Fa
     return rows, True, total, None
 
 
-# ------------------------------------------------------------ catálogo por páginas
-# Listar una organización grande entera cuesta decenas de llamadas. Las vistas piden solo la
-# página que enseñan, la búsqueda la hace GitHub y comprobar un repositorio concreto no exige
-# listar los demás. La lista completa queda para el vigilante de PRs, que la necesita para
-# detectar repositorios retirados, y su caché se aprovecha aquí cuando está fresca.
+# ------------------------------------------------------------ paged catalog
+# Listing a whole large organization costs dozens of calls. Views ask only for the page they
+# show, GitHub does the searching, and checking one specific repository doesn't require
+# listing the others. The full list is left to the PR watcher, which needs it to detect
+# removed repositories, and its cache is reused here while it is fresh.
 
 PAGE_TTL = 60
-SEARCH_LIMIT = 1000  # GitHub no devuelve más resultados por búsqueda
+SEARCH_LIMIT = 1000  # GitHub returns no more results than this per search
 _pages: dict[tuple, tuple[float, object]] = {}
 _known: dict[tuple[int, str], tuple[float, dict | None]] = {}
 _info: dict[int, tuple[float, dict]] = {}
@@ -463,7 +463,7 @@ def _store(store: dict, key, value) -> None:
 
 
 def _remember(installation_id: int, rows: list[dict]) -> None:
-    """Lo que GitHub acaba de listar para la instalación sirve para validar esa selección sin otra llamada."""
+    """What GitHub just listed for the installation validates that selection without another call."""
     for row in rows:
         _store(_known, (installation_id, row["id"]), row)
         _store(_known, (installation_id, row["uid"]), row)
@@ -476,7 +476,7 @@ def _complete(installation_id: int) -> list[dict] | None:
 
 
 def installation_info(installation_id: int) -> dict:
-    """`installation_details` cacheado: cuenta y alcance cambian poco y se consultan en cada página."""
+    """Cached `installation_details`: account and scope rarely change and are read on every page."""
     cached = _cached(_info, installation_id, REPOS_TTL)
     if cached is _MISSING:
         cached = installation_details(installation_id)
@@ -495,7 +495,7 @@ def _total(payload: dict, fallback: int) -> int:
 
 
 def repositories_page(installation_id: int, page: int, per_page: int) -> tuple[list[dict], int]:
-    """Una página del catálogo con el total: una sola llamada a GitHub, sin recorrer las demás."""
+    """One catalog page with the total: a single GitHub call, without walking the other pages."""
     _check_page(page, per_page)
     start = (page - 1) * per_page
     full = _complete(installation_id)
@@ -514,12 +514,12 @@ def repositories_page(installation_id: int, page: int, per_page: int) -> tuple[l
 
 
 def search_repositories(installation_id: int, text: str, page: int, per_page: int) -> tuple[list[dict], int, bool]:
-    """Busca por nombre. Devuelve (filas, total, parcial).
+    """Searches by name. Returns (rows, total, partial).
 
-    Con acceso a todos los repositorios de la cuenta busca GitHub (`/search/repositories`
-    acotado a esa cuenta). Con repositorios seleccionados la búsqueda de GitHub también
-    devolvería públicos no concedidos, así que se filtra la lista de la instalación; si aún
-    se está leyendo, el resultado es parcial.
+    With access to all the account's repositories, GitHub does the search (`/search/repositories`
+    scoped to that account). With selected repositories GitHub's search would also return
+    public repositories that weren't granted, so the installation's list is filtered instead; if
+    it is still being read, the result is partial.
     """
     _check_page(page, per_page)
     needle = text.strip().casefold()
@@ -528,7 +528,7 @@ def search_repositories(installation_id: int, text: str, page: int, per_page: in
     if full is None:
         info = installation_info(installation_id)
         account = info.get("account")
-        # Solo letras, números y separadores: el texto no puede añadir calificadores (`org:`, `user:`…).
+        # Only letters, digits and separators: the text can't add qualifiers (`org:`, `user:`…).
         term = " ".join(re.sub(r"[^A-Za-z0-9._-]+", " ", text).split())[:100]
         if (term and info.get("repository_selection") == "all" and isinstance(account, str)
                 and OWNER.fullmatch(account) and page * per_page <= SEARCH_LIMIT):
@@ -543,7 +543,7 @@ def search_repositories(installation_id: int, text: str, page: int, per_page: in
                                installation_token(installation_id))
                 rows = _repo_rows({"repositories": payload.get("items") if isinstance(payload, dict) else None})
             except GitHubAppError:
-                # La búsqueda tiene su propio límite (30/min); se sigue con la lista de la instalación.
+                # Search has its own rate limit (30/min); fall back to the installation's list.
                 pass
             else:
                 rows = [row for row in rows if row["name"].split("/", 1)[0].casefold() == account.casefold()]
@@ -561,9 +561,9 @@ def search_repositories(installation_id: int, text: str, page: int, per_page: in
 
 
 def _scoped_repository(installation_id: int, name: str) -> dict | None:
-    """GitHub solo acuña un token para repositorios concedidos a la instalación: es la prueba de pertenencia.
+    """GitHub only mints a token for repositories granted to the installation: that is the proof of membership.
 
-    El token se pide con el mínimo (metadatos de lectura de ese repositorio) y se descarta.
+    The token is requested with the minimum (read access to that repository's metadata) and discarded.
     """
     body = json.dumps({"repositories": [name], "permissions": {"metadata": "read"}}).encode()
     request = Request(f"{API}/app/installations/{installation_id}/access_tokens", data=body, method="POST", headers={
@@ -583,7 +583,7 @@ def _scoped_repository(installation_id: int, name: str) -> dict | None:
 
 
 def installation_repository(installation_id: int, source_id: str) -> dict | None:
-    """Un repositorio concreto de la instalación (`github:owner/repo`), sin listar el resto."""
+    """One specific repository of the installation (`github:owner/repo`), without listing the rest."""
     if not isinstance(source_id, str) or not source_id.startswith("github:"):
         return None
     cached = _cached(_known, (installation_id, source_id), REPOS_TTL)
@@ -609,7 +609,7 @@ def installation_repository(installation_id: int, source_id: str) -> dict | None
 
 
 def installation_repository_by_uid(installation_id: int, uid: str) -> dict | None:
-    """Igual que `installation_repository`, por identidad estable (`github#123`), que sobrevive a renombrados."""
+    """Like `installation_repository`, by stable identity (`github#123`), which survives renames."""
     match = UID.fullmatch(uid) if isinstance(uid, str) else None
     if match is None:
         return None
@@ -626,7 +626,7 @@ def installation_repository_by_uid(installation_id: int, uid: str) -> dict | Non
             raise
         payload = None
     name = payload.get("full_name") if isinstance(payload, dict) else None
-    # Un repositorio público se lee aunque no esté concedido: la pertenencia se confirma aparte.
+    # A public repository can be read even if it wasn't granted: membership is confirmed separately.
     found = installation_repository(installation_id, f"github:{name}") if isinstance(name, str) else None
     if found is not None and found["uid"] != uid:
         found = None
@@ -723,7 +723,7 @@ def _pull(item: dict) -> dict:
 
 
 def pull_files(installation_id: int, repository: str, number: int) -> list[dict]:
-    """Ficheros del PR con su parche. GitHub corta en 3000 ficheros y omite el parche de los grandes."""
+    """The PR's files with their patch. GitHub stops at 3000 files and omits the patch of large ones."""
     token = installation_token(installation_id)
     files: list[dict] = []
     for page in range(1, 31):
@@ -738,12 +738,12 @@ def pull_files(installation_id: int, repository: str, number: int) -> list[dict]
 
 
 def upsert_pr_comment(installation_id: int, repository: str, number: int, body, marker: str = COMMENT_MARKER) -> str:
-    """Un solo comentario por PR, que se reescribe en cada revisión en lugar de acumular ruido."""
+    """A single comment per PR, rewritten on every review instead of piling up noise."""
     token = installation_token(installation_id)
     repository = _repo(repository)
     body = f"{marker}\n{text(body, default_locale())}"[:65_000]  # GitHub caps comment bodies at 65 536 characters
     comments = _get(f"{API}/repos/{repository}/issues/{number}/comments?per_page=100", token)
-    # Solo se reescribe un comentario creado por esta App: el marcador solo no basta, cualquiera puede pegarlo.
+    # Only a comment created by this App is rewritten: the marker alone isn't enough, anyone can paste it.
     app_id = str(_settings()["app_id"])
     mine = next((item for item in comments if isinstance(item, dict) and marker in str(item.get("body") or "")
                  and str((item.get("performed_via_github_app") or {}).get("id")) == app_id), None) if isinstance(comments, list) else None
@@ -762,16 +762,16 @@ def set_commit_status(installation_id: int, repository: str, sha: str, state: st
                {"state": state, "context": "tamandua", "description": text(description, default_locale())[:140]})
 
 
-# ------------------------------------------------------------ mínimo privilegio
+# ------------------------------------------------------------ least privilege
 
-# Lo único que necesita el producto: leer código y dejar el resultado de la revisión en el PR.
+# All the product needs: read code and leave the review's result on the PR.
 REQUIRED_PERMISSIONS = {"contents": "read", "metadata": "read", "pull_requests": "write", "statuses": "write"}
 _LEVEL = {"read": 1, "write": 2, "admin": 3}
 _app_cache: dict = {}
 
 
 def app_permissions(max_age: int = 60) -> dict:
-    """Permisos que declara la App (no la instalación). Cacheado: es una llamada autenticada como App."""
+    """Permissions the App declares (not the installation). Cached: it is a call authenticated as the App."""
     cached = _app_cache.get("value")
     if cached and _app_cache.get("at", 0) + max_age > time.time():
         return cached
@@ -783,7 +783,7 @@ def app_permissions(max_age: int = 60) -> dict:
 
 
 def permission_review(declared: dict, granted: dict) -> dict:
-    """Compara lo declarado y lo concedido con lo necesario: qué sobra y qué falta."""
+    """Compares what is declared and granted with what is needed: what is extra and what is missing."""
     excess = sorted(name for name, level in declared.items()
                     if _LEVEL.get(level, 0) > _LEVEL.get(REQUIRED_PERMISSIONS.get(name, ""), 0))
     missing = sorted(name for name, level in REQUIRED_PERMISSIONS.items()
@@ -793,7 +793,7 @@ def permission_review(declared: dict, granted: dict) -> dict:
             "excess": excess, "missing": missing, "pending_acceptance": pending}
 
 
-# ------------------------------------------------------------ manifiestos
+# ------------------------------------------------------------ manifests
 
 MANIFEST_NAMES = re.compile(r"(package\.json|requirements[\w.-]*\.txt|pyproject\.toml|go\.mod|Cargo\.toml|Dockerfile|"
                             r"(docker-)?compose[\w.-]*\.ya?ml)")
@@ -801,7 +801,7 @@ MANIFEST_SKIP = {"node_modules", ".git", "vendor", "dist", "build", ".next", "ve
 
 
 def repository_tree(installation_id: int, repository: str, branch: str) -> list[dict]:
-    """Ficheros del repositorio (ruta, sha, tamaño) sin descargarlos. GitHub corta en ~100 000 entradas."""
+    """Repository files (path, sha, size) without downloading them. GitHub stops at ~100 000 entries."""
     token = installation_token(installation_id)
     repository = _repo(repository)
     if not valid_branch(branch):
@@ -814,7 +814,7 @@ def repository_tree(installation_id: int, repository: str, branch: str) -> list[
 
 
 def repository_manifests(installation_id: int, repository: str, branch: str, *, max_files: int = 40) -> list[tuple[str, bytes]]:
-    """Solo los ficheros que describen la arquitectura, leídos con la API de git: sin bajar el repositorio."""
+    """Only the files that describe the architecture, read through the git API: without cloning the repository."""
     token = installation_token(installation_id)
     repository = _repo(repository)
     entries = repository_tree(installation_id, repository, branch)

@@ -1,13 +1,13 @@
-"""Credencial de IA que aporta el propio usuario, validada antes de guardarla.
+"""AI credential the user brings, validated before it is stored.
 
-La clave la pone el usuario desde la interfaz y es **suya**: paga su consumo y
-puede retirarla. Nunca se devuelve al navegador —solo su estado y los cuatro
-últimos caracteres— y nunca se pide por variable de entorno al usuario. La
-variable de entorno sigue existiendo, pero es para el operador del despliegue.
+The user enters the key from the interface and it is **theirs**: they pay for its usage and
+can withdraw it. It never goes back to the browser (only its status and its last four
+characters) and the user is never asked for it through an environment variable. The
+environment variable still exists, but it is meant for the deployment's operator.
 
-Guardar la clave no habilita nada por sí solo: hoy el análisis es determinista y
-no llama a ningún modelo. Cuando se habilite hará falta consentimiento por
-ejecución, presupuesto y redacción de secretos.
+Storing the key enables nothing by itself: today the analysis is deterministic and
+calls no model. Enabling it will require per-run consent, a budget and redaction of
+secrets.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def _write(data: dict) -> None:
 
 
 def _key(name: str) -> str | None:
-    """La clave del usuario manda; la del entorno es el respaldo del operador."""
+    """The user's key wins; the environment's is the operator's fallback."""
     stored = _load().get(name)
     if isinstance(stored, dict) and isinstance(stored.get("api_key"), str) and stored["api_key"]:
         return stored["api_key"]
@@ -71,7 +71,7 @@ def provider_status() -> list[dict]:
 
 
 def save_provider_key(name: str, api_key: str) -> dict:
-    """Valida la clave contra el proveedor antes de guardarla; si falla, no se guarda."""
+    """Validates the key against the provider before storing it; if validation fails, it isn't stored."""
     if name not in PROVIDERS:
         raise ProviderError(msg("integrations.ai.unsupported"))
     if (not isinstance(api_key, str) or not 20 <= len(api_key) <= 400

@@ -1,9 +1,9 @@
-"""Cobertura OWASP Web Top 10:2025 calculada de lo que de verdad corrió.
+"""OWASP Web Top 10:2025 coverage computed from what actually ran.
 
-Cada categoría se marca según los motores y reglas que se ejecutaron y los
-hallazgos que produjeron, no con una frase genérica. Las reglas propias declaran
-su categoría en `metadata.owasp`; aquí se cuentan por categoría leyendo los
-archivos de reglas (formato propio, así que basta una expresión regular).
+Each category is marked from the engines and rules that ran and the findings
+they produced, not with a generic sentence. Our own rules declare their
+category in `metadata.owasp`; here they are counted per category by reading the
+rule files (our own format, so a regular expression is enough).
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ UNTESTABLE = {
 
 @lru_cache(maxsize=1)
 def rules_by_category() -> dict[str, int]:
-    """Cuántas reglas propias apuntan a cada categoría OWASP."""
+    """How many of our own rules target each OWASP category."""
     counts: dict[str, int] = {}
     for path in sorted(RULES_DIR.glob("*.yml")):
         current = None

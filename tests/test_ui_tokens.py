@@ -1,7 +1,7 @@
-"""El panel solo usa tokens de color: ningún color suelto de Tailwind ni hexadecimal en los componentes.
+"""The panel only uses color tokens: no stray Tailwind color or hex value in the components.
 
-Los tokens (`text-danger`, `bg-warning-soft`, `border-info-line`…) tienen su valor claro y oscuro
-en `web/src/index.css`, con el contraste WCAG AA comprobado. Un color suelto se salta esa garantía.
+The tokens (`text-danger`, `bg-warning-soft`, `border-info-line`…) have their light and dark values
+in `web/src/index.css`, with WCAG AA contrast checked. A stray color bypasses that guarantee.
 """
 
 import re
@@ -14,7 +14,7 @@ PALETTE = ("slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|eme
 RAW = re.compile(rf"(?<![\w-])(?:[a-z0-9\[\]&=_.-]+:)*(?:text|bg|border|ring|fill|stroke|decoration|outline|divide|from|to|via|"
                  rf"shadow|accent|placeholder|caret)-(?:(?:{PALETTE})-\d{{2,3}}|white|black)(?:/\d+)?(?![\w-])")
 HEX = re.compile(r"#[0-9a-fA-F]{6}\b")
-# El logo es una ilustración con sus propios colores, no parte de la interfaz.
+# The logo is an illustration with its own colors, not part of the interface.
 EXEMPT = {"brand-mark.tsx"}
 
 

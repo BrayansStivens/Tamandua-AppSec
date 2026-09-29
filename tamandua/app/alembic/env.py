@@ -1,4 +1,4 @@
-"""Entorno de Alembic: usa la conexión que le pasa tamandua.app.database (o la URL configurada)."""
+"""Alembic environment: uses the connection handed over by tamandua.app.database (or the configured URL)."""
 
 from alembic import context
 from sqlalchemy import create_engine

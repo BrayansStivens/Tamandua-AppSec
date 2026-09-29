@@ -1,21 +1,21 @@
-"""Análisis de imágenes de contenedor directamente desde su registro, sin ejecutarlas.
+"""Container image scanning straight from the registry, without running the image.
 
-Qué se revisa de una imagen (`registry/repositorio:etiqueta` o `@sha256:…`):
+What gets checked in an image (`registry/repository:tag` or `@sha256:…`):
 
-* **Paquetes** del sistema operativo y de las aplicaciones empaquetadas, con dos motores:
-  Trivy y Grype. Coinciden en la gran mayoría de CVE, pero discrepan en los paquetes con
-  parches retroportados de las distribuciones; lo que ven ambos se marca como tal.
-* **Secretos** dentro de las capas y en la **configuración de la imagen**: variables de
-  entorno (`ENV`) e historial de construcción (`ARG` usados en `RUN`), que es donde acaban
-  las credenciales que se pasan para descargar dependencias privadas.
-* **Configuración**: usuario root, falta de `HEALTHCHECK` y demás reglas propias sobre la
-  configuración, más Checkov sobre un Dockerfile reconstruido del historial (descargas sin
-  verificar TLS, `sudo`, gestores de paquetes sin firma…). Sin duplicar lo que ya ven las
-  reglas propias (`config_scanners.merge_image`).
+* **Packages** of the operating system and of packaged applications, with two engines:
+  Trivy and Grype. They agree on the vast majority of CVEs but disagree on packages with
+  patches backported by the distributions; what both see is marked as such.
+* **Secrets** inside the layers and in the **image configuration**: environment
+  variables (`ENV`) and build history (`ARG` used in `RUN`), which is where credentials
+  passed in to download private dependencies end up.
+* **Configuration**: root user, missing `HEALTHCHECK` and our other configuration rules,
+  plus Checkov on a Dockerfile rebuilt from the history (downloads without TLS
+  verification, `sudo`, package managers without signatures…). Without duplicating what our
+  own rules already see (`config_scanners.merge_image`).
 
-La imagen nunca se ejecuta ni se construye: los motores leen el manifiesto y las capas del
-registro. Las credenciales de registros privados se guardan cifradas (`vault`) y llegan a
-los motores por variable de entorno, no por la línea de comandos.
+The image is never run or built: the engines read the manifest and the layers from the
+registry. Private registry credentials are stored encrypted (`vault`) and reach the
+engines through environment variables, not the command line.
 """
 
 from __future__ import annotations
@@ -68,10 +68,10 @@ class ImageError(ValueError):
         return text(self.message, default_locale())
 
 
-# --- referencias --------------------------------------------------------------------------
+# --- references ---------------------------------------------------------------------------
 
 def parse_reference(text: str) -> dict:
-    """Normaliza una referencia de imagen. Docker Hub se escribe completo (`docker.io/library/nginx`)."""
+    """Normalizes an image reference. Docker Hub is written out in full (`docker.io/library/nginx`)."""
     raw = str(text or "").strip()
     match = REFERENCE.fullmatch(raw) if 3 <= len(raw) <= 300 else None
     if not match:
@@ -93,10 +93,10 @@ def _host_only(registry: str) -> str:
 
 
 def check_registry_address(registry: str) -> dict[str, str]:
-    """El motor se conectará a ese registro: si resuelve a una red interna, se exige permiso expreso.
+    """The engine will connect to that registry: if it resolves to an internal network, explicit permission is needed.
 
-    Evita que el formulario sirva para que el servidor hable con servicios internos (SSRF).
-    Para registros propios en la red local: TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.
+    Keeps the form from being used to make the server talk to internal services (SSRF).
+    For your own registries on the local network: TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1.
 
     Returns the address to pin the registry's name to ({host: address}) so the engine can't resolve it again to
     another one (DNS rebinding between this check and the scan). Empty for Docker Hub, whose name nobody here chooses,
@@ -118,7 +118,7 @@ def check_registry_address(registry: str) -> dict[str, str]:
     return {host: sorted(addresses, key=lambda address: (":" in address, address))[0].split("%")[0]}
 
 
-# --- credenciales de registros ------------------------------------------------------------
+# --- registry credentials -----------------------------------------------------------------
 
 def _stored() -> dict:
     from tamandua.shared.vault import VaultError, get
@@ -130,7 +130,7 @@ def _stored() -> dict:
 
 
 def registries() -> list[dict]:
-    """Registros con credenciales guardadas. Nunca devuelve el token."""
+    """Registries with stored credentials. Never returns the token."""
     return [{"registry": host, "username": entry.get("username"), "last4": (entry.get("token") or "")[-4:],
              "saved_at": entry.get("saved_at"), "saved_by": entry.get("saved_by")}
             for host, entry in sorted(_stored().items()) if isinstance(entry, dict)]
@@ -168,7 +168,7 @@ def credentials_for(registry: str) -> dict | None:
     return entry if isinstance(entry, dict) and entry.get("token") else None
 
 
-# --- motores ------------------------------------------------------------------------------
+# --- engines ------------------------------------------------------------------------------
 
 def _former_fingerprint(identifiers: set[str], fallback: str, ecosystem: str, name: str, version: str) -> str:
     """The image fingerprint before it was unified with the repository one (intel/packages.py): kept as
@@ -261,8 +261,8 @@ def run_grype_image(reference: str, cache_dir: Path, feeds: dict, credentials: d
                if credentials else None)
     try:
         completed = _run("grype", [f"registry:{reference}", "-o", "json", "-q"], None, network=True, secret_env=secrets,
-                         # La imagen de Grype no trae un /tmp escribible para usuarios no root: sus temporales
-                         # (capas de la imagen analizada) van a disco, dentro de su caché.
+                         # Grype's image has no /tmp writable by non-root users: its temporary files
+                         # (layers of the scanned image) go to disk, inside its cache.
                          env={"GRYPE_DB_CACHE_DIR": "/cache", "GRYPE_CHECK_FOR_APP_UPDATE": "false", "TMPDIR": "/cache/tmp", "HOME": "/cache/tmp"},
                          mounts=["-v", f"{_host(cache_dir)}:/cache"], hosts=hosts)
         if completed.returncode != 0 and not completed.stdout.strip():
@@ -290,7 +290,7 @@ def _registry_error(stderr: str, credentials: dict | None) -> dict:
     return msg("scanning.image.registry.unreadable")
 
 
-# --- configuración de la imagen -------------------------------------------------------------
+# --- image configuration --------------------------------------------------------------------
 
 SECRET_NAME = re.compile(r"(?i)(pass(word|wd)?|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|credential|auth|pat)$|"
                          r"(^|_)(npm_token|github_token|gh_token|pip_index_url|aws_secret_access_key|database_url|dsn)$")
@@ -309,7 +309,7 @@ def _config_finding(rule: str, title, severity: str, reason, remediation, cwe: i
 
 
 def config_findings(metadata: dict, image: dict) -> list[dict]:
-    """Reglas propias sobre la configuración y el historial de la imagen. Ningún valor secreto se copia."""
+    """Our own rules on the image's configuration and history. No secret value is ever copied."""
     config_block = metadata.get("ImageConfig") or {}
     config = config_block.get("config") or {}
     history = [str(item.get("created_by") or "") for item in config_block.get("history") or []]
@@ -362,7 +362,7 @@ def config_findings(metadata: dict, image: dict) -> list[dict]:
 
 
 def merge_packages(trivy: list[dict], grype: list[dict]) -> tuple[list[dict], dict]:
-    """Une los avisos de paquetes de los dos motores. Mismo paquete y versión con algún identificador en común = el mismo aviso."""
+    """Merges both engines' package advisories. Same package and version with a shared identifier = same advisory."""
     index: dict[tuple[str, str], list[dict]] = {}
     for finding in trivy:
         package = finding.get("package") or {}
@@ -390,7 +390,7 @@ def merge_packages(trivy: list[dict], grype: list[dict]) -> tuple[list[dict], di
 
 
 def _finish_package(finding: dict) -> dict:
-    """Huella estable para imágenes (CVE canónico + familia de ecosistema) y remediación en términos de imagen."""
+    """Stable fingerprint for images (canonical CVE + ecosystem family) and remediation in image terms."""
     package = finding.get("package") or {}
     aliases = {finding["rule_id"], *finding.get("cve", []), *finding.get("ghsa", [])}
     kind = family(package.get("ecosystem", ""))
@@ -406,7 +406,7 @@ def _finish_package(finding: dict) -> dict:
                              package.get("name", ""), package.get("version", ""))
 
 
-# --- análisis completo --------------------------------------------------------------------
+# --- full scan ----------------------------------------------------------------------------
 
 def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None) -> RunRecord:
     from tamandua.modules.intel.advisories import load_feeds
@@ -435,7 +435,7 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
     report("ok" if checkov["status"] == "completed" else "warn", msg("scanning.progress.engine", engine="Checkov", detail=checkov["detail"]))
 
     packages, agreement = merge_packages([item for item in trivy["findings"] if item["scanner"] == "sca"], grype["findings"])
-    # Configuración: las reglas propias mandan; Trivy y Checkov solo suman lo que ellas no cubren.
+    # Configuration: our own rules lead; Trivy and Checkov only add what those rules don't cover.
     configuration, joined_rules = merge_image(config_findings(metadata, image) if metadata else [],
                                         [item for item in trivy["findings"] if item["scanner"] == "iac"], checkov["findings"])
     findings = ([_finish_package(item) for item in packages] + [item for item in trivy["findings"] if item["scanner"] == "secrets"]
@@ -487,7 +487,7 @@ def scan_image(image: dict, *, data_dir: Path, context: str = "", progress=None)
             "target": image["reference"], "variant": "image", "context": " ".join(str(context).split())[:400],
             "steps": steps, "findings": findings, "owasp_coverage": coverage,
             "dependencies": trivy.get("packages") or [],
-            "system_packages": trivy.get("system_packages") or [],  # solo para el SBOM
+            "system_packages": trivy.get("system_packages") or [],  # only for the SBOM
             "summary": {"files": 0, "dependencies": 0, "candidates": len(findings), "sast": 0, "secrets": secret_count,
                         "sca": sca_count, "iac": iac_count, "severities": severities, "priorities": priorities,
                         "kev": sum(1 for item in findings if item.get("kev")),

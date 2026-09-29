@@ -1,9 +1,9 @@
-"""Cola de trabajos durable sobre PostgreSQL (tabla `jobs`).
+"""Durable job queue on PostgreSQL (`jobs` table).
 
-El API encola y responde al instante; uno o varios workers reclaman con `FOR UPDATE SKIP LOCKED` (nunca dos el
-mismo trabajo). Mientras corre, el worker renueva `locked_at`; si un worker muere, sus trabajos se quedan sin
-renovar y `recover` los da por interrumpidos (la ejecución se marca fallida con un mensaje claro, como antes con un
-reinicio). Los análisis no se reintentan solos: repetirlos lo decide quien los lanzó.
+The API enqueues and answers right away; one or more workers claim jobs with `FOR UPDATE SKIP LOCKED` (never two
+on the same job). While a job runs, its worker renews `locked_at`; if a worker dies, its jobs stop being renewed
+and `recover` treats them as interrupted (the run is marked failed with a clear message, as a restart used to do).
+Scans are never retried on their own: whoever launched them decides whether to repeat them.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from tamandua.modules.runs.tables import jobs, workers
 from tamandua.shared import db
 from tamandua.shared.db import TENANT
 
-STALE = timedelta(minutes=5)  # sin renovar en este tiempo: el worker que lo tenía murió
+STALE = timedelta(minutes=5)  # not renewed within this time: the worker that held it died
 
 
 def enqueue(data_dir: Path, kind: str, payload: dict, *, run_id: str | None = None) -> str:
@@ -30,7 +30,7 @@ def enqueue(data_dir: Path, kind: str, payload: dict, *, run_id: str | None = No
 
 
 def claim(data_dir: Path, worker: str) -> dict | None:
-    """El trabajo más antiguo en cola, ya marcado como de este worker; None si no hay."""
+    """The oldest queued job, already marked as this worker's; None if there is none."""
     with db.transaction(data_dir) as connection:
         oldest = (select(jobs.c.id).where(jobs.c.tenant_id == TENANT, jobs.c.status == "queued")
                   .order_by(jobs.c.created_at).limit(1).with_for_update(skip_locked=True).scalar_subquery())
@@ -41,7 +41,7 @@ def claim(data_dir: Path, worker: str) -> dict | None:
 
 
 def touch(data_dir: Path, worker: str) -> None:
-    """Renueva los trabajos en curso de este worker (y su latido)."""
+    """Renews this worker's running jobs (and its heartbeat)."""
     with db.transaction(data_dir) as connection:
         connection.execute(update(jobs).where(jobs.c.tenant_id == TENANT, jobs.c.status == "running", jobs.c.locked_by == worker)
                            .values(locked_at=func.now()))
@@ -61,14 +61,14 @@ def finish(data_dir: Path, job_id: str, *, error: str | None = None, worker: str
 
 
 def pending(data_dir: Path) -> int:
-    """En cola o en curso (lo que aún no ha terminado)."""
+    """Queued or running (whatever hasn't finished yet)."""
     with db.transaction(data_dir) as connection:
         return connection.execute(select(func.count()).select_from(jobs)
                                   .where(jobs.c.tenant_id == TENANT, jobs.c.status.in_(("queued", "running")))).scalar_one()
 
 
 def recover(data_dir: Path) -> list[dict]:
-    """Trabajos en curso de un worker que dejó de renovarlos: se dan por interrumpidos. Devuelve cuáles."""
+    """Running jobs of a worker that stopped renewing them: they are treated as interrupted. Returns which ones."""
     with db.transaction(data_dir) as connection:
         rows = connection.execute(update(jobs).where(jobs.c.tenant_id == TENANT, jobs.c.status == "running",
                                                      jobs.c.locked_at < func.now() - STALE)

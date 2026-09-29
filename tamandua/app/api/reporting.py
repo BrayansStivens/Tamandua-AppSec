@@ -1,4 +1,4 @@
-"""Resumen (dashboard) e informe de evidencia para auditoría."""
+"""Dashboard summary and audit evidence report."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ class Dashboard(BaseModel):
 
 @router.get("/api/dashboard", response_model=Dashboard)
 def dashboard(days: int = 30, tz: str | None = None, context: Context = Depends(guard())) -> dict:
-    # Entero y comprobado a mano: un Literal[7, 30, …] rechazaba el «30» que llega como texto en la URL.
+    # A plain int checked by hand: a Literal[7, 30, …] rejected the "30" that arrives as text in the URL.
     if days not in WINDOWS:
         raise ApiError(400, msg("api.invalid_window"))
     return context.render(summary.cached(context.data_dir, days, summary.zone(tz)))

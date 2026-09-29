@@ -1,7 +1,7 @@
-"""Informes PDF legibles a partir del registro técnico en Markdown.
+"""Readable PDF reports built from the technical Markdown record.
 
-El texto se trata siempre como datos: los nombres, hallazgos y notas del usuario no
-pueden inyectar etiquetas de ReportLab ni cargar recursos externos.
+Text is always treated as data: names, findings and user notes cannot
+inject ReportLab tags or load external resources.
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-# Los tokens del sistema de diseño de informes (report_design); este renderizador queda para los
-# informes que aún son Markdown (dossiers heredados, revisiones de PR).
+# Tokens of the report design system (report_design); this renderer remains for the
+# reports that are still Markdown (legacy dossiers, PR reviews).
 from tamandua.modules.reporting.design import BRAND as TEAL, INK, LINE, MUTED, SOFT
 from tamandua.shared.i18n import t
 
@@ -37,7 +37,7 @@ STYLES = {
 
 
 def _inline(value: str) -> str:
-    # Primero escapar el texto sin confianza; solo después se agregan marcas propias.
+    # Escape the untrusted text first; only then add our own markup.
     safe = html.escape(value, quote=False)
     safe = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", safe)
     safe = re.sub(r"`([^`]+)`", r'<font color="#7342d3">\1</font>', safe)
@@ -66,7 +66,7 @@ def _table(lines: list[str]) -> Table:
 
 
 def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "", locale: str | None = None) -> bytes:
-    """Convierte un informe técnico en un PDF paginado; nunca afirma certificación."""
+    """Turns a technical report into a paginated PDF; never claims certification."""
     if len(markdown) > 2_000_000:
         raise ValueError("Report too large to export")
     output = io.BytesIO()
@@ -79,7 +79,7 @@ def render_pdf(markdown: str, *, title: str, kind: str, reference: str = "", loc
              HRFlowable(width="100%", thickness=1.2, color=TEAL, spaceAfter=12)]
     lines = markdown.splitlines()
     index = 0
-    # El encabezado Markdown ya aparece en la portada compacta.
+    # The Markdown heading already shows on the compact cover.
     if lines and lines[0].startswith("# "):
         index = 1
     while index < len(lines):

@@ -1,4 +1,4 @@
-"""Contrato del enriquecimiento de avisos: CVSS calculado, fix correcto, prioridad explicable."""
+"""Advisory enrichment contract: computed CVSS, correct fix, explainable priority."""
 
 import gzip
 import json
@@ -34,7 +34,7 @@ MINIMATCH = {
 
 class CvssTests(unittest.TestCase):
     def test_base_score_matches_the_specification(self):
-        # Valores publicados por NVD para estos vectores.
+        # Scores NVD publishes for these vectors.
         cases = {"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H": 7.5,
                  "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H": 9.8,
                  "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:L/I:L/A:N": 6.4,
@@ -67,12 +67,12 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(compare_versions("v2.1", "2.1.0"), 0)
 
     def test_fixed_version_comes_from_the_installed_version_line(self):
-        # Quien usa 9.0.5 debe oír "9.0.6", no "10.2.3".
+        # Someone on 9.0.5 should hear "9.0.6", not "10.2.3".
         self.assertEqual(affected_range(MINIMATCH, "npm", "minimatch", "9.0.5"), {"introduced": "9.0.0", "fixed": "9.0.6"})
         self.assertEqual(affected_range(MINIMATCH, "npm", "minimatch", "10.1.0")["fixed"], "10.2.3")
-        # Sin rango que contenga la versión, se ofrece la siguiente corrección disponible.
+        # With no range containing the version, the next available fix is offered.
         self.assertEqual(affected_range(MINIMATCH, "npm", "minimatch", "8.0.0")["fixed"], "9.0.6")
-        # Otro ecosistema con el mismo nombre no contamina.
+        # Another ecosystem with the same name doesn't leak in.
         self.assertEqual(affected_range(MINIMATCH, "npm", "otro", "9.0.5"), {"introduced": "0", "fixed": None})
 
 
@@ -108,10 +108,10 @@ class FindingTests(unittest.TestCase):
         self.assertEqual(finding["cwe"], [1333])
         self.assertEqual(finding["epss"], {"score": 0.0067, "percentile": 0.51})
         self.assertEqual(finding["priority"]["action"], "attend")
-        # Solo referencias https: una URL http no entra en el reporte.
+        # Only https references: an http URL doesn't make it into the report.
         self.assertEqual(finding["advisory"]["references"], ["https://github.com/advisories/GHSA-23c5-xmqv-rm74"])
         moved = dependency_finding({**dependency, "path": "apps/web/package-lock.json"}, MINIMATCH, feeds)
-        # Mover el lockfile no debe abrir un ticket nuevo en Jira.
+        # Moving the lockfile must not open a new Jira ticket.
         self.assertEqual(moved["fingerprint"], finding["fingerprint"])
         other = dependency_finding({**dependency, "version": "9.0.4"}, MINIMATCH, feeds)
         self.assertNotEqual(other["fingerprint"], finding["fingerprint"])

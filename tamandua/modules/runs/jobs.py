@@ -1,10 +1,10 @@
-"""Análisis en segundo plano con progreso visible, sobre la cola durable de PostgreSQL (runs/queue.py).
+"""Background scans with visible progress, on the durable PostgreSQL queue (runs/queue.py).
 
-Encolar no bloquea la petición HTTP: se guarda el registro de la ejecución (`queued`) y un trabajo en la cola, y se
-devuelve su identificador al instante. Un worker —el proceso `worker` o, en instalaciones de un solo proceso, un hilo
-dentro del servidor— reclama los trabajos y los ejecuta. Mientras corre, la ejecución guarda eventos de progreso
-pensados para el usuario: nunca rutas internas, salidas crudas de herramientas ni errores con detalles de
-infraestructura. Los tokens de código que acompañan a un trabajo van sellados con la clave maestra, nunca en claro.
+Queueing doesn't block the HTTP request: the run record (`queued`) and a job in the queue are stored, and the
+id comes back right away. A worker (the `worker` process or, in single-process installs, a thread inside the
+server) claims the jobs and runs them. While it runs, the run stores progress events meant for the user:
+never internal paths, raw tool output or errors with infrastructure details. The code tokens that come with
+a job are sealed with the master key, never stored in the clear.
 """
 
 from __future__ import annotations
@@ -58,18 +58,18 @@ def _counts(summary: dict) -> dict:
 
 
 class ScanJobs:
-    """Encola análisis y, si `worker` (por defecto), los ejecuta en un hilo de este proceso. El proceso `worker`
-    (python -m tamandua worker) usa la misma clase con `run_worker()`, sin hilos."""
+    """Queues scans and, if `worker` (the default), runs them in a thread of this process. The `worker` process
+    (python -m tamandua worker) uses the same class with `run_worker()`, without threads."""
 
     def __init__(self, data_dir: Path, *, worker: bool = True):
         self.data_dir = data_dir
         self.worker_id = f"{socket.gethostname()}:{os.getpid()}:{uuid.uuid4().hex[:6]}"
-        # Cada cuánto mira el trabajador, sin nada en cola, si hay un lote que avanzar.
+        # How often the worker, with nothing queued, checks for a batch to advance.
         self.idle_poll = 3.0
         self._stop = threading.Event()
         self._thread = None
-        # Solo el líder avanza los lotes (con varios workers, dos podrían tomar el mismo repositorio). En un solo
-        # proceso siempre es líder; el proceso worker lo activa al ganar el cerrojo de líder.
+        # Only the leader advances batches (with several workers, two could take the same repository). In a single
+        # process it is always the leader; the worker process turns it on when it wins the leader lock.
         self.leader = worker
         if worker:
             self.prepare(embedded=True)
@@ -77,11 +77,11 @@ class ScanJobs:
             self._thread.start()
 
     def prepare(self, *, embedded: bool) -> None:
-        """Al arrancar un worker. `embedded`: un solo proceso, así que lo que figure en curso murió con el anterior."""
+        """On worker start. `embedded`: a single process, so whatever shows as running died with the previous one."""
         from tamandua.modules.runs import batches
         self._recover(everything=embedded)
         batches.release_taken(self.data_dir)
-        # El registro de hallazgos se deriva de las ejecuciones: si está vacío y hay ejecuciones, se reconstruye.
+        # The findings registry is derived from the runs: if it is empty and there are runs, it is rebuilt.
         if findings_registry.is_empty(self.data_dir) and find_runs(self.data_dir, limit=1):
             run_registry.rebuild(self.data_dir)
 
@@ -89,8 +89,8 @@ class ScanJobs:
         self._stop.set()
 
     def _recover(self, *, everything: bool) -> None:
-        """Ejecuciones que no van a terminar: de un worker que dejó de responder, o sin trabajo en la cola (de una
-        versión anterior o de un corte). Se marcan fallidas con un mensaje claro; volver a lanzarlas lo decide el usuario."""
+        """Runs that will never finish: from a worker that stopped responding, or with no job in the queue (from an
+        older version or an outage). They are marked failed with a clear message; relaunching them is up to the user."""
         from sqlalchemy import select, update
         from tamandua.modules.runs.tables import jobs
         from tamandua.shared import db
@@ -111,7 +111,7 @@ class ScanJobs:
                 self._fail(record, msg("runs.failure.restart"))
                 log.warning("ejecución interrumpida por reinicio", extra={"run_id": row["id"]})
 
-    # --- API pública ---------------------------------------------------------------
+    # --- public API ----------------------------------------------------------------
 
     def enqueue_repository_scan(self, *, source_id: str, source_name: str, allow_osv_upload: bool,
                                 context: str, tokens: dict[str, str], installation_id: int | None, uid: str | None = None,
@@ -132,12 +132,12 @@ class ScanJobs:
         if requested_by:
             record["requested_by"] = requested_by
         if trigger:
-            # Qué lo lanzó (p. ej. la vigilancia de la rama principal, con el commit que vio cambiar).
+            # What triggered it (e.g. the main-branch watch, with the commit it saw change).
             record["trigger"] = trigger
         # The run and its job in one transaction: another worker's recovery never sees a queued run without its job.
         with db.transaction(self.data_dir):
             self._save(record)
-            # Los tokens de código no se guardan en claro en la cola: van sellados con la clave maestra.
+            # Code tokens are never stored in the clear in the queue: they are sealed with the master key.
             queue.enqueue(self.data_dir, "repository_scan", {"source_id": source_id, "allow_osv_upload": allow_osv_upload, "context": context,
                                                              "tokens": vault.seal(tokens, "job-tokens") if tokens else None,
                                                              "installation_id": installation_id, "uid": uid,
@@ -147,7 +147,7 @@ class ScanJobs:
 
     def enqueue_pr_review(self, *, source_id: str, pull: dict, installation_id: int, requested_by: str, uid: str | None = None,
                           default_branch: str | None = None) -> dict:
-        """Revisión del commit de cabeza de un PR. Se marca como revisado al encolar para no duplicar."""
+        """Review of a PR's head commit. Marked as reviewed when queued so it isn't queued twice."""
         from tamandua.modules.pullrequests import watch as pr_watch
         run_id = uuid.uuid4().hex
         name = source_id.removeprefix("github:")
@@ -168,7 +168,7 @@ class ScanJobs:
         return {"id": run_id, "status": "queued"}
 
     def enqueue_image_scan(self, *, image: dict, context: str, requested_by: str) -> dict:
-        """Análisis de una imagen de contenedor leída del registro: no se ejecuta ni se construye."""
+        """Scan of a container image read from the registry: it is neither run nor built."""
         run_id = uuid.uuid4().hex
         record = {"schema_version": "0.3.0", "id": run_id, "type": "image_scan", "status": "queued", "created_at": _now(),
                   "target": image["reference"], "variant": "image",
@@ -209,10 +209,10 @@ class ScanJobs:
                                                       allow_osv_upload=batch["allow_osv_upload"], context=batch["context"],
                                                       tokens={}, installation_id=item.get("installation_id"), uid=item.get("uid"))
             batches.attach(self.data_dir, batch["id"], index, run_id=queued["id"])
-        except Exception as exc:  # noqa: BLE001 — un repositorio que falla no detiene el lote
+        except Exception as exc:  # noqa: BLE001 — a failing repository doesn't stop the batch
             batches.attach(self.data_dir, batch["id"], index, error=_reason(exc))
 
-    # --- trabajador ----------------------------------------------------------------
+    # --- worker --------------------------------------------------------------------
 
     def run_worker(self) -> None:
         """Claims and runs jobs until asked to stop. The heartbeat keeps beating while a scan runs (scans take far
@@ -229,7 +229,7 @@ class ScanJobs:
                 self._stop.wait(self.idle_poll)
                 continue
             if job is None:
-                # Sin nada pendiente, el siguiente repositorio del lote activo (si lo hay); solo el líder.
+                # With nothing pending, the next repository of the active batch (if any); leader only.
                 if self.leader:
                     self._feed_batch()
                 self._stop.wait(self.idle_poll)
@@ -240,7 +240,7 @@ class ScanJobs:
             beating.start()
             try:
                 self._execute({**job["payload"], "kind": job["kind"], "run_id": job["run_id"]})
-            except Exception as exc:  # noqa: BLE001 — el trabajador nunca debe morir por un análisis
+            except Exception as exc:  # noqa: BLE001 — the worker must never die because of a scan
                 error = type(exc).__name__
                 log.exception("fallo inesperado del trabajador", extra={"run_id": job.get("run_id")})
             finally:
@@ -258,7 +258,7 @@ class ScanJobs:
             queue.touch(self.data_dir, self.worker_id)
             if recover:
                 self._recover(everything=False)
-        except Exception:  # noqa: BLE001 — la base puede no estar lista un momento; se reintenta
+        except Exception:  # noqa: BLE001 — the database may not be ready for a moment; it retries
             log.exception("latido del worker fallido")
 
     def _beat_until(self, done: threading.Event) -> None:
@@ -319,7 +319,7 @@ class ScanJobs:
             self._fail(record, msg("runs.failure.source", reason=_reason(exc)))
         except Exception as exc:  # noqa: BLE001
             log.error("escaneo fallido: %s", traceback.format_exc().splitlines()[-1], extra={"run_id": run_id})
-            # Al usuario se le dice que falló y en qué fase, nunca la traza ni rutas del servidor.
+            # The user is told it failed and in which phase, never the traceback or server paths.
             self._fail(record, msg("runs.failure.internal"))
             del exc
 
@@ -415,7 +415,7 @@ class ScanJobs:
             with TemporaryDirectory(prefix="pr-", dir=work) as temporary:
                 root, source = snapshot_source(source_id, Path(temporary), None, installation, ref=pull["head_sha"], progress=progress)
                 scan = scan_repository(root, source, allow_osv_upload=False, data_dir=self.data_dir, progress=progress)
-            # Las rutas excluidas las decide el servidor, no el PR: se quitan antes de decidir si bloquea.
+            # Excluded paths are decided by the server, not the PR: they are removed before deciding whether it blocks.
             from tamandua.modules.findings.exclusions import apply_to_record
             scan = apply_to_record(self.data_dir, scan, asset_key(record))
             if (scan.get("excluded") or {}).get("findings"):
@@ -433,7 +433,7 @@ class ScanJobs:
             outcome = pr_review.classify(scan["findings"], changed, prints)
             outcome["verdict"] = pr_review.verdict(outcome["introduced"], config["gate"])
             outcome["tools"] = scan["summary"].get("tools") or []
-            # Informativo y aparte: dependencias declaradas sin uso, separando las que añade el PR.
+            # Informational and separate: declared but unused dependencies, singling out the ones the PR adds.
             from tamandua.modules.scanning.unused_deps import split_by_pr
             unused = scan.get("unused_dependencies") or {"unused": [], "ecosystems": []}
             new_unused, old_unused = split_by_pr(unused["unused"], changed)
@@ -465,7 +465,7 @@ class ScanJobs:
             self._fail(record, msg("runs.failure.pr_internal"))
 
     def _deliver(self, installation, repository, pull, outcome, run_id, baseline, config, progress) -> dict:
-        """Publica el resultado en GitHub si el repositorio lo tiene activado y la App tiene permiso."""
+        """Publishes the result on GitHub if the repository has it enabled and the App has permission."""
         from tamandua.modules.pullrequests import review as pr_review
         from tamandua.modules.integrations.github import GitHubAppError, installation_details, set_commit_status, upsert_pr_comment
         if not config.get("post_comment"):
@@ -479,7 +479,7 @@ class ScanJobs:
             try:
                 body = pr_review.render_comment(pull, outcome, run_id=run_id, baseline_run=baseline["id"] if baseline else None,
                                                 gate=config["gate"], tools=outcome.get("tools"),
-                                                # Solo se enlaza un panel público declarado: nunca el host interno.
+                                                # Only a declared public panel is linked: never the internal host.
                                                 panel_url=(lambda url: url if url.startswith("https://") else None)(
                                                     settings.text("TAMANDUA_PUBLIC_URL")))
                 delivery["comment"] = upsert_pr_comment(installation, repository, pull["number"], body)

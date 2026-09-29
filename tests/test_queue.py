@@ -1,4 +1,4 @@
-"""F3: cola durable en PostgreSQL, worker aparte, tokens sellados y buzón de avisos con reintentos."""
+"""F3: durable queue in PostgreSQL, separate worker, sealed tokens and a notification outbox with retries."""
 
 import json
 import tempfile
@@ -44,14 +44,14 @@ class QueueTests(unittest.TestCase):
             thread.start()
         for thread in threads:
             thread.join()
-        self.assertEqual(sorted(claimed), list(range(40)))  # ni perdidos ni duplicados
+        self.assertEqual(sorted(claimed), list(range(40)))  # none lost, none duplicated
         self.assertEqual(queue.pending(self.data_dir), 0)
 
     def test_a_dead_worker_jobs_are_recovered_and_its_run_fails(self):
         scans = ScanJobs(self.data_dir, worker=False)
         queued = scans.enqueue_image_scan(image={"reference": "nginx:1", "asset": "image:nginx", "name": "nginx"}, context="", requested_by="ana")
         job = queue.claim(self.data_dir, "muerto")
-        with db.transaction(self.data_dir) as connection:  # dejó de renovar hace rato
+        with db.transaction(self.data_dir) as connection:  # stopped renewing a while ago
             connection.execute(update(jobs).where(jobs.c.id == job["id"]).values(locked_at=text("now() - interval '10 minutes'")))
         scans._recover(everything=False)
         self.assertEqual(load_run(self.data_dir, queued["id"])["status"], "failed")
@@ -94,10 +94,10 @@ class QueueTests(unittest.TestCase):
     def test_queued_scans_survive_a_restart_but_orphans_fail(self):
         scans = ScanJobs(self.data_dir, worker=False)
         queued = scans.enqueue_image_scan(image={"reference": "nginx:1", "asset": "image:nginx", "name": "nginx"}, context="", requested_by="ana")
-        ScanJobs(self.data_dir, worker=False).prepare(embedded=False)  # otro worker arranca
-        self.assertEqual(load_run(self.data_dir, queued["id"])["status"], "queued")  # antes se perdía al reiniciar
+        ScanJobs(self.data_dir, worker=False).prepare(embedded=False)  # another worker starts
+        self.assertEqual(load_run(self.data_dir, queued["id"])["status"], "queued")  # used to be lost on restart
         with db.transaction(self.data_dir) as connection:
-            connection.execute(update(jobs).values(status="done"))  # la ejecución queda sin trabajo: huérfana
+            connection.execute(update(jobs).values(status="done"))  # the run is left without a job: orphaned
         ScanJobs(self.data_dir, worker=False).prepare(embedded=False)
         self.assertEqual(load_run(self.data_dir, queued["id"])["status"], "failed")
 
@@ -110,7 +110,7 @@ class QueueTests(unittest.TestCase):
         self.assertNotIn("glpat-SECRETO-123", stored)
         from tamandua.shared import vault
         self.assertEqual(vault.unseal(json.loads(stored)["tokens"], "job-tokens"), {"gitlab": "glpat-SECRETO-123"})
-        with self.assertRaises(vault.VaultError):  # sellado para otra cosa: no se abre
+        with self.assertRaises(vault.VaultError):  # sealed for something else: it doesn't open
             vault.unseal(json.loads(stored)["tokens"], "otra-cosa")
 
     def test_only_the_leader_feeds_batches(self):
@@ -122,7 +122,7 @@ class QueueTests(unittest.TestCase):
             threading.Timer(0.1, follower.stop).start()
             follower.run_worker()
         feed.assert_not_called()
-        self.assertTrue(ScanJobs(self.data_dir, worker=True).leader)  # un solo proceso: siempre líder
+        self.assertTrue(ScanJobs(self.data_dir, worker=True).leader)  # single process: always the leader
 
     def test_a_leader_that_loses_its_connection_stops_its_tasks_and_competes_again(self):
         import time
@@ -167,7 +167,7 @@ class QueueTests(unittest.TestCase):
             acquire = text("SELECT pg_try_advisory_lock(:key)")
             self.assertTrue(first.execute(acquire, {"key": LEADER_KEY}).scalar())
             self.assertFalse(second.execute(acquire, {"key": LEADER_KEY}).scalar())
-            first.invalidate()  # el líder muere: su conexión se cierra de verdad (no vuelve al pool) y el cerrojo se libera
+            first.invalidate()  # the leader dies: its connection truly closes (not back to the pool), freeing the lock
             self.assertTrue(second.execute(acquire, {"key": LEADER_KEY}).scalar())
         finally:
             second.close()
@@ -202,8 +202,8 @@ class OutboxTests(unittest.TestCase):
         notifications.on_batch({"label": "3 repositorios", "done": 3, "failed": 0, "critical": 1, "high": 2}, data_dir=self.data_dir)
         answers = iter([(False, "HTTP 503"), (True, "HTTP 200")])
         with patch.object(notifications, "_post", side_effect=lambda *args, **kwargs: next(answers)):
-            self.assertEqual(notifications.drain(self.data_dir), 1)  # falla: se reintenta más tarde
-            self.assertEqual(notifications.drain(self.data_dir), 0)  # todavía no le toca
+            self.assertEqual(notifications.drain(self.data_dir), 1)  # fails: retried later
+            self.assertEqual(notifications.drain(self.data_dir), 0)  # not due yet
             with db.transaction(self.data_dir) as connection:
                 connection.execute(update(outbox).values(next_attempt_at=text("now() - interval '1 second'")))
             self.assertEqual(notifications.drain(self.data_dir), 1)

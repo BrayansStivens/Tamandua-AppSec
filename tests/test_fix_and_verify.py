@@ -1,4 +1,4 @@
-"""Cerrar el ciclo: cómo corregir cada hallazgo y reverificarlo sin buscarlo a mano."""
+"""Closing the loop: how to fix each finding and re-verify it without hunting for it by hand."""
 
 import os
 import unittest
@@ -24,7 +24,7 @@ class FixGuideTests(unittest.TestCase):
     def test_the_command_matches_the_package_manager_and_closes_every_advisory(self):
         findings = fix_guide.attach([dependency("web/package-lock.json", "lodash", "4.17.20", "4.17.19"),
                                      dependency("web/package-lock.json", "lodash", "4.17.20", "4.17.21")])
-        self.assertEqual(localize(findings[0]["fix"]["commands"]), [{"label": "Actualiza", "action": "update", "code": "npm install lodash@4.17.21"}])  # la que cierra ambos
+        self.assertEqual(localize(findings[0]["fix"]["commands"]), [{"label": "Actualiza", "action": "update", "code": "npm install lodash@4.17.21"}])  # fixes both advisories
         cases = {("yarn.lock", "npm", True): "yarn add left-pad@1.3.0", ("poetry.lock", "pip", True): 'poetry add "left-pad>=1.3.0"',
                  ("poetry.lock", "pip", False): "poetry update left-pad", ("uv.lock", "pip", False): "uv lock --upgrade-package left-pad",
                  ("Cargo.lock", "cargo", True): "cargo update -p left-pad@1.0.0 --precise 1.3.0", ("composer.lock", "composer", True): 'composer require "left-pad:^1.3.0"',
@@ -36,16 +36,16 @@ class FixGuideTests(unittest.TestCase):
         go = fix_guide.guide(dependency("go.mod", "golang.org/x/net", "v0.1.0", "0.17.0", ecosystem="gomod"))
         self.assertEqual(go["commands"][0]["code"], "go get golang.org/x/net@v0.17.0 && go mod tidy")
         stdlib = fix_guide.guide(dependency("go.mod", "stdlib", "v1.22.1", "1.22.5", ecosystem="gomod"))
-        self.assertEqual(stdlib["commands"][0]["code"], "go mod edit -toolchain=go1.22.5")  # no «go get stdlib@…»
+        self.assertEqual(stdlib["commands"][0]["code"], "go mod edit -toolchain=go1.22.5")  # not "go get stdlib@…"
         dev = {**dependency("yarn.lock", "jest", "29.0.0", "29.7.0"), "package": {**dependency("yarn.lock", "jest", "29.0.0", "29.7.0")["package"], "dev": True}}
-        self.assertEqual(fix_guide.guide(dev)["commands"][0]["code"], "yarn add -D jest@29.7.0")  # no la pasa a producción
+        self.assertEqual(fix_guide.guide(dev)["commands"][0]["code"], "yarn add -D jest@29.7.0")  # stays dev-only
 
     def test_the_pull_request_table_only_shows_a_command_that_updates(self):
         from tamandua.modules.pullrequests.review import _rows
         finding = {**_finding("e" * 64, "high", package="minimist"), "path": "package-lock.json",
                    "package": {"ecosystem": "npm", "name": "minimist", "version": "0.0.8", "fixed_version": "1.2.6", "direct": False}}
         row = _rows([finding])[-1]
-        self.assertIn("Actualizar a `1.2.6`", row)   # transitiva: el comando sería solo «npm install»
+        self.assertIn("Actualizar a `1.2.6`", row)   # transitive: the command would just be "npm install"
         self.assertNotIn("`npm install`", row)
         direct = {**finding, "package": {**finding["package"], "direct": True}}
         self.assertIn("`npm install minimist@1.2.6`", _rows([direct])[-1])
@@ -60,7 +60,7 @@ class FixGuideTests(unittest.TestCase):
         none = fix_guide.guide(dependency("package-lock.json", "abandoned", "1.0.0", None))
         self.assertEqual(none["commands"], [])
         odd = fix_guide.guide(dependency("package-lock.json", "a; rm -rf /", "1.0.0", "2.0.0"))
-        self.assertEqual(odd["commands"], [])  # un nombre raro no se convierte en comando
+        self.assertEqual(odd["commands"], [])  # an odd name doesn't become a command
 
     def test_code_and_secrets_get_an_example_or_the_rotation_steps(self):
         code = fix_guide.guide({"scanner": "sast", "rule_id": "appsec.js.sql-injection", "remediation": "Usa parámetros."})
@@ -72,7 +72,7 @@ class FixGuideTests(unittest.TestCase):
 
 class FixCommandSafetyTests(unittest.TestCase):
     def test_names_that_look_like_options_or_shell_never_reach_a_command(self):
-        """Los hallazgos viajan en `scan --format json` a asistentes que pueden ejecutar `fix.commands`."""
+        """Findings travel in `scan --format json` to assistants that may run `fix.commands`."""
         for name, fixed in (("--registry", "1.3.0"), ("left-pad;id", "1.3.0"), ("left-pad", "-1"), ("$(id)", "1.3.0")):
             fix = fix_guide.guide(dependency("package.json", name, "1.0.0", fixed, ecosystem="npm", direct=True))
             self.assertEqual(fix["commands"], [], name)
@@ -101,7 +101,7 @@ class ReverifyTests(HttpCase):
                 patch("tamandua.modules.runs.jobs.ScanJobs.enqueue_repository_scan", return_value={"id": "f" * 32, "status": "queued"}) as enqueue:
             status, body, _ = self.reverify("a" * 64)
         self.assertEqual((status, body["joined"], enqueue.call_args.kwargs["trigger"]), (202, False, {"kind": "reverify"}))
-        # Termina el análisis: «a» ya no está, «b» sigue.
+        # The scan finishes: "a" is gone, "b" remains.
         done = save_repository_scan(self.data_dir, _scan("org/api", [_finding("b" * 64, "high", package="lodash"), _finding("c" * 64, "low", package="left-pad")],
                                                          datetime.now(timezone.utc).isoformat()))
         for fingerprint in ("a" * 64, "b" * 64):

@@ -1,6 +1,7 @@
-"""El editor (threat-layout.ts) y las exportaciones (threat_diagram.py) colocan el diagrama igual (y su leyenda, threat-colors.ts).
+"""The editor (threat-layout.ts) and the exports (threat_diagram.py) lay out the diagram the same way, and its
+legend too (threat-colors.ts).
 
-Se ejecuta el TypeScript con Node (≥ 22.6 quita los tipos sin compilar). Sin Node, la prueba se omite.
+The TypeScript runs with Node (≥ 22.6 strips the types without compiling). Without Node, the test is skipped.
 """
 
 import json

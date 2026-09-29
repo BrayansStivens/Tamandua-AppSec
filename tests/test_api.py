@@ -1,4 +1,4 @@
-"""API FastAPI: rutas tipadas y rutas de tabla (@route), un solo control de seguridad."""
+"""FastAPI API: typed routes and table routes (@route), one single security check."""
 
 import json
 import unittest
@@ -18,7 +18,7 @@ class OpenApiTests(unittest.TestCase):
         self.assertTrue({"/api/health", "/api/dashboard", "/api/cve-db", "/api/cve-db/item", "/api/cve-db/affected", "/api/sla", "/api/cra",
                          "/api/cra/products", "/api/cra/events", "/api/cra/assets", "/api/policies/cra", "/api/evidence",
                          "/api/evidence/assets", "/api/evidence/portfolio"} <= set(document["paths"]))
-        # El panel se genera de esta copia: si la API cambia, `make openapi` (el CI lo comprueba).
+        # The panel is generated from this copy: if the API changes, run `make openapi` (CI checks it).
         self.assertEqual(openapi_document(), (ROOT / "web/src/shared/api/openapi.json").read_text())
 
     def test_every_array_in_the_committed_copy_declares_its_maximum(self):
@@ -57,7 +57,7 @@ class OpenApiSecurityTests(unittest.TestCase):
 
 class StackTests(HttpCase):
     def test_same_security_for_typed_and_table_routes(self):
-        # Ruta migrada (FastAPI) y ruta clásica (adaptador): mismo 401, mismas cabeceras.
+        # Migrated route (FastAPI) and classic route (adapter): same 401, same headers.
         for path in ("/api/sla", "/api/runs"):
             raw = asgi.raw(self.client, "GET", path)
             self.assertIn(b" 401 ", raw.split(b"\r\n", 1)[0], path)
@@ -65,18 +65,18 @@ class StackTests(HttpCase):
             self.assertIn(b"Content-Security-Policy: default-src 'none'", raw, path)
         self.assertEqual(asgi.request(self.client, "GET", "/api/sla", headers={"Host": "evil.test"}).json(), {"error": "Host no permitido"})
         Users(self.data_dir).create("ana", PASSWORD)
-        status, _, cookies = self.post("/api/auth/login", "login", {"username": "ana", "password": PASSWORD})  # POST clásico
+        status, _, cookies = self.post("/api/auth/login", "login", {"username": "ana", "password": PASSWORD})  # classic
         self.assertEqual((status, len(cookies)), (200, 1))
         cookie = {"Cookie": cookies[0].split("; ")[0]}
-        self.assertIn("HttpOnly", cookies[0])  # la cookie del clásico cruza el adaptador intacta
+        self.assertIn("HttpOnly", cookies[0])  # the classic route's cookie crosses the adapter intact
         self.assertEqual(self.call("GET", "/api/sla", headers=cookie)[0], 200)
         self.assertEqual(self.call("GET", "/api/dashboard?days=12", headers=cookie), (400, {"error": "Ventana inválida"}, []))
-        # Los valores válidos llegan como texto en la URL (el panel siempre manda days y tz).
+        # Valid values arrive as text in the URL (the panel always sends days and tz).
         for days in (7, 30, 90, 365):
             status, body, _ = self.call("GET", f"/api/dashboard?days={days}&tz=America/Bogota", headers=cookie)
             self.assertEqual((status, body["window_days"]), (200, days))
         self.assertEqual(self.call("GET", "/api/no-existe", headers=cookie)[0], 404)
-        # CSRF: un POST sin la cabecera de acción no pasa, venga de donde venga.
+        # CSRF: a POST without the action header doesn't get through, wherever it comes from.
         self.assertEqual(self.call("POST", "/api/sla", {"days": {}}, {**cookie, "Origin": ORIGIN})[0], 403)
 
 

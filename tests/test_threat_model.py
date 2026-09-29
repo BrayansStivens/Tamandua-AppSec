@@ -1,4 +1,4 @@
-"""Modelado de amenazas: validación, propuesta desde el inventario, STRIDE, evidencia, decisiones y exportaciones."""
+"""Threat modeling: validation, proposal from the inventory, STRIDE, evidence, decisions and exports."""
 
 import ast
 import json
@@ -49,7 +49,7 @@ class ModelTests(unittest.TestCase):
                     document = json.loads((examples / locale / f"{method}.json").read_text(encoding="utf-8"))
                     imported = tm.from_portable(document)
                     self.assertEqual(imported["methodology"], method)
-                    # Los ejemplos muestran todos los tipos de componente, incluido uno personalizado, y sin posiciones.
+                    # The examples show every component type, a custom one included, and no positions.
                     self.assertEqual(len(imported["components"]), 13)
                     self.assertEqual(len(imported["flows"]), 13)
                     self.assertIn("custom", {item["kind"] for item in imported["components"]})
@@ -73,13 +73,13 @@ class ModelTests(unittest.TestCase):
     def test_rules_fire_on_the_right_elements(self):
         rows = tm.threats(model())
         fired = {(row["rule"], row["element"]) for row in rows}
-        self.assertIn(("TM-I03", "db"), fired)          # credenciales en un almacén
-        self.assertIn(("TM-I02", "db"), fired)          # sensible y sin cifrar en reposo
-        self.assertIn(("TM-S03", "api"), fired)         # webhook de Stripe hacia la API
-        self.assertIn(("TM-I05", "f3"), fired)          # datos de pago a un tercero
-        self.assertIn(("TM-E02", "api"), fired)         # llama hacia fuera: SSRF
-        self.assertNotIn(("TM-S01", "api"), fired)      # autentica: no aplica «sin autenticación»
-        self.assertIn(("TM-T04", "f2"), fired)          # SQL sin cifrar cruzando de Aplicación a Datos
+        self.assertIn(("TM-I03", "db"), fired)          # credentials in a store
+        self.assertIn(("TM-I02", "db"), fired)          # sensitive and unencrypted at rest
+        self.assertIn(("TM-S03", "api"), fired)         # Stripe webhook into the API
+        self.assertIn(("TM-I05", "f3"), fired)          # payment data to a third party
+        self.assertIn(("TM-E02", "api"), fired)         # calls out: SSRF
+        self.assertNotIn(("TM-S01", "api"), fired)      # authenticates: "no authentication" doesn't apply
+        self.assertIn(("TM-T04", "f2"), fired)          # unencrypted SQL crossing from "Aplicación" to "Datos"
         flows = [{**flow, "encrypted": True} if flow["id"] == "f2" else flow for flow in model()["flows"]]
         self.assertNotIn(("TM-T04", "f2"), {(row["rule"], row["element"]) for row in tm.threats(model(flows=flows))})
         encrypted = model(components=[*model()["components"][:2], {**model()["components"][2], "encrypted_at_rest": True}, model()["components"][3]])
@@ -103,7 +103,7 @@ class ModelTests(unittest.TestCase):
         rows = tm.threats(current, {other: [xss]})
         by = {(row["rule"], row["element"]): row for row in rows}
         self.assertEqual(by[("TM-T01", "front")]["status"], "evidenced")
-        self.assertEqual(by[("TM-T01", "api")]["status"], "open")   # la API no hereda los hallazgos del front
+        self.assertEqual(by[("TM-T01", "api")]["status"], "open")   # the API doesn't inherit the front end's findings
 
     def test_in_a_monorepo_evidence_comes_only_from_the_component_folder(self):
         current = tm.validate({**model(), "components": model()["components"] + [
@@ -117,7 +117,7 @@ class ModelTests(unittest.TestCase):
         by = {(row["rule"], row["element"]): row for row in tm.threats(current, {REPO: [backend, ui]})}
         self.assertEqual([item["fingerprint"] for item in by[("TM-T01", "front")]["evidence"]], ["f" * 64])
         self.assertEqual(by[("TM-T01", "front")]["evidence_scope"], [{"asset": REPO, "path": "frontend/"}])
-        # La API no tiene carpeta: toma el repositorio entero y lo dice.
+        # The API has no folder: it takes the whole repository and says so.
         self.assertEqual(by[("TM-T01", "api")]["evidence_scope"], [{"asset": REPO, "path": None}])
         self.assertEqual(by[("TM-T01", "api")]["evidence_count"], 2)
 
@@ -132,7 +132,7 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(placed["boundaries"][0]["box"], {"x": 0, "y": 0, "width": 300, "height": 200})
         odd = [{**item, "position": {"x": "1", "y": 2}} if item["id"] == "usuario" else item for item in model()["components"]]
         self.assertIsNone(model(components=odd)["components"][0]["position"])
-        self.assertEqual(tm._layout(placed)["nodes"]["usuario"], {"x": 10.3, "y": -4})  # las exportaciones usan lo dibujado
+        self.assertEqual(tm._layout(placed)["nodes"]["usuario"], {"x": 10.3, "y": -4})  # the exports use what was drawn
         partly_placed = model(components=[{**item, "position": {"x": 777, "y": 88}} if item["id"] == "api" else item
                                           for item in model()["components"]])
         self.assertEqual(tm._layout(partly_placed)["nodes"]["api"], {"x": 777, "y": 88})
@@ -141,9 +141,9 @@ class ModelTests(unittest.TestCase):
     def test_linddun_looks_at_privacy_not_security(self):
         rows = tm.threats(model(methodology="linddun"))
         fired = {(row["rule"], row["element"]) for row in rows}
-        self.assertIn(("PV-Dd02", "db"), fired)          # datos personales sin cifrar en reposo
+        self.assertIn(("PV-Dd02", "db"), fired)          # personal data unencrypted at rest
         self.assertIn(("PV-L01", "db"), fired)
-        self.assertIn(("PV-U01", "api"), fired)          # recoge datos personales del usuario
+        self.assertIn(("PV-U01", "api"), fired)          # collects the user's personal data
         self.assertFalse([row for row in rows if row["rule"].startswith("TM-")])
         self.assertEqual({row["framework"] for row in rows}, {"linddun"})
         self.assertIn("Divulgación de datos", {row["category"] for row in rows})
@@ -167,7 +167,7 @@ class ModelTests(unittest.TestCase):
             {"id": "b", "parent": "a", "text": "Phishing", "difficulty": "low"},
             {"id": "c", "parent": None, "text": "Saltarse el segundo factor", "gate": "and", "element": "api", "mitigated": True}]}
         mappings = [{"technique": "T1110", "element": "api", "status": "relevant", "note": "Sin límite de intentos"},
-                    {"technique": "T1110", "element": "api"}]  # duplicado: se ignora
+                    {"technique": "T1110", "element": "api"}]  # duplicate: ignored
         current = model(methodology="attack", attack_trees=[tree], attack_mappings=mappings,
                         pasta={"objectives": "Que nadie pague por otro"})
         self.assertEqual(len(current["attack_mappings"]), 1)
@@ -191,7 +191,7 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(linked["repositories"], [REPO])
         with self.assertRaises(tm.ModelError):
             tm.validate({**blank, "repositories": ["github:ajeno/repo"]}, known_assets={REPO})
-        # Un repositorio que usa un componente forma parte del proyecto aunque no se añadiera a mano.
+        # A repository that uses a component is part of the project even if nobody added it by hand.
         self.assertEqual(model()["repositories"], [REPO])
 
     def test_proposals_merge_into_what_the_team_already_drew(self):
@@ -207,7 +207,7 @@ class ModelTests(unittest.TestCase):
                       {"id": "b", "source": "pagos", "target": "pg", "protocol": "sql", "authenticated": True}],
             "boundaries": [{"id": "aplicacion", "name": "Aplicación", "components": ["pagos"]}]}, known_assets={REPO, other})
         merged, added = tm.merge_proposal(drawn, proposal)
-        self.assertEqual(added, {"components": 1, "flows": 2})      # «Usuario» y «PostgreSQL» ya existían
+        self.assertEqual(added, {"components": 1, "flows": 2})      # "Usuario" and "PostgreSQL" already existed
         names = [item["name"] for item in merged["components"]]
         self.assertEqual(names.count("Usuario"), 1)
         self.assertEqual(names.count("PostgreSQL"), 1)
@@ -216,7 +216,7 @@ class ModelTests(unittest.TestCase):
         self.assertIn(new["id"], app["components"])
         box = app["box"]
         self.assertTrue(box["x"] <= new["position"]["x"] <= box["x"] + box["width"])
-        self.assertTrue(box["y"] <= new["position"]["y"] <= box["y"] + box["height"])     # dentro de su frontera dibujada
+        self.assertTrue(box["y"] <= new["position"]["y"] <= box["y"] + box["height"])     # inside its drawn boundary
         self.assertIn(("usuario", new["id"]), {(flow["source"], flow["target"]) for flow in merged["flows"]})
         self.assertEqual(tm.validate(merged, known_assets={REPO, other})["repositories"], [REPO, other])
 
@@ -229,7 +229,7 @@ class ModelTests(unittest.TestCase):
             "flows": [{"id": "a", "source": "front", "target": "api", "protocol": "https"},
                       {"id": "b", "source": "api", "target": "db", "protocol": "sql"},
                       {"id": "c", "source": "api", "target": "gcp", "protocol": "https"}],
-            # Cajas que no caben (la base de datos se sale) y que se pisan entre sí.
+            # Boxes that don't fit (the database spills out) and that overlap each other.
             "boundaries": [{"id": "backend", "name": "Backend", "components": ["api", "db"], "box": {"x": 350, "y": 120, "width": 450, "height": 380}},
                            {"id": "nube", "name": "Nube", "components": ["gcp"], "box": {"x": 660, "y": 20, "width": 200, "height": 120}}]}
         imported = tm.from_portable({"format": "tamandua-threat-model", "version": 1, "model": base})
@@ -246,7 +246,7 @@ class ModelTests(unittest.TestCase):
             layout = tm._layout(current)
             nodes, boxes = layout["nodes"], layout["boundaries"]
             sizes = {item["id"]: tm._node_size(item) for item in current["components"]}
-            self.assertEqual(len({item["kind"] for item in current["components"]}), 12, path)   # los ejemplos cubren todos los tipos
+            self.assertEqual(len({item["kind"] for item in current["components"]}), 12, path)   # every kind is covered
             for boundary in current["boundaries"]:
                 box = boxes[boundary["id"]]
                 for member in boundary["components"]:
@@ -295,7 +295,7 @@ class ModelTests(unittest.TestCase):
                 patch("tamandua.modules.integrations.github.repository_manifests", return_value=files) as fetch:
             found = inventory.live(REPO, installation_id=7)
         self.assertEqual(fetch.call_args.args[1:], ("org/shop", "main"))
-        self.assertNotIn("npm", found["packages"])  # la ruta que salía del directorio se ignoró
+        self.assertNotIn("npm", found["packages"])  # the path that left the directory was ignored
         self.assertEqual(found["found_in"]["axum"], "crates/api/Cargo.toml")
         draft = tm.suggest("Tienda", [{"id": REPO, "name": "org/shop", "inventory": found, "findings": []}])
         by_name = {item["name"]: item for item in draft["components"]}
@@ -461,7 +461,7 @@ class RouteTests(HttpCase):
             status, pdf = self.call("GET", f"/api/threat-models/{model_id}/report.pdf", headers={"Cookie": cookie})[:2]
             self.assertEqual(status, 200)
             self.assertTrue(pdf.startswith(b"%PDF-"))
-            # Un modelo de amenazas no es evidencia de SOC 2 ni de ISO: esos informes son de los hallazgos.
+            # A threat model isn't SOC 2 or ISO evidence: those reports are about the findings.
             self.assertEqual(self.call("GET", f"/api/threat-models/{model_id}/report-soc2.pdf", headers={"Cookie": cookie})[0], 404)
             for artifact in ("report.md", "report.pdf", "report-soc2.pdf", "report-iso27001.pdf", "findings.sarif", "tickets.json", "record.json"):
                 status, body = self.call("GET", f"/api/assets/export?key={REPO}&status=all&artifact={artifact}", headers={"Cookie": cookie})[:2]

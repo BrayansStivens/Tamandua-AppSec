@@ -1,8 +1,8 @@
-"""Agrupar hallazgos por corrección: lo que un equipo de desarrollo hace, no lo que un motor reporta.
+"""Group findings by fix: what a development team does, not what an engine reports.
 
-Los avisos de un mismo paquete (mismo manifiesto y versión) se cierran con una sola actualización: la
-versión más alta entre las que corrigen cada aviso. El código, los secretos y la infraestructura se
-atienden uno a uno, pero una misma regla repetida en varios archivos es un solo patrón que corregir.
+Advisories of the same package (same manifest and version) are closed by a single upgrade: the
+highest of the versions that fix each advisory. Code, secrets and infrastructure are handled one by
+one, but the same rule repeated across several files is a single pattern to fix.
 """
 
 from __future__ import annotations
@@ -31,11 +31,11 @@ def _ids(items: list[dict]) -> list[str]:
 
 
 def fix_groups(findings: list[dict], *, by_rule: bool = False) -> list[dict]:
-    """Una entrada por corrección, en orden de prioridad (explotación activa, severidad, alcance).
+    """One entry per fix, in priority order (active exploitation, severity, scope).
 
-    Cada entrada: kind («package» o «finding»), severity (la peor), items, counts, ids, kev, epss,
-    y para paquetes name, version, path, target (versión que cierra todos) y complete (todos tienen corrección).
-    Con by_rule, los hallazgos de código de una misma regla se juntan (kind «rule»)."""
+    Each entry: kind ("package" or "finding"), severity (the worst), items, counts, ids, kev, epss,
+    and for packages name, version, path, target (the version that closes them all) and complete (all have a fix).
+    With by_rule, code findings of the same rule are grouped together (kind "rule")."""
     groups: dict[tuple, list[dict]] = {}
     for item in findings:
         package = item.get("package") or {}
@@ -61,15 +61,15 @@ def fix_groups(findings: list[dict], *, by_rule: bool = False) -> list[dict]:
         elif key[0] == "rule":
             entry.update(rule=key[2], title=items[0].get("title") or key[2])
         result.append(entry)
-    # Lo malicioso y lo explotado activamente, primero.
+    # Malicious and actively exploited first.
     return sorted(result, key=lambda entry: (not entry["malicious"], not entry["kev"], ORDER.get(entry["severity"], 9), -len(entry["items"]), -entry["epss"],
                                              entry.get("path") or entry["items"][0].get("path") or ""))
 
 
 def action(entry: dict, *, short: bool = False, locale: str | None = None) -> str:
-    """Qué hacer, en una frase. `short`: para una celda de tabla (el detalle lleva la guía completa)."""
+    """What to do, in one sentence. `short`: for a table cell (the detail carries the full guide)."""
     if entry.get("malicious"):
-        # Código hostil: no hay versión que «corrija», se quita (mismo criterio que la guía de corrección del panel).
+        # Hostile code: no version "fixes" it, it gets removed (same criterion as the panel's fix guide).
         version = entry.get("version") or ""
         sentence = (t("findings.remediation.remove_malicious", locale, package=entry["name"], version=version) if entry.get("name")
                     else t("findings.remediation.remove_malicious_unnamed", locale, version=version))

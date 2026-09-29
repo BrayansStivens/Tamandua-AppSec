@@ -11,7 +11,7 @@ from tamandua.shared.model import RunRecord
 
 
 def rebuild(data_dir: Path) -> int:
-    """Reconstruye todos los registros desde las ejecuciones, en orden cronológico."""
+    """Rebuilds every registry from the runs, in chronological order."""
     registry.reset(data_dir)
     applied = 0
     # Only the runs the registry takes (registry.apply ignores the rest), oldest first.
@@ -26,7 +26,7 @@ def rebuild(data_dir: Path) -> int:
 
 
 def resolve(data_dir: Path, run_id: str) -> RunRecord | dict:
-    """Una ejecución por su id, o el estado de un repositorio por `asset:<clave>`."""
+    """A run by its id, or a repository's state by `asset:<key>`."""
     if isinstance(run_id, str) and run_id.startswith(registry.VIEW_PREFIX):
         return registry.view(data_dir, run_id[len(registry.VIEW_PREFIX):], status="all")
     return load_run(data_dir, run_id)

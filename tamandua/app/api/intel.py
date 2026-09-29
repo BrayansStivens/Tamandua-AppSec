@@ -1,4 +1,4 @@
-"""CVE tracker: búsqueda paginada en la copia local de NVD, con KEV, EPSS y EUVD; y la búsqueda rápida en lo reciente."""
+"""CVE tracker: paginated search of the local NVD copy with KEV, EPSS and EUVD, and a quick search of recent CVEs."""
 
 from __future__ import annotations
 
@@ -124,12 +124,12 @@ def overview(context: Context = Depends(guard())) -> dict[str, Any]:
 
 
 @router.get("/api/cve-db/item", response_model=CveDetail)
-def item(id: str = "", context: Context = Depends(guard())) -> dict:  # noqa: A002 — nombre del parámetro público
+def item(id: str = "", context: Context = Depends(guard())) -> dict:  # noqa: A002 — public parameter name
     identifier = _cve_id(id)
     detail = cve_db.detail(context.data_dir, identifier)
     if detail is None:
         raise ApiError(404, msg("api.cve_not_found"))
-    # NVD ya no puntúa todos los CVE: EUVD (ENISA) completa la puntuación y dice si se explota activamente.
+    # NVD no longer scores every CVE: EUVD (ENISA) fills in the score and says whether it is actively exploited.
     europe = euvd.lookup(context.data_dir, identifier)
     detail["score_source"] = "nvd" if detail.get("score") is not None else None
     if detail.get("score") is None and europe and europe.get("score") is not None:

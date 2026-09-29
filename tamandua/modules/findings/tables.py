@@ -1,5 +1,5 @@
-"""Tablas del registro de hallazgos y del triage. Cada hallazgo guarda su entrada completa en JSONB (el formato de
-siempre) y, aparte, lo que se consulta: estado y CVE (índice GIN para «¿me afecta este CVE?»)."""
+"""Tables for the findings registry and triage. Each finding keeps its whole entry in JSONB (the usual format) and,
+separately, what gets queried: status and CVE (GIN index for "does this CVE affect me?")."""
 
 from sqlalchemy import DateTime, func, ARRAY, Column, ForeignKeyConstraint, Index, Table, Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -11,7 +11,7 @@ registry_assets = Table(
     Column("tenant_id", Text, primary_key=True, server_default=TENANT),
     Column("asset_key", Text, primary_key=True),
     Column("name", Text),
-    Column("applied", JSONB, nullable=False, server_default="[]"),  # ejecuciones ya incorporadas (idempotencia)
+    Column("applied", JSONB, nullable=False, server_default="[]"),  # runs already merged in (idempotency)
 )
 
 registry_findings = Table(

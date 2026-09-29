@@ -1,21 +1,21 @@
-"""Rutas excluidas por repositorio: carpetas de pruebas, ejemplos vulnerables a propósito, código generado.
+"""Paths excluded per repository: test folders, intentionally vulnerable examples, generated code.
 
-Las decide un administrador en el panel y viven en el servidor (en su base de datos), no en un
-fichero del repositorio: si vivieran en el repositorio, un PR podría excluirse a sí mismo. Cada
-cambio guarda quién, cuándo y por qué, y se conservan los últimos cambios como historial.
+An admin sets them in the panel and they live on the server (in its database), not in a file in the
+repository: if they lived in the repository, a PR could exclude itself. Each change records who, when
+and why, and the latest changes are kept as history.
 
-Qué pasa con lo excluido:
+What happens to what is excluded:
 
-* **Ejecuciones**: los hallazgos en rutas excluidas salen de la ejecución (informe, SARIF, panel,
-  revisión de PR y su veredicto) y se cuentan en `excluded` y en los límites, para que se vea que
-  existen. Nada se oculta sin decirlo.
-* **Registro**: lo que estaba abierto en esas rutas pasa a **excluido**, no a remediado: no se
-  arregló, se decidió no mirarlo. Si la ruta deja de estar excluida, vuelve a abierto.
+* **Runs**: findings under excluded paths are taken out of the run (report, SARIF, panel, PR review
+  and its verdict) and counted in `excluded` and in the limits, so it shows that they exist. Nothing
+  is hidden without saying so.
+* **Registry**: whatever was open under those paths becomes **excluded**, not remediated: it wasn't
+  fixed, someone decided not to look at it. If the path stops being excluded, it goes back to open.
 
-Patrones al estilo glob, relativos a la raíz del repositorio: `fixtures`, `fixtures/*`, `docs/*.md`,
-`**/testdata/**`. `*` no cruza `/`; `**` sí. Como en `.gitignore`, un patrón que coincide con una carpeta
-excluye todo lo que hay dentro: `fixtures` o `fixtures/*` excluyen también `fixtures/a/b.py`.
-No se admiten patrones que lo excluyan todo.
+Glob-style patterns, relative to the repository root: `fixtures`, `fixtures/*`, `docs/*.md`,
+`**/testdata/**`. `*` doesn't cross `/`; `**` does. As in `.gitignore`, a pattern that matches a folder
+excludes everything inside it: `fixtures` or `fixtures/*` also exclude `fixtures/a/b.py`.
+Patterns that exclude everything are rejected.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ _log = logging_setup.get("exclusions")
 MAX_PATTERNS = 50
 MAX_LENGTH = 200
 PATTERN = re.compile(r"[A-Za-z0-9_.\-/*?]+")
-# Claves de activo: github#123, local:mi-repo, image:ghcr.io/acme/api… Nada que rompa una línea de log.
+# Asset keys: github#123, local:my-repo, image:ghcr.io/acme/api… Nothing that could break a log line.
 ASSET_KEY = re.compile(r"[A-Za-z0-9#:_./@+-]{1,200}")
 HISTORY = 20
 
@@ -63,7 +63,7 @@ def patterns(data_dir: Path, key: str) -> list[str]:
 
 
 def normalize(raw) -> list[str]:
-    """Valida y normaliza. `fixtures/` equivale a `fixtures/**`."""
+    """Validates and normalizes. `fixtures/` is the same as `fixtures/**`."""
     if not isinstance(raw, list) or len(raw) > MAX_PATTERNS:
         raise ExclusionError(msg("findings.exclusions.errors.too_many", max=MAX_PATTERNS))
     result = []
@@ -79,7 +79,7 @@ def normalize(raw) -> list[str]:
             raise ExclusionError(msg("findings.exclusions.errors.not_relative", pattern=pattern))
         if pattern.endswith("/"):
             pattern += "**"
-        while "**/**" in pattern or "***" in pattern:  # equivalentes y, repetidos, caros de evaluar
+        while "**/**" in pattern or "***" in pattern:  # equivalent and, when repeated, costly to evaluate
             pattern = pattern.replace("**/**", "**").replace("***", "**")
         if matches_everything(pattern):
             raise ExclusionError(msg("findings.exclusions.errors.everything", pattern=pattern))
@@ -89,8 +89,8 @@ def normalize(raw) -> list[str]:
 
 
 def matches_everything(pattern: str) -> bool:
-    """Solo comodines de nombre libre (`*`, `?*`, `**/*`…): coincide con cualquier carpeta de la raíz y, al excluir
-    carpetas enteras, con todo el repositorio."""
+    """Free-name wildcards only (`*`, `?*`, `**/*`…): matches any top-level folder and, since whole folders are
+    excluded, the entire repository."""
     return all(part == "**" or ("*" in part and set(part) <= {"*", "?"}) for part in pattern.split("/"))
 
 
@@ -117,9 +117,9 @@ def _regex(pattern: str) -> re.Pattern:
 
 
 def excluded(path: str, active: list[str]) -> str | None:
-    """El primer patrón que excluye esta ruta (o una de sus carpetas), o None."""
+    """The first pattern that excludes this path (or one of its folders), or None."""
     parts = str(path or "").removeprefix("./").lstrip("/").split("/")
-    candidates = ["/".join(parts[:end]) for end in range(len(parts), 0, -1)]  # el archivo y cada carpeta que lo contiene
+    candidates = ["/".join(parts[:end]) for end in range(len(parts), 0, -1)]  # the file and every folder containing it
     for pattern in active:
         regex = _regex(pattern)
         if any(regex.match(candidate) for candidate in candidates):
@@ -168,8 +168,8 @@ def _recount(reason, count: int):
 
 
 def apply_to_record(data_dir: Path, record: dict, key: str) -> dict:
-    """Saca de la ejecución lo que cae en rutas excluidas y rehace las cuentas del resumen."""
-    if "excluded" in record:  # ya aplicado (la revisión de PR lo hace antes de clasificar)
+    """Takes findings under excluded paths out of the run and recomputes the summary counts."""
+    if "excluded" in record:  # already applied (the PR review does it before classifying)
         return record
     active = patterns(data_dir, key)
     if not active:

@@ -1,4 +1,4 @@
-"""`tamandua scan`: carpeta local, comparación con la rama base, umbral y códigos de salida."""
+"""`tamandua scan`: local folder, comparison with the base branch, threshold and exit codes."""
 
 import json
 import shutil
@@ -42,7 +42,7 @@ class GitTests(unittest.TestCase):
         (self.repo / "app.py").write_text("a = 1\nb = eval(x)\nc = 3\n")
         (self.repo / "requirements.txt").write_text("requests==2.25.0\nurllib3==1.26.4\n")
         self.git("commit", "-qam", "feature")
-        (self.repo / "nuevo.py").write_text("x = 1\n")  # sin commit ni add: también cuenta
+        (self.repo / "nuevo.py").write_text("x = 1\n")  # neither added nor committed: it still counts
 
     def tearDown(self):
         self.directory.cleanup()
@@ -76,7 +76,7 @@ class GitTests(unittest.TestCase):
             result = run(self.repo, data_dir=Path(data), base="main")
         self.assertEqual([item["fingerprint"] for item in result["findings"]], ["eval", "new-sca"])
         self.assertEqual((result["comparison"]["preexisting_in_changed_code"], result["exit_code"]), (1, EXIT_BLOCKED))
-        # El punto de partida se analiza de verdad: su copia sale de git, no del árbol de trabajo.
+        # The baseline is really scanned: its copy comes from git, not from the working tree.
         self.assertTrue(result["comparison"]["baseline"])
 
     def test_the_base_snapshot_is_the_merge_base_tree(self):
@@ -103,7 +103,7 @@ class GateTests(unittest.TestCase):
     def test_an_incomplete_scan_never_passes_as_clean(self):
         self.assertEqual(self.run_with([], failed=("trivy",))["exit_code"], EXIT_INCOMPLETE)
         self.assertEqual(self.run_with([], docker=False)["exit_code"], EXIT_INCOMPLETE)
-        # Lo que sí se encontró bloquea igual aunque falte un motor.
+        # What was found still blocks, even if an engine is missing.
         self.assertEqual(self.run_with([finding("a", "x.py", 1, "critical")], failed=("trivy",))["exit_code"], EXIT_BLOCKED)
 
     def test_text_groups_advisories_of_a_package_into_one_fix(self):
@@ -137,7 +137,7 @@ class GateTests(unittest.TestCase):
         payload = json.loads(local_scan.render_json(result))
         self.assertEqual((payload["exit_code"], payload["findings"][0]["path"]), (EXIT_BLOCKED, "x.py"))
         secret = next(item for item in payload["findings"] if item["scanner"] == "secrets")
-        self.assertTrue(secret["fix"]["steps"])  # la guía de corrección viaja con el hallazgo
+        self.assertTrue(secret["fix"]["steps"])  # the fix guide travels with the finding
         sarif = json.loads(local_scan.render_sarif(result))
         self.assertEqual(sarif["runs"][0]["results"][0]["level"], "error")
         self.assertEqual(sarif["runs"][0]["tool"]["driver"]["rules"][0]["properties"]["security-severity"], "9.5")

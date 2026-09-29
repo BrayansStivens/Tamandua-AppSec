@@ -1,4 +1,4 @@
-"""Ciclo de vida de los hallazgos: abiertos, remediados solos, reabiertos, PRs y remediación manual."""
+"""Finding lifecycle: open, remediated on their own, reopened, PRs and manual remediation."""
 
 import tempfile
 import unittest
@@ -49,15 +49,15 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(registry.summarize(self.data_dir, KEY)["open"], 2)
 
     def test_an_incomplete_scan_never_fixes_anything(self):
-        """Si un motor no corrió (Docker, imágenes, red), no aparecer no prueba que se corrigió."""
+        """If an engine didn't run (Docker, images, network), a missing finding doesn't prove it was fixed."""
         self.run_([_finding(A), _finding(B)])
         self.run_([], status="incomplete")
         self.assertEqual(self.status(), {A: "open", B: "open"})
-        # Lo que sí ve un escaneo incompleto se abre igual.
+        # What an incomplete scan does see is still opened.
         C = "c" * 64
         self.run_([_finding(C)], status="incomplete")
         self.assertEqual(self.status(), {A: "open", B: "open", C: "open"})
-        # El siguiente escaneo completo sí remedia lo que ya no está.
+        # The next complete scan does remediate what is gone.
         self.run_([_finding(A)])
         self.assertEqual(self.status(), {A: "open", B: "fixed", C: "fixed"})
 
@@ -74,9 +74,9 @@ class RegistryTests(unittest.TestCase):
         self.run_([_finding(C)], pr=4)
         entry = registry.load(self.data_dir, KEY)["findings"][C]
         self.assertEqual((entry["status"], entry["origin"]["kind"], entry["origin"]["pr"]), ("open", "pr", 4))
-        self.run_([_finding(A)])                   # un escaneo de main no borra lo que vive en la rama del PR
+        self.run_([_finding(A)])                   # a main scan doesn't clear what lives on the PR branch
         self.assertEqual(self.status()[C], "open")
-        self.run_([], pr=4, head="2" * 40)         # nuevo commit del PR sin el hallazgo
+        self.run_([], pr=4, head="2" * 40)         # new PR commit without the finding
         self.assertEqual(self.status()[C], "fixed")
         self.assertIn("2222222", text(registry.load(self.data_dir, KEY)["findings"][C]["fixed"]["how"]))
 
@@ -86,7 +86,7 @@ class RegistryTests(unittest.TestCase):
         registry.pull_closed(self.data_dir, KEY, 5, merged=False, when="2026-09-02")
         registry.pull_closed(self.data_dir, KEY, 6, merged=True, when="2026-09-02")
         self.assertEqual(self.status(), {B: "fixed", C: "open"})
-        self.run_([])                              # el escaneo de main tras el merge ya no lo ve
+        self.run_([])                              # the main scan after the merge no longer sees it
         self.assertEqual(self.status()[C], "fixed")
 
     def test_manual_fix_needs_a_reason_and_reopens_if_it_comes_back(self):
@@ -97,7 +97,7 @@ class RegistryTests(unittest.TestCase):
         triage.decide(self.data_dir, state, [A], "fixed", reason="Parche aplicado en producción, pendiente de desplegar", user=USER)
         self.assertEqual([item["fingerprint"] for item in registry.view(self.data_dir, KEY, status="fixed")["findings"]], [A])
         self.assertEqual(registry.view(self.data_dir, KEY, status="open")["findings"], [])
-        self.run_([_finding(A)])                   # vuelve a salir: no estaba remediado
+        self.run_([_finding(A)])                   # it shows up again: it wasn't remediated
         self.assertEqual(triage.effective(triage.load(self.data_dir)[KEY][A])["status"], "open")
         self.assertEqual(len(registry.view(self.data_dir, KEY, status="open")["findings"]), 1)
 

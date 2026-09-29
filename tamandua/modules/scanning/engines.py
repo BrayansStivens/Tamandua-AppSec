@@ -1,22 +1,22 @@
-"""Escáneres externos en contenedores pinneados por digest, un frente cada uno.
+"""External scanners in containers pinned by digest, each covering one area.
 
-- Trivy: dependencias de cualquier ecosistema, configuración de infraestructura
-  (Dockerfile, Kubernetes, Terraform) y secretos. Necesita red solo para bajar su
-  base de vulnerabilidades, que se cachea; no envía nada del repositorio.
-- OSV-Scanner: dependencias con la base OSV (que incluye la GitHub Advisory Database de
-  Dependabot) y más formatos de manifiesto (.NET, Gradle, uv…). Baja las bases de avisos
-  y compara en local; lo que coincide con Trivy se une en un solo hallazgo.
-- Gitleaks: secretos con alta precisión. Sin red.
-- Opengrep: SAST multi-lenguaje con nuestras propias reglas (`rules/`). Sin red.
-- Checkov y zizmor: infraestructura como código y pipelines de CI/CD (`config_scanners`). Sin red.
+- Trivy: dependencies of any ecosystem, infrastructure configuration
+  (Dockerfile, Kubernetes, Terraform) and secrets. Needs network only to fetch its
+  vulnerability database, which is cached; sends nothing from the repository.
+- OSV-Scanner: dependencies against the OSV database (which includes Dependabot's GitHub
+  Advisory Database) and more manifest formats (.NET, Gradle, uv…). Downloads the advisory
+  databases and compares locally; what matches Trivy is merged into a single finding.
+- Gitleaks: high-precision secrets. No network.
+- Opengrep: multi-language SAST with our own rules (`rules/`). No network.
+- Checkov and zizmor: infrastructure as code and CI/CD pipelines (`config_scanners`). No network.
 
-Cada contenedor corre sin capacidades, sin escalada de privilegios, con el
-snapshot montado en solo lectura y **con el mismo UID y GID que la app**: en Linux,
-root sin capacidades no puede entrar en las carpetas 0700 de la app y los motores
-devolverían cero hallazgos sin avisar (en macOS Docker Desktop lo oculta). Si Docker o una imagen no están, el paso se
-declara `not_tested` con el motivo: nunca se finge una ejecución.
+Each container runs with no capabilities, no privilege escalation, the
+snapshot mounted read-only and **with the same UID and GID as the app**: on Linux,
+root without capabilities can't enter the app's 0700 folders and the engines
+would return zero findings without warning (on macOS, Docker Desktop hides this). If Docker or an image is missing,
+the step is declared `not_tested` with the reason: a run is never faked.
 
-Los valores de secretos no se guardan jamás: solo regla, archivo y línea.
+Secret values are never stored: only rule, file and line.
 """
 
 from __future__ import annotations
@@ -49,23 +49,23 @@ RULES_DIR = paths.RULES_DIR
 IMAGES = {
     "trivy": {"name": "Trivy", "version": "0.74.0",
               "image": "aquasec/trivy@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969"},
-    # Dependencias con la base OSV (incluye la GitHub Advisory Database de Dependabot) y más formatos de manifiesto.
+    # Dependencies against the OSV database (includes Dependabot's GitHub Advisory Database) and more manifest formats.
     "osv-scanner": {"name": "OSV-Scanner", "version": "2.6.0",
                     "image": "ghcr.io/google/osv-scanner@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa"},
     "gitleaks": {"name": "Gitleaks", "version": "8.30.1",
                  "image": "ghcr.io/gitleaks/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f"},
     "opengrep": {"name": "Opengrep", "version": "1.30.0", "image": "localhost/tamandua/opengrep:1.30.0"},
-    # Segunda opinión en imágenes de contenedor: discrepa con Trivy sobre todo en paquetes del sistema.
+    # Second opinion on container images: it disagrees with Trivy mostly on system packages.
     "grype": {"name": "Grype", "version": "0.119.0",
               "image": "anchore/grype@sha256:8c2c9234a345577a6d321a4753aa3ee1276d8975c8452d2344a56b57733ecad3"},
-    # Infraestructura como código y pipelines: casi el doble de reglas que Trivy en Terraform y CloudFormation.
+    # Infrastructure as code and pipelines: nearly twice as many rules as Trivy for Terraform and CloudFormation.
     "checkov": {"name": "Checkov", "version": "3.3.19",
                 "image": "bridgecrew/checkov@sha256:d3e96adafdb315ca82e792ca8708c01adae85292800fb064c8b309b3d0cb7b80"},
-    # GitHub Actions a fondo: inyección en plantillas, disparadores peligrosos, permisos y acciones sin fijar.
+    # GitHub Actions in depth: template injection, dangerous triggers, permissions and unpinned actions.
     "zizmor": {"name": "zizmor", "version": "1.30.1",
                "image": "ghcr.io/zizmorcore/zizmor@sha256:a2eb396d886c053073405c7a980f2139ba2248ec172243cfa3841e57196e8101"},
 }
-# Lenguajes con reglas propias y las extensiones por las que se reconocen en el snapshot.
+# Languages with our own rules and the extensions that identify them in the snapshot.
 RULE_LANGUAGES = {
     "JavaScript": {".js", ".jsx", ".mjs", ".cjs"}, "TypeScript": {".ts", ".tsx"}, "Python": {".py"},
     "Java": {".java"}, "Go": {".go"}, "PHP": {".php"}, "Ruby": {".rb"}, "C#": {".cs"},
@@ -86,11 +86,11 @@ def in_container() -> bool:
 
 
 def own_mounts() -> dict[str, str]:
-    """Montajes de este contenedor tal como los ve el demonio: {ruta interna: ruta en el host}.
+    """This container's mounts as the daemon sees them: {internal path: host path}.
 
-    Se pregunta a Docker en vez de fiarse de `${PWD}` en compose, que en PowerShell o cmd
-    (Windows) llega vacío. Así vale igual en macOS (Apple Silicon e Intel), Linux, Windows y WSL.
-    Fuera de un contenedor, o si Docker no responde, devuelve {} (y se reintenta al minuto)."""
+    Docker is asked instead of trusting `${PWD}` in compose, which arrives empty in PowerShell or cmd
+    (Windows). That way it works the same on macOS (Apple Silicon and Intel), Linux, Windows and WSL.
+    Outside a container, or if Docker doesn't answer, returns {} (and retries a minute later)."""
     at = _own_mounts["at"]
     if at is not None and (_own_mounts["mounts"] or time.monotonic() - at < 60):
         return dict(_own_mounts["mounts"])
@@ -125,17 +125,17 @@ def _host_pairs() -> list[tuple[str, str]]:
 
 
 def _usable(inside: str, outside: str | None) -> bool:
-    # `${PWD}/data` con PWD vacío queda en `/data`: igual a la ruta interna, no apunta al host.
+    # `${PWD}/data` with an empty PWD becomes `/data`: the same as the internal path, it doesn't point at the host.
     return bool(outside and outside.strip() and outside.rstrip("/") not in (inside.rstrip("/"), "/data", "/rules"))
 
 
 def host_path(path: Path) -> str:
-    """Ruta tal como la ve el demonio de Docker.
+    """A path as the Docker daemon sees it.
 
-    Cuando la app corre en un contenedor, los volúmenes que pide para los
-    contenedores hermanos se resuelven en el host, no dentro de la app. La ruta del
-    host se detecta preguntando a Docker por los montajes de este contenedor; si no
-    se puede, se usan TAMANDUA_HOST_DATA_DIR y TAMANDUA_HOST_RULES_DIR.
+    When the app runs in a container, the volumes it requests for sibling
+    containers are resolved on the host, not inside the app. The host path is
+    found by asking Docker for this container's mounts; if that isn't possible,
+    TAMANDUA_HOST_DATA_DIR and TAMANDUA_HOST_RULES_DIR are used.
     """
     resolved = path.resolve()
     if runner() == "local":
@@ -153,10 +153,10 @@ _TOKENS = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{2
 
 
 def cause(completed: subprocess.CompletedProcess | None) -> str:
-    """La última línea útil del stderr del motor o de Docker, para decir *por qué* falló.
+    """The last useful line of the engine's or Docker's stderr, to say *why* it failed.
 
-    Se recorta, se quitan colores y cualquier token, y la carpeta de datos del host se
-    abrevia: lo que se ve en el panel ayuda a diagnosticar sin exponer credenciales."""
+    It is trimmed, stripped of colors and any token, and the host data folder is
+    shortened: what the panel shows helps diagnose without exposing credentials."""
     if completed is None:
         return ""
     lines = [line.strip() for line in _ANSI.sub("", completed.stderr or "").splitlines() if line.strip()]
@@ -205,8 +205,8 @@ def and_list(items):
 
 
 def host_mount_problem() -> dict | None:
-    """Dentro del contenedor, los motores montan la carpeta de datos *del host*. Si no se pudo
-    averiguar (ni preguntando a Docker ni por el entorno), los motores fallarían sin explicación."""
+    """Inside the container, the engines mount the *host's* data folder. If it couldn't be
+    found (neither by asking Docker nor from the environment), the engines would fail with no explanation."""
     inside = settings.text("TAMANDUA_DATA_DIR")
     if not inside or not in_container():
         return None
@@ -222,7 +222,7 @@ DOCKER_SOCKET = Path("/var/run/docker.sock")
 
 
 def socket_problem() -> dict | None:
-    """El caso típico en Linux y WSL: el socket es del grupo `docker`, no de root, y el contenedor no está en él."""
+    """Typical on Linux and WSL: the socket belongs to the `docker` group, not root, and the container isn't in it."""
     try:
         if not DOCKER_SOCKET.exists() or os.access(DOCKER_SOCKET, os.R_OK | os.W_OK):
             return None
@@ -245,7 +245,7 @@ def docker_available() -> bool:
                                        timeout=8) if binary else None
         except (OSError, subprocess.TimeoutExpired):
             completed = None
-        # Sin permiso sobre el socket, `docker info` puede salir con 0 y sin versión de servidor: eso no es Docker disponible.
+        # Without access to the socket, `docker info` can exit 0 with no server version: that isn't a usable Docker.
         _docker_state["ok"] = bool(completed) and completed.returncode == 0 and bool(completed.stdout.strip())
         _docker_state["why"] = socket_problem() or cause(completed) if not _docker_state["ok"] else ""
         _docker_state["at"] = time.monotonic()
@@ -254,7 +254,7 @@ def docker_available() -> bool:
 
 
 def docker_problem():
-    """Por qué Docker no está disponible, en una frase; vacío si lo está."""
+    """Why Docker isn't available, in one sentence; empty if it is."""
     return "" if docker_available() else (_docker_state.get("why") or msg("scanning.engines.docker_unresponsive"))
 
 
@@ -323,9 +323,9 @@ def engine_status() -> list[dict]:
 
 
 def pull_engines(report=None) -> list[dict]:
-    """Descarga por digest las imágenes publicadas que falten; la de Opengrep se construye con `make build`.
+    """Pulls the missing published images by digest; Opengrep's is built with `make build`.
 
-    `make engines` descarga desde el host (con progreso); esto queda para quien no use make."""
+    `make engines` pulls from the host (with progress); this is for those who don't use make."""
     if runner() == "local":  # installed with the image: nothing to download
         return [{**row, "action": msg("scanning.engines.action.none") if row["ready"] else msg("scanning.engines.action.not_installed")}
                 for row in engine_status()]
@@ -409,15 +409,15 @@ def _result(key: str, status: str, detail, findings: list | None = None, started
 
 
 def engine_user() -> list[str]:
-    """`--user` con el UID y GID de este proceso, y un HOME escribible para motores que guardan estado."""
+    """`--user` with this process's UID and GID, and a writable HOME for engines that keep state."""
     if not hasattr(os, "getuid"):
         return []
     return ["--user", f"{os.getuid()}:{os.getgid()}", "-e", "HOME=/tmp"]
 
 
 def writable_cache(preferred: Path) -> Path:
-    """La caché del motor si este usuario puede escribirla; si no (p. ej. la crearon motores que corrían
-    como root en una versión anterior), una nueva junto a ella. La vieja se puede borrar a mano."""
+    """The engine's cache if this user can write to it; otherwise (e.g. engines running as root in an
+    earlier version created it), a new one next to it. The old one can be deleted by hand."""
     preferred.mkdir(parents=True, exist_ok=True)
     blocked = not os.access(preferred, os.W_OK | os.X_OK) or any(
         not os.access(entry, os.W_OK) for entry in list(preferred.iterdir())[:50])
@@ -431,8 +431,8 @@ def writable_cache(preferred: Path) -> Path:
 def _run(key: str, arguments: list[str], snapshot: Path | None, *, network: bool = False,
          mounts: list[str] | None = None, timeout: int = 900, env: dict[str, str] | None = None,
          secret_env: dict[str, str] | None = None, hosts: dict[str, str] | None = None) -> subprocess.CompletedProcess:
-    """Contenedor efímero del motor. `secret_env` viaja por el entorno del cliente de Docker
-    (`-e NOMBRE` sin valor), nunca en la línea de comandos, para que no se vea en `ps` ni en los logs.
+    """The engine's ephemeral container. `secret_env` travels through the Docker client's environment
+    (`-e NAME` with no value), never on the command line, so it doesn't show in `ps` or in the logs.
     `hosts`: names the container resolves to a fixed address ({name: address}), already checked by the caller."""
     if runner() == "local":
         return _run_local(key, arguments, snapshot, mounts=mounts, timeout=timeout, env=env, secret_env=secret_env, network=network)
@@ -573,7 +573,7 @@ def _base(scanner: str, rule: str, title, path: str, line: int, severity: str, *
 # --- Opengrep ---------------------------------------------------------------------
 
 def snapshot_languages(snapshot: Path) -> dict:
-    """Qué lenguajes hay en el repositorio y cuáles tienen reglas propias."""
+    """Which languages the repository has, and which of them have our own rules."""
     present: dict[str, int] = {}
     for path in snapshot.rglob("*"):
         if not path.is_file():
@@ -622,9 +622,9 @@ def parse_opengrep(payload: dict) -> list[Finding]:
             reason=msg("scanning.opengrep.reason", snippet=snippet, path=path, line=line), remediation=remediation,
             cwe=cwe, owasp=str(metadata.get("owasp", "A05:2025")),
             confidence=CONFIDENCE.get(str(metadata.get("confidence", "MEDIUM")).upper(), 6),
-            # La huella usa el fragmento, no la línea: mover código no debe reabrir tickets.
+            # The fingerprint uses the snippet, not the line: moving code must not reopen tickets.
             digest=_stable("sast", rule, path, snippet))
-        # Dos coincidencias de la misma regla en la misma línea son un solo hallazgo (misma huella).
+        # Two matches of the same rule on the same line are a single finding (same fingerprint).
         if finding["fingerprint"] not in seen:
             seen.add(finding["fingerprint"])
             findings.append(finding)
@@ -635,10 +635,10 @@ MINIFIED_SUFFIXES = {".js", ".mjs", ".cjs", ".css"}
 
 
 def minified_files(snapshot: Path, limit: int = 200) -> list[str]:
-    """JavaScript y CSS compilados o minificados: líneas kilométricas que el SAST no puede leer con sentido.
+    """Compiled or minified JavaScript and CSS: endless lines that SAST can't make sense of.
 
-    Siguen en la instantánea (un bundle puede llevar una clave incrustada y Gitleaks debe verla);
-    solo se excluyen de Opengrep.
+    They stay in the snapshot (a bundle may carry an embedded key and Gitleaks must see it);
+    they are only excluded from Opengrep.
     """
     found = []
     for path in sorted(snapshot.rglob("*")):
@@ -658,9 +658,9 @@ def minified_files(snapshot: Path, limit: int = 200) -> list[str]:
 
 
 def _rules_for(snapshot: Path) -> Path:
-    """Las reglas tal como puede montarlas el motor. Con compose vienen montadas del host; lanzada la app
-    con `docker run` (CI) están solo dentro de su imagen, y el motor —un contenedor hermano— no las vería.
-    En ese caso se copian junto al snapshot, que sí está en la carpeta de datos montada."""
+    """The rules as the engine can mount them. With compose they come mounted from the host; with the app launched
+    by `docker run` (CI) they exist only inside its image, and the engine (a sibling container) wouldn't see them.
+    In that case they are copied next to the snapshot, which is in the mounted data folder."""
     if not in_container() or any(Path(inside).resolve() == RULES_DIR.resolve() for inside, _ in _host_pairs()):
         return RULES_DIR
     target = snapshot.parent / "opengrep-rules"
@@ -678,7 +678,7 @@ def run_opengrep(snapshot: Path) -> EngineResult:
         return _result("opengrep", "not_tested", msg("scanning.opengrep.no_docker", problem=docker_problem()))
     elif not image_available("opengrep"):
         reason = _last_image_error.get("opengrep", "")
-        # «No such image» es que falta construirla; cualquier otra cosa es un problema con Docker.
+        # "No such image" means it hasn't been built yet; anything else is a problem with Docker.
         if not reason or "no such image" in reason.lower():
             return _result("opengrep", "not_tested", msg("scanning.opengrep.image_missing"))
         return _result("opengrep", "not_tested", msg("scanning.opengrep.image_error", cause=reason))
@@ -688,8 +688,8 @@ def run_opengrep(snapshot: Path) -> EngineResult:
     try:
         completed = _run("opengrep", ["scan", "--config", "/rules", "--json", "--quiet", *excludes, "/src"], snapshot,
                          mounts=["-v", f"{host_path(_rules_for(snapshot))}:/rules:ro"])
-        # 0: sin hallazgos · 1: con hallazgos. Otro código (2 fatal, 7 configuración inválida…) es que no analizó:
-        # contarlo como «0 candidatos» sería un falso limpio.
+        # 0: no findings · 1: findings. Any other code (2 fatal, 7 invalid configuration…) means it didn't scan:
+        # counting it as "0 candidates" would be a false clean.
         if completed.returncode not in (0, 1):
             return _result("opengrep", "inconclusive", with_cause(msg("scanning.opengrep.exit_code", code=completed.returncode), completed), started=started)
         payload = json.loads(completed.stdout or "{}")
@@ -748,7 +748,7 @@ def _trivy_vulnerability(entry: dict, target: str, ecosystem: str, feeds: dict, 
     meta = (packages or {}).get(entry.get("PkgID")) or {}
     dev = bool(meta.get("Dev"))
     if dev:
-        # De desarrollo: no llega a producción, pero corre en los equipos y en la CI (cadena de suministro).
+        # Dev dependency: never reaches production, but runs on developer machines and in CI (supply chain).
         priority["factors"].append(msg("scanning.priority.dev_dependency"))
         if not kev and priority["action"] == "act":
             priority["action"] = "attend"
@@ -785,7 +785,7 @@ def _trivy_misconfiguration(entry: dict, target: str) -> dict:
                     remediation=str(entry.get("Resolution") or "").strip() or msg("scanning.iac.review_reference"),
                     cwe=[], owasp="A02:2025", confidence=8,
                     digest=_stable("iac", rule, target, resource or str(line)))
-    # Rango de líneas: con él se reconoce el mismo fallo cuando Checkov lo señala en el bloque del recurso.
+    # Line range: lets the same issue be recognized when Checkov flags it on the resource block.
     finding["end_line"] = max(line, int(cause.get("EndLine") or line))
     return finding
 
@@ -795,7 +795,7 @@ def _trivy_secret(entry: dict, target: str, custom: dict | None = None) -> dict:
     rule = str(entry.get("RuleID") or "secret")
     if rule in (custom or {}):
         return _custom_secret(custom[rule], rule, target, line, tool="trivy", confidence=8)
-    # Nunca se guarda el valor: Trivy ya lo redacta, y aquí ni siquiera se lee.
+    # The value is never stored: Trivy already redacts it, and here it isn't even read.
     category = entry.get("Category")
     return _base("secrets", rule, (SECRET_TITLES.get(rule) or msg("scanning.secrets.exposed_titled", title=str(entry.get("Title") or rule))),
                  target, line, SECRET_SEVERITY, tool="trivy",
@@ -809,12 +809,12 @@ MAX_PACKAGES = 20_000
 
 
 def trivy_packages(payload: dict, *, system: bool = False) -> list[dict]:
-    """Paquetes con su versión (no solo los vulnerables), de Trivy.
+    """Packages with their version (not just the vulnerable ones), from Trivy.
 
-    Por defecto, los de aplicación: con ellos se comprueban a diario los avisos que se publiquen después, sin
-    volver a analizar (ver advisory_watch). Con `system`, los del sistema operativo de una imagen, que solo van
-    al SBOM (sus avisos dependen de la versión de la distribución y llegan al reanalizar).
-    Además del nombre y la versión se guarda lo que pide un SBOM: purl, licencias y si es dependencia directa."""
+    By default, application packages: against them, advisories published later are checked daily without
+    rescanning (see advisory_watch). With `system`, an image's operating system packages, which only go
+    to the SBOM (their advisories depend on the distribution version and arrive on rescan).
+    Besides name and version it keeps what an SBOM asks for: purl, licenses and whether it's a direct dependency."""
     packages, seen = [], set()
     wanted = "os-pkgs" if system else "lang-pkgs"
     for result in payload.get("Results", []) or []:
@@ -872,7 +872,7 @@ def parse_trivy(payload: dict, feeds: dict, custom: dict | None = None) -> list[
 
 def _trivy_fs(snapshot: Path, cache_dir: Path, scanners: str, config_dir: Path | None, *,
               network: bool = True) -> subprocess.CompletedProcess:
-    # Con las dependencias de desarrollo (marcadas como tales) y la lista de paquetes para saber cuáles son.
+    # Include dev dependencies (flagged as such) and the full package list, to tell which ones they are.
     secret_config = ["--secret-config", "/cfg/trivy-secret.yaml"] if config_dir else []
     return _run("trivy", ["fs", "--scanners", scanners, *secret_config, "--include-dev-deps", "--list-all-pkgs",
                           "--cache-dir", "/cache", "--format", "json", "--quiet",
@@ -964,8 +964,8 @@ def _withhold(result: dict, settings: dict | None, reference) -> dict:
 # --- OSV-Scanner ---------------------------------------------------------------------
 
 def parse_osv_scanner(payload: dict, feeds: dict) -> list[Finding]:
-    """Un hallazgo por aviso y paquete. OSV agrupa en `groups` los identificadores del mismo aviso
-    (GHSA, PYSEC, CVE…); de cada grupo se toma uno como principal y el resto quedan como alias."""
+    """One finding per advisory and package. OSV groups the identifiers of the same advisory in `groups`
+    (GHSA, PYSEC, CVE…); one from each group becomes the primary and the rest become aliases."""
     from tamandua.modules.intel.advisories import dependency_finding
     from tamandua.modules.scanning.dependency_merge import stable_fingerprint
     findings, seen = [], set()
@@ -999,11 +999,11 @@ def parse_osv_scanner(payload: dict, feeds: dict) -> list[Finding]:
 
 
 def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bool = False) -> EngineResult:
-    """OSV-Scanner con las bases de avisos descargadas en local: la lista de dependencias no sale de aquí.
+    """OSV-Scanner with the advisory databases downloaded locally: the dependency list never leaves this machine.
 
-    Solo con `resolve` (el usuario autorizó consultas externas) resuelve dependencias transitivas de
-    manifiestos sin lockfile, lo que consulta deps.dev. El análisis de llamadas queda apagado: en Rust
-    ejecutaría scripts de compilación del repositorio."""
+    Only with `resolve` (the user allowed external queries) does it resolve transitive dependencies of
+    manifests without a lockfile, which queries deps.dev. Call analysis stays off: in Rust it would
+    run the repository's build scripts."""
     started = time.time()
     if problem := unavailable("osv-scanner", msg("scanning.osv.no_docker")):
         return _result("osv-scanner", "not_tested", problem)
@@ -1013,7 +1013,7 @@ def run_osv_scanner(snapshot: Path, cache_dir: Path, feeds: dict, *, resolve: bo
     try:
         completed = _run("osv-scanner", arguments, snapshot, network=True, timeout=1800,
                          env={"OSV_SCANNER_LOCAL_DB_CACHE_DIRECTORY": "/cache"}, mounts=["-v", f"{host_path(cache_dir)}:/cache"])
-        # 0: sin avisos · 1: con avisos. Cualquier otro código es un error del motor.
+        # 0: no advisories · 1: advisories. Any other code is an engine error.
         if completed.returncode not in (0, 1) or not completed.stdout.strip():
             if completed.returncode == 0:
                 return _result("osv-scanner", "completed", msg("scanning.osv.no_manifests"), started=started)
@@ -1174,7 +1174,7 @@ def parse_gitleaks(payload: list, custom: dict | None = None, root: Path | None 
 def _gitleaks_report(snapshot: Path, settings: dict | None, started: float, *, strict: bool = False) -> tuple[list | None, dict | None]:
     """(report, None), or (None, the step's result) when Gitleaks couldn't produce it. `strict`: a missing report is
     a failure even without settings."""
-    # El reporte se escribe junto al snapshot: es la única carpeta que ambos contenedores ven.
+    # The report is written next to the snapshot: it's the only folder both containers see.
     # The settings go in a separate folder, mounted read-only.
     with tempfile.TemporaryDirectory(prefix="gitleaks-", dir=snapshot.parent) as output, \
             tempfile.TemporaryDirectory(prefix="gitleaks-config-", dir=snapshot.parent) as config:
@@ -1226,7 +1226,7 @@ def run_gitleaks(snapshot: Path, settings: dict | None = None) -> EngineResult:
 
 
 def merge_secrets(*groups: list[Finding]) -> list[Finding]:
-    """Un mismo secreto lo ven dos motores: se conserva uno y se anota el otro."""
+    """The same secret seen by two engines: one is kept and the other is noted."""
     by_location: dict[tuple[str, int], dict] = {}
     for group in groups:
         for finding in group:

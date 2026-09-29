@@ -16,7 +16,7 @@ class FirstRunTests(HttpCase):
         auth = self.state.auth
         code = auth.setup_code()
         self.assertRegex(code, r"^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$")
-        self.assertEqual(auth.setup_code(), code)  # estable mientras no se use
+        self.assertEqual(auth.setup_code(), code)  # stable until it is used
         status, body, _ = self.post("/api/auth/setup", "setup-admin", self.setup_body("AAAA-BBBB-CCCC"))
         self.assertEqual(status, 400)
         self.assertIn("consola", body["error"])
@@ -27,7 +27,7 @@ class FirstRunTests(HttpCase):
         # The cookie from setup is a real session: the admin lands signed in (and goes on to enrol TOTP).
         session = self.call("GET", "/api/auth/session", headers={"Cookie": cookies[0].split(";")[0]})[1]
         self.assertTrue(session["authenticated"], session)
-        # Ya hay administrador: el código muere y no se puede crear otro por esta vía.
+        # There is an admin now: the code dies and no other one can be created this way.
         self.assertIsNone(auth.setup_code())
         status, _, _ = self.post("/api/auth/setup", "setup-admin", self.setup_body(code, "otro"))
         self.assertEqual(status, 400)

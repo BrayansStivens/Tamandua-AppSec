@@ -1,20 +1,20 @@
-"""Identidad y sesiones del panel, solo con la biblioteca estándar.
+"""Panel identity and sessions, with the standard library only.
 
-Tres piezas separadas a propósito, para que SSO/OIDC se enchufe después sin
-rehacer nada:
+Three pieces kept apart on purpose, so SSO/OIDC can plug in later without
+redoing anything:
 
-* **Usuarios** (`data/auth/users.json`, 0600): identidad (id, usuario, rol) y sus
-  credenciales locales —contraseña con scrypt y, opcionalmente, TOTP con
-  códigos de respaldo—. Un proveedor externo añadiría una identidad más al
-  usuario, no otro tipo de usuario.
-* **Sesiones** (`data/auth/sessions.json`): del lado del servidor, para poder
-  revocarlas (cerrar sesión, cambiar contraseña). El navegador solo recibe un
-  identificador aleatorio firmado con HMAC en una cookie HttpOnly.
-* **Límite de intentos**: por usuario y por dirección de origen, con bloqueo
-  progresivo. Vive en memoria: reiniciar el servidor lo reinicia también.
+* **Users** (`data/auth/users.json`, 0600): identity (id, username, role) and
+  its local credentials — a scrypt password and, optionally, TOTP with backup
+  codes. An external provider would add one more identity to the user, not
+  another kind of user.
+* **Sessions** (`data/auth/sessions.json`): server-side, so they can be revoked
+  (sign-out, password change). The browser only gets a random identifier
+  signed with HMAC in an HttpOnly cookie.
+* **Attempt limits**: per user and per source address, with progressive
+  lock-out. It lives in memory: restarting the server resets it too.
 
-Nunca se guarda ni se registra una contraseña, un código TOTP ni el valor de la
-cookie; en los logs solo aparecen usuario, resultado y motivo.
+A password, a TOTP code or the cookie value is never stored or logged; logs
+only show the username, the outcome and the reason.
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-# ---------------------------------------------------------------- contraseñas
+# ------------------------------------------------------------------ passwords
 
 def hash_password(password: str) -> dict:
     validate_password(password)
@@ -86,8 +86,8 @@ def hash_password(password: str) -> dict:
 
 
 def verify_password(record: dict | None, password: str) -> bool:
-    # Con un usuario inexistente se calcula igual sobre un registro fijo: el
-    # tiempo de respuesta no dice si el usuario existe.
+    # For an unknown user the hash is still computed, against a fixed record:
+    # the response time doesn't reveal whether the user exists.
     record = record or _DUMMY
     try:
         digest = hashlib.scrypt(password.encode("utf-8"), salt=base64.b64decode(record["salt"]), dklen=32,
@@ -123,7 +123,7 @@ def totp_code(secret: bytes, moment: int, *, digits: int = TOTP_DIGITS, step: in
 
 
 def totp_matches(secret: bytes, code: str, moment: int, last_step: int | None) -> int | None:
-    """Devuelve el paso aceptado (±1 de tolerancia) o None. Un paso ya usado no vale dos veces."""
+    """Returns the accepted step (±1 tolerance) or None. A step already used doesn't count twice."""
     if not isinstance(code, str) or not re.fullmatch(r"\d{6}", code):
         return None
     current = moment // TOTP_STEP
@@ -173,11 +173,11 @@ def _seal_clear_seeds(totp: dict) -> bool:
     return changed
 
 
-# ------------------------------------------------------------------- usuarios
+# ---------------------------------------------------------------------- users
 
 class Users:
-    """Usuarios en PostgreSQL (tabla users). Los cambios van en transacción con cerrojo: dos altas o cambios a la vez,
-    desde el API o la CLI, no se pisan."""
+    """Users in PostgreSQL (users table). Changes run in a locked transaction: two users created or changed at
+    once, from the API or the CLI, don't overwrite each other."""
 
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
@@ -236,14 +236,14 @@ class Users:
         return self._one(users.c.id == user_id) if isinstance(user_id, str) else None
 
     def create_first_admin(self, username: str, password: str, display_name: str = "") -> dict:
-        """Como `create`, pero solo si no hay nadie: dos altas simultáneas no crean dos administradores."""
+        """Like `create`, but only if nobody exists yet: two concurrent calls don't create two administrators."""
         with self._locked():
             if self.any():
                 raise AuthError(msg("auth.errors.workspace_has_admin"))
             return self.create(username, password, role="admin", display_name=display_name)
 
     def create(self, username: str, password: str | None, *, role: str = "member", display_name: str = "") -> dict:
-        """Con contraseña (CLI) o sin ella (invitación: la pone el invitado con su enlace)."""
+        """With a password (CLI) or without one (invitation: the invitee sets it through their link)."""
         key = normalize_username(username)
         if role not in ROLES:
             raise AuthError(msg("auth.errors.invalid_role"))
@@ -293,7 +293,7 @@ class Users:
                             guard=lambda rows, target: _admin_guard(rows, target, actor_id, role=role))
         _log.info("role_changed", extra={"user": user["username"], "role": role})
 
-    # -- Enlaces de un solo uso para invitar o restablecer la contraseña: solo se guarda su hash.
+    # -- One-time links to invite someone or reset a password: only their hash is stored.
     def issue_link(self, user_id: str, purpose: str) -> str:
         if purpose not in ("invite", "reset"):
             raise AuthError(msg("auth.errors.invalid_link"))
@@ -350,7 +350,7 @@ class Users:
     def touch_login(self, user_id: str) -> None:
         self._update(user_id, lambda user: user.update(last_login_at=_now()))
 
-    # -- TOTP: se prepara (secreto pendiente), se confirma con un código válido y queda activo.
+    # -- TOTP: prepared (pending secret), confirmed with a valid code, and then active.
     def begin_totp(self, user_id: str) -> dict:
         secret = secrets.token_bytes(20)
         def mutate(user):
@@ -389,7 +389,7 @@ class Users:
         _log.info("totp_reset", extra={"user": user["username"]})
 
     def verify_totp(self, user_id: str, code: str, moment: int | None = None) -> bool:
-        """Acepta un código TOTP o un código de respaldo; consume lo que use."""
+        """Accepts a TOTP code or a backup code; consumes whichever it uses."""
         outcome = {"ok": False}
         def mutate(user):
             totp = user.get("totp", {})
@@ -415,7 +415,7 @@ class Users:
 
 
 def _admin_guard(rows: list[dict], target: dict, actor_id: str | None, *, role: str | None = None, disable: bool = False) -> None:
-    """Nadie se quita a sí mismo el acceso de administrador y nunca se queda el sistema sin uno activo."""
+    """Nobody removes their own admin access, and the system is never left without an active administrator."""
     demotes = disable or (role is not None and role != "admin")
     if actor_id is not None and target["id"] == actor_id and demotes:
         raise AuthError(msg("auth.errors.self_demote"))
@@ -434,7 +434,7 @@ def normalize_username(value, *, strict: bool = True) -> str:
     return key[:40]
 
 
-# ------------------------------------------------------------------- sesiones
+# ------------------------------------------------------------------- sessions
 
 SESSION_KEY = "session-key"
 SETUP_CODE = "setup-code"
@@ -457,8 +457,8 @@ def import_session_key(data_dir: Path) -> int:
 
 
 class Sessions:
-    """Sesiones del lado del servidor (tabla sessions) con cookie firmada; el retén (`challenge`) cubre el paso TOTP.
-    Validar una cookie es una búsqueda por clave primaria (antes se leía el archivo entero en cada petición)."""
+    """Server-side sessions (sessions table) with a signed cookie; the `challenge` hold covers the TOTP step.
+    Validating a cookie is a primary-key lookup (it used to read the whole file on every request)."""
 
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
@@ -519,7 +519,7 @@ class Sessions:
             attributes.append("Secure")
         return "; ".join(attributes)
 
-    # -- retén entre contraseña correcta y TOTP: token opaco de vida corta, del lado del servidor.
+    # -- hold between a correct password and TOTP: a short-lived opaque token, kept server-side.
     def open_challenge(self, user_id: str, client: str) -> str:
         token = secrets.token_urlsafe(32)
         now = time.time()
@@ -545,7 +545,7 @@ class Sessions:
             connection.execute(delete(auth_challenges).where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.id == _token_hash(token)))
 
     def fail_challenge(self, token: str) -> None:
-        """Tres códigos fallidos agotan el reto: hay que volver a la contraseña."""
+        """Three failed codes use up the challenge: back to the password."""
         with db.transaction(self.data_dir) as connection:
             failures = connection.execute(update(auth_challenges).where(auth_challenges.c.tenant_id == TENANT, auth_challenges.c.id == _token_hash(token))
                                           .values(failures=auth_challenges.c.failures + 1).returning(auth_challenges.c.failures)).scalar_one_or_none()
@@ -565,7 +565,7 @@ def parse_cookie(header: str | None) -> str | None:
     return None
 
 
-# ------------------------------------------------------- límite de intentos
+# ----------------------------------------------------------- attempt limits
 
 class Throttle:
     """Progressive lock-out per key (user or address): 30 s, 60 s, 120 s… up to 15 min. In the database, so every
@@ -609,7 +609,7 @@ class Throttle:
 
 
 class Authenticator:
-    """Orquesta usuarios, sesiones y bloqueo. Es lo único que toca el servidor."""
+    """Orchestrates users, sessions and lock-out. It is the only thing the server touches."""
 
     def __init__(self, data_dir: Path):
         self.users = Users(data_dir)
@@ -657,19 +657,19 @@ class Authenticator:
         return value if value in TOTP_POLICIES else "admins"
 
     def needs_totp(self, user: dict) -> bool:
-        """Verdadero si la política exige TOTP a este usuario y aún no lo tiene: solo puede enrolarse."""
+        """True if the policy requires TOTP for this user and they don't have it yet: they can only enrol."""
         policy = self.totp_policy()
         required = policy == "all" or (policy == "admins" and user.get("role") == "admin")
         return required and not user.get("totp", {}).get("enabled")
 
     def second_factor_for_link(self, user: dict, client: str) -> dict:
-        """Tras canjear un enlace: si la cuenta tiene TOTP, el enlace sustituye la contraseña, no el segundo factor."""
+        """After redeeming a link: if the account has TOTP, the link replaces the password, not the second factor."""
         if user["totp"].get("enabled"):
             return {"challenge": self.sessions.open_challenge(user["id"], client)}
         return self._complete(user, client, mfa=False)
 
     def login(self, username, password, client: str) -> dict:
-        """Primer paso. Devuelve {"session": cookie} o {"challenge": token} si falta TOTP."""
+        """First step. Returns {"session": cookie}, or {"challenge": token} if TOTP is still needed."""
         key = normalize_username(username, strict=False) if isinstance(username, str) else ""
         if not key or not isinstance(password, str) or len(password) > PASSWORD_MAX:
             raise AuthError(msg("auth.errors.bad_credentials"))
@@ -680,7 +680,7 @@ class Authenticator:
                 _log.warning("login_blocked", extra={"user": key, "client": client, "retry_in": wait})
                 raise Locked(wait)
         user = self.users.get(key)
-        # Un número acotado de scrypt a la vez: cada uno reserva 32 MiB.
+        # A bounded number of scrypt runs at a time: each one reserves 32 MiB.
         with _SCRYPT_SLOTS:
             ok = verify_password(user["password"] if user else None, password) and user is not None and not user.get("disabled")
         if not ok:
@@ -731,7 +731,7 @@ class Authenticator:
         self.sessions.revoke(parse_cookie(cookie_header))
 
     def change_password(self, user: dict, current: str, new: str, cookie_header: str | None) -> str:
-        """Cambia la contraseña, cierra las demás sesiones y devuelve una cookie nueva para esta."""
+        """Changes the password, closes the other sessions and returns a new cookie for this one."""
         if not verify_password(user["password"], current if isinstance(current, str) else ""):
             raise AuthError(msg("auth.errors.current_password_mismatch"))
         mfa = bool((self.current(cookie_header)[1] or {}).get("mfa"))

@@ -1,4 +1,4 @@
-"""Triage persistente: la decisión sobrevive entre escaneos y cambia lo que cuenta como pendiente."""
+"""Persistent triage: the decision survives across scans and changes what counts as pending."""
 
 import tempfile
 import unittest

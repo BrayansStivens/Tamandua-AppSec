@@ -1,4 +1,4 @@
-"""Community lista para otros: datos de demostración y primeros pasos deducidos del estado real."""
+"""Community ready for others: demo data and first steps derived from the real state."""
 
 import base64
 import os
@@ -35,7 +35,7 @@ class DemoTests(unittest.TestCase):
             second = demo.seed(data, fixtures=ROOT / "fixtures", models=ROOT / "web/src/examples/threat-models", report=lambda message: None)
             self.assertEqual(seen[0], ("local:demo-ejemplos", ["sast-samples", "scanner-samples"]))
             self.assertEqual((first["code"]["status"], "threat_model" in first, "threat_model" in second), ("completed", True, False))
-            self.assertEqual([model["name"] for model in tm.list_models(data)], [demo.model_name()])  # no se duplica
+            self.assertEqual([model["name"] for model in tm.list_models(data)], [demo.model_name()])  # not duplicated
             self.assertEqual({row["source"]["id"] for row in list_runs(data)}, {"local:demo-ejemplos"})
             # Tests run with TAMANDUA_DEFAULT_LOCALE=es: the demo speaks Spanish and imports the Spanish example.
             self.assertEqual(demo.model_name(), "Demo · Portal de clientes (STRIDE)")
@@ -71,8 +71,8 @@ class OnboardingTests(HttpCase):
             demo_scan = _scan("demo · ejemplos vulnerables", [], datetime.now(timezone.utc).isoformat())
             save_repository_scan(self.data_dir, {**demo_scan, "source": {**demo_scan["source"], "id": "local:demo-ejemplos"}})
             _, state, _ = self.call("GET", "/api/onboarding", headers={"Cookie": cookie})
-            self.assertEqual((state["demo"], state["analyzed"]), (True, False))  # la demo no es «tu primer análisis»
-            # Activar el segundo factor por el flujo real: confirmar reemite la sesión.
+            self.assertEqual((state["demo"], state["analyzed"]), (True, False))  # the demo is not "your first scan"
+            # Enable the second factor through the real flow: confirming reissues the session.
             _, body, _ = self.post("/api/auth/totp/setup", "totp-setup", {}, cookie)
             code = totp_code(base64.b32decode(body["secret"]), int(time.time()))
             cookie = self.post("/api/auth/totp/confirm", "totp-confirm", {"code": code}, cookie)[2][0].split("; ")[0]

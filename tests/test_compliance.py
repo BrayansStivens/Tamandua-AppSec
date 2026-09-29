@@ -1,4 +1,4 @@
-"""Fase de cumplimiento: paquetes maliciosos, SBOM CycloneDX, VEX desde el triage, EUVD y marcos del informe."""
+"""Compliance phase: malicious packages, CycloneDX SBOM, VEX from triage, EUVD and report frameworks."""
 
 import os
 import tempfile
@@ -41,13 +41,13 @@ class MaliciousTests(unittest.TestCase):
                          ("critical", True, "act", None))
         self.assertEqual(finding["source"]["id"], "ossf-malicious")
         self.assertIn("rota sus tokens", text(finding["remediation"]))
-        # Otro aviso del mismo paquete tampoco propone «actualiza a…».
+        # Another advisory of the same package doesn't propose "upgrade to…" either.
         other = {**_finding("b" * 64, "high", package="event-stream"), "path": "package-lock.json",
                  "package": {"ecosystem": "npm", "name": "event-stream", "version": "3.3.6", "fixed_version": "4.0.0"}}
         fix_guide.attach([finding, other])
         self.assertIn("paquete malicioso", text(other["fix"]["steps"][0]))
         self.assertFalse(any("Actualiza" in step for step in localize(finding["fix"]["steps"])))
-        # Los informes (tabla y «qué hacer primero») dicen lo mismo que el panel, y lo malicioso va primero.
+        # The reports (table and "what to do first") say the same as the panel, and malicious comes first.
         from tamandua.modules.findings.remediation import action, fix_groups
         groups = fix_groups([_finding("c" * 64, "critical", package="axios"), finding, other])
         self.assertTrue(groups[0]["malicious"])
@@ -71,12 +71,12 @@ class SbomAndVexTests(unittest.TestCase):
         document = sbom.cyclonedx(self.record(), version="0.9", now=NOW)
         self.assertEqual((document["bomFormat"], document["specVersion"]), ("CycloneDX", "1.6"))
         refs = {component["bom-ref"]: component for component in document["components"]}
-        # Los paquetes de los hallazgos que no estaban en el inventario (otra versión de lodash, minimist) entran igual.
+        # Packages of findings that weren't in the inventory (another lodash version, minimist) get in all the same.
         self.assertEqual(set(refs), {"pkg:npm/lodash@4.17.20", "pkg:npm/left-pad@1.3.0", "pkg:npm/lodash@1.0.0", "pkg:npm/minimist@1.0.0"})
         self.assertEqual(refs["pkg:npm/lodash@4.17.20"]["licenses"], [{"license": {"name": "MIT"}}])
         root = document["metadata"]["component"]
         self.assertEqual((root["bom-ref"], root["hashes"][0]["content"]), ("pkg:github/acme/api", "f" * 64))
-        # Relación conocida: el producto depende directamente de lodash, no de left-pad (transitiva).
+        # Known relationship: the product depends directly on lodash, not on left-pad (transitive).
         self.assertIn("pkg:npm/lodash@4.17.20", document["dependencies"][0]["dependsOn"])
         self.assertNotIn("pkg:npm/left-pad@1.3.0", document["dependencies"][0]["dependsOn"])
 
@@ -107,7 +107,7 @@ class SbomAndVexTests(unittest.TestCase):
         record["findings"] = findings + [extra, code, _finding("e" * 64, "medium", package="ms")]
         document = vex.openvex(record, version="0.9", now=NOW)
         statuses = [statement["status"] for statement in document["statements"]]
-        self.assertEqual(statuses, ["not_affected", "affected", "fixed", "under_investigation"])  # el hallazgo de código no entra
+        self.assertEqual(statuses, ["not_affected", "affected", "fixed", "under_investigation"])  # not the code finding
         first, second = document["statements"][:2]
         self.assertEqual(first["impact_statement"], "La función vulnerable no se usa")
         self.assertIn("hasta 2026-12-01", second["action_statement"])
@@ -238,10 +238,10 @@ class ExportRouteTests(HttpCase):
             self.assertEqual(body["components"][0]["purl"], "pkg:npm/axios@1.0.0")
         triage.decide(self.data_dir, self.run, ["a" * 64], "false_positive", reason="No se alcanza desde el código", user=ADMIN)
         status, body, _ = self.get(f"/api/assets/export?key={self.key}&artifact=vex.openvex.json&status=open")
-        self.assertEqual((status, body["statements"][0]["status"]), (200, "not_affected"))  # también lo descartado
+        self.assertEqual((status, body["statements"][0]["status"]), (200, "not_affected"))  # the dismissed one too
         self.assertEqual(self.get(f"/api/assets/export?key={self.key}&artifact=sbom.xml")[0], 404)
         broken = save_repository_scan(self.data_dir, {**_scan("org/api", [], datetime.now(timezone.utc).isoformat()), "status": "incomplete"})
-        self.assertEqual(self.get(f"/api/runs/{broken['id']}/sbom.cdx.json")[0], 404)  # no se exporta como si hubiera terminado
+        self.assertEqual(self.get(f"/api/runs/{broken['id']}/sbom.cdx.json")[0], 404)  # not exported as if finished
 
 
 class EuvdTests(unittest.TestCase):
@@ -263,7 +263,7 @@ class EuvdTests(unittest.TestCase):
         item = euvd.lookup(self.data_dir, "CVE-2026-7777", fetch=fetch, now=NOW)
         self.assertEqual((item["id"], item["severity"], item["exploited_since"]), ("EUVD-2026-9", "critical", "2026-09-02"))
         euvd.lookup(self.data_dir, "CVE-2026-7777", fetch=fetch, now=NOW + timedelta(days=1))
-        self.assertEqual(len(calls), 1)  # de la caché
+        self.assertEqual(len(calls), 1)  # from the cache
 
         def down(cve):
             raise OSError("sin red")
@@ -278,7 +278,7 @@ class EuvdRouteTests(HttpCase):
         Users(self.data_dir).create("analista", PASSWORD)
         cookie = {"Cookie": self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})[2][0].split("; ")[0]}
         entry = nvd_entry("CVE-2026-55555", "2026-09-19T00:00:00.000")
-        entry["cve"]["metrics"] = {}  # NVD ya no lo enriquece
+        entry["cve"]["metrics"] = {}  # NVD no longer enriches it
         cve_db.upsert(self.data_dir, [entry])
         payload = {"items": [{"id": "EUVD-2026-5", "aliases": "CVE-2026-55555", "baseScore": 7.5, "baseScoreVersion": "3.1",
                               "baseScoreVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"}]}

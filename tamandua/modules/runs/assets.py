@@ -32,7 +32,7 @@ class AssetPurged:
 
 
 def backfill(data_dir: Path, repositories: list[dict]) -> int:
-    """Ejecuciones guardadas antes de la identidad estable: se les pone su `uid` y se mueven triage y tickets."""
+    """Runs saved before the stable identity: they get their `uid`, and triage and tickets move with them."""
     uid_of = {item["id"]: item["uid"] for item in repositories if item.get("uid")}
     moved: dict[str, str] = {}
     updated = 0
@@ -58,7 +58,7 @@ def backfill(data_dir: Path, repositories: list[dict]) -> int:
 
 def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None = None,
               active_accounts: set[str] | None = None) -> dict:
-    """Compara lo analizado con la lista COMPLETA de la instalación. Devuelve qué se marcó y qué se borró."""
+    """Compares what was analysed with the installation's FULL list. Returns what was marked and what was deleted."""
     now = now or datetime.now(timezone.utc)
     backfill(data_dir, repositories)
     analysed = {asset_key(row): (row.get("source") or {}).get("name") for row in find_runs(data_dir, asset_prefix="github#")}
@@ -69,7 +69,7 @@ def reconcile(data_dir: Path, repositories: list[dict], *, now: datetime | None 
 
 
 def purge(data_dir: Path, uid: str) -> int:
-    """Borra las ejecuciones de un repositorio y avisa para que cada contexto olvide lo suyo. Devuelve ejecuciones borradas."""
+    """Deletes a repository's runs and announces it so every context forgets its own data. Returns the runs deleted."""
     removed = delete_runs(data_dir, [row["id"] for row in find_runs(data_dir, assets=[uid])])
     events.publish(AssetPurged(data_dir, uid))
     _log.warning("repo_purged", extra={"reason": f"{uid}: {removed} ejecuciones borradas"})
@@ -77,10 +77,10 @@ def purge(data_dir: Path, uid: str) -> int:
 
 
 def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
-    """Un renglón por repositorio analizado: su último escaneo completo, lo pendiente y si GitHub lo retiró."""
+    """One row per analysed repository: its latest full scan, what is pending and whether GitHub removed it."""
     registry = source_assets.load_registry(data_dir)
     groups: dict[str, dict] = {}
-    for row in find_runs(data_dir, types=FINDING_RUNS):  # del más reciente al más antiguo
+    for row in find_runs(data_dir, types=FINDING_RUNS):  # newest first
         key = asset_key(row)
         entry = groups.setdefault(key, {"key": key, "name": (row.get("source") or {}).get("name"), "provider": (row.get("source") or {}).get("provider"),
                                         "source_id": (row.get("source") or {}).get("id"), "scans": 0, "pr_reviews": 0,
@@ -91,7 +91,7 @@ def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
         if row["type"] in FULL_SCANS and entry["latest_scan"] is None and row["status"] in ("completed", "incomplete"):
             entry["latest_scan"] = {"run_id": row["id"], "created_at": row["created_at"], "status": row["status"]}
     for key, entry in groups.items():
-        # Lo pendiente sale del registro: escaneos y PRs juntos, menos lo remediado y lo descartado.
+        # Pending comes from the registry: scans and PRs together, minus what was remediated or dismissed.
         counts = findings_registry.summarize(data_dir, key)
         entry["open"] = {"total": counts["open"], **counts["by_severity"], "from_pr": counts["from_pr"],
                          "fixed": counts["fixed"], "suppressed": counts["suppressed"], "excluded": counts["excluded"]}
@@ -103,10 +103,10 @@ def overview(data_dir: Path, *, query: str | None = None) -> list[dict]:
 
 
 def in_flight(data_dir: Path, key: str) -> dict | None:
-    """Un análisis completo de ese activo que aún no terminó, si lo hay."""
+    """A full scan of that asset that has not finished yet, if any."""
     return next(iter(find_runs(data_dir, types=FULL_SCANS, statuses=("queued", "running"), assets=[key], limit=1)), None)
 
 
 def latest_scan(data_dir: Path, key: str) -> dict | None:
-    """El último análisis completo del activo: de él sale cómo volver a analizarlo (repositorio o imagen)."""
+    """The asset's latest full scan: it tells how to scan it again (repository or image)."""
     return next(iter(find_runs(data_dir, types=FULL_SCANS, assets=[key], limit=1)), None)

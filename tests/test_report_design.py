@@ -1,4 +1,4 @@
-"""Informes y diagrama con el sistema de diseño: concisos, agrupados por acción y con colores de la paleta."""
+"""Reports and diagram on the design system: concise, grouped by action and in palette colours."""
 
 import base64
 import json
@@ -36,7 +36,7 @@ def pages(pdf: bytes) -> int:
 
 
 def text(pdf: bytes) -> str:
-    """Texto aproximado de un PDF de ReportLab (flujos comprimidos), para comprobar qué dice."""
+    """Approximate text of a ReportLab PDF (compressed streams), to check what it says."""
     chunks = []
     for stream in re.findall(rb"stream\r?\n(.*?)endstream", pdf, re.S):
         stream = stream.strip()
@@ -53,16 +53,16 @@ class RemediationTests(unittest.TestCase):
         findings = [advisory("CVE-1", "high", "11.0.0"), advisory("CVE-2", "critical", "12.3.0"), advisory("CVE-3", "medium", "9.9.0"),
                     code("a", "high"), code("b", "high")]
         groups = fix_groups(findings)
-        self.assertEqual(len(groups), 3)  # un paquete + dos hallazgos de código
+        self.assertEqual(len(groups), 3)  # one package + two code findings
         package = next(entry for entry in groups if entry["kind"] == "package")
         self.assertEqual((package["severity"], package["target"], package["complete"], len(package["items"])), ("critical", "12.3.0", True, 3))
         self.assertEqual(action(package), "Actualizar pillow a 12.3.0 (cierra los 3)")
-        self.assertEqual(len(fix_groups(findings, by_rule=True)), 2)  # la misma regla en dos sitios: un patrón
+        self.assertEqual(len(fix_groups(findings, by_rule=True)), 2)  # the same rule in two places: one pattern
 
     def test_exploited_first_and_partial_fixes_are_said(self):
         groups = fix_groups([advisory("CVE-9", "critical", "2.0"), advisory("CVE-5", "medium", None, kev=True, name="lib", version="1.0"),
                              advisory("CVE-6", "high", "1.5", name="lib", version="1.0")])
-        self.assertEqual(groups[0]["name"], "lib")  # explotación activa antes que severidad
+        self.assertEqual(groups[0]["name"], "lib")  # active exploitation before severity
         self.assertIn("cierra 1 de 2", action(groups[0]))
         self.assertEqual(action(fix_groups([advisory("CVE-7", "low", None)])[0], short=True),
                          "Sin versión corregida: evaluar alcanzabilidad, mitigar o sustituir")
@@ -79,7 +79,7 @@ class ReportTests(unittest.TestCase):
     def test_a_package_with_many_advisories_is_one_row(self):
         many = [advisory(f"CVE-2026-{index:04d}", "high", f"12.{index}.0") for index in range(120)]
         pdf = render_audit_pdf(self.record(many), many, validate_options({"framework": "soc2", "detail": "all"}, default_by="ana"), version="t")
-        self.assertLessEqual(pages(pdf), 4)  # antes, una fila y un bloque por aviso: decenas de páginas
+        self.assertLessEqual(pages(pdf), 4)  # previously one row and one block per advisory: dozens of pages
         self.assertIn("120 vulnerabilidades", text(pdf))
 
     def test_technical_report_puts_actions_first_and_says_what_was_not_analysed(self):
@@ -89,7 +89,7 @@ class ReportTests(unittest.TestCase):
         self.assertTrue(pdf.startswith(b"%PDF-"))
         for expected in ("Qu\\351 hacer primero", "Actualizar pillow a 12.0.0 \\(cierra los 40\\)", "Cobertura incompleta", "Anexo"):
             self.assertIn(expected, content)
-        self.assertIn("(org/) Tj (<) Tj (b) Tj (>) Tj (app)", content)  # el nombre es dato: se ve tal cual, no se interpreta
+        self.assertIn("(org/) Tj (<) Tj (b) Tj (>) Tj (app)", content)  # the name is data: shown as is, not interpreted
         self.assertLessEqual(pages(pdf), 5)
 
     def test_markdown_report_renders_in_the_requested_language(self):
@@ -117,8 +117,8 @@ class DiagramTests(unittest.TestCase):
         svg = tm.to_svg(current)
         ET.fromstring(svg)
         self.assertIn(threat_diagram.COLORS["danger"][0], svg)
-        self.assertIn("1 · HTTPS", svg)          # flujos numerados como en la tabla del informe
-        self.assertIn("Actores y terceros", svg)  # leyenda de los colores automáticos que se usan
+        self.assertIn("1 · HTTPS", svg)          # flows numbered as in the report's table
+        self.assertIn("Actores y terceros", svg)  # legend for the automatic colours in use
 
     def test_data_flows_left_to_right_and_back_flows_do_not_push_columns(self):
         example = tm.from_portable(json.loads(EXAMPLE.read_text(encoding="utf-8")))
@@ -127,7 +127,7 @@ class DiagramTests(unittest.TestCase):
         actors = [layout["nodes"][key]["x"] for key, kind in kinds.items() if kind == "actor"]
         others = [layout["nodes"][key]["x"] for key, kind in kinds.items() if kind not in ("actor",)]
         self.assertLess(max(actors), min(others))
-        for point in layout["nodes"].values():  # rejilla de 8 px: fácil de retocar a mano
+        for point in layout["nodes"].values():  # 8 px grid: easy to tweak by hand
             self.assertEqual((point["x"] % 8, point["y"] % 8), (0, 0))
 
 

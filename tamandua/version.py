@@ -1,5 +1,5 @@
-"""Versión del producto: la leen la API, los informes, el Makefile y el CI."""
+"""Product version: read by the API, the reports, the Makefile and CI."""
 
 VERSION = "0.9"
-# Con qué se presenta Tamandua ante los servicios externos (GitHub, OSV, NVD, Jira…).
+# How Tamandua identifies itself to external services (GitHub, OSV, NVD, Jira…).
 USER_AGENT = f"Tamandua/{VERSION}"

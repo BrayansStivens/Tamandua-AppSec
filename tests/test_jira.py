@@ -1,4 +1,4 @@
-"""Conector de Jira contra un Jira simulado: nunca sale a la red."""
+"""Jira connector against a fake Jira: never goes out to the network."""
 
 import json
 import tempfile
@@ -66,7 +66,7 @@ class JiraTests(unittest.TestCase):
         state = self.configure()
         self.assertEqual((state["project"], state["last4"], state["project_name"]), ("SEC", "1234", "Seguridad"))
         self.assertNotIn(TOKEN, json.dumps(state))
-        # Cifrado en el almacén: el token no aparece en ningún fichero de configuración.
+        # Encrypted in the store: the token appears in no configuration file.
         for path in (self.data_dir / "config").iterdir():
             self.assertNotIn(TOKEN.encode(), path.read_bytes(), path.name)
         from tamandua.shared import vault

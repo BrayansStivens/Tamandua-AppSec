@@ -1,5 +1,5 @@
-"""Buzón de salida de avisos (outbox): cada mensaje se guarda antes de enviarse y el worker lo entrega con reintentos.
-Si el proceso cae, no se pierde; si el canal falla, se reintenta con espera creciente."""
+"""Notification outbox: every message is stored before it is sent, and the worker delivers it with retries.
+If the process dies, nothing is lost; if the channel fails, it is retried with a growing backoff."""
 
 from sqlalchemy import Column, DateTime, Index, Integer, String, Table, Text, func
 from sqlalchemy.dialects.postgresql import JSONB

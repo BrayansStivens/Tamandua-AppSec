@@ -68,7 +68,7 @@ def _set_state(connection, key: str, value) -> None:
 # --- ingestion ---------------------------------------------------------------------------
 
 def parse_entry(entry: dict) -> tuple | None:
-    """Una entrada de NVD 2.0 a una fila. La métrica más moderna disponible manda: 4.0, 3.1, 3.0, 2."""
+    """An NVD 2.0 entry to a row. The newest available metric wins: 4.0, 3.1, 3.0, 2."""
     cve = entry.get("cve") or {}
     identifier = cve.get("id")
     if not isinstance(identifier, str) or not re.fullmatch(r"CVE-\d{4}-\d{4,}", identifier):
@@ -88,7 +88,7 @@ def parse_entry(entry: dict) -> tuple | None:
     description = next((item.get("value") for item in cve.get("descriptions", []) if item.get("lang") == "en"), "") or ""
     cwes = sorted({item.get("value") for weakness in cve.get("weaknesses", []) for item in weakness.get("description", [])
                    if isinstance(item.get("value"), str) and item["value"].startswith("CWE-")})[:MAX_CWES]
-    # Las 10 primeras referencias con su etiqueta principal: el detalle completo sigue en NVD y la base no se dispara.
+    # The first 10 references with their main tag: the full detail stays in NVD and the database doesn't balloon.
     references = [{"url": item["url"][:500], "tags": (item.get("tags") or [])[:1]} for item in cve.get("references", [])
                   if isinstance(item.get("url"), str) and item["url"].startswith(("https://", "http://"))][:MAX_REFERENCES]
     return (identifier, int(identifier[4:8]), cve.get("published"), cve.get("lastModified"), cve.get("vulnStatus"),
@@ -119,7 +119,7 @@ def _nvd_get(params: dict) -> dict:
 
 
 def pause() -> float:
-    # Límite público de NVD: 5 peticiones / 30 s sin key, 50 / 30 s con key.
+    # NVD's public rate limit: 5 requests / 30 s without a key, 50 / 30 s with one.
     return 0.8 if settings.is_set("TAMANDUA_NVD_API_KEY") else 6.5
 
 
@@ -229,7 +229,7 @@ def import_sqlite(data_dir: Path) -> int:
 
 
 class Syncer:
-    """Hilo que mantiene la base al día. Solo lo arranca `serve`; se puede apagar con TAMANDUA_CVE_SYNC=off."""
+    """Thread that keeps the database up to date. Only `serve` starts it; TAMANDUA_CVE_SYNC=off turns it off."""
 
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
@@ -259,7 +259,7 @@ class Syncer:
                 backoff = 60
                 delay = pause() if done != "idle" else 300
             except (HTTPError, URLError, TimeoutError, OSError, ValueError, SQLAlchemyError) as error:
-                # Sin detalles de la petición: la URL podría acabar en logs con parámetros; la key va en cabecera.
+                # No request details: the URL could end up in logs with its parameters; the key goes in a header.
                 _sync["error"] = type(error).__name__
                 _log.warning("cve_sync_failed", extra={"reason": type(error).__name__})
                 delay, backoff = backoff, min(backoff * 2, 900)

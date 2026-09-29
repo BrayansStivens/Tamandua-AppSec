@@ -1,4 +1,4 @@
-"""Rutas excluidas por repositorio: patrones, efecto en ejecuciones y registro, y quién puede cambiarlas."""
+"""Excluded paths per repository: patterns, effect on runs and the registry, and who can change them."""
 
 import tempfile
 import unittest
@@ -15,7 +15,7 @@ from tamandua.shared.i18n import localize
 
 ADMIN = {"username": "operadora", "role": "admin"}
 KEY = "github#7"
-QUERY_KEY = "github%237"  # «#» empezaría el fragmento de la URL
+QUERY_KEY = "github%237"  # "#" would start the URL fragment
 
 
 def located(fingerprint, path, severity="high"):
@@ -42,12 +42,12 @@ class PatternTests(unittest.TestCase):
         active = ["fixtures/**", "docs/*.md", "**/testdata/**"]
         self.assertEqual(exclusions.excluded("fixtures/sast-samples/app.py", active), "fixtures/**")
         self.assertEqual(exclusions.excluded("docs/intro.md", active), "docs/*.md")
-        self.assertIsNone(exclusions.excluded("docs/deep/intro.md", active))  # «*» no cruza «/»
+        self.assertIsNone(exclusions.excluded("docs/deep/intro.md", active))  # "*" doesn't cross "/"
         self.assertEqual(exclusions.excluded("pkg/api/testdata/x.json", active), "**/testdata/**")
         self.assertEqual(exclusions.excluded("testdata/x.json", active), "**/testdata/**")
         self.assertIsNone(exclusions.excluded("src/fixtures/app.py", active))
         self.assertEqual(exclusions.excluded(".github/workflows/ci.yml", [".github/**"]), ".github/**")
-        # Como en .gitignore: si el patrón coincide con una carpeta, todo lo que hay dentro queda excluido.
+        # As in .gitignore: if the pattern matches a folder, everything inside it is excluded.
         for pattern in ("fixtures/*", "fixtures", "fixtures/sast-*"):
             self.assertEqual(exclusions.excluded("fixtures/sast-samples/index.php", [pattern]), pattern)
         self.assertIsNone(exclusions.excluded("src/fixtures/app.py", ["fixtures/*"]))
@@ -96,7 +96,7 @@ class RecordAndRegistryTests(unittest.TestCase):
         saved = exclusions.save(self.data_dir, KEY, ["fixtures/**"], reason="Ejemplos vulnerables a propósito", user=ADMIN)
         moved = findings_registry.apply_exclusions(self.data_dir, KEY, saved["patterns"], when=saved["at"])
         self.assertEqual(moved, {"excluded": 1, "reopened": 0})
-        self.save(5)  # el siguiente escaneo no lo da por remediado
+        self.save(5)  # the next scan doesn't take it as remediated
         state = findings_registry.summarize(self.data_dir, KEY)
         self.assertEqual((state["open"], state["excluded"], state["fixed"]), (1, 1, 0))
         exclusions.save(self.data_dir, KEY, [], reason=None, user=ADMIN)

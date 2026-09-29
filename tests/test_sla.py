@@ -1,4 +1,4 @@
-"""Plazos de corrección: política tolerante, reloj desde la primera detección, API, Resumen e informe."""
+"""Fix deadlines: lenient policy, clock from the first detection, API, Summary and report."""
 
 import os
 import tempfile
@@ -52,7 +52,7 @@ class PolicyTests(unittest.TestCase):
                          {"days": 7, "due": "2026-10-08", "days_left": -2, "state": "overdue"})
         self.assertEqual(sla.deadline("high", "2026-10-01T00:00:00+00:00", sla.DEFAULTS, today=today)["state"], "ok")
         self.assertEqual(sla.deadline("high", "2026-09-12T00:00:00+00:00", sla.DEFAULTS, today=today)["state"], "soon")
-        self.assertIsNone(sla.deadline("info", "2026-10-01", sla.DEFAULTS, today=today))  # sin plazo para su severidad
+        self.assertIsNone(sla.deadline("info", "2026-10-01", sla.DEFAULTS, today=today))  # no deadline for its severity
         self.assertIsNone(sla.deadline("low", "2026-10-01", {**sla.DEFAULTS, "low": None}, today=today))
         self.assertIsNone(sla.deadline("high", "no es fecha", sla.DEFAULTS, today=today))
 
@@ -62,12 +62,12 @@ class PolicyTests(unittest.TestCase):
                     {**base, "lifecycle": {**base["lifecycle"], "status": "fixed"}}, {"severity": "critical"}]
         sla.annotate(findings, sla.DEFAULTS, today=date(2026, 2, 1))
         self.assertEqual([(item.get("sla") or {}).get("state") for item in findings], ["overdue", "overdue", None, None, None])
-        self.assertNotIn("sla", findings[4])  # sin ciclo de vida (una ejecución suelta): no se inventa un plazo
+        self.assertNotIn("sla", findings[4])  # no lifecycle (a standalone run): no deadline is made up
         self.assertEqual(sla.counts(findings)["overdue_by_severity"]["critical"], 2)
 
 
 class IntegrationTests(unittest.TestCase):
-    """El reloj lo marca la primera detección en el registro, en Hallazgos, en el Resumen y en el informe."""
+    """The clock starts at the first detection in the registry, in Findings, in the Summary and in the report."""
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -76,7 +76,7 @@ class IntegrationTests(unittest.TestCase):
         now = datetime.now(timezone.utc).isoformat()
         first = {**_scan("org/api", [_finding("a" * 64, "critical"), _finding("b" * 64, "high", package="lodash")], long_ago), "finished_at": long_ago}
         save_repository_scan(self.data_dir, first, created_at=long_ago)
-        # Reaparece hoy con uno nuevo: el viejo sigue contando desde hace 40 días.
+        # Seen again today, plus a new one: the old findings keep counting from 40 days ago.
         again = {**_scan("org/api", [_finding("a" * 64, "critical"), _finding("b" * 64, "high", package="lodash"),
                                      _finding("c" * 64, "critical", package="axios2")], now), "finished_at": now}
         self.run = save_repository_scan(self.data_dir, again, created_at=now)
@@ -92,15 +92,15 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual((state["summary"]["sla"]["overdue"], state["summary"]["sla"]["days"]["critical"]), (2, 7))
         kpis = dashboard.compute(self.data_dir)["kpis"]["sla"]
         self.assertEqual((kpis["overdue"], kpis["soon"], kpis["overdue_by_severity"]["critical"]), (2, 1, 1))
-        # Un riesgo aceptado deja de vencer.
+        # An accepted risk is no longer overdue.
         triage.decide(self.data_dir, self.run, ["b" * 64], "accepted", reason="compensado por el WAF", user=ADMIN)
         self.assertEqual(findings_registry.view(self.data_dir, self.key)["summary"]["sla"]["overdue"], 1)
         options = validate_options({}, default_by="ana")
         state = findings_registry.view(self.data_dir, self.key, status="all")
         content = pdf_text(render_audit_pdf(state, state["findings"], options, version="0.9"))
-        self.assertIn("\\(1 aviso fuera de plazo\\)", content)  # texto del PDF: acentos y paréntesis escapados
+        self.assertIn("\\(1 aviso fuera de plazo\\)", content)  # PDF text: accents and parentheses escaped
         self.assertIn("cr\\355tica 7 d\\355as", content)
-        self.assertIn("(33 d\\355as)", content)  # retraso: detectado hace 40 días con plazo de 7
+        self.assertIn("(33 d\\355as)", content)  # delay: detected 40 days ago with a 7-day deadline
 
     def test_changing_the_policy_moves_the_deadlines(self):
         sla.save(self.data_dir, {"critical": 60, "high": 60, "medium": 90, "low": 180}, user=ADMIN)
@@ -108,7 +108,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(state["summary"]["sla"]["overdue"], 0)
         self.assertEqual(dashboard.cached(self.data_dir)["kpis"]["sla"]["overdue"], 0)
         sla.save(self.data_dir, {"critical": 1, "high": 60, "medium": 90, "low": 180}, user=ADMIN)
-        self.assertEqual(dashboard.cached(self.data_dir)["kpis"]["sla"]["overdue"], 1)  # la caché del Resumen se invalida
+        self.assertEqual(dashboard.cached(self.data_dir)["kpis"]["sla"]["overdue"], 1)  # Summary cache invalidated
 
 
 class RouteTests(HttpCase):

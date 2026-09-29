@@ -1,4 +1,4 @@
-"""Skills públicas (skills/*/SKILL.md): formato Agent Skills válido y sin opciones de la CLI que no existan."""
+"""Public skills (skills/*/SKILL.md): valid Agent Skills format and no CLI options that don't exist."""
 
 import re
 import unittest
@@ -9,7 +9,7 @@ from tamandua.cli.main import build_parser
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS = sorted((ROOT / "skills").glob("*/SKILL.md"))
 NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-GIT_OPTIONS = {"--short", "--show-toplevel"}  # de las órdenes de git que acompañan a Tamandua
+GIT_OPTIONS = {"--short", "--show-toplevel"}  # from the git commands that accompany Tamandua
 
 
 def frontmatter(text: str) -> dict:

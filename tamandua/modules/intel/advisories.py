@@ -1,13 +1,13 @@
-"""Enriquecimiento de avisos de dependencias: de un identificador a una decisión.
+"""Dependency advisory enrichment: from an identifier to a decision.
 
-`querybatch` de OSV solo dice *qué* aviso afecta a una versión. Aquí se pide el
-detalle de cada uno y se cruza con dos feeds públicos para que cada hallazgo
-traiga lo que un equipo necesita para actuar: resumen, CVSS calculado, versión
-corregida para *esa* línea de versiones, si está en explotación activa (CISA
-KEV), probabilidad de explotación (EPSS) y una prioridad cuyos factores se ven.
+OSV's `querybatch` only says *which* advisory affects a version. Here each one's
+details are fetched and cross-checked against two public feeds, so every finding
+carries what a team needs to act: summary, computed CVSS, the fixed version for
+*that* version line, whether it is actively exploited (CISA KEV), exploit
+probability (EPSS) and a priority whose factors are visible.
 
-Los feeds se descargan en bloque y se guardan a diario: no se consulta a nadie
-CVE por CVE, así que nadie se entera de qué dependencias tienen los clientes.
+The feeds are downloaded in bulk and stored daily: nobody is queried CVE by CVE,
+so nobody learns which dependencies the customers have.
 """
 
 from __future__ import annotations
@@ -35,12 +35,12 @@ EPSS_URL = "https://epss.empiricalsecurity.com/epss_scores-current.csv.gz"
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 NVD_TTL = 12 * 3600
 FEED_TTL = 24 * 3600
-MAX_DETAILS = 80          # avisos distintos cuyo detalle se pide por ejecución
+MAX_DETAILS = 80          # distinct advisories whose details are fetched per run
 _details_cache: dict[str, dict] = {}
 _feed_cache: dict[str, tuple[float, dict]] = {}
 
 
-# --- CVSS v3.x: el score se calcula del vector, no se copia de nadie --------------
+# --- CVSS v3.x: the score is computed from the vector, not copied from anyone -----
 
 _AV = {"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2}
 _AC = {"L": 0.77, "H": 0.44}
@@ -56,7 +56,7 @@ def _roundup(value: float) -> float:
 
 
 def cvss3_base_score(vector: str) -> float | None:
-    """Base score CVSS 3.0/3.1 según la especificación; None si el vector no es válido."""
+    """CVSS 3.0/3.1 base score per the specification; None if the vector is invalid."""
     match = re.fullmatch(r"CVSS:3\.[01]/(.+)", vector.strip())
     if not match:
         return None
@@ -82,14 +82,14 @@ def severity_from_score(score: float | None, label: str | None = None) -> str:
         (label or "").upper(), "medium")
 
 
-# --- versiones: comparación tolerante para elegir la versión corregida correcta -----
+# --- versions: lenient comparison to pick the right fixed version -------------------
 
 def _version_key(version: str) -> tuple:
     text = version.strip().lstrip("vV")
     release = re.match(r"[0-9]+(?:\.[0-9]+)*", text)
     numbers = [int(part) for part in release.group(0).split(".")] if release else [0]
     rest = text[release.end():] if release else text
-    # Una pre-release (1.0.0-rc1) va antes que su versión final; un post (1.0.0.post1) después.
+    # A pre-release (1.0.0-rc1) sorts before its final version; a post-release (1.0.0.post1) after it.
     stage = 0 if re.match(r"^[-.]?(a|b|rc|alpha|beta|dev|pre)", rest, re.IGNORECASE) else 2 if "post" in rest else 1
     return (tuple(numbers + [0] * (6 - len(numbers))), stage)
 
@@ -100,10 +100,10 @@ def compare_versions(left: str, right: str) -> int:
 
 
 def affected_range(advisory: dict, ecosystem: str, name: str, installed: str) -> dict:
-    """El rango que contiene la versión instalada, con su versión corregida.
+    """The range that contains the installed version, with its fixed version.
 
-    Un aviso suele traer un rango por línea de versiones (9.x, 10.x…). Decir
-    "actualiza a 10.2.3" a quien usa 9.0.5 es una recomendación equivocada.
+    An advisory usually has one range per version line (9.x, 10.x…). Telling
+    someone on 9.0.5 to "upgrade to 10.2.3" is the wrong recommendation.
     """
     ranges = []
     for entry in advisory.get("affected", []):
@@ -130,7 +130,7 @@ def affected_range(advisory: dict, ecosystem: str, name: str, installed: str) ->
     return {"introduced": chosen["introduced"], "fixed": chosen["fixed"]}
 
 
-# --- OSV: detalle de cada aviso -----------------------------------------------------
+# --- OSV: each advisory's details ---------------------------------------------------
 
 def fetch_advisory(identifier: str) -> dict | None:
     if not re.fullmatch(r"[A-Za-z0-9-]{5,80}", identifier):
@@ -173,7 +173,7 @@ def summarize_advisory(payload: dict) -> dict:
             "references": references}
 
 
-# --- feeds públicos con caché diaria -------------------------------------------------
+# --- public feeds with a daily cache -------------------------------------------------
 
 def _feed(name: str, url: str, data_dir: Path, parse) -> dict:
     cached = _feed_cache.get(name)
@@ -253,7 +253,7 @@ def _parse_nvd(body: bytes) -> dict:
 
 
 NVD_PAGE = 2000
-NVD_PAUSE = 6.5  # sin API key NVD admite 5 peticiones por 30 s
+NVD_PAUSE = 6.5  # without an API key NVD allows 5 requests per 30 s
 _nvd_refresh = {"running": False}
 _nvd_lock = __import__("threading").Lock()
 
@@ -269,11 +269,11 @@ def _nvd_get(params: dict) -> bytes:
 
 
 def refresh_recent_cves(data_dir: Path, *, pause: float = NVD_PAUSE, fetch=None) -> None:
-    """Descarga NVD: totales de 7 y 30 días, publicados por día y la página MÁS RECIENTE de la semana.
+    """Downloads NVD: 7- and 30-day totals, published per day, and the week's MOST RECENT page.
 
-    NVD ordena de antiguo a nuevo y corta en 2000 por página: pedir la primera página
-    devolvía los 2000 más antiguos de la ventana. Por eso se pide primero el total y
-    luego la última página. Solo viaja un rango de fechas; ningún dato del cliente.
+    NVD sorts oldest to newest and caps pages at 2000: asking for the first page
+    returned the 2000 oldest in the window. So the total is fetched first, then
+    the last page. Only a date range goes out; no customer data.
     """
     from datetime import datetime, timedelta, timezone
     fetch = fetch or _nvd_get
@@ -316,14 +316,14 @@ def _refresh_in_background(data_dir: Path) -> None:
         try:
             refresh_recent_cves(data_dir)
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError):
-            pass  # se reintenta en la siguiente consulta; mientras, vale lo último descargado
+            pass  # retried on the next query; meanwhile the last download stands
         finally:
             _nvd_refresh["running"] = False
     threading.Thread(target=run, name="tamandua-nvd", daemon=True).start()
 
 
 def load_recent_cves(data_dir: Path, days: int = 7) -> dict:
-    """Lo último descargado de NVD. Si caducó, se refresca en segundo plano: el panel nunca espera a NVD."""
+    """The last NVD download. If it expired, it refreshes in the background: the panel never waits for NVD."""
     folder = data_dir / "feeds"
     path, counts_path = folder / "nvd-recent.json", folder / "nvd-counts.json"
     stale = not counts_path.is_file() or time.time() - counts_path.stat().st_mtime >= NVD_TTL
@@ -347,14 +347,14 @@ def load_recent_cves(data_dir: Path, days: int = 7) -> dict:
     return parsed
 
 
-# --- prioridad explicable ------------------------------------------------------------
+# --- explainable priority ------------------------------------------------------------
 
 SEVERITY = {"critical": msg("intel.severity.critical"), "high": msg("intel.severity.high"), "medium": msg("intel.severity.medium"),
             "low": msg("intel.severity.low"), "info": msg("intel.severity.info")}
 
 
 def prioritize(severity: str, cvss_score: float | None, kev: dict | None, epss: tuple | None, fixed: str | None) -> dict:
-    """Acción SSVC-like con factores visibles: no es una nota mágica."""
+    """SSVC-like action with visible factors: not a magic score."""
     factors = []
     score = cvss_score or 0.0
     probability = epss[0] if epss else None
@@ -377,15 +377,15 @@ def prioritize(severity: str, cvss_score: float | None, kev: dict | None, epss: 
     return {"action": action, "factors": factors}
 
 
-# --- hallazgo enriquecido -----------------------------------------------------------
+# --- enriched finding ---------------------------------------------------------------
 
 def is_malicious(summary: dict) -> bool:
-    """Avisos MAL-* (OpenSSF Malicious Packages, vía OSV): el paquete es código hostil, no un fallo."""
+    """MAL-* advisories (OpenSSF Malicious Packages, via OSV): the package is hostile code, not a bug."""
     return any(str(identifier).upper().startswith("MAL-") for identifier in [summary.get("id"), *(summary.get("aliases") or [])])
 
 
 def malicious_finding(dependency: dict, summary: dict) -> dict:
-    """Un paquete malicioso no se «actualiza»: se elimina y se da por comprometido lo que lo instaló."""
+    """A malicious package isn't "upgraded": it is removed, and whatever installed it is treated as compromised."""
     name, installed, path = dependency["name"], dependency["version"], dependency["path"]
     return {**_dependency_digests(dependency, summary), "scanner": "sca", "rule_id": summary["id"],
             "title": msg("intel.malicious.title", package=name[:150], version=installed[:40]), "path": path, "line": 1, "severity": "critical",

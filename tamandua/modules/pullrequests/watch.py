@@ -1,12 +1,12 @@
-"""Qué repositorios se vigilan (sus PRs y su rama principal), qué commits ya se revisaron y el vigilante que sondea.
+"""Which repositories are watched (their PRs and main branch), which commits were already reviewed, and the poller.
 
-La configuración se guarda por identidad estable (`github#<id>`): renombrar un
-repositorio no apaga su vigilancia.
+Settings are stored by stable identity (`github#<id>`): renaming a
+repository doesn't turn off its watch.
 
-Sin webhooks (el MVP local no tiene URL pública) se sondea: cada
-``TAMANDUA_PR_POLL_SECONDS`` (300 por defecto, mínimo 60) se listan los PRs
-abiertos de los repositorios activados y se encola una revisión por cada commit
-de cabeza que aún no se haya revisado. Los borradores se saltan.
+Without webhooks (the local MVP has no public URL) it polls: every
+``TAMANDUA_PR_POLL_SECONDS`` (300 by default, minimum 60) it lists the open PRs
+of the enabled repositories and queues a review for each head commit not
+reviewed yet. Drafts are skipped.
 
 Only PRs into the repository's target branches are reviewed (`base_branches`; empty means the default branch).
 Each target branch is watched too: when its latest commit changes, the repository is rescanned at that commit so
@@ -37,8 +37,8 @@ from tamandua.shared.i18n import msg, text
 _log = logging_setup.get("pr_watch")
 DEFAULTS = {"enabled": False, "post_comment": True, "gate": "high", "branch": True, "base_branches": []}
 MAX_BASE_BRANCHES = 10
-BRANCH_PER_POLL = 3     # reanálisis de rama principal encolados por vuelta, como mucho
-BRANCH_QUEUE_LIMIT = 2  # solo si en la cola hay menos que esto
+BRANCH_PER_POLL = 3     # main-branch rescans queued per round, at most
+BRANCH_QUEUE_LIMIT = 2  # only if the queue holds fewer than this
 
 
 @dataclass(frozen=True)
@@ -182,7 +182,7 @@ def forget(data_dir: Path, key: str) -> None:
 
 
 def migrate(data_dir: Path, repositories: list[dict]) -> None:
-    """Configuración antigua guardada por nombre (`github:owner/repo`) → identidad estable. What the stable key
+    """Old settings stored by name (`github:owner/repo`) → stable identity. What the stable key
     already holds wins."""
     by_name = {item["id"]: item["uid"] for item in repositories if item.get("uid")}
     if not by_name:
@@ -268,7 +268,7 @@ def mark_closed(data_dir: Path, key: str, number: int) -> None:
 
 
 class Watcher:
-    """Hilo que sondea los PRs de los repositorios activados. Solo lo arranca `serve`."""
+    """Thread that polls the PRs of the enabled repositories. Only `serve` starts it."""
 
     def __init__(self, data_dir: Path, jobs, installation_for):
         self.data_dir, self.jobs, self.installation_for = data_dir, jobs, installation_for
@@ -284,17 +284,17 @@ class Watcher:
 
     def _loop(self) -> None:
         _log.info("pr_watch_started", extra={"reason": f"cada {self.interval} s"})
-        # La primera vuelta no espera el intervalo completo: tras reiniciar, los PRs abiertos se revisan enseguida.
+        # The first round doesn't wait the full interval: after a restart, open PRs are reviewed right away.
         delay = min(15, self.interval)
         while not self._stop.wait(delay):
             delay = self.interval
             try:
                 self.poll()
-            except Exception:  # noqa: BLE001 — un fallo de red no debe matar al vigilante
+            except Exception:  # noqa: BLE001 — a network failure must not kill the watcher
                 _log.exception("pr_watch_failed")
 
     def _closed(self, installation: int, key: str, repository: str, done: dict, open_numbers: set[int]) -> None:
-        """PRs revisados que ya no están abiertos: sin merge retiran sus hallazgos; con merge esperan al escaneo."""
+        """Reviewed PRs that are no longer open: unmerged ones retire their findings; merged ones wait for the scan."""
         from tamandua.modules.findings.registry import pull_closed
         from tamandua.modules.integrations.github import GitHubAppError, pull_request
         for number, entry in done.items():
@@ -326,10 +326,10 @@ class Watcher:
                 _log.warning("pr_repos_failed", extra={"reason": f"{installation}: {exc}"})
                 failed = True
         if failed:
-            # Una respuesta parcial no demuestra que los repositorios de otra cuenta desaparecieron.
+            # A partial response doesn't prove that another account's repositories disappeared.
             return 0
         migrate(self.data_dir, repositories)
-        # Solo las cuentas aún conectadas pueden demostrar la ausencia de un repositorio.
+        # Only accounts still connected can prove that a repository is gone.
         from tamandua.modules.integrations.installations import github_connections
         accounts = {row["account"].casefold() for row in github_connections(self.data_dir)
                     if isinstance(row.get("account"), str)}

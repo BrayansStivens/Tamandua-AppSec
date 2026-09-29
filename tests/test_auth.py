@@ -1,4 +1,4 @@
-"""Identidad, sesiones, TOTP y la puerta de autenticación del panel."""
+"""Identity, sessions, TOTP and the panel's authentication gate."""
 
 import base64
 import io
@@ -22,7 +22,7 @@ from fastapi.routing import APIRoute
 from tamandua.app.api import ROUTERS
 from tamandua.app.api.server import build_state
 
-# Contraseña de prueba armada por partes: un literal así lo marcaría (con razón) un detector de secretos.
+# Test password built from parts: a literal like this would (rightly) trip a secret detector.
 NEW_PASSWORD = "-".join(("otra", "frase", "muy", "larga", "99"))
 
 PASSWORD = "correcto-caballo-bateria"
@@ -31,7 +31,7 @@ ORIGIN = "http://127.0.0.1:8766"
 
 class PrimitiveTests(unittest.TestCase):
     def test_rfc6238_vector(self):
-        # Vector SHA-1 del apéndice B de RFC 6238, recortado a 6 dígitos.
+        # SHA-1 vector from RFC 6238 appendix B, truncated to 6 digits.
         self.assertEqual(totp_code(b"12345678901234567890", 59, digits=8), "94287082")
         self.assertEqual(totp_code(b"12345678901234567890", 1111111109, digits=8), "07081804")
 
@@ -174,12 +174,12 @@ class AuthenticatorTests(unittest.TestCase):
         self.assertIn("challenge", step)
         with self.assertRaises(AuthError):
             self.auth.second_factor(step["challenge"], "000000", "c")
-        with self.assertRaises(AuthError):  # el retén está atado al cliente que lo abrió
+        with self.assertRaises(AuthError):  # the challenge is bound to the client that opened it
             self.auth.second_factor(step["challenge"], codes[0], "otro")
         done = self.auth.second_factor(step["challenge"], codes[0], "c")
         self.assertTrue(self.auth.sessions.resolve(done["session"])["mfa"])
         again = self.auth.login("operadora", PASSWORD, "c")
-        with self.assertRaises(AuthError):  # un código de respaldo solo vale una vez
+        with self.assertRaises(AuthError):  # a backup code works only once
             self.auth.second_factor(again["challenge"], codes[0], "c")
 
     def test_password_change_revokes_other_sessions(self):
@@ -205,7 +205,7 @@ class CliTests(unittest.TestCase):
 
 
 def stored_identity(data_dir) -> str:
-    """Todo lo que la base guarda de usuarios y sesiones, como texto (para comprobar que no hay secretos en claro)."""
+    """Everything the database stores about users and sessions, as text (to check no secret is in the clear)."""
     import json
     from sqlalchemy import select
     from tamandua.modules.identity.tables import sessions, users
@@ -226,7 +226,7 @@ def routes_with_policy() -> list[SimpleNamespace]:
 
 
 class HttpCase(unittest.TestCase):
-    """Servidor sin socket sobre un directorio temporal, con helpers de petición."""
+    """Socketless server over a temporary directory, with request helpers."""
 
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -235,14 +235,14 @@ class HttpCase(unittest.TestCase):
         store.start()
         self.addCleanup(store.stop)
         engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
-        # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.
+        # These tests cover other things; the TOTP policy has its own.
         policy = patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"})
         policy.start()
         self.addCleanup(policy.stop)
         engines.start()
         self.addCleanup(engines.stop)
         self.state = build_state(self.data_dir)
-        # Todas las peticiones pasan por la aplicación completa (FastAPI con todas sus rutas).
+        # Every request goes through the full application (FastAPI with all its routes).
         self.client = asgi.client_for(self.data_dir, self.state)
 
     def tearDown(self):
@@ -254,7 +254,7 @@ class HttpCase(unittest.TestCase):
         try:
             body = response.json() if response.content else None
         except ValueError:
-            body = response.content  # artefactos que no son JSON (Markdown, scripts)
+            body = response.content  # non-JSON artefacts (Markdown, scripts)
         return response.status_code, body, cookies
 
     def post(self, path, action, body, cookie=None):
@@ -264,7 +264,7 @@ class HttpCase(unittest.TestCase):
 
 
 class GateTests(HttpCase):
-    """La puerta en el servidor: sin sesión no se ve nada salvo login y salud mínima."""
+    """The server-side gate: without a session nothing is visible except login and minimal health."""
 
     def test_everything_requires_a_session(self):
         status, body, _ = self.call("GET", "/api/auth/session")
@@ -273,7 +273,7 @@ class GateTests(HttpCase):
                      "/api/assets/export?key=x&artifact=report.pdf", "/api/threat-models/x/report.pdf"):
             self.assertEqual(self.call("GET", path)[0], 401, path)
         status, body, _ = self.call("GET", "/api/health")
-        self.assertEqual(set(body), {"status", "version"})  # sin sesión no se cuenta el estado interno
+        self.assertEqual(set(body), {"status", "version"})  # no internal state without a session
         self.assertEqual(self.post("/api/repositories/scans", "scan-repository", {"source_id": "x", "allow_osv_upload": False})[0], 401)
 
     def test_login_cookie_attributes_and_member_limits(self):
@@ -286,7 +286,7 @@ class GateTests(HttpCase):
         self.assertNotIn(PASSWORD, json.dumps(body))
         cookie = attributes[0]
         self.assertEqual(self.call("GET", "/api/runs", headers={"Cookie": cookie})[0], 200)
-        # Un miembro analiza, pero no conecta proveedores ni guarda claves del servicio.
+        # A member can scan, but can't connect providers or save service keys.
         status, _, _ = self.post("/api/providers/keys", "save-ai-key", {"provider": "openai", "action": "remove"}, cookie)
         self.assertEqual(status, 403)
         status, _, cookies = self.post("/api/auth/logout", "logout", {}, cookie)
@@ -302,7 +302,7 @@ class GateTests(HttpCase):
         self.assertEqual((status, body["error"]), (401, "Usuario o contraseña incorrectos"))
 
     def test_route_table_enforces_session_and_role(self):
-        """Recorre todas las rutas registradas: ninguna privada responde sin sesión ni una de admin a un miembro."""
+        """Walks every registered route: no private one answers without a session, no admin one answers a member."""
         Users(self.data_dir).create("analista", PASSWORD)
         _, _, cookies = self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})
         member = cookies[0].split("; ")[0]
@@ -328,7 +328,7 @@ class GateTests(HttpCase):
 
 
 class PolicyAndUsersTests(HttpCase):
-    """Política de TOTP para administradores, invitaciones y salvaguardas del último admin."""
+    """TOTP policy for admins, invitations and the last-admin safeguards."""
 
     def setUp(self):
         super().setUp()
@@ -353,7 +353,7 @@ class PolicyAndUsersTests(HttpCase):
             self.assertEqual(self.post("/api/repositories/scans", "scan-repository", {"source_id": "x", "allow_osv_upload": False}, cookie)[0], 403)
             status, _, cookies = self.enrol(cookie)
             self.assertEqual(status, 200)
-            # Confirmar reemite la sesión con segundo factor; la anterior, sin él, deja de valer.
+            # Confirming reissues the session with a second factor; the previous one, without it, stops working.
             fresh = cookies[0].split("; ")[0]
             self.assertEqual(self.call("GET", "/api/runs", headers={"Cookie": fresh})[0], 200)
             self.assertEqual(self.call("GET", "/api/runs", headers={"Cookie": cookie})[0], 401)
@@ -366,7 +366,7 @@ class PolicyAndUsersTests(HttpCase):
         self.assertIn("/#link=", body["link"])
         token = body["link"].split("#link=", 1)[1]
         self.assertNotIn(token, stored_identity(self.data_dir))
-        # Sin contraseña todavía, nadie entra con esa cuenta.
+        # With no password set yet, nobody can sign in with that account.
         self.assertEqual(self.post("/api/auth/login", "login", {"username": "analista", "password": PASSWORD})[0], 401)
         status, found, _ = self.post("/api/auth/link/check", "check-link", {"token": token})
         self.assertEqual((status, found["username"], found["purpose"]), (200, "analista", "invite"))
@@ -374,7 +374,7 @@ class PolicyAndUsersTests(HttpCase):
         self.assertEqual((status, done["user"]["username"]), (200, "analista"))
         self.assertIn("HttpOnly", cookies[0])
         self.assertEqual(self.post("/api/auth/link", "accept-link", {"token": token, "password": NEW_PASSWORD})[0], 400)
-        # Un miembro no administra usuarios.
+        # A member does not manage users.
         member = self.login_cookie("analista", NEW_PASSWORD)
         self.assertEqual(self.call("GET", "/api/users", headers={"Cookie": member})[0], 403)
 
@@ -398,7 +398,7 @@ class PolicyAndUsersTests(HttpCase):
 
 
 class AuditRegressionTests(HttpCase):
-    """Regresiones de la auditoría del 23/09: H-1, H-2, O-2, O-3."""
+    """Regressions from the 23/09 audit: H-1, H-2, O-2, O-3."""
 
     def setUp(self):
         super().setUp()
@@ -407,7 +407,7 @@ class AuditRegressionTests(HttpCase):
 
     def enrol(self, user_id):
         secret = base64.b32decode(self.auth.users.begin_totp(user_id)["secret"])
-        now = int(time.time()) - 60  # un paso que el login posterior no reutiliza
+        now = int(time.time()) - 60  # a time step the later login does not reuse
         self.auth.users.confirm_totp(user_id, totp_code(secret, now), now)
         return secret
 
@@ -421,7 +421,7 @@ class AuditRegressionTests(HttpCase):
     def test_session_without_mfa_is_useless_once_totp_is_on(self):
         _, _, cookies = self.post("/api/auth/login", "login", {"username": "operadora", "password": PASSWORD})
         cookie = cookies[0].split("; ")[0]
-        self.enrol(self.admin["id"])  # la CLI o un proceso aparte lo activa sin reemitir esta sesión
+        self.enrol(self.admin["id"])  # the CLI or another process enables it without reissuing this session
         self.assertEqual(self.call("GET", "/api/runs", headers={"Cookie": cookie})[0], 401)
 
     def test_concurrent_totp_guesses_are_bounded(self):

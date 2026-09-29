@@ -1,12 +1,12 @@
-"""Sistema de diseño de los informes PDF: una sola fuente para todos (técnico, auditoría, amenazas).
+"""Design system for the PDF reports: one source for all of them (technical, audit, threats).
 
-Reglas (las mismas del panel; ver .claude/skills/tamandua-design):
-- Colores: solo los tokens del panel (web/src/index.css) en hexadecimal; nada de paletas sueltas.
-  Texto ≥ 4,5:1 sobre su fondo; bordes y adornos que identifican algo ≥ 3:1.
-- Estructura: primero la conclusión (cifras clave y qué hacer), después el detalle; lo exhaustivo va a un
-  anexo o se queda en el JSON/SARIF. Se agrupa por acción (un paquete, una regla), no por aviso suelto.
-- Nada de títulos huérfanos: antes de cada sección hay un salto condicional.
-- Todo texto que llega de un repositorio, de un modelo o de un formulario es dato: se escapa (t()).
+Rules (the same as the panel's; see .claude/skills/tamandua-design):
+- Colors: only the panel tokens (web/src/index.css) in hex; no ad-hoc palettes.
+  Text ≥ 4.5:1 against its background; borders and marks that identify something ≥ 3:1.
+- Structure: the conclusion first (key figures and what to do), then the detail; the exhaustive part goes to an
+  appendix or stays in the JSON/SARIF. Group by action (a package, a rule), not by individual advisory.
+- No orphan headings: every section is preceded by a conditional break.
+- All text that comes from a repository, a model or a form is data: it gets escaped (t()).
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ from reportlab.platypus import (BaseDocTemplate, CondPageBreak, Frame, NextPageT
 
 from tamandua.shared import i18n
 
-# Tokens del panel en modo claro (web/src/index.css), en hexadecimal para el PDF y el SVG.
+# Panel tokens in light mode (web/src/index.css), in hex for the PDF and the SVG.
 BRAND, BRAND_BG = colors.HexColor("#7342d3"), colors.HexColor("#f4f1ff")
 INK, MUTED, LINE, SOFT = colors.HexColor("#171717"), colors.HexColor("#636363"), colors.HexColor("#e5e5e5"), colors.HexColor("#f5f5f5")
 SUCCESS, SUCCESS_BG = colors.HexColor("#006e42"), colors.HexColor("#e9f8ef")
 DANGER, DANGER_BG = colors.HexColor("#b71824"), colors.HexColor("#ffefed")
 ATTENTION, ATTENTION_BG = colors.HexColor("#a34100"), colors.HexColor("#fff0e4")
-SEVERITY = {  # texto, fondo
+SEVERITY = {  # text, background
     "critical": (colors.HexColor("#ffffff"), colors.HexColor("#c21725")),
     "high": (ATTENTION, ATTENTION_BG),
     "medium": (colors.HexColor("#8a4c00"), colors.HexColor("#fef4df")),
@@ -43,8 +43,8 @@ STYLE = {
     "eyebrow": ParagraphStyle("eyebrow", fontName="Helvetica-Bold", fontSize=8, leading=11, textColor=BRAND, spaceAfter=6),
     "title": ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=INK, spaceAfter=4),
     "subtitle": ParagraphStyle("subtitle", fontName="Helvetica", fontSize=9.5, leading=14, textColor=MUTED, spaceAfter=10),
-    # Sin keepWithNext: ataría el título a la tabla entera y la mandaría completa a la página siguiente.
-    # Antes de cada título hay un salto condicional (CondPageBreak) que evita títulos huérfanos.
+    # No keepWithNext: it would tie the heading to the whole table and push all of it to the next page.
+    # Each heading is preceded by a conditional break (CondPageBreak) that prevents orphan headings.
     "h2": ParagraphStyle("h2", fontName="Helvetica-Bold", fontSize=11.5, leading=15, textColor=INK, spaceBefore=12, spaceAfter=6),
     "h3": ParagraphStyle("h3", fontName="Helvetica-Bold", fontSize=9.5, leading=13, textColor=INK, spaceBefore=8, spaceAfter=3),
     "body": ParagraphStyle("body", fontName="Helvetica", fontSize=8.8, leading=13, textColor=INK, spaceAfter=4),
@@ -67,7 +67,7 @@ def hexval(color: colors.Color) -> str:
 
 
 def t(value, limit: int = 400) -> str:
-    """Texto sin confianza → marcado seguro de ReportLab (escapado, una línea, acotado)."""
+    """Untrusted text → safe ReportLab markup (escaped, one line, bounded)."""
     text = " ".join(str(value or "").split())
     if len(text) > limit:
         text = text[:limit].rsplit(" ", 1)[0] + "…"
@@ -115,7 +115,7 @@ def grid(rows, widths, *, header=True, zebra=False) -> Table:
 
 
 def table(headers: list[str], rows: list[list], widths: list[float], *, zebra=True) -> Table:
-    """Tabla con cabecera: celdas de texto ya marcadas (str) se envuelven en párrafos."""
+    """Table with a header row: text cells already marked up (str) are wrapped in paragraphs."""
     body = [[cell if not isinstance(cell, str) else Paragraph(cell, STYLE["cell"]) for cell in row] for row in rows]
     return grid([[Paragraph(label, STYLE["head"]) for label in headers], *body], widths, zebra=zebra)
 
@@ -131,7 +131,7 @@ def chip(severity: str, label: str | None = None, *, locale: str | None = None) 
 
 
 def kpis(items: list[tuple[str, object, colors.Color, colors.Color]], width: float = WIDTH) -> Table:
-    """Tarjetas de cifras clave: (etiqueta, valor, color del valor, fondo). Como mucho seis: más, no se leen."""
+    """Key-figure cards: (label, value, value color, background). Six at most: more can't be read."""
     cells = [[Paragraph(f'<font color="{hexval(ink)}">{value}</font>', STYLE["kpi"]), Paragraph(label, STYLE["kpilabel"])]
              for label, value, ink, _ in items]
     result = Table([cells], colWidths=[width / len(items)] * len(items), hAlign="LEFT")
@@ -144,7 +144,7 @@ def kpis(items: list[tuple[str, object, colors.Color, colors.Color]], width: flo
 
 
 def meta(pairs: list[tuple[str, str]]) -> Table:
-    """Cuadrícula de metadatos (quién, qué, cuándo), de tres en tres."""
+    """Metadata grid (who, what, when), three per row."""
     rows = []
     for start in range(0, len(pairs), 3):
         chunk = pairs[start:start + 3] + [("", "")] * (3 - len(pairs[start:start + 3]))
@@ -164,7 +164,7 @@ def h2(text: str) -> Paragraph:
 
 
 def bullets(items: list[str], style: str = "body") -> list:
-    """Viñetas con texto ya escapado o marcado por el llamador."""
+    """Bullets whose text the caller has already escaped or marked up."""
     return [Paragraph("•&nbsp;&nbsp;" + item, STYLE[style]) for item in items]
 
 
@@ -180,12 +180,12 @@ def signoff(prepared_by: str = "", *, locale: str | None = None) -> list:
 
 
 def wide_page(flowables: list, *, size=None) -> list:
-    """Una página apaisada (p. ej. el diagrama) en medio del informe; después se vuelve a A4 vertical."""
+    """A landscape page (e.g. the diagram) in the middle of the report; afterwards it goes back to portrait A4."""
     return [NextPageTemplate("wide-a3" if size == "a3" else "wide"), PageBreak(), *flowables, NextPageTemplate("normal"), PageBreak()]
 
 
 def _guard_headings(story: list) -> list:
-    # Un título nunca queda solo al pie: si no caben unas filas debajo, pasa a la página siguiente.
+    # A heading never sits alone at the bottom: if a few rows don't fit below it, it moves to the next page.
     room = {"h2": 32 * mm, "h3": 22 * mm}
     return [part for flowable in story for part in ((CondPageBreak(room[flowable.style.name]), flowable)
                                                     if isinstance(flowable, Paragraph) and flowable.style.name in room else (flowable,))]
@@ -193,7 +193,7 @@ def _guard_headings(story: list) -> list:
 
 def build(story: list, *, title: str, footer: str, version: str, author: str = "Tamandua", subject: str = "",
           locale: str | None = None) -> bytes:
-    """PDF A4 con la barra de marca, pie con título y página, y páginas apaisadas cuando se piden."""
+    """A4 PDF with the brand bar, a footer with title and page number, and landscape pages when requested."""
     output = io.BytesIO()
 
     def frame(canvas, document):
@@ -221,7 +221,7 @@ def build(story: list, *, title: str, footer: str, version: str, author: str = "
 
 
 def wide_size(name: str | None) -> tuple[float, float]:
-    """Área útil de una página apaisada (para escalar un dibujo antes de colocarlo)."""
+    """Usable area of a landscape page (to scale a drawing before placing it)."""
     width, height = landscape(A3 if name == "a3" else A4)
     return width - 2 * MARGIN, height - 34 * mm
 

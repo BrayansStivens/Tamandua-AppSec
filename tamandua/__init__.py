@@ -1,15 +1,15 @@
-"""Tamandua: seguridad de aplicaciones autoalojada.
+"""Tamandua: self-hosted application security.
 
-Estructura (monolito modular):
+Layout (modular monolith):
 
-* `app/`: composición. Servidor HTTP y rutas, migraciones de datos al arrancar, estáticos del panel.
-* `modules/<contexto>/`: el negocio, un paquete por contexto (identity, sources, scanning, runs,
-  findings, intel, compliance, reporting, integrations, pullrequests, threats, lab). Un módulo no
-  importa de `app`.
-* `shared/`: lo transversal sin negocio (logs, almacén cifrado, rutas). No importa de `modules`.
-* `cli/`: la línea de comandos.
+* `app/`: composition. HTTP server and routes, data migrations at startup, the panel's static files.
+* `modules/<context>/`: the business logic, one package per context (identity, sources, scanning, runs,
+  findings, intel, compliance, reporting, integrations, pullrequests, threats, lab). A module never
+  imports from `app`.
+* `shared/`: cross-cutting code with no business logic (logs, encrypted store, paths). Never imports from `modules`.
+* `cli/`: the command line.
 
-Los contratos entre capas los comprueba import-linter en el CI (pyproject.toml).
+import-linter checks the contracts between layers in CI (pyproject.toml).
 """
 
 from tamandua.version import VERSION

@@ -40,13 +40,13 @@ KEEP_BACKUPS = 5
 @dataclass(frozen=True)
 class Migration:
     name: str
-    touches: tuple[str, ...]  # rutas relativas a data/ que se copian antes de migrar
+    touches: tuple[str, ...]  # paths relative to data/, copied before migrating
     apply: Callable[[Path], object]
 
 
-# Migraciones de datos (en orden; nunca se reordena ni se borra una publicada). El esquema de las tablas lo llevan
-# las migraciones de Alembic; aquí van las transformaciones de datos que no son solo esquema. La lista empieza vacía
-# con la primera versión pública (PostgreSQL): no hay instalaciones anteriores que convertir.
+# Data migrations (in order; a published one is never reordered or deleted). Alembic migrations own the table
+# schema; this is for data transformations that are not just schema. The list starts empty with the first public
+# release (PostgreSQL): there are no earlier installs to convert.
 
 
 def _cra_opt_in(data_dir: Path) -> int:
@@ -173,7 +173,7 @@ def _locked(data_dir: Path):
 
 
 def _backup(data_dir: Path, pending: list[tuple[int, Migration]]) -> Path | None:
-    """Copia lo que van a tocar las migraciones pendientes. Solo eso: runs/ o la base de CVE pueden pesar gigas."""
+    """Copies what the pending migrations will touch. Only that: runs/ or the CVE database can weigh gigabytes."""
     paths = sorted({path for _, migration in pending for path in migration.touches if (data_dir / path).exists()})
     if not paths:
         return None
@@ -193,9 +193,9 @@ def _backup(data_dir: Path, pending: list[tuple[int, Migration]]) -> Path | None
 
 
 def upgrade(data_dir: Path) -> list[str]:
-    """Deja la base (esquema de Alembic) y data/ en la última versión. Devuelve lo que migró en data/ (vacío si nada)."""
+    """Brings the database (Alembic schema) and data/ to the latest version; returns the data/ migrations it ran."""
     from tamandua.app import database
-    database.upgrade()  # antes que nada: las migraciones de datos y la aplicación leen de estas tablas
+    database.upgrade()  # first of all: data migrations and the application read from these tables
     data_dir.mkdir(parents=True, exist_ok=True)
     state = _state(data_dir)
     if state and state["version"] == LATEST:
@@ -221,7 +221,7 @@ def upgrade(data_dir: Path) -> list[str]:
             history.append({"version": number, "name": migration.name, "at": datetime.now(timezone.utc).isoformat(),
                             "result": result if isinstance(result, (int, str)) else None,
                             "backup": str(backup.relative_to(data_dir)) if backup else None})
-            _write(data_dir, number, history)  # tras cada paso: si algo falla, se reanuda desde ahí
+            _write(data_dir, number, history)  # after each step: if something fails, it resumes from there
             done.append(migration.name)
         _log.warning("data_migrated", extra={"reason": f"datos migrados al formato {LATEST}: {', '.join(done)}"
                                                         + (f" (copia previa en {backup})" if backup else "")})

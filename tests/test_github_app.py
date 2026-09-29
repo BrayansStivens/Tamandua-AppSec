@@ -1,4 +1,4 @@
-"""Contrato de la GitHub App: qué se firma, qué se guarda y qué nunca se persiste."""
+"""GitHub App contract: what gets signed, what gets stored and what is never persisted."""
 
 import base64
 import json
@@ -36,7 +36,7 @@ def _environment(key_file: str) -> dict:
 class GitHubAppTests(unittest.TestCase):
     def setUp(self):
         github_app.forget()
-        # Sin aislar el almacén, las pruebas leerían las credenciales reales de quien las corre.
+        # Without isolating the store, the tests would read the real credentials of whoever runs them.
         self.store = tempfile.TemporaryDirectory()
         patcher = patch.object(paths, "CONFIG_DIR", Path(self.store.name) / "config")
         patcher.start()
@@ -64,7 +64,7 @@ class GitHubAppTests(unittest.TestCase):
 
         def fake_get(url, token, **_):
             seen.append((url, token))
-            # GitHub valida el JWT; aquí basta con comprobar que lo firma esta clave.
+            # GitHub validates the JWT; here it's enough to check that this key signs it.
             header, payload, signature = token.split(".")
             pad = lambda value: value + "=" * (-len(value) % 4)
             key.public_key().verify(base64.urlsafe_b64decode(pad(signature)), f"{header}.{payload}".encode(),
@@ -81,7 +81,7 @@ class GitHubAppTests(unittest.TestCase):
         with patch.dict(os.environ, testenv.base(), clear=True), patch("tamandua.modules.integrations.github._get", side_effect=fake_get):
             verified = github_app.verify_app(" 4242 ", pem)
             self.assertEqual(seen[0][0], "https://api.github.com/app")
-            self.assertNotIn("PRIVATE KEY", seen[0][1])  # a GitHub va un JWT, nunca la clave
+            self.assertNotIn("PRIVATE KEY", seen[0][1])  # GitHub gets a JWT, never the key
             github_app.save_credentials(verified)
             files = {path.name for path in (Path(self.store.name) / "config").iterdir()}
             self.assertEqual(files, {"master.key"})  # the entries live in the database, sealed
@@ -89,7 +89,7 @@ class GitHubAppTests(unittest.TestCase):
             state = github_app.config()
             self.assertEqual((state["configured"], state["slug"], state["owner"], state["source"]), (True, "appsec-de-acme", "acme", "vault"))
             self.assertNotIn("PRIVATE", json.dumps(state))
-            github_app._app_jwt()  # firma con la clave descifrada del almacén
+            github_app._app_jwt()  # signs with the key decrypted from the store
             self.assertTrue(github_app.forget_app())
             self.assertFalse(github_app.config()["configured"])
         with patch.dict(os.environ, testenv.base(), clear=True), patch("tamandua.modules.integrations.github._get", side_effect=GitHubAppError("401")):
@@ -114,7 +114,7 @@ class GitHubAppTests(unittest.TestCase):
         self.assertEqual(payload["iss"], "123456")
         self.assertLessEqual(payload["exp"] - payload["iat"], 600)
         self.assertGreater(payload["exp"], time.time())
-        # La firma tiene que validar con la clave pública: no es un JWT decorativo.
+        # The signature must verify with the public key: it's not a decorative JWT.
         key.public_key().verify(base64.urlsafe_b64decode(pad(signature_raw)),
                                 f"{header_raw}.{payload_raw}".encode(),
                                 padding.PKCS1v15(), hashes.SHA256())
@@ -221,7 +221,7 @@ class GitHubAppTests(unittest.TestCase):
 
 
 class CatalogPagingTests(unittest.TestCase):
-    """Una organización con 901 repositorios no debe recorrerse entera para enseñar 25."""
+    """An organization with 901 repositories must not be walked in full to show 25."""
     BIG = {7: [(index + 1, f"acme/repo-{index:03d}") for index in range(901)], 8: [(5000, "beta/web"), (5001, "beta/api")]}
     ACCOUNTS = {7: ("acme", "all"), 8: ("beta", "selected")}
 
@@ -232,7 +232,7 @@ class CatalogPagingTests(unittest.TestCase):
             listing = source_page(None, [7], page=3)
             listed = [url for url in calls if "/installation/repositories" in url]
         self.assertEqual((listing["total"], len(listing["sources"]), listing["sources"][0]["name"]), (901, 25, "acme/repo-050"))
-        self.assertEqual(len(listed), 2)  # la primera página da el total; la tercera, las filas
+        self.assertEqual(len(listed), 2)  # the first page gives the total; the third, the rows
         self.assertTrue(all("per_page=25" in url for url in listed))
 
     def test_pages_continue_across_organizations_and_filter_by_account(self):
@@ -251,7 +251,7 @@ class CatalogPagingTests(unittest.TestCase):
         with fake_github(self.BIG, self.ACCOUNTS) as calls:
             found = source_page(None, [7], query="repo-12 org:otra")
         self.assertIn("/search/repositories", calls[-1])
-        # El texto no puede añadir calificadores: `org:otra` se queda en palabras sueltas.
+        # The text can't add qualifiers: `org:otra` stays as plain words.
         self.assertIn("org%3Aacme", calls[-1])
         self.assertNotIn("org%3Aotra", calls[-1])
         self.assertFalse(found["partial"])

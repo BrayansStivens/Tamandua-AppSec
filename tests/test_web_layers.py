@@ -1,11 +1,11 @@
-"""Capas del panel (FSD ligero): app → pages → features → shared. Una capa no importa de las de arriba."""
+"""Panel layers (lightweight FSD): app → pages → features → shared. A layer never imports from the ones above."""
 
 import re
 import unittest
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[1] / "web" / "src"
-ORDER = ["app", "pages", "features", "shared"]  # de arriba abajo
+ORDER = ["app", "pages", "features", "shared"]  # top to bottom
 IMPORT = re.compile(r"""from\s+['"]@/(?P<layer>[a-z]+)/""")
 
 

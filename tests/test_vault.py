@@ -14,7 +14,7 @@ from tamandua.shared import log as logging_setup
 from tamandua.shared import vault
 from tamandua.shared.i18n import text
 
-# Valores sintéticos armados por partes: el repositorio no lleva literales con forma de credencial.
+# Synthetic values built from pieces: the repository holds no credential-shaped literals.
 OPENAI_KEY = "-".join(("sk", "proj", "valor", "muy", "secreto", "123"))
 CLIENT_SECRET = "".join(format(digit, "x") for digit in range(16)) * 2 + "01234567"
 
@@ -91,7 +91,7 @@ class VaultTests(unittest.TestCase):
                                     "Authorization: Basic c2VjOnRva2Vu -----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----")
         for leaked in (CLIENT_SECRET, "11ABCDEFG", "c2VjOnRva2Vu", "MIIE"):
             self.assertNotIn(leaked, line)
-        self.assertIn("appsec", logging_setup.redact("slug appsec"))  # lo que no es secreto se conserva
+        self.assertIn("appsec", logging_setup.redact("slug appsec"))  # what isn't a secret is kept
 
     def test_the_vault_file_of_earlier_versions_is_imported_once(self):
         vault.put("jira", {"token": "ATATT3xFfGF0-nuevo"})

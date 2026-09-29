@@ -1,4 +1,4 @@
-"""La conexión de IA conserva las claves en el servidor y no consume inferencia."""
+"""The AI connection keeps the keys on the server and doesn't consume inference."""
 
 import io
 import json
@@ -26,8 +26,8 @@ class FakeResponse:
 
 class ProviderTests(unittest.TestCase):
     def setUp(self):
-        # El almacén de claves se aísla: sin esto las pruebas leerían la credencial
-        # real de quien las ejecuta y podrían filtrarla en un mensaje de fallo.
+        # The key store is isolated: without this the tests would read the real credential
+        # of whoever runs them and could leak it in a failure message.
         self.store = tempfile.TemporaryDirectory()
         patcher = patch.object(paths, "CONFIG_DIR", Path(self.store.name) / "config")
         patcher.start()

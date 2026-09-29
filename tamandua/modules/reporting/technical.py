@@ -1,10 +1,10 @@
-"""Informe técnico de hallazgos (PDF) de un análisis o del estado acumulado de un repositorio o imagen.
+"""Technical findings report (PDF) for a scan or for the accumulated state of a repository or image.
 
-Para el equipo que corrige, en este orden: cuánto hay y qué hacer primero (una acción por paquete o por
-hallazgo de código); las dependencias agrupadas con la versión que cierra todos sus avisos; el código,
-secretos e infraestructura (detalle solo de críticos y altos); el método y lo que no se pudo analizar.
-El índice completo de vulnerabilidades va en un anexo compacto; el texto íntegro de cada aviso sigue
-en el JSON, el SARIF y el panel.
+For the team doing the fixes, in this order: how much there is and what to do first (one action per package or
+per code finding); dependencies grouped with the version that closes all their advisories; code, secrets and
+infrastructure (details only for critical and high); the method and what couldn't be analyzed.
+The full vulnerability index goes in a compact annex; the full text of each advisory remains
+in the JSON, the SARIF and the panel.
 """
 
 from __future__ import annotations

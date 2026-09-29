@@ -1,10 +1,10 @@
-"""Informe del modelo de amenazas para el equipo de desarrollo (PDF y Markdown).
+"""Threat model report for the development team (PDF and Markdown).
 
-Lo que un equipo necesita para actuar, en este orden: cuánto hay y qué atender primero; el diagrama;
-las amenazas que escribió el equipo (las más concretas); las que tienen indicios en los análisis; y las
-de las reglas agrupadas por patrón (una medida corrige el patrón en todos sus componentes, en vez de
-repetir la misma amenaza veinte veces). Lo exhaustivo (flujos, componentes, PASTA, árboles, ATT&CK) va
-en anexos. El diagrama y la tabla de flujos comparten la numeración.
+What a team needs to act, in this order: how much there is and what to handle first; the diagram;
+the threats the team wrote (the most concrete ones); those with evidence in the scans; and the
+rule-based ones grouped by pattern (one measure fixes the pattern in all its components, instead of
+repeating the same threat twenty times). The exhaustive parts (flows, components, PASTA, trees, ATT&CK) go
+in annexes. The diagram and the flow table share the numbering.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def _counts(items: list[dict], locale: str) -> str:
 
 
 def digest(model: dict, rows: list[dict], *, locale: str | None = None) -> dict:
-    """Todo lo que muestran el PDF y el Markdown, ya agrupado y ordenado y en el idioma `locale`."""
+    """Everything the PDF and the Markdown show, already grouped, sorted and in the `locale` language."""
     from tamandua.modules.threats import model as tm
     locale = locale or default_locale()
     rows = localize(rows, locale)
@@ -76,7 +76,7 @@ def digest(model: dict, rows: list[dict], *, locale: str | None = None) -> dict:
     grouped.sort(key=lambda entry: (ORDER.index(entry["severity"]), -entry["evidenced"], -entry["count"], entry["title"]))
     team.sort(key=lambda row: (row["status"] not in PENDING, ORDER.index(row["severity"]), row["element_name"]))
     evidenced.sort(key=lambda row: (ORDER.index(row["severity"]), -row["evidence_count"], row["element_name"]))
-    # Qué atender primero: lo concreto (indicios, lo que escribió el equipo) antes que los patrones genéricos.
+    # What to handle first: the concrete (evidence, what the team wrote) before the generic patterns.
     first = [("evidence", row) for row in evidenced if row["severity"] in ("critical", "high")]
     first += [("team", row) for row in team if row["status"] in PENDING and row["severity"] in ("critical", "high")]
     first += [("pattern", entry) for entry in grouped if entry["severity"] == "critical"]
@@ -101,7 +101,7 @@ def digest(model: dict, rows: list[dict], *, locale: str | None = None) -> dict:
 
 
 def coverage(model: dict, data: dict) -> list[str]:
-    """Cómo salen las amenazas y qué no se pudo contrastar: sin repositorios, «sin indicios» no significa «sin fallos»."""
+    """How threats are derived and what couldn't be verified: without repositories, "no evidence" isn't "no flaws"."""
     locale = data["locale"]
     total, linked = len(data["components"]), len(data["linked"])
     lines = [t("threats.report.coverage_method", locale, method=data["method_label"], count=len(data["team"]))]
@@ -188,12 +188,12 @@ def render_pdf(model: dict, rows: list[dict], *, version: str, locale: str | Non
                              esc("; ".join(item["mitigations"][:2]) or "—", 260)])
         story.append(table([r("col_severity"), r("col_threat"), r("col_where"), r("col_action")], body,
                            [19 * mm, 55 * mm, 45 * mm, WIDTH - 119 * mm]))
-    # El diagrama, en una página apaisada (A3 si es grande: sigue siendo vectorial y se puede ampliar).
+    # The diagram, on a landscape page (A3 if large: it is still vector and can be zoomed in).
     if data["components"]:
         drawn = threat_diagram.scene(model, data["kinds"], locale=locale)
         _, _, width, height = drawn["bounds"]
         area = wide_size(None)
-        size = "a3" if min(area[0] / width, area[1] / height) < 0.5 else None  # por debajo, el texto no se lee impreso
+        size = "a3" if min(area[0] / width, area[1] / height) < 0.5 else None  # below that, text is unreadable in print
         area = wide_size(size)
         story += wide_page([Paragraph(esc(r("diagram")), STYLE["h3"]),
                             threat_diagram.to_drawing(model, area[0], area[1] - 12 * mm, data["kinds"], locale=locale)], size=size)
@@ -242,7 +242,7 @@ def render_pdf(model: dict, rows: list[dict], *, version: str, locale: str | Non
             story.append(Paragraph(esc(r("decisions_truncated", shown=400, count=len(data["decided"]))), STYLE["note"]))
     else:
         story.append(Paragraph(esc(r("no_decisions"), 400), STYLE["body"]))
-    # Anexos
+    # Annexes
     no = '<font color="#b71824">{}</font>'
     if data["flows"]:
         story.append(h2(r("appendix_flows")))
@@ -334,7 +334,7 @@ def _row(*cells) -> str:
 
 
 def to_markdown(model: dict, rows: list[dict], *, locale: str | None = None) -> str:
-    """El mismo informe en Markdown (para un wiki, un ticket o un pull request)."""
+    """The same report in Markdown (for a wiki, a ticket or a pull request)."""
     data = digest(model, rows, locale=locale)
     locale = data["locale"]
     r = lambda key, **params: t(f"threats.report.{key}", locale, **params)  # noqa: E731

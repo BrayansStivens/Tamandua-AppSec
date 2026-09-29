@@ -1,12 +1,12 @@
-"""Informe de evidencia de gestión de vulnerabilidades (SOC 2, ISO/IEC 27001 o general).
+"""Vulnerability management evidence report (SOC 2, ISO/IEC 27001 or general).
 
-Lo que un equipo entrega cuando un auditor o un cliente pide evidencia: quién, qué sistema y qué
-periodo; cómo se analizó y qué quedó fuera; qué se encontró, en qué estado está y qué excepciones
-se aprobaron, con su motivo y su responsable. Conciso: el detalle técnico completo sigue en el
-informe técnico, el SARIF y el JSON.
+What a team hands over when an auditor or a customer asks for evidence: who, which system and which
+period; how it was scanned and what was left out; what was found, what state it is in and which
+exceptions were approved, with their reason and owner. Concise: the full technical detail stays in
+the technical report, the SARIF and the JSON.
 
-No es una opinión de auditoría ni una certificación, y lo dice. Todo texto que llega del
-repositorio o del formulario se trata como dato: se escapa antes de dibujarse.
+It is not an audit opinion or a certification, and it says so. All text coming from the
+repository or the form is treated as data: it is escaped before being drawn.
 """
 
 from __future__ import annotations

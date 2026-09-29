@@ -1,4 +1,4 @@
-"""OWASP Top 10:2025 (web): el catálogo contra el que se mide la cobertura. Cada entrada: id y nombre."""
+"""OWASP Top 10:2025 (web): the catalog coverage is measured against. Each entry: id and name."""
 
 WEB_TOP_10_2025 = (
     ("A01", "Broken Access Control"),

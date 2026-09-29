@@ -1,24 +1,24 @@
-"""Configuración como código y pipelines: Checkov y zizmor, sin repetir lo que ya ve Trivy.
+"""Configuration as code and pipelines: Checkov and zizmor, without repeating what Trivy already sees.
 
 - **Checkov** (Apache-2.0): Terraform, CloudFormation, Kubernetes, Helm, Kustomize, ARM, Bicep,
-  Serverless, OpenAPI, Ansible, Dockerfile y pipelines (GitHub Actions, GitLab CI, Bitbucket,
-  Azure Pipelines, CircleCI, Argo). Corre sin red y con `--skip-download`: no descarga módulos
-  externos ni consulta la plataforma de Prisma. Por eso la edición libre no trae severidad y
-  se asigna aquí con reglas visibles (`checkov_severity`).
-- **zizmor** (MIT): auditoría a fondo de GitHub Actions (inyección en plantillas, disparadores
-  peligrosos, permisos, acciones sin fijar por SHA, credenciales persistidas). Sin conexión.
+  Serverless, OpenAPI, Ansible, Dockerfile and pipelines (GitHub Actions, GitLab CI, Bitbucket,
+  Azure Pipelines, CircleCI, Argo). Runs offline with `--skip-download`: it doesn't download external
+  modules or query the Prisma platform. That is why the free edition carries no severity, which is
+  assigned here with visible rules (`checkov_severity`).
+- **zizmor** (MIT): in-depth GitHub Actions audit (template injection, dangerous triggers,
+  permissions, actions not pinned by SHA, persisted credentials). Offline.
 
-En imágenes de contenedor, Checkov revisa un Dockerfile **reconstruido del historial** de la
-imagen (`dockerfile_from_history`): su modo de imágenes necesita una clave de Prisma Cloud.
+On container images, Checkov checks a Dockerfile **rebuilt from the image's history**
+(`dockerfile_from_history`): its image mode needs a Prisma Cloud key.
 
-**Sin duplicados.** Cuando dos motores ven lo mismo en el mismo sitio queda un solo hallazgo:
-el del motor principal (Trivy en infraestructura, zizmor en GitHub Actions, las reglas propias
-en imágenes) con `also_detected_by` y `related_rules`. La equivalencia entre reglas sale de una
-tabla medida sobre TerraGoat, CfnGoat, KubernetesGoat y CI/CD-Goat, más una comparación de
-títulos cuando la tabla no conoce la pareja.
+**No duplicates.** When two engines see the same thing in the same place, one finding remains:
+the main engine's (Trivy for infrastructure, zizmor for GitHub Actions, our own rules for
+images) with `also_detected_by` and `related_rules`. Rule equivalence comes from a table
+measured on TerraGoat, CfnGoat, KubernetesGoat and CI/CD-Goat, plus a title comparison
+when the table doesn't know the pair.
 
-Ningún fragmento de código de los informes (`code_block` de Checkov, `feature` de zizmor) se
-lee ni se guarda: puede contener secretos. Solo regla, archivo y líneas.
+No code snippet from the reports (Checkov's `code_block`, zizmor's `feature`) is read
+or stored: it may contain secrets. Only rule, file and lines.
 """
 
 from __future__ import annotations
@@ -45,12 +45,12 @@ FRAMEWORK_LABEL = {"terraform": "Terraform", "terraform_json": "Terraform", "clo
                    "azure_pipelines": "Azure Pipelines", "circleci_pipelines": "CircleCI", "argo_workflows": "Argo Workflows"}
 POLICY_INDEX = "https://www.checkov.io/5.Policy%20Index/all.html"
 
-# --- equivalencias entre motores -------------------------------------------------------------
+# --- cross-engine equivalences ---------------------------------------------------------------
 
-# Trivy (ID normalizado, sin «AVD-») → reglas de Checkov que comprueban lo mismo.
-# Medida sobre TerraGoat, CfnGoat, KubernetesGoat y CI/CD-Goat, revisada a mano pareja por pareja.
+# Trivy (normalized ID, without `AVD-`) → Checkov rules that check the same thing.
+# Measured on TerraGoat, CfnGoat, KubernetesGoat and CI/CD-Goat, reviewed by hand pair by pair.
 TRIVY_CHECKOV: dict[str, tuple[str, ...]] = {
-    # AWS (Terraform y CloudFormation comparten identificadores en los dos motores)
+    # AWS (Terraform and CloudFormation share identifiers in both engines)
     "AWS-0017": ("CKV_AWS_158",), "AWS-0026": ("CKV_AWS_3", "CKV2_AWS_2"), "AWS-0027": ("CKV_AWS_189",),
     "AWS-0028": ("CKV_AWS_79",), "AWS-0029": ("CKV_AWS_46",), "AWS-0030": ("CKV_AWS_163",), "AWS-0031": ("CKV_AWS_51",),
     "AWS-0033": ("CKV_AWS_136",), "AWS-0038": ("CKV_AWS_37",), "AWS-0039": ("CKV_AWS_58",), "AWS-0040": ("CKV_AWS_39",),
@@ -92,7 +92,7 @@ TRIVY_CHECKOV: dict[str, tuple[str, ...]] = {
     # Dockerfile
     "DS-0001": ("CKV_DOCKER_7",), "DS-0002": ("CKV_DOCKER_3", "CKV_DOCKER_8"), "DS-0004": ("CKV_DOCKER_1",),
     "DS-0005": ("CKV_DOCKER_4",), "DS-0017": ("CKV_DOCKER_5",), "DS-0026": ("CKV_DOCKER_2",),
-    # Kubernetes (también lo que Checkov ve al renderizar Helm)
+    # Kubernetes (also what Checkov sees when rendering Helm)
     "KSV-0001": ("CKV_K8S_20",), "KSV-0003": ("CKV_K8S_37",), "KSV-0004": ("CKV_K8S_37",), "KSV-0006": ("CKV_K8S_27",),
     "KSV-0008": ("CKV_K8S_18",), "KSV-0009": ("CKV_K8S_19",), "KSV-0010": ("CKV_K8S_17",), "KSV-0011": ("CKV_K8S_11",),
     "KSV-0012": ("CKV_K8S_23",), "KSV-0013": ("CKV_K8S_14",), "KSV-0014": ("CKV_K8S_22",), "KSV-0015": ("CKV_K8S_10",),
@@ -101,8 +101,8 @@ TRIVY_CHECKOV: dict[str, tuple[str, ...]] = {
     "KSV-0044": ("CKV_K8S_49",), "KSV-0104": ("CKV_K8S_31",), "KSV-0105": ("CKV_K8S_23",), "KSV-0110": ("CKV_K8S_21",),
     "KSV-0118": ("CKV_K8S_29", "CKV_K8S_30"),
 }
-# Severidad de las reglas de Checkov que tienen pareja en Trivy: la de Trivy (sus metadatos sí la traen).
-# Generada desde la tabla de arriba y el paquete de reglas de Trivy 0.74; el resto usa `checkov_severity`.
+# Severity of the Checkov rules paired with a Trivy rule: Trivy's (its metadata does carry one).
+# Generated from the table above and Trivy 0.74's rule bundle; the rest use `checkov_severity`.
 CHECKOV_SEVERITY: dict[str, str] = {rule: level for level, rules in {
     "critical": """CKV_AWS_38 CKV_AWS_382 CKV_AWS_39 CKV_AWS_46 CKV_AWS_83 CKV_AZURE_10 CKV_AZURE_109 CKV_AZURE_35
         CKV_AZURE_44 CKV_AZURE_6 CKV_AZURE_9 CKV_GCP_15 CKV_K8S_49""",
@@ -128,23 +128,23 @@ CHECKOV_SEVERITY: dict[str, str] = {rule: level for level, rules in {
         CKV_GCP_74 CKV_GCP_8 CKV_GCP_9 CKV_K8S_10 CKV_K8S_11 CKV_K8S_12 CKV_K8S_13 CKV_K8S_21 CKV_K8S_37
         CKV_K8S_40""",
 }.items() for rule in rules.split()}
-# zizmor → Checkov en GitHub Actions. Checkov marca el workflow entero; zizmor, la línea exacta.
+# zizmor → Checkov on GitHub Actions. Checkov flags the whole workflow; zizmor, the exact line.
 ZIZMOR_CHECKOV: dict[str, tuple[str, ...]] = {
     "template-injection": ("CKV_GHA_2",), "insecure-commands": ("CKV_GHA_1",), "excessive-permissions": ("CKV2_GHA_1",),
 }
-# Reglas propias de imagen → Trivy y Checkov sobre el Dockerfile reconstruido.
+# Our own image rules → Trivy and Checkov on the rebuilt Dockerfile.
 IMAGE_EQUIVALENT: dict[str, tuple[str, ...]] = {
     "IMG-ROOT": ("CKV_DOCKER_3", "CKV_DOCKER_8", "DS-0002"), "IMG-NO-HEALTHCHECK": ("CKV_DOCKER_2", "DS-0026"),
     "IMG-SSH": ("CKV_DOCKER_1", "DS-0004"), "IMG-ADD-URL": ("CKV_DOCKER_4", "DS-0005"),
 }
-# De la imagen entera (no de un paso del historial): se unen aunque cada motor la ubique distinto.
+# About the whole image (not one history step): merged even when each engine places them differently.
 IMAGE_WIDE = {"IMG-ROOT", "IMG-NO-HEALTHCHECK", "IMG-SSH"}
-# El Dockerfile reconstruido empieza con un FROM ficticio: estas reglas hablarían de él, no de la imagen.
+# The rebuilt Dockerfile starts with a dummy FROM: these rules would be about it, not about the image.
 IMAGE_SKIP = {"CKV_DOCKER_7", "CKV_DOCKER_11"}
 
 
 def trivy_id(rule: str) -> str:
-    """«AVD-AWS-0086», «AWS-0086» y «KSV001» son la misma regla de Trivy según la versión."""
+    """`AVD-AWS-0086`, `AWS-0086` and `KSV001` are the same Trivy rule, depending on the version."""
     text = re.sub(r"^AVD-", "", str(rule or "").upper())
     match = re.fullmatch(r"([A-Z]+)-?(\d+)", text)
     return f"{match[1]}-{int(match[2]):04d}" if match else text
@@ -180,12 +180,12 @@ def _overlap(a: dict, b: dict) -> bool:
 def merge_equivalent(primary: list[dict], secondary: list[dict], table: dict[str, tuple[str, ...]], *,
                      normalize=lambda rule: rule, file_level: set[str] | None = None, anywhere: set[str] | None = None,
                      by_title: float | None = None) -> tuple[list[dict], int]:
-    """Une lo que dos motores ven a la vez. Devuelve los principales (anotados) más los secundarios nuevos.
+    """Merges what two engines both see. Returns the main findings (annotated) plus the new secondary ones.
 
-    Un secundario es el mismo hallazgo que un principal si su regla es equivalente según `table`
-    (o, con `by_title`, si los títulos se parecen al menos eso), están en el mismo archivo y sus
-    líneas se solapan. `file_level`: reglas secundarias que señalan el archivo entero. `anywhere`:
-    reglas principales que valen para todo el activo, sin importar dónde las ubique cada motor.
+    A secondary finding is the same as a main one if its rule is equivalent according to `table`
+    (or, with `by_title`, if the titles are at least that similar), they are in the same file and their
+    lines overlap. `file_level`: secondary rules that flag the whole file. `anywhere`: main rules
+    that apply to the whole asset, wherever each engine places them.
     """
     file_level, anywhere = file_level or set(), anywhere or set()
     by_path: dict[str, list[dict]] = {}
@@ -231,7 +231,7 @@ _LOW = re.compile(r"\btags?\b|label|description|monitoring|x-?ray|tracing|perfor
 
 
 def checkov_severity(check_id: str, name: str) -> str:
-    """La edición libre de Checkov no trae severidad: se deduce del nombre de la regla, a la baja si hay duda."""
+    """Checkov's free edition carries no severity: it is inferred from the rule name, rounding down when unsure."""
     if check_id in CHECKOV_SEVERITY:
         return CHECKOV_SEVERITY[check_id]
     if _LOW.search(name):
@@ -242,7 +242,7 @@ def checkov_severity(check_id: str, name: str) -> str:
 
 
 def parse_checkov(payload, *, image: dict | None = None, step_of: dict[int, int] | None = None) -> list[dict]:
-    """Hallazgos de Checkov. Con `image`, las líneas del Dockerfile reconstruido se traducen a pasos del historial."""
+    """Checkov findings. With `image`, lines of the rebuilt Dockerfile are mapped to history steps."""
     reports = payload if isinstance(payload, list) else [payload] if isinstance(payload, dict) else []
     findings, seen = [], set()
     for report in reports:
@@ -317,10 +317,10 @@ INSTRUCTION = re.compile(r"^(RUN|ENV|COPY|ADD|USER|EXPOSE|WORKDIR|ARG|LABEL|HEAL
 
 
 def dockerfile_from_history(history: list[str], config: dict | None = None) -> tuple[str, dict[int, int]]:
-    """Dockerfile equivalente al historial de la imagen y, para cada línea, el paso del que sale.
+    """Dockerfile equivalent to the image's history and, for each line, the step it comes from.
 
-    Admite el formato del constructor clásico (`/bin/sh -c #(nop) …`) y el de BuildKit (`RUN … # buildkit`).
-    El `ADD file:…` de la capa base es el sistema de ficheros de la imagen de partida, no un ADD del autor.
+    Handles the classic builder's format (`/bin/sh -c #(nop) …`) and BuildKit's (`RUN … # buildkit`).
+    The base layer's `ADD file:…` is the base image's filesystem, not an ADD written by the author.
     """
     lines, step_of = ["FROM scratch"], {}
     for index, raw in enumerate(history):
@@ -354,8 +354,8 @@ def dockerfile_from_history(history: list[str], config: dict | None = None) -> t
 
 
 def run_checkov_image(metadata: dict, image: dict, work_dir: Path) -> dict:
-    """Checkov sobre el Dockerfile reconstruido. El historial puede llevar secretos: el fichero vive en una
-    carpeta temporal que se borra al terminar y el contenedor no tiene red."""
+    """Checkov on the rebuilt Dockerfile. The history may carry secrets: the file lives in a temporary
+    folder deleted when done, and the container has no network."""
     started = time.time()
     if problem := unavailable("checkov", msg("scanning.checkov.image_no_docker")):
         return _result("checkov", "not_tested", problem)
@@ -414,7 +414,7 @@ ZIZMOR_AUDITS = {
 }
 ZIZMOR_SEVERITY = {"high": "high", "medium": "medium", "low": "low", "informational": "info", "unknown": "low"}
 ZIZMOR_CONFIDENCE = {"high": 8, "medium": 6, "low": 4, "unknown": 4}
-# Riesgo real, pero para explotarlo hace falta comprometer antes la acción de terceros: se rebaja un nivel.
+# Real risk, but exploiting it first requires compromising the third-party action: lowered one level.
 ZIZMOR_DOWNGRADE = {"unpinned-uses": "medium", "unpinned-images": "low", "anonymous-definition": "info"}
 
 
@@ -452,7 +452,7 @@ def parse_zizmor(payload: list) -> list[dict]:
 
 
 def github_actions_files(snapshot: Path) -> list[Path]:
-    """Workflows y acciones compuestas que zizmor audita."""
+    """Workflows and composite actions that zizmor audits."""
     workflows = snapshot / ".github" / "workflows"
     found = sorted(path for path in workflows.iterdir() if path.suffix in (".yml", ".yaml")) if workflows.is_dir() else []
     return found + sorted(path for path in snapshot.rglob("action.y*ml") if path.name in ("action.yml", "action.yaml"))
@@ -481,10 +481,10 @@ def run_zizmor(snapshot: Path) -> dict:
     return _result("zizmor", "completed", detail, findings, started)
 
 
-# --- unión -------------------------------------------------------------------------------------
+# --- merge -------------------------------------------------------------------------------------
 
 def merge_repository(trivy_iac: list[dict], checkov: list[dict], zizmor: list[dict]) -> tuple[list[dict], dict]:
-    """Infraestructura: Trivy manda y Checkov suma lo que Trivy no ve. GitHub Actions: zizmor manda."""
+    """Infrastructure: Trivy leads and Checkov adds what Trivy doesn't see. GitHub Actions: zizmor leads."""
     checkov_iac = [item for item in checkov if item["scanner"] == "iac"]
     checkov_cicd = [item for item in checkov if item["scanner"] == "cicd"]
     iac, iac_joined = merge_equivalent(trivy_iac, checkov_iac, TRIVY_CHECKOV, normalize=trivy_id, by_title=0.75)
@@ -495,7 +495,7 @@ def merge_repository(trivy_iac: list[dict], checkov: list[dict], zizmor: list[di
 
 
 def merge_image(own: list[dict], trivy_config: list[dict], checkov: list[dict]) -> tuple[list[dict], int]:
-    """Imágenes: las reglas propias mandan; Trivy y Checkov solo añaden lo que ellas no cubren."""
+    """Images: our own rules lead; Trivy and Checkov only add what those rules don't cover."""
     merged, joined = merge_equivalent(own, trivy_config, IMAGE_EQUIVALENT, anywhere=IMAGE_WIDE, normalize=trivy_id)
     merged, joined_checkov = merge_equivalent(merged, checkov, IMAGE_EQUIVALENT, anywhere=IMAGE_WIDE, normalize=trivy_id)
     return merged, joined + joined_checkov

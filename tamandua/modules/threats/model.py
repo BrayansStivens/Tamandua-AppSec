@@ -1,19 +1,19 @@
-"""Modelado de amenazas: un modelo del sistema, STRIDE por elemento y evidencia de los escaneos.
+"""Threat modeling: a model of the system, STRIDE per element and evidence from the scans.
 
-El modelo lo construye el equipo —componentes, flujos de datos y fronteras de
-confianza— con ayuda de una **propuesta** que sale del inventario de los
-repositorios escaneados (qué frameworks, bases de datos y servicios usa el
-código). La propuesta es un punto de partida editable, no una verdad.
+The team builds the model — components, data flows and trust boundaries — helped
+by a **proposal** drawn from the inventory of the scanned repositories (which
+frameworks, databases and services the code uses). The proposal is an editable
+starting point, not the truth.
 
-Sobre el modelo se aplican reglas STRIDE propias y visibles, como las reglas
-SAST: cada amenaza dice qué regla la genera, por qué aplica a ese elemento, qué
-la mitiga y con qué CWE se relaciona. Lo que la distingue de una lista genérica
-es la **evidencia**: si un repositorio enlazado tiene hallazgos abiertos con uno
-de esos CWE —en la carpeta del componente, si se indicó—, la amenaza aparece *con indicios* y
-enlaza a ellos: una señal para revisar, no una confirmación.
+Our own visible STRIDE rules are applied to the model, like the SAST rules: each
+threat says which rule generates it, why it applies to that element, what
+mitigates it and which CWE it relates to. What sets it apart from a generic list
+is the **evidence**: if a linked repository has open findings with one of those
+CWEs — in the component's folder, if one was given — the threat shows up *with
+evidence* and links to them: a signal to review, not a confirmation.
 
-Exporta a OWASP Threat Dragon (JSON v2) y a un script de OWASP pytm, para quien
-quiera seguir en esas herramientas.
+Exports to OWASP Threat Dragon (JSON v2) and to an OWASP pytm script, for anyone
+who wants to carry on in those tools.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ PROTOCOLS = ("https", "http", "grpc", "websocket", "sql", "amqp", "redis", "smtp
 DECISIONS = ("mitigated", "accepted", "not_applicable")
 ID = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 FOLDER = re.compile(r"[A-Za-z0-9_.\- /@+]{0,200}")
-CANVAS = 100_000  # coordenadas del lienzo: de sobra para cualquier diagrama
+CANVAS = 100_000  # canvas coordinates: plenty for any diagram
 LIMITS = {"components": 60, "flows": 150, "boundaries": 20}
 
 
@@ -83,7 +83,7 @@ def _text(value, limit: int, field, *, required: bool = False) -> str:
 
 
 def _folder(value, field) -> str:
-    """Carpeta del repositorio que es el código de un componente: relativa, sin «..», terminada en «/»."""
+    """Repository folder holding a component's code: relative, no "..", ending in "/"."""
     if value in (None, ""):
         return ""
     if not isinstance(value, str) or not FOLDER.fullmatch(value):
@@ -99,7 +99,7 @@ def _number(value, low: float, high: float):
 
 
 def _position(raw) -> dict | None:
-    """Dónde está un componente en el lienzo del editor. Opcional: sin ella se reparte en columnas."""
+    """Where a component sits on the editor canvas. Optional: without it, components are laid out in columns."""
     if not isinstance(raw, dict):
         return None
     x, y = _number(raw.get("x"), -CANVAS, CANVAS), _number(raw.get("y"), -CANVAS, CANVAS)
@@ -107,7 +107,7 @@ def _position(raw) -> dict | None:
 
 
 def _size(raw) -> dict | None:
-    """Tamaño de un componente redimensionado en el editor; sin él, el panel usa el tamaño estándar."""
+    """Size of a component resized in the editor; without it, the panel uses the standard size."""
     if not isinstance(raw, dict):
         return None
     width, height = _number(raw.get("width"), 120, 800), _number(raw.get("height"), 50, 600)
@@ -122,10 +122,10 @@ def _box(raw) -> dict | None:
     return {**position, "width": width, "height": height} if position and width and height else None
 
 
-# ------------------------------------------------------------ validación
+# ------------------------------------------------------------ validation
 
 def _color(value, identifier: str) -> str:
-    """Color elegido en el editor: un token de la paleta o nada (automático, según el tipo)."""
+    """Color picked in the editor: a palette token or nothing (automatic, by kind)."""
     if value in (None, ""):
         return ""
     if value not in threat_diagram.COLORS:
@@ -146,7 +146,7 @@ def _legend(raw, components: list[dict]) -> dict:
 
 
 def validate(payload: dict, *, known_assets: set[str]) -> dict:
-    """Normaliza un modelo que llega del panel. Todo lo que no se reconoce se rechaza."""
+    """Normalizes a model coming from the panel. Anything unrecognized is rejected."""
     if not isinstance(payload, dict):
         raise ModelError(msg("threats.errors.invalid_model"))
     model = {"name": _text(payload.get("name"), 80, msg("threats.fields.name"), required=True),
@@ -229,14 +229,14 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
         raise ModelError(msg("threats.errors.invalid_repositories"))
     if any(item not in known_assets for item in repositories):
         raise ModelError(msg("threats.errors.unknown_repository"))
-    # Los repositorios que usan los componentes forman parte del proyecto aunque no se hayan añadido a mano.
+    # The repositories the components use belong to the project even if nobody added them by hand.
     model["repositories"] = list(dict.fromkeys([*repositories, *(item["asset"] for item in components if item.get("asset") and not item["asset"].startswith("domain:"))]))
     references = payload.get("repository_refs") or []
     if not isinstance(references, list) or len(references) > 50:
         raise ModelError(msg("threats.errors.invalid_repository_refs"))
     model["repository_refs"] = list(dict.fromkeys(_text(item, 200, msg("threats.fields.repository_ref"), required=True) for item in references))
     try:
-        # Lo propio del enfoque elegido: amenazas escritas a mano, árboles, técnicas ATT&CK, etapas PASTA.
+        # What is specific to the chosen approach: hand-written threats, trees, ATT&CK techniques, PASTA stages.
         extras = threat_methods.validate(payload, elements=ids | flow_ids)
     except threat_methods.MethodError as exc:
         raise ModelError(exc.message) from exc
@@ -245,7 +245,7 @@ def validate(payload: dict, *, known_assets: set[str]) -> dict:
 
 
 def to_portable(model: dict, assets: dict[str, dict] | None = None) -> dict:
-    """Formato editable: no contiene IDs locales, decisiones ni evidencia de escaneos."""
+    """Editable format: no local IDs, decisions or scan evidence."""
     assets = assets or {}
     def label(identifier: str) -> str:
         return assets.get(identifier, {}).get("name") or identifier
@@ -271,7 +271,7 @@ def to_portable(model: dict, assets: dict[str, dict] | None = None) -> dict:
 
 
 def from_portable(document: dict) -> dict:
-    """Importa un modelo sin confiar en IDs de activos ni enlazarlos automáticamente."""
+    """Imports a model without trusting asset IDs or linking them automatically."""
     if not isinstance(document, dict):
         raise ModelError(msg("threats.errors.not_an_object"))
     if "format" in document or "version" in document:
@@ -297,7 +297,7 @@ def from_portable(document: dict) -> dict:
         detached.append({**item, "asset": None, "asset_ref": reference})
     clean = {**raw, "components": detached, "repositories": [], "repository_refs": [*references, *repositories]}
     imported = validate(clean, known_assets=set())
-    # Posiciones que no encajan con sus fronteras (cajas pequeñas o solapadas): mejor recolocar que dibujarlas mal.
+    # Positions that don't fit their boundaries (small or overlapping boxes): re-laying out beats drawing them wrong.
     if not geometry_fits(imported):
         imported = {**imported, "components": [{**item, "position": None} for item in imported["components"]],
                     "boundaries": [{**item, "box": None} for item in imported["boundaries"]]}
@@ -315,8 +315,8 @@ def from_portable(document: dict) -> dict:
 
 
 def geometry_fits(model: dict) -> bool:
-    """¿Las posiciones y cajas de un modelo son coherentes? Cada componente colocado dentro de la caja de su
-    frontera y ninguna caja pisa a otra (salvo si la contiene entera). Sin posiciones, no hay nada que comprobar."""
+    """Are a model's positions and boxes consistent? Every placed component inside its boundary's box, and no box
+    overlapping another (unless it contains it entirely). Without positions, there is nothing to check."""
     components = {item["id"]: item for item in model.get("components", [])}
     if not any(item.get("position") for item in components.values()):
         return True
@@ -345,7 +345,7 @@ def geometry_fits(model: dict) -> bool:
 
 
 def _portable_sections(model: dict) -> set[str]:
-    """Las secciones propias de un método; el diagrama es común a todos."""
+    """A method's own sections; the diagram is shared by all of them."""
     method = model.get("methodology") or "stride"
     if method == "custom":
         modules = set(model.get("custom_modules", ["manual", "elements"]))
@@ -360,7 +360,7 @@ def _portable_sections(model: dict) -> set[str]:
     }.get(method, set())
 
 
-# ------------------------------------------------------------ almacén
+# ------------------------------------------------------------ storage
 
 def _name(model_id: str) -> str:
     if not isinstance(model_id, str) or not re.fullmatch(r"[0-9a-f]{24}", model_id):
@@ -404,7 +404,7 @@ def save(data_dir: Path, model: dict, *, by: str, model_id: str | None = None) -
 
 
 def delete(data_dir: Path, model_id: str) -> None:
-    load(data_dir, model_id)  # 404 si no existe
+    load(data_dir, model_id)  # 404 if it doesn't exist
     documents.delete(data_dir, _name(model_id))
 
 
@@ -429,9 +429,9 @@ def decide(data_dir: Path, model_id: str, threat_id: str, status: str, reason, *
     return model
 
 
-# ------------------------------------------------------------ propuesta
+# ------------------------------------------------------------ proposal
 
-# Firma de dependencia → componente que sugiere. Nombres exactos o prefijos terminados en «/».
+# Dependency signature → component it suggests. Exact names or prefixes ending in "/".
 NEXT_APP, BROWSER_APP, ORM_DATABASE = msg("threats.suggest.nextjs_app"), msg("threats.suggest.browser_app"), msg("threats.suggest.orm_database")
 SIGNATURES = [
     (("next",), "web_app", NEXT_APP, "Next.js"),
@@ -474,7 +474,7 @@ def _slug(text: str, used: set[str]) -> str:
 
 
 def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -> dict:
-    """Propuesta inicial a partir del inventario de los últimos escaneos. Todo queda marcado como sugerido.
+    """Initial proposal from the inventory of the latest scans. Everything is marked as suggested.
 
     The proposal becomes the team's own editable content, so it is written in the requester's language."""
     locale = locale or default_locale()
@@ -489,7 +489,7 @@ def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -
     for repository in repositories:
         inventory = repository.get("inventory") or {}
         names = {item for values in (inventory.get("packages") or {}).values() for item in values}
-        # Sin inventario (escaneos antiguos) se usan los paquetes de los hallazgos de dependencias.
+        # Without an inventory (old scans), the packages from dependency findings are used.
         names |= {(item.get("package") or {}).get("name") for item in repository.get("findings", []) if item.get("package")}
         names.discard(None)
         found_in = inventory.get("found_in") or {}
@@ -513,7 +513,7 @@ def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -
             read = ", ".join(inventory.get("manifests") or []) or t("threats.suggest.no_manifest", locale)
             matched.append(("api", t("threats.suggest.service", locale, name=short), None,
                             t("threats.suggest.no_framework", locale, name=short, read=read[:200]), "", ""))
-        # Un ORM es la forma de hablar con la base de datos, no otra base de datos: si hay motor concreto, se fusionan.
+        # An ORM is how the code talks to the database, not another database: with a concrete engine, they merge.
         orm = next((item for item in matched if item[1] == orm_database), None)
         engines = [item for item in matched if item[0] == "database" and item[1] != orm_database]
         merged_orm = None
@@ -523,7 +523,7 @@ def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -
             merged_orm = (kind, label, t("threats.suggest.via", locale, technology=technology, orm=orm[2]),
                           t("threats.suggest.accessed_with", locale, provenance=provenance, packages=orm[5]), folder, "")
             matched.append(merged_orm)
-        # Next.js ya es la app web: no se duplica con «aplicación en el navegador».
+        # Next.js already is the web app: it isn't duplicated with a "browser application".
         if any(item[1] == next_app for item in matched):
             matched = [item for item in matched if item[1] != browser_app]
         several = len(repositories) > 1
@@ -531,7 +531,7 @@ def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -
             kind, label, technology, provenance, folder, _ = entry
             key = (kind, label if kind not in PROCESSES else f"{label}:{repository['id']}")
             if key in found:
-                # Otra pista del mismo componente: se suma a su procedencia en lugar de perderse.
+                # Another hint for the same component: it adds to its provenance instead of being lost.
                 existing = found[key]
                 if provenance and provenance not in existing["description"]:
                     existing["description"] = f"{existing['description']}; {provenance}"[:400]
@@ -541,7 +541,7 @@ def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -
                 continue
             if entry is merged_orm:
                 via.add(key)
-            # Con varios repositorios, cada proceso lleva el suyo en el nombre: dos «API Python» no se distinguen.
+            # With several repositories each process names its own: two "Python API" would be indistinguishable.
             shown = f"{label} · {short}" if several and kind in PROCESSES and short not in label else label
             component = {"id": _slug(shown, used), "name": shown, "kind": kind, "technology": technology or "",
                          "description": provenance[:400],
@@ -584,15 +584,15 @@ def suggest(name: str, repositories: list[dict], *, locale: str | None = None) -
             "components": components, "flows": flows, "boundaries": [item for item in boundaries if item["components"]]}
 
 
-NODE_W, ROW, PAD = 184, 124, 36  # mismas medidas que el editor del panel
+NODE_W, ROW, PAD = 184, 124, 36  # same measurements as the panel's editor
 
 
 def merge_proposal(model: dict, proposal: dict) -> tuple[dict, dict]:
-    """Añade a un modelo lo que se propone desde nuevos repositorios, sin duplicar lo que ya hay.
+    """Adds to a model what is proposed from new repositories, without duplicating what is already there.
 
-    Un componente propuesto es el mismo que uno existente si coinciden tipo y repositorio (procesos) o
-    tipo y nombre (actores, almacenes, terceros). Los nuevos se colocan dentro de su frontera si ya
-    está dibujada, o a la derecha de lo dibujado: no se pierde la disposición que hizo el equipo.
+    A proposed component is the same as an existing one if kind and repository match (processes) or
+    kind and name (actors, stores, third parties). New ones go inside their boundary if it is already
+    drawn, or to the right of what is drawn: the layout the team made is kept.
     """
     merged = json.loads(json.dumps(model))
     components = merged.setdefault("components", [])
@@ -653,7 +653,7 @@ def merge_proposal(model: dict, proposal: dict) -> tuple[dict, dict]:
                     inside = [item["position"]["y"] for item in components if item["id"] in target["components"] and item.get("position")]
                     component["position"] = {"x": box["x"] + PAD, "y": (max(inside) + ROW) if inside else box["y"] + 50}
                     box["height"] = max(box["height"], component["position"]["y"] - box["y"] + ROW)
-    for member in added:  # sin frontera: a la derecha de lo dibujado
+    for member in added:  # no boundary: to the right of what is drawn
         component = next(item for item in components if item["id"] == member)
         if drawn and not component.get("position"):
             component["position"] = {"x": right, "y": 90}
@@ -699,12 +699,12 @@ def _index(model: dict) -> tuple[dict, dict]:
 
 
 def _kind(component: dict) -> str:
-    """Los tipos propios conservan un rol base para las reglas y los formatos externos."""
+    """Custom kinds keep a base role for the rules and the external formats."""
     return (component.get("custom_base") or "service") if component["kind"] == "custom" else component["kind"]
 
 
 def _targets(model: dict, rules: list[dict] | None = None) -> list[tuple[dict, dict | None, dict | None]]:
-    """(regla, componente, flujo) para cada regla que aplica. Las condiciones están aquí, a la vista."""
+    """(rule, component, flow) for every rule that applies. The conditions are here, in plain sight."""
     components, boundary_of = _index(model)
     flows = model.get("flows", [])
     inbound = {cid: [flow for flow in flows if flow["target"] == cid] for cid in components}
@@ -727,7 +727,7 @@ def _targets(model: dict, rules: list[dict] | None = None) -> list[tuple[dict, d
             process = kind in PROCESSES
             sensitive = any(CLASSIFICATIONS[item] >= 3 for item in component["data"]) or any(
                 CLASSIFICATIONS[item] >= 3 for flow in inbound[component["id"]] + outbound[component["id"]] for item in flow["data"])
-            # Datos personales (LINDDUN): los guarda o le llegan o salen por algún flujo.
+            # Personal data (LINDDUN): it stores it, or it comes in or goes out through some flow.
             personal = "pii" in component["data"] or any("pii" in flow["data"] for flow in inbound[component["id"]] + outbound[component["id"]])
             match = {
                 "process": process,
@@ -755,7 +755,7 @@ def _targets(model: dict, rules: list[dict] | None = None) -> list[tuple[dict, d
 
 
 def _severity(model: dict, rule: dict, component: dict | None, flow: dict | None) -> str:
-    """Severidad base de la regla, un nivel arriba si está expuesto y lleva datos críticos, uno abajo si es interno y poco sensible."""
+    """Rule's base severity: one level up if exposed with critical data, one down if internal and low-sensitivity."""
     components, _ = _index(model)
     if flow is not None:
         data = flow["data"]
@@ -774,7 +774,7 @@ def _severity(model: dict, rule: dict, component: dict | None, flow: dict | None
 
 
 def _scopes_near(model: dict, component: dict | None, flow: dict | None) -> set[tuple[str, str]]:
-    """(repositorio, carpeta) cuyo código implementa o toca el elemento; carpeta vacía = repositorio entero."""
+    """(repository, folder) whose code implements or touches the element; empty folder = whole repository."""
     components, _ = _index(model)
     if component is not None and _kind(component) in PROCESSES:
         return {(component["asset"], component.get("path") or "")} if component.get("asset") else set()
@@ -787,7 +787,7 @@ def _scopes_near(model: dict, component: dict | None, flow: dict | None) -> set[
 
 
 def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None, *, locale: str | None = None) -> list[dict]:
-    """Amenazas del modelo con su severidad, evidencia de los escaneos y decisión del equipo, rendered for `locale`."""
+    """The model's threats with their severity, scan evidence and team decision, rendered for `locale`."""
     decisions = model.get("decisions", {})
     rows = []
     method = model.get("methodology") or "stride"
@@ -801,7 +801,7 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None,
         threat_id = hashlib.sha256(f"{rule['id']}|{element}".encode()).hexdigest()[:16]
         evidence = []
         policy = rule.get("evidence") or {}
-        # Por defecto evidencia el código propio; una vulnerabilidad de una dependencia se atribuye a TM-T02.
+        # By default only first-party code is evidence; a vulnerability in a dependency is attributed to TM-T02.
         scanners = policy.get("scanners", ("sast", "secrets", "iac"))
         scopes = sorted(_scopes_near(model, component, flow))
         for asset, folder in scopes:
@@ -809,7 +809,7 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None,
                 scanner = finding.get("scanner")
                 if scanner not in scanners:
                     continue
-                # Solo el código del componente: en un monorepo, el backend no evidencia amenazas del frontend.
+                # Only the component's code: in a monorepo, the backend is no evidence of frontend threats.
                 if folder and not str(finding.get("path") or "").startswith(folder):
                     continue
                 if (policy.get("any_cwe") or scanner in policy.get("any_cwe_for", ())
@@ -839,10 +839,10 @@ def threats(model: dict, findings_by_asset: dict[str, list[dict]] | None = None,
 
 
 def _manual_rows(model: dict, decisions: dict) -> list[dict]:
-    """Amenazas escritas por el equipo: mismo ciclo de decisiones que las de las reglas."""
+    """Threats written by the team: same decision cycle as the rule-based ones."""
     components, _ = _index(model)
     flows = {flow["id"]: flow for flow in model.get("flows", [])}
-    # Un código de la categoría del enfoque («S», «Dd») se muestra con su nombre; lo demás, tal cual.
+    # A category code of the approach ("S", "Dd") is shown with its name; anything else, as is.
     names = threat_methods.LINDDUN if model.get("methodology") == "linddun" else STRIDE
     rows = []
     for item in model.get("manual_threats", []):
@@ -863,7 +863,7 @@ def _manual_rows(model: dict, decisions: dict) -> list[dict]:
 
 
 def evidence_index(data_dir: Path, assets: set[str]) -> dict[str, list[dict]]:
-    """Hallazgos activos del último escaneo completo de cada repositorio enlazado."""
+    """Active findings from the latest full scan of each linked repository."""
     from tamandua.modules.runs.store import find_runs, load_run
     latest: dict[str, dict] = {}
     from tamandua.modules.sources.assets import asset_key
@@ -892,10 +892,10 @@ def summary(rows: list[dict]) -> dict:
                             for level in SEVERITY_ORDER}}
 
 
-# ------------------------------------------------------------ exportaciones
+# ------------------------------------------------------------ exports
 
 def to_threat_dragon(model: dict, rows: list[dict], *, locale: str | None = None) -> dict:
-    """OWASP Threat Dragon v2: un diagrama STRIDE con actores, procesos, almacenes, flujos y fronteras."""
+    """OWASP Threat Dragon v2: a STRIDE diagram with actors, processes, stores, flows and boundaries."""
     locale = locale or default_locale()
     rows = localize(rows, locale)
     shapes = {"actor": ("actor", "tm.Actor"), "external": ("actor", "tm.Actor"), "identity": ("actor", "tm.Actor"),
@@ -956,13 +956,13 @@ def _node_size(component: dict) -> tuple[float, float]:
 
 
 def to_svg(model: dict, *, locale: str | None = None) -> str:
-    """Exporta solamente el diagrama actual como SVG autónomo, sin código ni scripts."""
+    """Exports only the current diagram as a self-contained SVG, with no code or scripts."""
     locale = locale or default_locale()
     return threat_diagram.to_svg(model, localize(KINDS, locale), locale=locale)
 
 
 def to_pytm(model: dict, *, locale: str | None = None) -> str:
-    """Script de OWASP pytm equivalente, para quien quiera seguir modelando como código."""
+    """Equivalent OWASP pytm script, for anyone who wants to keep modeling as code."""
     locale = locale or default_locale()
     def name(value: str) -> str:
         return json.dumps(value, ensure_ascii=False)

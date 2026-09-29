@@ -1,4 +1,4 @@
-"""Contrato del flujo de repositorio: selección, escaneo y límites de confianza."""
+"""Repository flow contract: selection, scanning and trust boundaries."""
 
 import io
 import json
@@ -19,8 +19,8 @@ from tamandua.shared.i18n import localize, text
 
 class RepositoryWorkflowTests(unittest.TestCase):
     def setUp(self):
-        # Estas pruebas cubren el camino interno (sin motores en contenedor). Con Docker
-        # presente lanzarían Trivy/Opengrep de verdad: lento y con otro resultado.
+        # These tests cover the internal path (no containerized engines). With Docker
+        # present they would run Trivy/Opengrep for real: slow and with a different result.
         # clear=True: a real check left behind (its time stamp) would make Docker be asked again.
         patcher = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         patcher.start()
@@ -91,7 +91,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
             self.assertEqual(selected["name"], "owner/project")
             self.assertEqual(request.call_count, 2)
             self.assertEqual(download.call_args.kwargs["redirect_host"], "codeload.github.com")
-            # El tarball se borra tras extraerlo: no se queda un archivo intermedio.
+            # The tarball is deleted after extraction: no intermediate file is left behind.
             self.assertFalse((Path(temporary).parent / "repository.tar.gz").exists())
 
     def test_session_token_is_used_for_listing_and_snapshot_without_persisting_it(self):
@@ -117,7 +117,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
             self.assertEqual(download.call_args.args[1], "session-secret")
 
     def test_manifests_are_never_filtered_out_of_the_snapshot(self):
-        """Un lockfile descartado deja el SCA a ciegas sin que nadie lo note."""
+        """A dropped lockfile leaves SCA blind without anyone noticing."""
         for name in ("package-lock.json", "package.json", "yarn.lock", "pnpm-lock.yaml",
                      "requirements.txt", "go.sum", "pom.xml", "Gemfile.lock", "Cargo.lock",
                      "composer.lock", "Dockerfile", ".env.example"):
@@ -128,7 +128,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
                 self.assertFalse(_analyzable(Path(f"proyecto/{name}")), name)
 
     def test_a_decompression_bomb_is_refused_and_says_why(self):
-        """El único caso en que negarse es correcto: el archivo miente sobre su tamaño."""
+        """The only case where refusing is right: the archive lies about its size."""
         archive = io.BytesIO()
         with tarfile.open(fileobj=archive, mode="w:gz") as tar:
             content = b"\0" * 100_000
@@ -137,7 +137,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
                 info.size = len(content)
                 tar.addfile(info, io.BytesIO(content))
         blob = archive.getvalue()
-        # Comprime muy bien: pocos KB en disco declarando 2 MB de contenido.
+        # It compresses very well: a few KB on disk declaring 2 MB of content.
         self.assertLess(len(blob), 100_000)
         with tempfile.TemporaryDirectory() as temporary, \
                 patch("tamandua.modules.sources.repositories.MAX_EXPANSION", 500_000):
@@ -152,9 +152,9 @@ class RepositoryWorkflowTests(unittest.TestCase):
                 info = tarfile.TarInfo(f"repo-main/{name}")
                 info.size = len(content)
                 tar.addfile(info, io.BytesIO(content))
-            add("logo.png", b"x" * 500)            # no analizable
+            add("logo.png", b"x" * 500)            # not analyzable
             add("app.min.js", b"x" * 500)          # bundle
-            add("enorme.py", b"x" * 5_000)         # excede el tamaño por archivo
+            add("enorme.py", b"x" * 5_000)         # exceeds the per-file size
             for index in range(6):
                 add(f"src/modulo_{index}.py", b"value = 1\n")
         blob = archive.getvalue()
@@ -163,7 +163,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
                 patch("tamandua.modules.sources.repositories.MAX_FILE", 1_000), \
                 patch("tamandua.modules.sources.repositories.MAX_FILES", 4):
             root = Path(temporary)
-            # Pasarse de los límites no puede ser un error: deja al usuario sin nada.
+            # Going over the limits can't be an error: that would leave the user with nothing.
             stats = _extract_limited(blob, root)
         self.assertEqual(stats["files"], 4)
         self.assertEqual(stats["skipped_not_analyzable"], 2)
@@ -184,7 +184,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
         self.assertEqual(snapshot_step["status"], "partial")
         self.assertIn("900", snapshot_step["detail"])
         self.assertIn("presupuesto", snapshot_step["detail"])
-        # Un snapshot truncado no puede presentarse como ejecución completa.
+        # A truncated snapshot can't be presented as a complete run.
         self.assertEqual(scan["status"], "incomplete")
         self.assertTrue(any("cobertura de este repositorio es parcial" in item for item in scan["limitations"]))
 
@@ -248,7 +248,7 @@ class RepositoryWorkflowTests(unittest.TestCase):
 
 
 class DownloadTests(unittest.TestCase):
-    """Una descarga lenta informa de lo recibido y tiene plazo total: no se queda «pegada» en silencio."""
+    """A slow download reports what it has received and has an overall deadline: it never silently gets stuck."""
 
     class Slow:
         def __init__(self, chunks, step):
@@ -329,7 +329,7 @@ class EngineRegistryTests(unittest.TestCase):
 
 
 class EnginesDownTests(unittest.TestCase):
-    """Si los motores no corren (imágenes sin construir), la ejecución no puede presentarse como limpia."""
+    """If the engines don't run (images not built), the run can't be presented as clean."""
 
     def test_scan_without_engines_is_incomplete_and_says_why(self):
         from tamandua.modules.scanning import repository as repository_scan
@@ -371,7 +371,7 @@ class EngineCauseTests(unittest.TestCase):
         mounts = json.dumps([{"Type": "bind", "Source": "/run/desktop/mnt/host/c/Users/yo/tamandua/data", "Destination": "/data"},
                              {"Type": "bind", "Source": "/var/run/docker.sock", "Destination": "/var/run/docker.sock"}])
         scanners._own_mounts.update(at=None, mounts={})
-        # En PowerShell `${PWD}` llega vacío y compose deja la ruta del host en `/data`.
+        # In PowerShell `${PWD}` arrives empty and compose leaves the host path as `/data`.
         with patch.dict("os.environ", {"TAMANDUA_DATA_DIR": "/data", "TAMANDUA_HOST_DATA_DIR": "/data", "HOSTNAME": "074eeb4e2cfd"}), \
                 patch.object(scanners, "in_container", return_value=True), \
                 patch.object(scanners.shutil, "which", return_value="/usr/bin/docker"), \
@@ -394,7 +394,7 @@ class EngineCauseTests(unittest.TestCase):
 
 
 class DockerAccessTests(unittest.TestCase):
-    """Linux y WSL con Docker nativo: el socket es del grupo `docker` y el contenedor puede no estar en él."""
+    """Linux and WSL with native Docker: the socket belongs to the `docker` group and the container may not be in it."""
 
     def tearDown(self):
         from tamandua.modules.scanning import engines as scanners
@@ -443,7 +443,7 @@ class DockerAccessTests(unittest.TestCase):
 
 class MakefileEnginesTests(unittest.TestCase):
     def test_make_engines_sees_every_published_image(self):
-        """`make engines` lee las imágenes con sed; si cambia su formato en scanners.py, esto avisa."""
+        """`make engines` reads the images with sed; if their format in scanners.py changes, this warns."""
         import re
         import subprocess
         from tamandua.modules.scanning.engines import IMAGES

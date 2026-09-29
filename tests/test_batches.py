@@ -1,4 +1,4 @@
-"""Lotes de análisis: varios repositorios o una organización, sin ir uno por uno."""
+"""Scan batches: several repositories or an organization, without going one by one."""
 
 import os
 import tempfile
@@ -31,7 +31,7 @@ class BatchLogicTests(unittest.TestCase):
 
     def test_items_are_taken_one_by_one_and_the_batch_finishes(self):
         batch = batches.create(self.data, [item("acme/a"), item("acme/b"), item("acme/a")], by="ana", label="dos")
-        self.assertEqual(len(batch["items"]), 2)  # sin duplicados
+        self.assertEqual(len(batch["items"]), 2)  # no duplicates
         taken = [batches.take_next(self.data) for _ in range(2)]
         for (current, index), run_id in zip(taken, ("1" * 32, "2" * 32)):
             batches.attach(self.data, current["id"], index, run_id=run_id)
@@ -44,11 +44,11 @@ class BatchLogicTests(unittest.TestCase):
             batches.create(self.data, [item("acme/b")], by="ana", label="otro")
         batches.cancel(self.data, batch["id"], by="ana")
         self.assertIsNone(batches.take_next(self.data))
-        batches.create(self.data, [item("acme/b")], by="ana", label="otro")  # cancelado ya no bloquea
+        batches.create(self.data, [item("acme/b")], by="ana", label="otro")  # a cancelled batch no longer blocks
 
     def test_a_restart_releases_what_was_taken_but_not_queued(self):
         batch = batches.create(self.data, [item("acme/a")], by="ana", label="uno")
-        batches.take_next(self.data)  # el proceso muere antes de encolarlo
+        batches.take_next(self.data)  # the process dies before queuing it
         batches.release_taken(self.data)
         current, index = batches.take_next(self.data)
         self.assertEqual((current["id"], index), (batch["id"], 0))
@@ -65,7 +65,7 @@ class BatchLogicTests(unittest.TestCase):
         batches.attach(self.data, current["id"], index, error="Repositorio no disponible")
         state = batches.summary(self.data, batches.load(self.data, batch["id"]))
         self.assertEqual((state["done"], state["failed"], state["pending"], state["critical"]), (1, 1, 1, 1))
-        self.assertEqual(state["eta_seconds"], 60)  # un pendiente × la duración media real (60 s)
+        self.assertEqual(state["eta_seconds"], 60)  # one pending × the real average duration (60 s)
 
 
 class ImageBatchTests(unittest.TestCase):
@@ -76,7 +76,7 @@ class ImageBatchTests(unittest.TestCase):
             data = Path(folder)
             items = [{"kind": "image", "image": parse_reference(reference)} for reference in ("nginx:1.21", "nginx:1.27-alpine", "nginx:1.21")]
             batch = batches.create(data, items, by="ana", label="imágenes")
-            self.assertEqual([item["name"] for item in batch["items"]], ["docker.io/library/nginx:1.21", "docker.io/library/nginx:1.27-alpine"])  # dos etiquetas, dos análisis
+            self.assertEqual([item["name"] for item in batch["items"]], ["docker.io/library/nginx:1.21", "docker.io/library/nginx:1.27-alpine"])  # two tags, two scans
             with patch.object(ScanJobs, "__init__", lambda self, data_dir: setattr(self, "data_dir", data_dir)), \
                     patch.object(ScanJobs, "enqueue_image_scan", return_value={"id": "3" * 32}) as enqueue:
                 jobs = ScanJobs(data)
@@ -88,7 +88,7 @@ class ImageBatchTests(unittest.TestCase):
 
 class WorkerTests(unittest.TestCase):
     def test_the_real_worker_goes_through_the_whole_batch(self):
-        """El trabajador toma los repositorios del lote uno a uno cuando no tiene otra cosa, hasta terminarlo."""
+        """The worker takes the batch's repositories one by one when it has nothing else to do, until it is done."""
         import time
         from tamandua.modules.runs.jobs import ScanJobs
         from test_dashboard import _finding, _scan
@@ -122,7 +122,7 @@ class BatchRouteTests(HttpCase):
             self.admin = self.post("/api/auth/login", "login", {"username": "admin", "password": PASSWORD})[2][0].split("; ")[0]
             self.member = self.post("/api/auth/login", "login", {"username": "miembro", "password": PASSWORD})[2][0].split("; ")[0]
         save_github(self.data_dir, 7, {"account": "acme", "repository_selection": "all"}, "admin")
-        # El trabajador no toma nada del lote durante la prueba: aquí solo se prueba la API.
+        # The worker takes nothing from the batch during the test: only the API is tested here.
         patcher = patch("tamandua.modules.runs.jobs.ScanJobs._feed_batch")
         patcher.start()
         self.addCleanup(patcher.stop)
@@ -136,7 +136,7 @@ class BatchRouteTests(HttpCase):
         self.assertEqual((status, body["total"], body["pending"]), (202, 2, 2))
         status, _, _ = self.create({"account": "acme"}, self.member)
         self.assertEqual(status, 403)
-        # Otro lote mientras uno sigue en curso: se rechaza.
+        # Another batch while one is still running: rejected.
         self.assertEqual(self.create({"source_ids": ["github:acme/servicio-03"]}, self.member)[0], 409)
         with patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"}):
             _, listing, _ = self.call("GET", "/api/repositories/batches", headers={"Cookie": self.member})
@@ -156,7 +156,7 @@ class BatchRouteTests(HttpCase):
             self.assertEqual(create(body)[0], 400, body)
         status, body, _ = create({"references": ["nginx:1.21", " nginx:1.21 ", "ghcr.io/acme/api:2.0"], "context": "producción"})
         self.assertEqual((status, body["total"], body["label"]), (202, 2, "2 imágenes"))
-        self.assertEqual(create({"references": ["nginx:1.27"]})[0], 409)  # un lote a la vez
+        self.assertEqual(create({"references": ["nginx:1.27"]})[0], 409)  # one batch at a time
 
     def test_invalid_requests(self):
         for body, expected in (({"source_ids": ["github:otra/cosa"]}, 400), ({"source_ids": []}, 400),

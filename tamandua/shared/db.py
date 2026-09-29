@@ -1,14 +1,14 @@
-"""Base de datos: PostgreSQL con SQLAlchemy 2 (Core) y psycopg 3.
+"""Database: PostgreSQL with SQLAlchemy 2 (Core) and psycopg 3.
 
-* `TAMANDUA_DATABASE_URL` (p. ej. `postgresql+psycopg://tamandua:…@postgres:5432/tamandua`) dice dónde está.
-* Cada tabla lleva `tenant_id`: hoy siempre `TENANT` («default»); la edición gestionada lo usará con RLS.
-* El esquema lo crean las migraciones de Alembic (`tamandua/app/alembic`) al arrancar; `metadata` es su fuente.
-* Aislamiento para pruebas: con `TAMANDUA_DB_ISOLATE=data-dir`, cada carpeta de datos usa su propio esquema de
-  Postgres (creado al vuelo). Así cada prueba, que usa un directorio temporal, tiene su base limpia sin cambiar la
-  firma de las 150 funciones que reciben `data_dir`.
+* `TAMANDUA_DATABASE_URL` (e.g. `postgresql+psycopg://tamandua:…@postgres:5432/tamandua`) says where it is.
+* Every table has a `tenant_id`: today always `TENANT` ("default"); the managed edition will use it with RLS.
+* The schema is created by the Alembic migrations (`tamandua/app/alembic`) at startup; `metadata` is their source.
+* Test isolation: with `TAMANDUA_DB_ISOLATE=data-dir`, each data folder uses its own Postgres schema (created on
+  the fly). That way each test, which uses a temporary directory, gets a clean database without changing the
+  signature of the 150 functions that take `data_dir`.
 
-Concurrencia: los cerrojos son de Postgres (`pg_advisory_xact_lock`) y valen entre procesos y réplicas, no solo entre
-hilos de un proceso como los `threading.Lock` que sustituyen.
+Concurrency: locks are Postgres locks (`pg_advisory_xact_lock`) and hold across processes and replicas, not only
+across the threads of one process like the `threading.Lock`s they replace.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ metadata = MetaData(naming_convention={
 _engine: Engine | None = None
 _engine_lock = threading.Lock()
 _schema_lock = threading.Lock()
-_ready: dict[str, frozenset[str]] = {}  # esquema aislado -> tablas ya creadas en él
+_ready: dict[str, frozenset[str]] = {}  # isolated schema -> tables already created in it
 _current: contextvars.ContextVar[Connection | None] = contextvars.ContextVar("tamandua_db_connection", default=None)
 
 
@@ -56,13 +56,13 @@ def engine() -> Engine:
     global _engine
     with _engine_lock:
         if _engine is None:
-            # Todas las marcas de tiempo en UTC, como las que ya guarda la aplicación en ISO 8601.
+            # Every timestamp in UTC, like the ISO 8601 ones the application already stores.
             _engine = create_engine(url(), pool_pre_ping=True, pool_size=5, max_overflow=10, connect_args={"options": "-c timezone=UTC"})
         return _engine
 
 
 def reset() -> None:
-    """Olvida el motor (p. ej. tras cambiar la URL en una prueba)."""
+    """Forgets the engine (e.g. after a test changes the URL)."""
     global _engine
     with _engine_lock:
         if _engine is not None:
@@ -81,12 +81,12 @@ def _prepare(connection: Connection, schema: str | None) -> Connection:
     if schema is None:
         return connection
     tables = frozenset(metadata.tables)
-    if _ready.get(schema) != tables:  # primera vez, o se registraron tablas nuevas al importar otro módulo
-        # En una conexión aparte y bajo cerrojo: crear el mismo esquema desde varios hilos a la vez choca en Postgres.
+    if _ready.get(schema) != tables:  # first time, or importing another module registered new tables
+        # On its own connection and under a lock: several threads creating the same schema at once clash in Postgres.
         with _schema_lock:
             if _ready.get(schema) != tables:
                 with engine().begin() as setup:
-                    setup.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))  # nombre derivado de un hash, no del usuario
+                    setup.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))  # hash-derived name, not user input
                     metadata.create_all(setup.execution_options(schema_translate_map={None: schema}))
                 _ready[schema] = tables
     return connection.execution_options(schema_translate_map={None: schema})
@@ -94,7 +94,7 @@ def _prepare(connection: Connection, schema: str | None) -> Connection:
 
 @contextmanager
 def transaction(data_dir: Path):
-    """Una transacción (o la que ya está abierta en este contexto: las operaciones anidadas comparten la de fuera)."""
+    """A transaction (or the one already open in this context: nested operations share the outer one)."""
     current = _current.get()
     if current is not None:
         yield current
@@ -116,6 +116,6 @@ def separate_transaction(data_dir: Path):
 
 
 def lock(connection: Connection, *parts: str) -> None:
-    """Cerrojo exclusivo hasta el final de la transacción, por clave (entre procesos y réplicas)."""
+    """Exclusive lock until the end of the transaction, per key (across processes and replicas)."""
     digest = hashlib.sha256("\x1f".join((TENANT, *parts)).encode()).digest()
     connection.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": int.from_bytes(digest[:8], "big", signed=True)})

@@ -1,9 +1,9 @@
 """HTTP API on FastAPI: one router per context (`<context>.py`).
 
-Toda petición pasa por el mismo control (ver `security.py`): host permitido (middleware) → CSRF, sesión, segundo
-factor y rol (`security.authorize`, vía `deps.guard`) → límites de cuerpo. Las respuestas llevan
-las mismas cabeceras de seguridad (CSP, nosniff, frame, HSTS si hay HTTPS). No se publica la documentación
-interactiva ni el OpenAPI: el esquema se genera con `make openapi`.
+Every request goes through the same control (see `security.py`): allowed host (middleware) → CSRF, session,
+second factor and role (`security.authorize`, via `deps.guard`) → body limits. Responses carry the same security
+headers (CSP, nosniff, frame, HSTS over HTTPS). Neither the interactive docs nor the OpenAPI document are served:
+the schema is generated with `make openapi`.
 """
 
 from __future__ import annotations
@@ -62,11 +62,11 @@ def _error(request: Request, message, **extra) -> dict:
 
 
 def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: bool = False) -> FastAPI:
-    """`state`: el estado ya creado (las pruebas lo reutilizan); si no, se crea con su cola y sus hilos."""
+    """`state`: an existing state (tests reuse one); otherwise one is built with its queue and threads."""
     if state is None:
         from tamandua.app.api.server import build_state
         state = build_state(data_dir, watch_pull_requests=watch)
-    # Sin redirecciones de barra final: una ruta desconocida es un 404, no un 307.
+    # No trailing-slash redirects: an unknown route is a 404, not a 307.
     app = FastAPI(title="Tamandua", version=VERSION, docs_url=None, redoc_url=None, openapi_url=None, redirect_slashes=False)
     app.state.core, app.state.port = state, port
     log = state.log
@@ -105,16 +105,16 @@ def create_app(data_dir: Path, *, port: int, state: State | None = None, watch: 
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(request: Request, error: StarletteHTTPException):
-        if error.status_code in (404, 405):  # método no admitido: como antes, la ruta no existe para ese método
+        if error.status_code in (404, 405):  # method not allowed: as before, the route doesn't exist for that method
             return JSONResponse(_error(request, msg("api.not_found")), status_code=404)
         return JSONResponse({"error": str(error.detail)}, status_code=error.status_code)
 
     @app.exception_handler(Exception)
     async def crashed(request: Request, error: Exception):
-        # Sin traza hacia fuera; el detalle queda en el log del servidor.
+        # No traceback goes out; the details stay in the server log.
         log.exception("error no controlado", extra={"method": request.method, "path": request.url.path})
         response = JSONResponse(_error(request, msg("api.internal_error")), status_code=500)
-        _security_headers(response, port)  # este manejador corre fuera del middleware: las pone él
+        _security_headers(response, port)  # this handler runs outside the middleware, so it sets them itself
         return response
 
     for module in ROUTERS:
@@ -138,15 +138,15 @@ def _invalid_parameters_as_400(document: dict) -> None:
 
 
 def openapi_document(data_dir: Path | None = None) -> str:
-    """El esquema OpenAPI de las rutas migradas, para generar el cliente TypeScript del panel (make openapi)."""
+    """The OpenAPI schema of the migrated routes, to generate the panel's TypeScript client (make openapi)."""
     from fastapi.openapi.utils import get_openapi
     app = FastAPI(title="Tamandua", version=VERSION)
     for module in ROUTERS:
         app.include_router(module.router)
     document = get_openapi(title=app.title, version=app.version, routes=app.routes)
     _invalid_parameters_as_400(document)
-    # Cómo se autentica la API: la cookie de sesión (HttpOnly) en todo, salvo lo que cada ruta declare como público.
-    # Los POST exigen además Origin y la cabecera X-Tamandua-Action (CSRF), que la cookie sola no cubre.
+    # How the API authenticates: the session cookie (HttpOnly) everywhere, except what a route declares public.
+    # POSTs also require Origin and the X-Tamandua-Action header (CSRF), which the cookie alone doesn't cover.
     document.setdefault("components", {})["securitySchemes"] = {
         "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Session signed in to the panel."},
         "metrics": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_METRICS_TOKEN (Prometheus scraper)."},

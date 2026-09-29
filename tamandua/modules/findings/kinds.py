@@ -1,9 +1,9 @@
-"""Tipos de ejecución, en un solo sitio para que ningún filtro se quede atrás al añadir uno."""
+"""Run kinds, in one place so that no filter is left behind when one is added."""
 
-# Análisis completos de un activo: lo que no aparece en uno nuevo queda remediado.
+# Full scans of an asset: whatever a new one no longer reports counts as remediated.
 FULL_SCANS = ("repository_scan", "image_scan")
-# Avisos publicados después del último análisis, contrastados con sus dependencias (advisory_watch). Solo añaden:
-# no son un análisis completo y no remedian nada.
+# Advisories published after the last scan, checked against its dependencies (advisory_watch). They only add:
+# they are not a full scan and remediate nothing.
 ADVISORY_RUNS = ("advisory_watch",)
-# Todo lo que alimenta el registro de hallazgos y admite triage.
+# Everything that feeds the findings registry and accepts triage.
 FINDING_RUNS = FULL_SCANS + ("pr_review",) + ADVISORY_RUNS

@@ -1,12 +1,12 @@
-"""Análisis de una carpeta local: `tamandua scan`. Para la terminal, pre-commit y CI.
+"""Scan of a local folder: `tamandua scan`. For the terminal, pre-commit and CI.
 
-Sin `--base` se analiza todo. Con `--base main` se analiza también el punto de partida
-(el merge-base con esa rama) y se informa solo de lo que el cambio introduce: lo que ya
-estaba antes no bloquea. Cuenta lo que aún no se ha subido (cambios sin commit y archivos
-nuevos no ignorados), así sirve antes del push y en el pipeline.
+Without `--base` everything is scanned. With `--base main` the starting point (the merge-base
+with that branch) is scanned too and only what the change introduces is reported: what was
+already there doesn't block. It counts what hasn't been pushed yet (uncommitted changes and new
+non-ignored files), so it works before the push and in the pipeline.
 
-Un análisis incompleto nunca pasa por limpio: si un motor no pudo ejecutarse, el comando
-lo dice y sale con su propio código.
+An incomplete scan never passes as clean: if an engine couldn't run, the command
+says so and exits with its own code.
 """
 
 from __future__ import annotations
@@ -24,11 +24,11 @@ from tamandua.modules.scanning.repository import scan_repository
 from tamandua.modules.sources.repositories import snapshot_directory
 from tamandua.shared.i18n import default_locale, localize, msg, t, text
 
-# Códigos de salida (documentados en docs/cli.md).
+# Exit codes (documented in docs/cli.md).
 EXIT_OK, EXIT_BLOCKED, EXIT_ERROR, EXIT_INCOMPLETE = 0, 1, 2, 3
 FAIL_ON = ("critical", "high", "medium", "low", "never")
-# Rama, etiqueta, SHA o expresión de git (HEAD~1, origin/main…). Nunca empieza por «-»: no puede
-# colarse como opción de git.
+# Branch, tag, SHA or git expression (HEAD~1, origin/main…). Never starts with "-": it can't
+# sneak in as a git option.
 REF = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/@^~{}+-]{0,199}")
 CORE_ENGINES = ("opengrep", "gitleaks", "trivy", "osv-scanner")
 
@@ -46,8 +46,8 @@ class LocalScanError(ValueError):
 
 def _git(path: Path, *args: str, binary: bool = False, timeout: int = 120):
     try:
-        # safe.directory: dentro del contenedor la carpeta montada es de otro usuario. core.fsmonitor=false:
-        # la configuración local de un repositorio no puede lanzar programas mientras se calcula el diff.
+        # safe.directory: inside the container the mounted folder belongs to another user. core.fsmonitor=false:
+        # a repository's local config can't launch programs while the diff is computed.
         completed = subprocess.run(["git", "-c", f"safe.directory={path}", "-c", "core.fsmonitor=false", "-C", str(path), *args],
                                    capture_output=True, text=not binary, timeout=timeout)
     except FileNotFoundError as exc:
@@ -62,7 +62,7 @@ def _git(path: Path, *args: str, binary: bool = False, timeout: int = 120):
 
 
 def merge_base(path: Path, base: str) -> str:
-    """El commit desde el que parte el cambio: el merge-base entre la base y HEAD."""
+    """The commit the change starts from: the merge-base between the base and HEAD."""
     if not REF.fullmatch(base or ""):
         raise LocalScanError(msg("scanning.local.errors.invalid_ref", ref=repr(base)))
     commit = _git(path, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{base}^{{commit}}").strip()
@@ -72,7 +72,7 @@ def merge_base(path: Path, base: str) -> str:
 
 
 def parse_diff(text: str) -> list[dict]:
-    """`git diff --unified=0` → la misma forma que los ficheros de un PR de GitHub (filename, status, patch)."""
+    """`git diff --unified=0` → the same shape as a GitHub PR's files (filename, status, patch)."""
     files, current, patch = [], None, []
     def close():
         if current is not None:
@@ -110,7 +110,7 @@ def parse_diff(text: str) -> list[dict]:
 
 
 def diff_files(path: Path, commit: str) -> list[dict]:
-    """Lo que cambió desde `commit` hasta el árbol de trabajo, más los archivos nuevos no ignorados."""
+    """What changed from `commit` to the working tree, plus new non-ignored files."""
     text = _git(path, "diff", "--unified=0", "--no-color", "--no-ext-diff", "--relative", "-M", commit, "--")
     files = parse_diff(text)
     untracked = _git(path, "ls-files", "--others", "--exclude-standard", "--", ".").splitlines()
@@ -118,13 +118,13 @@ def diff_files(path: Path, commit: str) -> list[dict]:
 
 
 def snapshot_commit(path: Path, commit: str, destination: Path) -> dict:
-    """La carpeta tal como estaba en `commit`, con los mismos filtros que el análisis actual."""
+    """The folder as it was at `commit`, with the same filters as the current scan."""
     prefix = _git(path, "rev-parse", "--show-prefix").strip()
     archive = _git(path, "archive", "--format=tar", f"{commit}:{prefix}" if prefix else commit, binary=True, timeout=600)
     raw = destination.parent / f"{destination.name}-raw"
     raw.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
-        # Filtro «data» (PEP 706): sin rutas absolutas, sin salir de la carpeta, sin dispositivos ni enlaces fuera.
+        # "data" filter (PEP 706): no absolute paths, no escaping the folder, no devices or links pointing outside.
         bundle.extractall(raw, filter="data")
     return snapshot_directory(raw, destination)
 
@@ -140,10 +140,10 @@ def _engines(scan: dict) -> tuple[list[str], list[str]]:
 
 def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool = True, fail_on: str = "high",
         allow_osv_upload: bool = False, progress=None, name: str | None = None, exclude: list[str] | None = None) -> dict:
-    """Analiza `path` y aplica el umbral. Devuelve el resultado listo para mostrar y el código de salida.
+    """Scans `path` and applies the threshold. Returns the result ready to display and the exit code.
 
-    `exclude`: patrones glob relativos a la raíz (`fixtures/**`, `**/testdata/**`) cuyos hallazgos no cuentan.
-    Se dicen en la salida («N en rutas excluidas»): nada se oculta sin decirlo."""
+    `exclude`: glob patterns relative to the root (`fixtures/**`, `**/testdata/**`) whose findings don't count.
+    The output mentions them ("N in excluded paths"): nothing is hidden without saying so."""
     from tamandua.modules.findings.exclusions import ExclusionError, excluded, normalize
     from tamandua.modules.scanning.engines import engines_available, engines_problem
     try:
@@ -204,7 +204,7 @@ def run(path: Path, *, data_dir: Path, base: str | None = None, baseline: bool =
             "findings": findings, "gate": gate, "exit_code": code, "scan": scan}
 
 
-# --- salida ----------------------------------------------------------------------------
+# --- output ----------------------------------------------------------------------------
 
 SEVERITY_TEXT = {"critical": "scanning.cli.severity.critical", "high": "scanning.cli.severity.high",
                  "medium": "scanning.cli.severity.medium", "low": "scanning.cli.severity.low", "info": "scanning.cli.severity.info"}
@@ -217,9 +217,9 @@ def _severity(level: str, locale: str) -> str:
 
 
 def _grouped(findings: list[dict], locale: str) -> list[tuple[str, str, str]]:
-    """Una línea por corrección: los avisos de un mismo paquete se cierran con una sola actualización.
+    """One line per fix: advisories of the same package are closed by a single upgrade.
 
-    La versión propuesta es la más alta entre las que corrigen cada aviso (la que los cierra todos)."""
+    The proposed version is the highest of the ones that fix each advisory (the one that closes them all)."""
     from tamandua.modules.intel.advisories import compare_versions
     order = {level: index for index, level in enumerate(SEVERITY_ORDER)}
     rows, packages = [], {}
@@ -248,8 +248,8 @@ _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 
 
 def _safe(value) -> str:
-    """Rutas y títulos vienen del repositorio analizado: sin caracteres de control, un nombre de archivo
-    no puede mover el cursor, borrar líneas ni falsear el veredicto en la terminal o el log de CI (CWE-150)."""
+    """Paths and titles come from the scanned repository: with no control characters, a file name can't
+    move the cursor, erase lines or fake the verdict in the terminal or the CI log (CWE-150)."""
     return _CONTROL.sub("?", str(value))
 
 
@@ -296,7 +296,7 @@ def render_json(result: dict, *, locale: str | None = None) -> str:
               "cwe", "cve", "ghsa", "package", "malicious", "remediation", "fix", "priority", "kev", "epss")
     payload = {key: result.get(key) for key in ("target", "status", "comparison", "fail_on", "excluded", "engines", "not_analyzed", "exit_code")}
     payload["gate"] = result["gate"]
-    # `fix`: la misma guía de corrección que el panel (pasos, órdenes y ejemplo), para quien corrige desde la terminal.
+    # `fix`: the same fix guide as the panel (steps, commands and example), for whoever fixes from the terminal.
     findings = attach([dict(item) for item in result["findings"]])
     payload["findings"] = [{key: item.get(key) for key in fields if item.get(key) is not None} for item in findings]
     return json.dumps(localize(payload, locale or default_locale()), ensure_ascii=False, indent=2) + "\n"

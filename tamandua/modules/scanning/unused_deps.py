@@ -1,14 +1,14 @@
-"""Dependencias declaradas que el código no usa. Informativo: nunca bloquea.
+"""Declared dependencies the code doesn't use. Informational: never blocks.
 
-Una dependencia sin usar sigue entrando en el build y en el análisis de
-vulnerabilidades: amplía la superficie sin aportar nada. Se revisan solo las
-dependencias de ejecución (``dependencies`` de npm, las del proyecto en Python),
-no las de desarrollo, que suelen ser herramientas que no se importan.
+An unused dependency still goes into the build and the vulnerability scan: it
+widens the attack surface for nothing. Only runtime dependencies are checked
+(npm ``dependencies``, the project's own in Python), not development ones,
+which are usually tools that aren't imported.
 
-Para no dar falsos positivos, una dependencia cuenta como usada si se importa en
-el código **o** si su nombre aparece en configuración, scripts, Dockerfile o
-Procfile (plugins de PostCSS, `gunicorn` en el CMD, apps de Django…). Aun así es
-una heurística y se presenta como tal.
+To avoid false positives, a dependency counts as used if it is imported in the
+code **or** its name appears in configuration, scripts, a Dockerfile or a
+Procfile (PostCSS plugins, `gunicorn` in the CMD, Django apps…). Even so, it is
+a heuristic and is presented as one.
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ PY_SUFFIXES = {".py", ".pyi"}
 CONFIG_HINTS = re.compile(r"(\.config\.|^\.?babelrc|^tsconfig|^jsconfig|^dockerfile|^procfile|^makefile|\.ya?ml$|\.toml$|\.ini$|\.cfg$|\.json$|\.sh$|\.env)", re.I)
 JS_IMPORT = re.compile(r"""(?:\bfrom\s+|\bimport\s*\(\s*|\brequire\s*\(\s*|\bimport\s+|@import\s+(?:url\()?)['"]([^'"\s]+)['"]""")
 PY_IMPORT = re.compile(r"^\s*(?:from\s+([A-Za-z_][\w]*)|import\s+([A-Za-z_][\w]*))", re.M)
-# Nombre de distribución → módulo que se importa, donde no coinciden.
+# Distribution name → imported module, where they differ.
 PY_MODULES = {"python-dotenv": "dotenv", "pillow": "PIL", "beautifulsoup4": "bs4", "pyyaml": "yaml", "scikit-learn": "sklearn",
               "opencv-python": "cv2", "psycopg2-binary": "psycopg2", "psycopg-binary": "psycopg", "pyjwt": "jwt",
               "python-jose": "jose", "python-multipart": "multipart", "google-cloud-storage": "google", "protobuf": "google",
               "attrs": "attr", "email-validator": "email_validator", "typing-extensions": "typing_extensions",
               "pymysql": "pymysql", "mysqlclient": "MySQLdb", "discord.py": "discord", "msgpack-python": "msgpack"}
-# Se usan sin importarse: los carga el framework o una herramienta.
+# Used without being imported: the framework or a tool loads them.
 IMPLICIT = {"npm": {"react-dom", "sharp", "typescript", "tailwindcss", "postcss", "autoprefixer", "@types/node", "tslib",
                     "core-js", "regenerator-runtime", "server-only", "client-only"},
             "pypi": {"uvicorn", "gunicorn", "psycopg2", "psycopg2-binary", "psycopg", "psycopg-binary", "asyncpg", "pymysql",
@@ -108,7 +108,7 @@ def _python_manifests(root: Path) -> list[tuple[Path, dict[str, int]]]:
 
 
 def analyze(root: Path) -> dict:
-    """Dependencias de ejecución sin uso encontrado, por manifiesto."""
+    """Runtime dependencies with no use found, per manifest."""
     root = root.resolve()
     js_used, py_used, mentions = set(), set(), []
     for path, _ in _files(root):
@@ -121,7 +121,7 @@ def analyze(root: Path) -> dict:
             mentions.append(text)
         if CONFIG_HINTS.search(path.name) and path.name not in ("package.json", "package-lock.json") and not path.name.startswith("requirements"):
             mentions.append(_read(path))
-    # Los scripts de package.json nombran binarios: `next dev`, `prisma migrate`.
+    # package.json scripts name binaries: `next dev`, `prisma migrate`.
     for path, _ in _npm_manifests(root):
         try:
             mentions.append(" ".join((json.loads(_read(path)).get("scripts") or {}).values()))
@@ -150,7 +150,7 @@ def analyze(root: Path) -> dict:
 
 
 def split_by_pr(unused: list[dict], changed: dict[str, set[int] | None]) -> tuple[list[dict], list[dict]]:
-    """Las que añade el PR (su línea del manifiesto está en el diff) y las que ya estaban."""
+    """Those the PR adds (their manifest line is in the diff) and those already there."""
     new, before = [], []
     for item in unused:
         lines = changed.get(item["manifest"], set())

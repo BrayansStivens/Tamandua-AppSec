@@ -1,9 +1,9 @@
-"""Documentos JSON en PostgreSQL: el almacén de la configuración y el estado pequeño (vigilancia de PRs, exclusiones,
-plazos, CRA, lotes, modelos de amenazas…).
+"""JSON documents in PostgreSQL: the store for configuration and small state (PR watching, exclusions,
+deadlines, CRA, batches, threat models…).
 
-Cada documento conserva la forma que tenía su archivo JSON, así que los módulos cambian solo su lectura y escritura.
-Leer-modificar-guardar va en una transacción con cerrojo por documento (`edit`): el API y el worker ya no se pisan
-escrituras, como pasaba con los archivos y los `threading.Lock` de cada proceso.
+Each document keeps the shape its JSON file had, so modules only change how they read and write it.
+Read-modify-save runs in a transaction with a per-document lock (`edit`): the API and the worker no longer
+overwrite each other's writes, as they did with the files and each process's `threading.Lock`s.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ documents = Table(
 
 
 def load(data_dir: Path, name: str, default=None):
-    """El documento, o una copia de `default` si no existe."""
+    """The document, or a copy of `default` if it doesn't exist."""
     with db.transaction(data_dir) as connection:
         body = connection.execute(select(documents.c.body).where(documents.c.tenant_id == TENANT, documents.c.name == name)).scalar_one_or_none()
     return copy.deepcopy(default) if body is None else body
@@ -43,7 +43,7 @@ def save(data_dir: Path, name: str, body) -> None:
 
 @contextmanager
 def lock(data_dir: Path, name: str):
-    """Transacción con cerrojo sobre un documento (entre procesos): dentro, load y save son atómicos."""
+    """Transaction holding a lock on a document (across processes): inside it, load and save are atomic."""
     with db.transaction(data_dir) as connection:
         db.lock(connection, "document", name)
         yield
@@ -51,7 +51,7 @@ def lock(data_dir: Path, name: str):
 
 @contextmanager
 def edit(data_dir: Path, name: str, default):
-    """Leer-modificar-guardar atómico: `with edit(d, "x", {}) as body: body["k"] = 1`."""
+    """Atomic read-modify-save: `with edit(d, "x", {}) as body: body["k"] = 1`."""
     with lock(data_dir, name):
         body = load(data_dir, name, default)
         yield body
@@ -64,7 +64,7 @@ def delete(data_dir: Path, name: str) -> None:
 
 
 def names(data_dir: Path, prefix: str) -> list[str]:
-    """Documentos cuyo nombre empieza por `prefix` (p. ej. «batches/»), en orden."""
+    """Documents whose name starts with `prefix` (e.g. `batches/`), in order."""
     escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     with db.transaction(data_dir) as connection:
         return list(connection.execute(select(documents.c.name).where(documents.c.tenant_id == TENANT,
@@ -73,7 +73,7 @@ def names(data_dir: Path, prefix: str) -> list[str]:
 
 
 def signature(data_dir: Path, *names_: str) -> tuple:
-    """Última modificación de unos documentos (para invalidar cachés)."""
+    """Last modification time of some documents (to invalidate caches)."""
     with db.transaction(data_dir) as connection:
         return tuple(connection.execute(select(documents.c.name, documents.c.updated_at)
                                         .where(documents.c.tenant_id == TENANT, documents.c.name.in_(names_))

@@ -131,7 +131,7 @@ class FindingTests(unittest.TestCase):
         self.assertEqual(merged[0]["also_detected_by"], ["grype"])
         self.assertEqual((merged[0]["confidence"], merged[0]["package"]["fixed_version"]), (9, "2.0.0"))
         self.assertEqual(merged[1]["package"]["name"], "zlib")
-        # Misma huella para el mismo aviso venga de quien venga: el ciclo de vida no se duplica.
+        # Same fingerprint for the same advisory whoever reports it: the lifecycle isn't duplicated.
         a = image_scan._finish_package({**merged[0], "fingerprint": "x"})
         b = image_scan._finish_package(grype[0])
         self.assertEqual(a["fingerprint"], b["fingerprint"])

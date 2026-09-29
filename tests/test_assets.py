@@ -1,4 +1,4 @@
-"""Identidad estable de los repositorios: renombrados agrupados, retirados borrados tras el margen."""
+"""Stable repository identity: renamed ones grouped, removed ones purged after the grace period."""
 
 import tempfile
 import unittest
@@ -45,10 +45,10 @@ class AssetTests(unittest.TestCase):
         pr_watch.configure(self.data_dir, "github#7", enabled=True, by="ana")
         first = assets.reconcile(self.data_dir, [], now=now)
         self.assertEqual((first["marked"], first["purged"]), (["github#7"], []))
-        self.assertEqual(len(list_runs(self.data_dir)), 2)          # dentro del margen no se toca nada
+        self.assertEqual(len(list_runs(self.data_dir)), 2)          # within the grace period nothing is touched
         self.assertIsNotNone(assets.overview(self.data_dir)[0]["removed_at"])
         back = assets.reconcile(self.data_dir, [{"uid": "github#7", "id": "github:org/nuevo", "name": "org/nuevo"}], now=now)
-        self.assertEqual(back["marked"], [])                          # volvió: se desmarca
+        self.assertEqual(back["marked"], [])                          # it came back: unmarked
         assets.reconcile(self.data_dir, [], now=now)
         gone = assets.reconcile(self.data_dir, [], now=now + timedelta(hours=25))
         self.assertEqual(gone["purged"], ["github#7"])

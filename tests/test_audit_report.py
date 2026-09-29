@@ -1,4 +1,4 @@
-"""Informe de evidencia para auditoría: formulario, alcance elegido, escape de datos y acceso."""
+"""Audit evidence report: form, chosen scope, data escaping and access."""
 
 import os
 import unittest
@@ -25,7 +25,7 @@ class OptionsTests(unittest.TestCase):
                 validate_options(raw, default_by="x")
 
     def test_text_from_the_form_or_the_repository_is_data(self):
-        """Marcado de ReportLab en el título o en un hallazgo no rompe el PDF ni se interpreta."""
+        """ReportLab markup in the title or in a finding neither breaks the PDF nor gets interpreted."""
         hostile = '<font color="red">x</font><img src="http://evil/x.png"/>&'
         options = validate_options({"title": hostile, "organization": hostile, "framework": "iso27001"}, default_by="x")
         findings = [{**_finding("a" * 64, "critical"), "title": hostile, "path": hostile, "reason": hostile, "remediation": hostile,

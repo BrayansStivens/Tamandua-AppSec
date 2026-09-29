@@ -28,11 +28,11 @@ _known_lock = threading.Lock()
 
 
 def register_secret(value: str) -> None:
-    """Valores concretos que nunca deben aparecer (claves guardadas en el almacén)."""
+    """Specific values that must never appear (keys stored in the vault)."""
     if isinstance(value, str) and len(value) >= 12:
         with _known_lock:
             _known.add(value)
-            # Los PEM también por líneas: una traza puede cortar la clave en trozos.
+            # PEMs line by line too: a traceback can split the key into pieces.
             _known.update(line for line in value.splitlines() if len(line) >= 24)
 
 

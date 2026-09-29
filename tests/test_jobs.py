@@ -1,4 +1,4 @@
-"""La cola de escaneos: responde al instante, informa del progreso y falla sin filtrar el servidor."""
+"""The scan queue: answers right away, reports progress and fails without leaking server details."""
 
 import json
 import os
@@ -47,10 +47,10 @@ class JobsTests(unittest.TestCase):
             queued = jobs.enqueue_repository_scan(source_id="local:demo", source_name="demo", allow_osv_upload=False,
                                                   context="prueba", tokens={}, installation_id=None)
             self.assertEqual(queued["status"], "queued")
-            # Antes de terminar, el registro ya existe y es legible por el panel.
+            # Before it finishes, the record already exists and the panel can read it.
             self.assertIn(load_run(self.data_dir, queued["id"])["status"], ("queued", "running", "completed"))
             record = _wait(self.data_dir, queued["id"])
-        self.assertEqual(record["status"], "incomplete")  # sin Docker en las pruebas no corre ningún motor: nunca «completed»
+        self.assertEqual(record["status"], "incomplete")  # no Docker in tests, so no engine runs: never "completed"
         self.assertEqual(record["context"], "prueba")
         self.assertGreaterEqual(record["summary"]["sast"], 1)
         levels = [event["level"] for event in record["progress"]]
@@ -87,7 +87,7 @@ class HostPathTests(unittest.TestCase):
             inside = Path(temporary)
             with patch.dict(os.environ, {"TAMANDUA_DATA_DIR": str(inside), "TAMANDUA_HOST_DATA_DIR": "/Users/dev/appsec/data"}):
                 self.assertEqual(host_path(inside / "work" / "snap"), "/Users/dev/appsec/data/work/snap")
-                # Fuera del directorio de datos no se toca la ruta.
+                # Outside the data directory the path is left untouched.
                 self.assertEqual(host_path(Path("/etc/hosts")), str(Path("/etc/hosts").resolve()))
         with patch.dict(os.environ, testenv.base(), clear=True):
             self.assertEqual(host_path(Path("/tmp/x")), str(Path("/tmp/x").resolve()))

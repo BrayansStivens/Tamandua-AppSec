@@ -1,5 +1,5 @@
-"""Tablas de ejecuciones. La fila del listado (`row`) y el registro completo (`record`) se guardan tal cual en JSONB
-(el formato que ya usa la aplicación); las columnas tipadas sirven para filtrar, ordenar y paginar en la base."""
+"""Run tables. The listing row (`row`) and the full record (`record`) are stored as they are in JSONB (the format
+the application already uses); the typed columns are for filtering, sorting and paging in the database."""
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKeyConstraint, Index, Integer, String, Table, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
@@ -25,8 +25,8 @@ Index("ix_runs_listing", runs.c.tenant_id, runs.c.created_at.desc(), runs.c.id.d
 Index("ix_runs_asset", runs.c.tenant_id, runs.c.asset_key)
 Index("ix_runs_status", runs.c.tenant_id, runs.c.status)
 
-# Cola de trabajos durable: el API encola, el worker reclama con FOR UPDATE SKIP LOCKED. Sin secretos en `payload`
-# (los tokens de código viajan por el almacén cifrado y el worker los borra al usarlos).
+# Durable job queue: the API enqueues, the worker claims with FOR UPDATE SKIP LOCKED. No secrets in `payload`
+# (code tokens travel through the encrypted store and the worker deletes them once used).
 jobs = Table(
     "jobs", metadata,
     Column("tenant_id", Text, primary_key=True, server_default=TENANT),
@@ -47,7 +47,7 @@ jobs = Table(
 Index("ix_jobs_claim", jobs.c.tenant_id, jobs.c.status, jobs.c.created_at)
 Index("ix_jobs_run", jobs.c.tenant_id, jobs.c.run_id)
 
-# Latido de cada worker: la salud del API dice si hay uno vivo y si puede lanzar los motores (Docker).
+# Each worker's heartbeat: the API's health check says whether one is alive and can launch the engines (Docker).
 workers = Table(
     "workers", metadata,
     Column("id", Text, primary_key=True),

@@ -1,4 +1,4 @@
-"""Actualizar no rompe los datos de quien ya los tiene: migraciones versionadas, con copia y una sola vez."""
+"""Upgrading doesn't break the data of those who already have it: versioned migrations, with a backup, only once."""
 
 import json
 import tempfile
@@ -41,7 +41,7 @@ class MigrationTests(unittest.TestCase):
             done = migrations.upgrade(self.data_dir)
             self.assertEqual(done, ["una", "otra"])
             self.assertEqual(self.version()["version"], 2)
-            self.assertEqual(migrations.upgrade(self.data_dir), [])  # ya al día: no vuelve a migrar ni a copiar
+            self.assertEqual(migrations.upgrade(self.data_dir), [])  # already up to date: no migrating or copying again
         backup = next((self.data_dir / migrations.BACKUPS).iterdir())
         self.assertEqual((backup / "findings" / "x.json").read_text(), '{"asset": "a", "findings": {}}')
         self.assertEqual(len(list((self.data_dir / migrations.BACKUPS).iterdir())), 1)

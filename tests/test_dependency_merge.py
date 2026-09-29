@@ -1,4 +1,4 @@
-"""Dependencias de varios motores: un aviso, un hallazgo. Con salidas reales de Trivy y OSV-Scanner."""
+"""Dependencies from several engines: one advisory, one finding. With real Trivy and OSV-Scanner output."""
 
 import json
 import unittest
@@ -19,7 +19,7 @@ class MergeTests(unittest.TestCase):
 
     def test_osv_scanner_groups_aliases_into_one_finding(self):
         starlette = [item for item in self.osv if item["package"]["name"] == "starlette"]
-        # OSV da cada aviso con varios nombres (PYSEC y GHSA): uno por grupo, no uno por nombre.
+        # OSV reports each advisory under several names (PYSEC and GHSA): one per group, not one per name.
         self.assertEqual(len(starlette), len({item["fingerprint"] for item in starlette}))
         self.assertTrue(all(item["tool"] == "osv-scanner" and item["cve"] for item in starlette))
         newtonsoft = next(item for item in self.osv if item["package"]["name"] == "Newtonsoft.Json")
@@ -31,12 +31,12 @@ class MergeTests(unittest.TestCase):
         keys = [(item["package"]["name"].lower(), item["package"]["version"], min(item["cve"] or [item["rule_id"]])) for item in merged]
         self.assertEqual(len(keys), len(set(keys)), "un mismo aviso sobre el mismo paquete aparece dos veces")
         self.assertEqual(len({item["fingerprint"] for item in merged}), len(merged))
-        # Lo que ven los dos queda como un hallazgo de Trivy (su huella no cambia) confirmado por OSV-Scanner.
+        # What both see stays one Trivy finding (its fingerprint doesn't change) confirmed by OSV-Scanner.
         joined = [item for item in merged if item.get("also_detected_by") == ["osv-scanner"]]
         self.assertEqual(len(joined), stats["joined"])
         self.assertTrue(joined and all(item["tool"] == "trivy" for item in joined))
         self.assertEqual({item["fingerprint"] for item in self.trivy} <= {item["fingerprint"] for item in merged}, True)
-        # Trivy no lee .csproj: .NET lo aporta OSV-Scanner.
+        # Trivy doesn't read .csproj: OSV-Scanner covers .NET.
         self.assertIn("Newtonsoft.Json", {item["package"]["name"] for item in merged if item["tool"] == "osv-scanner"})
 
     def test_merging_twice_does_not_duplicate(self):

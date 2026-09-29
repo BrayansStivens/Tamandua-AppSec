@@ -1,8 +1,8 @@
-"""Conexiones a proveedores de código: qué instalación se autorizó y quién lo hizo.
+"""Code-provider connections: which installation was authorized and who authorized it.
 
-Aquí no se guarda ninguna credencial. El identificador de instalación no es un
-secreto: sin la clave privada de la App no sirve para leer nada. Los tokens se
-acuñan en memoria cuando hacen falta (ver `github_app`).
+No credential is stored here. The installation ID is not a secret: without the
+App's private key it can't read anything. Tokens are minted in memory when
+needed (see `github_app`).
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ def save_github(data_dir: Path, installation_id: int, details: dict, connected_b
 
 
 def github_connections(data_dir: Path) -> list[dict]:
-    """Instalaciones conectadas."""
+    """Connected installations."""
     value = load(data_dir).get("github")
     rows = value if isinstance(value, list) else []
     return [row for row in rows if isinstance(row, dict) and isinstance(row.get("installation_id"), int)

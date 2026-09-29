@@ -1,4 +1,4 @@
-"""Arranque del panel: el estado compartido (auth, cola, log) y el servidor uvicorn."""
+"""Panel start-up: the shared state (auth, queue, log) and the uvicorn server."""
 
 from __future__ import annotations
 
@@ -15,14 +15,14 @@ from tamandua.shared.i18n import t
 
 
 def embedded_worker() -> bool:
-    """Un solo proceso (por defecto): el servidor ejecuta también los análisis. En compose, un servicio `worker` aparte
-    los ejecuta y el API corre con TAMANDUA_EMBEDDED_WORKER=0 (sin Docker)."""
+    """Single process (the default): the server also runs the scans. In compose, a separate `worker` service runs
+    them and the API runs with TAMANDUA_EMBEDDED_WORKER=0 (no Docker)."""
     return settings.flag("TAMANDUA_EMBEDDED_WORKER")
 
 
 def build_state(data_dir: Path, *, watch_pull_requests: bool = False, worker: bool | None = None) -> State:
     wiring.configure()
-    migrations.upgrade(data_dir)  # antes de que nada lea: una actualización convierte los datos viejos una sola vez
+    migrations.upgrade(data_dir)  # before anything reads: an upgrade converts old data exactly once
     embedded = embedded_worker() if worker is None else worker
     state = State(data_dir=data_dir, log=logging_setup.configure(data_dir), jobs=ScanJobs(data_dir, worker=embedded),
                   auth=Authenticator(data_dir))
@@ -36,10 +36,10 @@ LOOPBACK = ("127.0.0.1", "localhost", "::1", "[::1]")
 
 
 def transport_check(port: int) -> str | None:
-    """Motivo para no arrancar, o None. HTTP en claro solo si el panel no sale de esta máquina.
+    """Reason not to start, or None. Plain HTTP only if the panel never leaves this machine.
 
-    La contraseña, la cookie de sesión y los tokens que se pegan en Integraciones viajan en
-    cada petición: servirlos por HTTP a la red los expone a cualquiera en el camino.
+    The password, the session cookie and the tokens pasted into Integrations travel with every
+    request: serving them over HTTP on the network exposes them to anyone along the way.
     """
     url = public_url(port)
     parts = urlsplit(url)
@@ -69,7 +69,7 @@ def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
     problem = transport_check(port)
     if problem:
         raise SystemExit(problem)
-    # Fuera de un contenedor se escucha solo en loopback; dentro, en todas las interfaces del contenedor.
+    # Outside a container, listen on loopback only; inside one, on all of the container's interfaces.
     address = bind or settings.text("TAMANDUA_BIND")
     state = build_state(data_dir, watch_pull_requests=True)
     from tamandua.app.api import create_app
@@ -79,7 +79,7 @@ def serve(data_dir: Path, port: int, bind: str | None = None) -> None:
     print(t("cli.server.listening_tls" if cert else "cli.server.listening", url=public_url(port), address=f"{address}:{port}"), flush=True)
     code = state.auth.setup_code()
     if code:
-        # Directo a la consola y no al log en fichero: solo quien ve la consola del servidor puede reclamarlo.
+        # Straight to the console, not the log file: only someone who can see the server console can claim it.
         print("\n" + "=" * 64 + f"\n  {t('cli.server.setup_code')}\n      {code}\n  {t('cli.server.setup_code_hint')}\n" + "=" * 64 + "\n",
               flush=True)
     # No Server header; X-Forwarded-For only from trusted proxies (the allowed Host is always decided by

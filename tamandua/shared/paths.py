@@ -1,10 +1,10 @@
-"""Rutas del proyecto y de la configuración, en un solo sitio (antes cada módulo calculaba la suya)."""
+"""Project and configuration paths in one place (each module used to compute its own)."""
 
 import os
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]  # raíz del repositorio (o /app en el contenedor)
+ROOT = Path(__file__).resolve().parents[2]  # repository root (or /app in the container)
 RULES_DIR = ROOT / "rules"
 FIXTURES_DIR = ROOT / "fixtures"
-# Configuración y secretos (almacén cifrado). Las pruebas lo redirigen a un temporal con patch.object(paths, "CONFIG_DIR", …).
+# Config and secrets (encrypted vault). Tests redirect it to a temp dir with patch.object(paths, "CONFIG_DIR", …).
 CONFIG_DIR = Path(os.environ.get("TAMANDUA_CONFIG_DIR") or Path.home() / ".config" / "tamandua")

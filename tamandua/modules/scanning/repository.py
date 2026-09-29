@@ -1,4 +1,4 @@
-"""Análisis pasivo de snapshot: SAST acotado, secretos redactados y SCA OSV."""
+"""Passive snapshot analysis: bounded SAST, redacted secrets and OSV SCA."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ SECRET_RULES = (
     ("GitHub token", re.compile(r"\b(?:ghp_|gho_|ghu_|ghs_|ghr_)[A-Za-z0-9]{36,}\b")),
     ("OpenAI API key", re.compile(r"\bsk-[A-Za-z0-9_-]{30,}\b")),
     ("AWS access key ID", re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")),
-    # Firma incluida: un JWT completo en el código o la documentación es una credencial reutilizable.
+    # Signature included: a full JWT in code or docs is a reusable credential.
     ("JSON Web Token", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
     ("clave privada", re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY(?: BLOCK)?-----")),
     ("Stripe secret key", re.compile(r"\b(?:sk|rk)_live_[A-Za-z0-9]{20,}\b")),
@@ -209,7 +209,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     tools: list[dict] = []
     misconfigured = None if engines or not docker else socket_problem()
     if misconfigured:
-        # Docker está, pero este contenedor no puede usarlo: no es un análisis sin motores a propósito.
+        # Docker is there, but this container can't use it: this isn't a deliberately engine-less scan.
         report("warn", misconfigured)
     if engines:
         # Each engine runs in its container pinned by digest; the step keeps version, image and duration.
@@ -230,8 +230,8 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
         trivy_secrets = [item for item in trivy["findings"] if item["scanner"] == "secrets"]
         findings.extend(merge_secrets(secrets_gitleaks["findings"], trivy_secrets))
         withheld = merge_secrets(secrets_gitleaks.get("withheld") or [], trivy.get("withheld") or [])
-        # Trivy manda (sus huellas sostienen el triage ya hecho); OSV-Scanner suma lo que Trivy no ve y
-        # confirma lo que coincide, sin repetir el aviso aunque lo nombre con otro identificador.
+        # Trivy wins (its fingerprints hold the triage already done); OSV-Scanner adds what Trivy doesn't see
+        # and confirms what matches, without repeating the advisory even if it names it with another identifier.
         dependencies_found, dependency_merge = merge_dependencies([item for item in trivy["findings"] if item["scanner"] == "sca"],
                                                                   ("osv-scanner", osv["findings"]))
         findings.extend(dependencies_found)
@@ -239,7 +239,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             osv["detail"] = msg("scanning.repository.osv_merged", detail=osv["detail"], joined=dependency_merge["joined"],
                                 new=dependency_merge["new"])
         report_done(report, osv)
-        # Lo que Trivy y Checkov (o zizmor y Checkov) ven a la vez queda como un solo hallazgo con los dos motores.
+        # What Trivy and Checkov (or zizmor and Checkov) both see stays a single finding with both engines.
         configuration, joined = merge_repository([item for item in trivy["findings"] if item["scanner"] == "iac"],
                                                  checkov["findings"], zizmor["findings"])
         findings.extend(configuration)
@@ -267,7 +267,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
              "detail": msg("scanning.repository.steps.internal_secrets.detail",
                            candidates=sum(item["scanner"] == "secrets" for item in findings))},
         ])
-    # Invariante del registro: una huella, un hallazgo. Ningún motor ni fusión puede colar un duplicado.
+    # Registry invariant: one fingerprint, one finding. No engine or merge may slip in a duplicate.
     unique, seen = [], set()
     for item in findings:
         if item["fingerprint"] not in seen:
@@ -298,7 +298,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
     else:
         try:
             responses = _query_osv(dependencies)
-            # querybatch solo devuelve identificadores: el detalle de cada aviso es lo que da valor.
+            # querybatch only returns identifiers: each advisory's details are what bring the value.
             identifiers = []
             for item in responses:
                 for vulnerability in item.get("vulns", []):
@@ -367,7 +367,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
                   for action in ("act", "attend", "track")}
     truncated = bool(snapshot.get("truncated"))
     return {"type": "repository_scan",
-            # Sin Docker no corrió ningún motor: las reglas internas no bastan para dar el repositorio por revisado.
+            # Without Docker no engine ran: the internal rules aren't enough to call the repository reviewed.
             "status": "incomplete" if not engines or sca_status == "inconclusive" or truncated or misconfigured or any(
                 tool["tool"] in REQUIRED_ENGINES and tool["status"] == "inconclusive" for tool in tools)
                 # Allowlisted secrets not identified: one that stopped appearing may only be silenced.
@@ -375,7 +375,7 @@ def scan_repository(root: Path, source: dict, *, allow_osv_upload: bool = False,
             "source": source, "target": source["name"], "variant": "code", "context": declared,
             "steps": steps, "findings": findings,
             "owasp_coverage": coverage, "inventory": collect_inventory(root), "unused_dependencies": unused_dependencies(root),
-            # Paquetes con versión (de Trivy): la vigilancia diaria de avisos los contrasta sin reanalizar.
+            # Versioned packages (from Trivy): the daily advisory watch checks them without rescanning.
             "dependencies": next((tool.get("packages") or [] for tool in tools if tool["tool"] == "trivy"), []),
             "summary": {"files": len(files), "dependencies": len(dependencies),
                                                     "candidates": len(findings), "sast": sast_count,

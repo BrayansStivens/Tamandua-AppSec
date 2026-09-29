@@ -1,18 +1,18 @@
-"""Diagrama del modelo de amenazas: colocación automática, colores y dibujo (SVG y PDF).
+"""Threat model diagram: automatic layout, colors and drawing (SVG and PDF).
 
-La colocación es la misma que la del editor del panel (web/src/features/threats/threat-layout.ts); si cambia
-una, cambia la otra. Principios, para que un humano lo entienda y lo quiera editar:
-- Columnas según el recorrido de los datos, no según el tipo: lo que entra desde Internet a la izquierda,
-  lo que recibe datos a su derecha y los terceros al final. Los flujos de vuelta (respuestas, webhooks)
-  no empujan columnas: cuenta la distancia a los actores.
-- Cada frontera es un bloque que contiene a sus componentes; los bloques nunca se solapan.
-- Dentro de cada columna, cada bloque se coloca a la altura de aquello con lo que habla (menos cruces).
-- Rejilla de 8 px, pilas de 5 como mucho (más se reparten en columnas) y etiquetas cortas: número de
-  flujo y protocolo. Lo que viaja por cada flujo está en la tabla del informe, con el mismo número.
+The layout is the same as the panel editor's (web/src/features/threats/threat-layout.ts); if one changes,
+so does the other. Principles, so that a human understands it and wants to edit it:
+- Columns follow the data path, not the component type: what comes in from the Internet on the left,
+  what receives its data to its right and third parties last. Return flows (responses, webhooks)
+  don't push columns: the distance to the actors is what counts.
+- Each boundary is a block that contains its components; blocks never overlap.
+- Within each column, each block sits at the height of whatever it talks to (fewer crossings).
+- 8 px grid, stacks of 5 at most (more are spread over columns) and short labels: flow number and
+  protocol. What travels over each flow is in the report table, under the same number.
 
-El dibujo se describe una sola vez (una lista de primitivas) y se pinta en SVG o en PDF: el diagrama del
-informe y el que se exporta son idénticos. Todo texto del modelo se escapa en el SVG y en el PDF se dibuja
-como texto plano, nunca como marcado.
+The drawing is described once (a list of primitives) and painted as SVG or PDF: the report's diagram
+and the exported one are identical. All model text is escaped in the SVG and drawn as plain text in
+the PDF, never as markup.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import math
 
 from tamandua.shared.i18n import default_locale, localize, msg, t
 
-# Paleta: los tokens del panel (web/src/index.css, modo claro). (tinta ≥ 4,5:1 sobre blanco, relleno suave)
+# Palette: the panel tokens (web/src/index.css, light mode). (ink ≥ 4.5:1 on white, soft fill)
 COLORS = {
     "neutral": ("#525252", "#f7f7f7"),
     "brand": ("#7342d3", "#f1ecfb"),
@@ -35,7 +35,7 @@ COLORS = {
 COLOR_NAMES = {"neutral": msg("threats.colors.neutral"), "brand": msg("threats.colors.brand"), "info": msg("threats.colors.info"),
                "success": msg("threats.colors.success"), "warning": msg("threats.colors.warning"),
                "attention": msg("threats.colors.attention"), "danger": msg("threats.colors.danger")}
-# Sin color elegido, cada componente toma el de su papel; la leyenda lo explica.
+# With no chosen color, each component takes its role's color; the legend explains it.
 KIND_COLOR = {"actor": "neutral", "external": "neutral", "web_app": "brand", "api": "info", "service": "info", "function": "info",
               "database": "success", "cache": "success", "queue": "success", "storage": "success", "identity": "warning"}
 LEGEND = [("brand", msg("threats.diagram.legend_clients")), ("info", msg("threats.diagram.legend_services")),
@@ -86,14 +86,14 @@ def legend_tones(model: dict) -> tuple[list[str], list[str]]:
 
 
 def _snap(value: float) -> float:
-    # Como Math.round del editor (la mitad, hacia arriba), no el redondeo al par de round().
+    # Like the editor's Math.round (halves round up), not round()'s round-half-to-even.
     return math.floor(value / SNAP + 0.5) * SNAP
 
 
-# ------------------------------------------------------------------ colocación
+# ------------------------------------------------------------------ layout
 
 def _inner_ranks(ids: list[str], edges: list[tuple[str, str]], seed) -> dict[str, int]:
-    """Columnas dentro de una frontera: el papel de cada componente, empujado por los flujos internos."""
+    """Columns inside a boundary: the role of each component, pushed along by the internal flows."""
     rank = {item: seed(item) for item in ids}
     known = set(ids)
     forward = [(a, b) for a, b in edges if a != b and a in known and b in known and seed(a) <= seed(b)]
@@ -109,13 +109,13 @@ def _inner_ranks(ids: list[str], edges: list[tuple[str, str]], seed) -> dict[str
 
 
 def _group_ranks(ids: list[str], edges: list[tuple[str, str]], seed: dict[str, int], sinks: set[str]) -> dict[str, int]:
-    """Columna de cada bloque según el recorrido de los datos.
+    """Column of each block, following the data path.
 
-    Primero, a cuántos saltos está cada bloque de los actores (lo que entra desde fuera). Un flujo cuenta
-    «hacia delante» si se aleja de los actores (o, a la misma distancia, va de un papel anterior a uno
-    posterior: aplicación → datos). Los que vuelven (respuestas, webhooks, ciclos) no empujan columnas.
-    Con los de delante, cada bloque va una columna a la derecha del último que le envía datos. Lo que
-    nada alimenta (una cadena de CI) se acerca a su destino y los terceros que solo reciben van al final."""
+    First, how many hops each block is from the actors (what comes in from outside). A flow counts as
+    "forward" if it moves away from the actors (or, at the same distance, goes from an earlier role to a
+    later one: application → data). Flows going back (responses, webhooks, cycles) don't push columns.
+    With the forward ones, each block goes one column to the right of the last one that sends it data.
+    What nothing feeds (a CI chain) moves next to its target, and third parties that only receive go last."""
     targets: dict[str, list[str]] = {item: [] for item in ids}
     for a, b in edges:
         if b not in targets[a]:
@@ -131,10 +131,10 @@ def _group_ranks(ids: list[str], edges: list[tuple[str, str]], seed: dict[str, i
                 distance[other] = distance[item] + 1
                 queue.append(other)
     for item in ids:
-        distance.setdefault(item, -1)  # inalcanzable desde los actores: una fuente propia (CI, tareas)
-    # Orden estricto (distancia, papel medio, orden del modelo): cada flujo entre bloques va hacia delante o
-    # hacia atrás, nunca «de lado». Así dos bloques que se hablan no comparten columna (flechas verticales
-    # que atraviesan componentes).
+        distance.setdefault(item, -1)  # unreachable from the actors: a source of its own (CI, tasks)
+    # Strict order (distance, average role, model order): every flow between blocks goes forward or
+    # backward, never "sideways". That way two blocks that talk to each other never share a column (vertical
+    # arrows crossing components).
     key = {item: (distance[item], seed[item], index) for index, item in enumerate(ids)}
     forward = [(a, b) for a in ids for b in targets[a] if key[a] < key[b]]
     incoming: dict[str, list[str]] = {item: [] for item in ids}
@@ -143,14 +143,14 @@ def _group_ranks(ids: list[str], edges: list[tuple[str, str]], seed: dict[str, i
         incoming[b].append(a)
         outgoing[a].append(b)
     rank: dict[str, int] = {}
-    for item in sorted(ids, key=key.get):  # el orden estricto es topológico para los flujos de delante
+    for item in sorted(ids, key=key.get):  # the strict order is topological for the forward flows
         rank[item] = max((rank[source] + 1 for source in incoming[item]), default=0)
     for item in sorted(ids, key=key.get, reverse=True):
         if seed[item] > 0 and not incoming[item] and outgoing[item]:
             rank[item] = max(0, min(rank[other] for other in outgoing[item]) - 1)
         elif seed[item] > 0 and not incoming[item] and not outgoing[item]:
             rank[item] = min(1, max(rank.values(), default=0))
-    for item in ids:  # terceros que solo reciben: la última columna, como en cualquier diagrama de flujo de datos
+    for item in ids:  # third parties that only receive: the last column, as in any data flow diagram
         if item in sinks and incoming[item] and not outgoing[item]:
             rank[item] = max([rank[other] for other in ids if other not in sinks] + [rank[item] - 1]) + 1
     levels = sorted(set(rank.values()))
@@ -158,7 +158,7 @@ def _group_ranks(ids: list[str], edges: list[tuple[str, str]], seed: dict[str, i
 
 
 def _stacks(column: list[dict]) -> list[list[dict]]:
-    """Una pila de más de MAX_STACK componentes se reparte en columnas parejas (una rejilla)."""
+    """A stack of more than MAX_STACK components is split into even columns (a grid)."""
     if len(column) <= MAX_STACK:
         return [column]
     parts = math.ceil(len(column) / MAX_STACK)
@@ -239,8 +239,8 @@ def auto_layout(model: dict) -> dict:
     for group in groups:
         for item in group["members"]:
             group_of[item["id"]] = group["id"]
-    # Papel del bloque: la media de sus componentes (0 = solo actores). Una frontera de datos con un servicio
-    # de configuración sigue siendo «datos».
+    # A block's role: the average of its components' (0 = actors only). A data boundary holding a
+    # configuration service is still "data".
     seed = {group["id"]: sum(layer(item) for item in group["members"]) / len(group["members"]) for group in groups}
     sinks = {group["id"] for group in groups if all(base_kind(item) == "external" for item in group["members"])}
     between = [(group_of[f["source"]], group_of[f["target"]]) for f in flows if group_of[f["source"]] != group_of[f["target"]]]
@@ -258,7 +258,7 @@ def auto_layout(model: dict) -> dict:
         neighbours[f["source"]].append(f["target"])
         neighbours[f["target"]].append(f["source"])
 
-    # Menos cruces: cada bloque (y cada componente dentro de su bloque) a la altura media de sus vecinos.
+    # Fewer crossings: each block (and each component within its block) at the average height of its neighbors.
     nodes, boxes = _place(columns) if columns else ({}, {})
     for _ in range(4):
         centre = {key: point["y"] + node_size(components[key])[1] / 2 for key, point in nodes.items()}
@@ -276,7 +276,7 @@ def auto_layout(model: dict) -> dict:
                                                  if neighbours[item["id"]] else centre[item["id"]]))
         nodes, boxes = _place(columns)
     del by_id
-    # Fronteras vacías: al final, listas para arrastrar componentes dentro.
+    # Empty boundaries: at the end, ready for components to be dragged into them.
     right = max([box["x"] + box["width"] for box in boxes.values()] + [point["x"] + NODE_W for point in nodes.values()] + [0]) + GAP_X
     empty_y = 40
     for boundary in model.get("boundaries", []):
@@ -287,7 +287,7 @@ def auto_layout(model: dict) -> dict:
 
 
 def fit_box(box: dict, members: list[tuple[dict, tuple[float, float]]]) -> dict:
-    """Una caja siempre contiene a sus componentes, aunque llegue pequeña de un JSON."""
+    """A box always contains its components, even when it arrives too small from a JSON."""
     if not members:
         return box
     left = min([box["x"]] + [point["x"] - PAD for point, _ in members])
@@ -298,7 +298,7 @@ def fit_box(box: dict, members: list[tuple[dict, tuple[float, float]]]) -> dict:
 
 
 def layout(model: dict) -> dict:
-    """Respeta cada posición dibujada, coloca solo lo que no la tiene y ajusta cada caja a sus componentes."""
+    """Keeps every drawn position, places only what has none and fits each box to its components."""
     result = auto_layout(model)
     for component in model.get("components", []):
         if component.get("position"):
@@ -311,7 +311,7 @@ def layout(model: dict) -> dict:
     return result
 
 
-# ------------------------------------------------------------------ flechas y etiquetas (igual que React Flow)
+# ------------------------------------------------------------------ arrows and labels (same as React Flow)
 
 def _offset(distance: float) -> float:
     return 0.5 * distance if distance >= 0 else 0.25 * 25 * math.sqrt(-distance)
@@ -333,7 +333,7 @@ def _anchor(rect: dict, side: str) -> tuple[float, float]:
 
 
 def sides(a: dict, b: dict) -> tuple[str, str]:
-    """Qué lado de cada componente mira al otro (por sus centros): las flechas no cruzan por dentro de las cajas."""
+    """Which side of each component faces the other (by their centers): arrows never cut through the boxes."""
     dx = (b["x"] + b["width"] / 2) - (a["x"] + a["width"] / 2)
     dy = (b["y"] + b["height"] / 2) - (a["y"] + a["height"] / 2)
     if abs(dx) >= abs(dy):
@@ -341,11 +341,11 @@ def sides(a: dict, b: dict) -> tuple[str, str]:
     return ("bottom", "top") if dy >= 0 else ("top", "bottom")
 
 
-LANE = 14  # separación entre flujos que unen los mismos dos componentes (ida y vuelta, o varios)
+LANE = 14  # spacing between flows joining the same two components (there and back, or several)
 
 
 def lanes(flows: list[dict]) -> dict[str, float]:
-    """Desplazamiento de cada flujo: los que comparten extremos (en cualquier sentido) van en carriles paralelos."""
+    """Offset of each flow: flows that share endpoints (in either direction) run in parallel lanes."""
     groups: dict[frozenset, list[str]] = {}
     for flow in flows:
         groups.setdefault(frozenset((flow["source"], flow["target"])), []).append(flow["id"])
@@ -371,8 +371,8 @@ def _point(curve, t: float) -> tuple[float, float]:
             u ** 3 * sy + 3 * u * u * t * ay + 3 * u * t * t * by + t ** 3 * ty)
 
 
-LABEL_H = 18          # alto dibujado de la etiqueta
-LABEL_ROOM = 20       # alto con el que se buscan huecos (igual que el editor)
+LABEL_H = 18          # drawn height of a label
+LABEL_ROOM = 20       # height used when looking for free spots (same as the editor)
 SPOTS = (0.5, 0.4, 0.6, 0.3, 0.7, 0.78, 0.22, 0.85, 0.15)
 
 
@@ -386,8 +386,8 @@ def label_width(text: str) -> float:
 
 
 def label_spots(edges: list[tuple[str, tuple, str, float]], rects: list[dict]) -> dict[str, tuple[float, float]]:
-    """Etiqueta de cada flujo en el primer punto de su curva que no pisa componentes ni otras etiquetas.
-    Igual que labelSpots del editor: primero los flujos cortos (tienen menos sitio donde elegir)."""
+    """Each flow's label, at the first point of its curve that overlaps no component or other label.
+    Same as the editor's labelSpots: short flows first (they have fewer places to choose from)."""
     placed: list[dict] = []
     spots: dict[str, tuple[float, float]] = {}
     for key, curve, text, _ in sorted(edges, key=lambda edge: edge[3]):
@@ -407,10 +407,10 @@ def label_spots(edges: list[tuple[str, tuple, str, float]], rects: list[dict]) -
     return spots
 
 
-# ------------------------------------------------------------------ escena
+# ------------------------------------------------------------------ scene
 
 def _wrap(text: str, width: float, size: float, lines: int = 2, bold: bool = True) -> list[str]:
-    """Parte un nombre en como mucho `lines` renglones que caben en `width` (medida aproximada de Helvetica)."""
+    """Splits a name into at most `lines` lines that fit in `width` (approximate Helvetica measure)."""
     per_line = max(6, int(width / (size * (0.6 if bold else 0.53))))
     words, rows, current = str(text).split(), [], ""
     for word in words:
@@ -434,7 +434,7 @@ def flow_label(number: int, flow: dict) -> str:
 
 
 def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | None = None) -> dict:
-    """El diagrama como primitivas: {"bounds": (x, y, w, h), "items": [...]}. Lo pintan to_svg y to_drawing."""
+    """The diagram as primitives: {"bounds": (x, y, w, h), "items": [...]}. Painted by to_svg and to_drawing."""
     locale = locale or default_locale()
     kinds = kinds or {}
     geometry = layout(model)
@@ -454,7 +454,7 @@ def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | Non
         items += [{"t": "rect", "x": box["x"], "y": box["y"], "w": box["width"], "h": box["height"], "rx": 16, "fill": fill,
                    "opacity": 0.55, "stroke": ink, "sw": 1.5, "dash": (8, 6)},
                   {"t": "text", "x": box["x"] + 14, "y": box["y"] + 24, "text": boundary["name"][:80], "size": 12.5, "bold": True, "fill": ink}]
-    # Flujos: curvas como las del editor, numeradas en el orden del modelo (la tabla del informe usa el mismo número).
+    # Flows: curves like the editor's, numbered in model order (the report table uses the same number).
     curves = []
     offsets = lanes(model.get("flows", []))
     for number, flow in enumerate(model.get("flows", []), start=1):
@@ -487,7 +487,7 @@ def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | Non
                    "stroke": COLORS["danger"][0] if plain else LINE, "sw": 1},
                   {"t": "text", "x": x, "y": y + 3.6, "text": text, "size": 10, "bold": True, "fill": COLORS["danger"][0] if plain else MUTED,
                    "anchor": "middle"}]
-    # Componentes: forma según su papel (proceso redondeado, almacén entre dos líneas, el resto rectángulo).
+    # Components: shape by role (rounded process, store between two lines, a rectangle for the rest).
     for key, rect in rects.items():
         item = components[key]
         role = base_kind(item)
@@ -516,7 +516,7 @@ def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | Non
             cursor += 13
         if flags:
             items.append({"t": "text", "x": x + w / 2, "y": cursor - 1, "text": " · ".join(flags), "size": 9, "fill": MUTED, "anchor": "middle"})
-    # Límites, título arriba y leyenda abajo.
+    # Drawing bounds, with the title above and the legend below.
     extents = [(r["x"], r["y"], r["x"] + r["width"], r["y"] + r["height"]) for r in rects.values()]
     extents += [(box["x"], box["y"], box["x"] + box["width"], box["y"] + box["height"]) for box in geometry["boundaries"].values()]
     left = min((item[0] for item in extents), default=0) - 32
@@ -524,7 +524,7 @@ def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | Non
     right = max((item[2] for item in extents), default=720) + 32
     bottom = max((item[3] for item in extents), default=420) + 76
     width, height = max(560, right - left), max(300, bottom - top)
-    # Leyenda: los colores automáticos que se usan y los tipos de línea; si no cabe en una fila, sigue en otra.
+    # Legend: the automatic colors in use and the line types; if it doesn't fit on one row, it wraps to the next.
     # A manual color shows the team's label, or a placeholder so that every color on the diagram is explained.
     automatic, manual = legend_tones(model)
     labels, names = model.get("legend") or {}, dict(LEGEND)
@@ -565,7 +565,7 @@ def scene(model: dict, kinds: dict[str, str] | None = None, *, locale: str | Non
     return {"bounds": (left, top, width, height), "items": items}
 
 
-# ------------------------------------------------------------------ pintores
+# ------------------------------------------------------------------ painters
 
 def _svg_attrs(item: dict) -> str:
     stroke = f' stroke="{item["stroke"]}" stroke-width="{item["sw"]:g}"' if item.get("stroke") else ""
@@ -574,7 +574,7 @@ def _svg_attrs(item: dict) -> str:
 
 
 def to_svg(model: dict, kinds: dict[str, str] | None = None, *, locale: str | None = None) -> str:
-    """El diagrama como SVG autónomo: sin scripts ni recursos externos, con el texto escapado."""
+    """The diagram as a self-contained SVG: no scripts or external resources, with the text escaped."""
     drawn = scene(model, kinds, locale=locale)
     left, top, width, height = drawn["bounds"]
     escape = lambda value: html.escape(str(value), quote=True)
@@ -605,14 +605,14 @@ def to_svg(model: dict, kinds: dict[str, str] | None = None, *, locale: str | No
 
 
 def to_drawing(model: dict, max_width: float, max_height: float, kinds: dict[str, str] | None = None, *, locale: str | None = None):
-    """El mismo diagrama como dibujo vectorial de ReportLab, escalado para caber en (max_width, max_height)."""
+    """The same diagram as a ReportLab vector drawing, scaled to fit within (max_width, max_height)."""
     from reportlab.graphics.shapes import Drawing, Group, Line, Path, Polygon, Rect, String
     from reportlab.lib import colors
 
     drawn = scene(model, kinds, locale=locale)
     left, top, width, height = drawn["bounds"]
     scale = min(max_width / width, max_height / height, 1.0)
-    flip = lambda y: top + height - y  # SVG crece hacia abajo; ReportLab, hacia arriba (ya queda en [0, alto])
+    flip = lambda y: top + height - y  # SVG grows downward, ReportLab upward (it already ends up within [0, height])
     group = Group(transform=(scale, 0, 0, scale, -left * scale, 0))
     colour = lambda value: colors.HexColor(value) if value else None
     for item in drawn["items"]:

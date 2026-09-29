@@ -1,7 +1,7 @@
-"""Cómo se corrige cada regla SAST propia: un ejemplo mínimo antes/después en su lenguaje.
+"""How to fix each of our own SAST rules: a minimal before/after example in its language.
 
-Los ejemplos ilustran el patrón que detecta la regla (rules/*.yml) y su corrección habitual; no son un
-parche para el código concreto del hallazgo. Cortos a propósito: se leen en un panel lateral y en un PR.
+The examples illustrate the pattern the rule detects (rules/*.yml) and its usual fix; they are not a
+patch for the finding's actual code. Short on purpose: they are read in a side panel and in a PR.
 """
 
 from __future__ import annotations

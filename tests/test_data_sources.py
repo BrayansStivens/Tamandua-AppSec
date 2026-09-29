@@ -1,4 +1,4 @@
-"""Cada aviso de dependencias lleva su fuente y su licencia, y los informes la atribuyen."""
+"""Every dependency advisory carries its source and its license, and the reports attribute it."""
 
 import json
 import unittest
@@ -16,7 +16,7 @@ class DataSourceTests(unittest.TestCase):
     def test_each_engine_names_its_source(self):
         trivy = [item for item in parse_trivy(json.loads((OUTPUTS / "trivy-deps.json").read_text()), {}) if item["scanner"] == "sca"]
         self.assertTrue(trivy and all(item["source"]["id"] == "ghsa" and item["source"]["license"] == "CC BY 4.0" for item in trivy))
-        self.assertTrue(trivy[0]["source"]["url"].startswith("https://github.com/advisories"))  # el enlace concreto que da Trivy
+        self.assertTrue(trivy[0]["source"]["url"].startswith("https://github.com/advisories"))  # the link Trivy gives
         osv = parse_osv_scanner(json.loads((OUTPUTS / "osv-scanner.json").read_text()), {})
         self.assertTrue(osv and all(item["source"]["id"] == "ghsa" for item in osv))
         self.assertEqual(data_sources.from_osv("PYSEC-2024-1")["id"], "pypa")
@@ -29,7 +29,7 @@ class DataSourceTests(unittest.TestCase):
         self.assertEqual(data_sources.from_grype({"namespace": "sles:distro:sles:15"})["id"], "suse-cvrf")
         self.assertEqual(data_sources.from_trivy({"DataSource": {"ID": "redhat-csaf-vex"}})["name"], "Red Hat Security Data")
         unknown = data_sources.describe("nueva-fuente", url="javascript:alert(1)", name="Nueva")
-        self.assertEqual((unknown["terms"], unknown["url"]), ("unclear", ""))  # solo enlaces https
+        self.assertEqual((unknown["terms"], unknown["url"]), ("unclear", ""))  # https links only
         self.assertIsNone(data_sources.from_trivy({}))
 
     def test_merging_engines_keeps_a_source(self):
@@ -48,7 +48,7 @@ class DataSourceTests(unittest.TestCase):
         self.assertTrue(any(line.startswith("Alpine secdb: CC BY-SA 4.0") for line in lines))
         self.assertIn("This product uses the NVD API but is not endorsed or certified by the NVD.", lines)
         self.assertTrue(any("KEV" in line for line in lines) and any("EPSS" in line for line in lines))
-        self.assertEqual(_sources_section([]), [])  # sin avisos, nada que atribuir
+        self.assertEqual(_sources_section([]), [])  # no advisories, nothing to attribute
         self.assertIn("- Alpine secdb: CC BY-SA 4.0 (atribución y compartir igual) · 1 aviso · https://secdb.alpinelinux.org",
                       _sources_section(findings))
 

@@ -1,13 +1,13 @@
-"""SBOM en CycloneDX 1.6 a partir del inventario que ya guarda cada análisis completo.
+"""CycloneDX 1.6 SBOM built from the inventory every complete scan already stores.
 
-No se vuelve a analizar nada: Trivy lista todos los paquetes (no solo los vulnerables) y cada análisis los guarda
-en `dependencies` (y, en imágenes, `system_packages`). Aquí se convierten al formato que piden el CRA (Anexo I) y la
-guía BSI TR-03183-2: purl, versión, licencias cuando se conocen, relación directa con el producto y herramienta,
-autor y momento de generación. Lo que no sabemos (proveedor de cada paquete, hashes de cada componente) no se
-inventa: se omite, y el documento dice de dónde sale en `metadata.properties`.
+Nothing is scanned again: Trivy lists every package (not only the vulnerable ones) and each scan stores them in
+`dependencies` (and, for images, `system_packages`). Here they are turned into the format the CRA (Annex I) and the
+BSI TR-03183-2 guideline ask for: purl, version, licenses when known, direct relationship to the product, plus tool,
+author and generation time. What we don't know (each package's supplier, per-component hashes) is not made up: it
+is left out, and the document says where it comes from in `metadata.properties`.
 
-Lectores tolerantes: análisis anteriores a que se guardaran purl, licencias o la relación siguen sirviendo; el purl
-se reconstruye desde el ecosistema y la relación queda sin declarar.
+Tolerant readers: scans from before purl, licenses or the relationship were stored still work; the purl is rebuilt
+from the ecosystem and the relationship stays undeclared.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _stamp(now: datetime | None) -> str:
 
 
 def root_ref(record: Mapping[str, Any]) -> str:
-    """Identificador estable del producto analizado, para el SBOM y para el VEX."""
+    """Stable identifier of the scanned product, for the SBOM and the VEX."""
     source = record.get("source") or {}
     image = source.get("image") or {}
     if image.get("reference"):
@@ -49,7 +49,7 @@ def _root(record: dict) -> dict:
     if version:
         component["version"] = str(version)
     if source.get("sha256"):
-        # Huella de la instantánea analizada (el árbol de archivos), no de un binario publicado.
+        # Hash of the scanned snapshot (the file tree), not of a published binary.
         component["hashes"] = [{"alg": "SHA-256", "content": source["sha256"]}]
     identity = [("tamandua:uid", source.get("uid")), ("tamandua:image", image.get("reference")),
                 ("tamandua:branch", source.get("branch")), ("tamandua:commit", source.get("commit"))]
@@ -58,7 +58,7 @@ def _root(record: dict) -> dict:
     return component
 
 
-# Paquetes del sistema de una imagen: tipo de purl según la distribución (sin cualificadores de arquitectura, que no se guardan).
+# An image's system packages: purl type by distribution (no architecture qualifiers, since those aren't stored).
 OS_PURL = {"debian": ("deb", "debian"), "ubuntu": ("deb", "ubuntu"), "alpine": ("apk", "alpine"), "wolfi": ("apk", "wolfi"),
            "chainguard": ("apk", "chainguard"), "redhat": ("rpm", "redhat"), "centos": ("rpm", "centos"), "rocky": ("rpm", "rocky"),
            "alma": ("rpm", "almalinux"), "amazon": ("rpm", "amazon"), "oracle": ("rpm", "oracle"), "fedora": ("rpm", "fedora"),
@@ -75,8 +75,8 @@ def _purl(package: dict) -> str | None:
 
 
 def _inventory(record: dict):
-    """(paquete, es_del_sistema) del inventario y, si faltara algo (análisis antiguos, repositorios donde Trivy no
-    listó paquetes), los paquetes de los hallazgos de dependencias: nunca un SBOM sin lo que sí sabemos vulnerable."""
+    """(package, is_system) from the inventory and, if anything is missing (old scans, repositories where Trivy
+    listed no packages), the packages of the dependency findings: never an SBOM without what we know is vulnerable."""
     yield from ((package, False) for package in record.get("dependencies") or [])
     yield from ((package, True) for package in record.get("system_packages") or [])
     for finding in record.get("findings") or []:
@@ -100,7 +100,7 @@ def _component(package: dict, reference: str, system: bool, locale: str) -> dict
 
 
 def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale: str | None = None) -> dict:
-    """El SBOM de un análisis completo. Un análisis sin inventario da un SBOM sin componentes, nunca un error."""
+    """The SBOM of a complete scan. A scan without an inventory yields an SBOM with no components, never an error."""
     locale = locale or default_locale()
     root = _root(record)
     components: dict[str, dict] = {}
@@ -117,7 +117,7 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale
             known_relation = True
         if package.get("direct", True) is not False:
             direct.append(reference)
-    # Sin información de relación (análisis antiguos o imágenes), el producto depende de todo lo inventariado.
+    # Without relationship info (old scans or images), the product depends on everything in the inventory.
     depends_on = direct if known_relation else list(components)
     gaps = coverage_gaps(record.get("steps") or [], locale=locale)
     stamp = _stamp(now)
@@ -142,13 +142,13 @@ def cyclonedx(record: dict, *, version: str, now: datetime | None = None, locale
         },
         "components": list(components.values()),
         "dependencies": [{"ref": root["bom-ref"], "dependsOn": depends_on}],
-        # Si algún motor no terminó, el inventario puede estar incompleto: se declara, nunca se da por completo.
+        # If an engine didn't finish, the inventory may be incomplete: declare it, never present it as complete.
         **({"compositions": [{"aggregate": "incomplete", "assemblies": [root["bom-ref"]]}]} if gaps else {}),
     }
 
 
 def latest_scan(data_dir: Path, key: str) -> dict | None:
-    """El último análisis completo de un activo: de él sale el SBOM del estado actual."""
+    """The latest complete scan of an asset: the SBOM of its current state comes from it."""
     from tamandua.modules.findings.kinds import FULL_SCANS
     from tamandua.modules.runs.store import find_runs, load_run
     for row in find_runs(data_dir, types=FULL_SCANS, statuses=("completed",), assets=[key], limit=1):

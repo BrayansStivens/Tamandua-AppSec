@@ -1,17 +1,17 @@
-"""Reverificar un hallazgo: volver a analizar su activo y decir si sigue ahí.
+"""Re-verify a finding: scan its asset again and tell whether it is still there.
 
-Cierra el ciclo encontrar → corregir → verificar sin buscar a mano en un análisis nuevo. Se guarda qué
-hallazgo pidió verificación y con qué ejecución (`data/verifications.json`); el resultado se deduce del
-registro de hallazgos cuando esa ejecución termina:
+Closes the find → fix → verify loop without searching a new scan by hand. It stores which finding asked
+for verification and with which run (`data/verifications.json`); the result is derived from the findings
+registry when that run finishes:
 
-- `running`: el análisis está en cola o en curso.
-- `fixed`: el análisis completo ya no lo encuentra (el registro lo marcó remediado).
-- `present`: sigue apareciendo.
-- `inconclusive`: el análisis quedó incompleto (un motor no corrió): no demuestra nada, como en el registro.
-- `failed`: el análisis falló.
+- `running`: the scan is queued or in progress.
+- `fixed`: the full scan no longer finds it (the registry marked it remediated).
+- `present`: it still shows up.
+- `inconclusive`: the scan was incomplete (an engine didn't run): it proves nothing, as in the registry.
+- `failed`: the scan failed.
 
-Si ya hay un análisis de ese activo en cola o en curso (otra verificación, la vigilancia de la rama), el
-hallazgo se engancha a él en vez de lanzar otro.
+If a scan of that asset is already queued or running (another verification, the branch watch), the
+finding joins it instead of starting another one.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ def record(data_dir: Path, key: str, fingerprint: str, run_id: str, *, by: str) 
         payload = load(data_dir)
         asset = payload.setdefault(key, {})
         asset[fingerprint] = entry
-        if len(asset) > MAX_PER_ASSET:  # las más antiguas se olvidan
+        if len(asset) > MAX_PER_ASSET:  # the oldest ones are forgotten
             for old in sorted(asset, key=lambda item: asset[item]["at"])[:len(asset) - MAX_PER_ASSET]:
                 del asset[old]
         documents.save(data_dir, "verifications", payload)
@@ -71,7 +71,7 @@ def _run_rows(data_dir: Path, ids: list[str]) -> list[dict]:
 
 
 def annotate(data_dir: Path, key: str, findings: list[Finding]) -> list[Finding]:
-    """Añade `verification` a los hallazgos con una verificación pedida."""
+    """Adds `verification` to the findings that have a verification requested."""
     requested = load(data_dir).get(key) or {}
     if not requested or not any(item.get("fingerprint") in requested for item in findings):
         return findings

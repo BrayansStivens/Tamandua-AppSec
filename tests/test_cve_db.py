@@ -26,7 +26,7 @@ def nvd_entry(identifier, published, *, score=9.8, severity="CRITICAL", descript
 
 
 class FakeNvd:
-    """NVD de mentira: 2500 CVE en orden ascendente, paginados como la API real."""
+    """Fake NVD: 2500 CVEs in ascending order, paged like the real API."""
 
     def __init__(self, total=2500):
         self.entries = [nvd_entry(f"CVE-2026-{index:05d}", (NOW - timedelta(days=total - index)).strftime("%Y-%m-%dT%H:%M:%S.000"),
@@ -60,11 +60,11 @@ class CveDbTests(unittest.TestCase):
     def test_backfill_goes_newest_first_and_resumes(self):
         fake = FakeNvd()
         cve_db.sync_step(self.data_dir, fetch=fake, now=NOW)  # total
-        cve_db.sync_step(self.data_dir, fetch=fake, now=NOW)  # primera página: la más reciente
+        cve_db.sync_step(self.data_dir, fetch=fake, now=NOW)  # first page: the most recent
         self.assertEqual(fake.calls[1]["startIndex"], 2000)
         overview = cve_db.overview(self.data_dir, now=NOW)
         self.assertEqual((overview["count"], overview["sync"]["phase"]), (500, "backfill"))
-        # Tras un reinicio se sigue por donde iba, sin volver a pedir el total.
+        # After a restart it resumes where it left off, without asking for the total again.
         self.sync_all(fake)
         self.assertEqual([call.get("startIndex") for call in fake.calls[2:]], [1000, 0])
         overview = cve_db.overview(self.data_dir, now=NOW)
@@ -74,15 +74,15 @@ class CveDbTests(unittest.TestCase):
         self.sync_all(FakeNvd())
         page = cve_db.search(self.data_dir, limit=10)
         self.assertEqual((page["total"], len(page["items"])), (2500, 10))
-        self.assertEqual(page["items"][0]["id"], "CVE-2026-02499")  # lo más reciente primero
+        self.assertEqual(page["items"][0]["id"], "CVE-2026-02499")  # most recent first
         self.assertEqual(cve_db.search(self.data_dir, query="log4j")["total"], 250)
         self.assertEqual(cve_db.search(self.data_dir, query="cve-2026-0249")["total"], 10)
         self.assertEqual(cve_db.search(self.data_dir, severity="critical")["total"], 625)
         self.assertEqual(cve_db.search(self.data_dir, year=2025)["total"], 0)
         self.assertEqual(cve_db.search(self.data_dir, sort="score", limit=1)["items"][0]["score"], 9.8)
-        # Texto hostil para FTS5: se sanea a palabras, no rompe la consulta ni inyecta operadores.
+        # Hostile text for FTS5: sanitized to words, it neither breaks the query nor injects operators.
         self.assertEqual(cve_db.search(self.data_dir, query='parser" *')["total"], 2250)
-        self.assertEqual(cve_db.search(self.data_dir, query='log4j" OR id:* NEAR(')["total"], 0)  # todas las palabras, literales
+        self.assertEqual(cve_db.search(self.data_dir, query='log4j" OR id:* NEAR(')["total"], 0)  # all words, literally
         self.assertEqual(cve_db.search(self.data_dir, query="%_%")["total"], 2500)
 
     def test_kev_epss_rejected_and_detail(self):
@@ -90,7 +90,7 @@ class CveDbTests(unittest.TestCase):
         cve_db.upsert(self.data_dir, [nvd_entry("CVE-2026-09999", "2026-09-19T00:00:00.000", status="Rejected")])
         cve_db.load_signals(self.data_dir, {"kev": {"__meta__": {"version": "1"}, "CVE-2026-00003": {"date_added": "2026-09-01", "ransomware": True, "name": "Parser RCE"}},
                                             "epss": {"__meta__": {"header": "v"}, "CVE-2026-00003": (0.91, 0.99), "CVE-2026-00004": (0.2, 0.5)}})
-        self.assertEqual(cve_db.search(self.data_dir)["total"], 20)  # los rechazados no cuentan
+        self.assertEqual(cve_db.search(self.data_dir)["total"], 20)  # dismissed ones don't count
         kev = cve_db.search(self.data_dir, kev=True)
         self.assertEqual([item["id"] for item in kev["items"]], ["CVE-2026-00003"])
         self.assertEqual(cve_db.search(self.data_dir, sort="epss", limit=1)["items"][0]["id"], "CVE-2026-00003")
@@ -140,7 +140,7 @@ class CveDbTests(unittest.TestCase):
 class CveRoutesTests(HttpCase):
     def setUp(self):
         super().setUp()
-        # Las pruebas no salen a la red: EUVD responde desde aquí.
+        # Tests don't go out to the network: EUVD answers from here.
         self.europe = {"CVE-2026-12345": {"items": [{"id": "EUVD-2026-1", "aliases": "CVE-2026-12345\n", "baseScore": 8.1,
                                                      "baseScoreVersion": "3.1", "exploitedSince": "Sep 1, 2026, 12:00:00 AM"}]}}
         fake = patch("tamandua.modules.intel.euvd._fetch", side_effect=lambda cve: euvd.parse(self.europe.get(cve, {}), cve))
@@ -169,7 +169,7 @@ class CveRoutesTests(HttpCase):
         status, body, _ = self.call("GET", "/api/cve-db/item?id=cve-2026-12345", headers=self.cookie)
         self.assertEqual(status, 200)
         self.assertNotIn("affected", body)
-        # NVD lo puntúa: EUVD solo añade que se explota; la puntuación sigue siendo la de NVD.
+        # NVD scores it: EUVD only adds that it is exploited; the score is still NVD's.
         self.assertEqual((body["score_source"], body["score"], body["euvd"]["exploited_since"]), ("nvd", 9.8, "2026-09-01"))
         status, body, _ = self.call("GET", "/api/cve-db/overview", headers=self.cookie)
         self.assertEqual((status, body["count"], body["sync"]["phase"]), (200, 1, "pending"))
@@ -202,16 +202,16 @@ class CveRoutesTests(HttpCase):
                                       nvd_entry("CVE-2026-20003", "2026-09-16T00:00:00.000")])
         findings_registry._save(self.data_dir, {"asset": "github#1", "name": "acme/web", "findings": {
             "a": {"status": "open", "finding": {"cve": ["CVE-2026-12345"]}},
-            "b": {"status": "fixed", "finding": {"cve": ["CVE-2026-20001"]}},  # remediado: ya no es tuyo
-            "c": {"status": "open", "finding": {"cve": ["CVE-2026-20002"]}},  # descartado en triage abajo
-            "d": {"status": "open", "finding": {"cve": ["CVE-2026-99999"]}}}})  # aún no está en la copia local
+            "b": {"status": "fixed", "finding": {"cve": ["CVE-2026-20001"]}},  # remediated: no longer yours
+            "c": {"status": "open", "finding": {"cve": ["CVE-2026-20002"]}},  # dismissed in triage below
+            "d": {"status": "open", "finding": {"cve": ["CVE-2026-99999"]}}}})  # not in the local copy yet
         triage._save_asset(self.data_dir, "github#1", {"c": {"status": "false_positive", "reason": "x"}})
         status, body, _ = self.call("GET", "/api/cve-db?mine=1", headers=self.cookie)
         self.assertEqual((status, [item["id"] for item in body["items"]], body["mine_total"]), (200, ["CVE-2026-12345"], 2))
         _, body, _ = self.call("GET", "/api/cve-db", headers=self.cookie)
         self.assertEqual({item["id"]: item["affects"] for item in body["items"]},
                          {"CVE-2026-12345": True, "CVE-2026-20001": False, "CVE-2026-20002": False, "CVE-2026-20003": False})
-        # La caché se invalida al cambiar el registro.
+        # The cache is invalidated when the registry changes.
         findings_registry._save(self.data_dir, {"asset": "github#2", "name": "acme/api", "findings": {
             "e": {"status": "open", "finding": {"cve": ["CVE-2026-20003"]}}}})
         _, body, _ = self.call("GET", "/api/cve-db?mine=1&sort=score", headers=self.cookie)

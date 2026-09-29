@@ -1,9 +1,9 @@
-"""GitHub simulado a nivel HTTP para probar el catálogo por páginas sin red.
+"""GitHub faked at the HTTP level, to test the paged catalog without network.
 
-`repos` es {instalación: [(id numérico, "owner/repo"), ...]} y `accounts` es
-{instalación: (cuenta, "all" | "selected")}. `branches` es {"owner/repo": {rama: sha}}; sin él, cada
-repositorio solo tiene `main`. Se registran las URL pedidas en `calls` para comprobar que no se
-recorre el catálogo entero.
+`repos` is {installation: [(numeric id, "owner/repo"), ...]} and `accounts` is
+{installation: (account, "all" | "selected")}. `branches` is {"owner/repo": {branch: sha}}; without it, each
+repository only has `main`. Requested URLs are recorded in `calls` to check that the whole catalog isn't
+walked.
 """
 
 from __future__ import annotations

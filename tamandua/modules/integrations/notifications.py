@@ -1,15 +1,15 @@
-"""Avisos a Slack, Teams o un webhook cuando pasa algo que importa, para no depender de abrir el panel.
+"""Notifications to Slack, Teams or a webhook when something that matters happens, so nobody has to open the panel.
 
-Eventos:
-- `findings`: hallazgos nuevos desde un umbral de severidad, al terminar un análisis completo (manual, en lote o
-  por la vigilancia de la rama principal) o al detectar avisos nuevos a diario. Uno por análisis, agrupado: los
-  cinco más graves y el recuento. Las revisiones de PR no avisan aquí: ya comentan en el propio PR.
-- `batches`: un lote (varios repositorios, una organización, varias imágenes) terminó.
+Events:
+- `findings`: new findings from a severity threshold up, when a complete scan finishes (manual, in a batch or
+  from watching the main branch) or when new advisories are detected daily. One per scan, grouped: the five
+  most severe and the count. PR reviews don't notify here: they already comment on the PR itself.
+- `batches`: a batch (several repositories, an organization, several images) finished.
 
-Las URL de los webhooks son secretos (quien la tiene publica en tu canal): se guardan cifradas en la bóveda y
-nunca vuelven al navegador. Solo https y, salvo permiso expreso, a direcciones públicas (SSRF). El envío va en
-un hilo aparte con tiempo máximo: un canal caído nunca retrasa ni rompe un análisis. Los mensajes llevan título,
-severidad y ubicación de cada hallazgo, nunca el valor de un secreto.
+Webhook URLs are secrets (whoever has one can post to your channel): they are stored encrypted in the vault and
+never go back to the browser. Only https and, unless explicitly allowed, public addresses (SSRF). Sending runs in
+a separate thread with a timeout: a channel that is down never delays or breaks a scan. Messages carry each
+finding's title, severity and location, never the value of a secret.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def _count(level: str, count: int, locale: str) -> str:
     return t(keys[level], locale, count=count)
 MAX_CHANNELS = 10
 HOSTS = {"slack": re.compile(r"hooks\.slack\.com"),
-         # Teams: los flujos de Workflows/Power Automate (los conectores clásicos de Office 365 se retiran).
+         # Teams: Workflows/Power Automate flows (the classic Office 365 connectors are being retired).
          "teams": re.compile(r"(?:[a-z0-9-]+\.)*(?:logic\.azure\.com|webhook\.office\.com|environment\.api\.powerplatform\.com)")}
 
 
@@ -76,10 +76,10 @@ def _vault() -> dict:
 
 
 def channels() -> list[dict]:
-    """Lo que ve el panel: sin URL ni secreto, solo el host y los últimos caracteres."""
+    """What the panel sees: no URL or secret, only the host and the last characters."""
     rows = []
     for identifier, item in _vault().items():
-        # Solo el host: el final de la URL de Slack o Teams es parte de su token.
+        # Only the host: the tail of a Slack or Teams URL is part of its token.
         rows.append({"id": identifier, "kind": item["kind"], "name": item["name"], "host": urlsplit(item["url"]).hostname,
                      "events": item["events"], "threshold": item["threshold"],
                      "signed": bool(item.get("secret")), "created_by": item.get("created_by"), "created_at": item.get("created_at"),
@@ -97,7 +97,7 @@ def check_url(kind: str, url: str) -> str:
     if kind in HOSTS and not HOSTS[kind].fullmatch(host):
         raise NotificationError(msg("integrations.notifications.errors.wrong_host", kind=KINDS[kind], host=host))
     if not settings.flag("TAMANDUA_ALLOW_PRIVATE_WEBHOOKS"):
-        # El servidor hará la petición: una dirección interna convertiría el formulario en un SSRF.
+        # The server makes the request: an internal address would turn the form into an SSRF.
         try:
             addresses = {info[4][0] for info in socket.getaddrinfo(host, parts.port or 443, proto=socket.IPPROTO_TCP)}
         except OSError as exc:
@@ -108,7 +108,7 @@ def check_url(kind: str, url: str) -> str:
 
 
 def save(kind: str, name: str, url: str, events: list[str], threshold: str, *, by: str) -> tuple[dict, str | None]:
-    """Crea un canal. Devuelve la fila y, en un webhook, el secreto de firma (se muestra una sola vez)."""
+    """Creates a channel. Returns the row and, for a webhook, the signing secret (shown only once)."""
     from tamandua.shared.vault import put
     if kind not in KINDS:
         raise NotificationError(msg("integrations.notifications.errors.invalid_kind"))
@@ -152,7 +152,7 @@ def _record_delivery(identifier: str, ok: bool, detail) -> None:
             put(VAULT_NAME, stored)
 
 
-# ------------------------------------------------------------------ mensajes
+# ------------------------------------------------------------------ messages
 
 def panel_link(run_id: str | None = None) -> str | None:
     base = settings.text("TAMANDUA_PUBLIC_URL").rstrip("/")
@@ -207,7 +207,7 @@ def _slack_escape(value: str) -> str:
 
 
 def _teams_escape(value: str) -> str:
-    """Las tarjetas de Teams interpretan Markdown: un nombre con [texto](url) no debe convertirse en enlace."""
+    """Teams cards render Markdown: a name containing [text](url) must not turn into a link."""
     return re.sub(r"([\\`*_\[\]()#>])", r"\\\1", str(value))
 
 
@@ -248,20 +248,20 @@ def _post(channel: dict, payload: dict, *, sender=None) -> tuple[bool, str]:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     headers = {"Content-Type": "application/json", "User-Agent": "Tamandua"}
     if channel.get("secret"):
-        # El receptor comprueba que el aviso viene de este Tamandua: HMAC-SHA256 del cuerpo con el secreto del canal.
+        # The receiver checks the notice comes from this Tamandua: HMAC-SHA256 of the body with the channel's secret.
         headers["X-Tamandua-Signature"] = "sha256=" + hmac.new(channel["secret"].encode(), body, hashlib.sha256).hexdigest()
     try:
         if sender:
             return sender(channel["url"], body, headers)
-        check_url(channel["kind"], channel["url"])  # el DNS puede haber cambiado desde que se guardó
+        check_url(channel["kind"], channel["url"])  # DNS may have changed since it was saved
         # No redirects: a validated public URL could otherwise bounce the signed payload to an internal address.
         with http.opener().open(Request(channel["url"], data=body, headers=headers, method="POST"), timeout=10) as response:
             return 200 <= response.status < 300, f"HTTP {response.status}"
-    except HTTPError as exc:  # 404: la URL ya no existe; 401/403: sin permiso. Nunca se incluye la URL.
+    except HTTPError as exc:  # 404: the URL no longer exists; 401/403: no permission. The URL is never included.
         return False, f"HTTP {exc.code}"
     except URLError as exc:
         return False, msg("integrations.notifications.delivery.no_connection", reason=str(exc.reason)[:80])
-    except Exception as exc:  # noqa: BLE001 — un canal caído se anota, no rompe nada
+    except Exception as exc:  # noqa: BLE001 — a channel that is down gets recorded, it breaks nothing
         return False, exc.message if isinstance(exc, NotificationError) else type(exc).__name__
 
 
@@ -276,14 +276,15 @@ def _send(identifier: str, channel: dict, payload: dict, sender=None) -> threadi
     return thread
 
 
-RETRY_MINUTES = (1, 5, 30, 120, 360)  # espera creciente entre intentos; tras el último, el mensaje queda como fallido
+RETRY_MINUTES = (1, 5, 30, 120, 360)  # growing wait between attempts; after the last one, the message is left as failed
 
 
 def deliver(event: str, build, *, sender=None, wait: bool = False, data_dir: Path | None = None) -> list[threading.Thread]:
-    """Cada canal suscrito al evento recibe su mensaje (`build(channel)`, o None si no le toca nada).
+    """Each channel subscribed to the event gets its message (`build(channel)`, or None if nothing applies to it).
 
-    Con `data_dir`, el mensaje va al buzón de salida (tabla outbox) y lo entrega el worker con reintentos: si el proceso
-    cae o el canal falla, no se pierde. Sin él (o con `sender`, en pruebas), se envía al momento en un hilo."""
+    With `data_dir`, the message goes to the outbox (outbox table) and the worker delivers it with retries: it isn't
+    lost if the process dies or the channel fails. Without it (or with `sender`, in tests), it is sent right away in a
+    thread."""
     threads = []
     queued = []
     for identifier, channel in _vault().items():
@@ -306,8 +307,8 @@ def deliver(event: str, build, *, sender=None, wait: bool = False, data_dir: Pat
 
 
 def on_run(record: dict, opened: list[dict], *, sender=None, wait: bool = False, data_dir: Path | None = None) -> None:
-    """Tras incorporar un análisis al registro: avisa de lo nuevo (no de las revisiones de PR).
-    Cada canal recibe solo lo que alcanza su umbral: título, recuento y lista salen de lo mismo."""
+    """After a scan is added to the registry: notifies what is new (not PR reviews).
+    Each channel gets only what reaches its threshold: title, count and list all come from the same set."""
     if record.get("type") == "pr_review" or not opened:
         return
 
@@ -318,7 +319,7 @@ def on_run(record: dict, opened: list[dict], *, sender=None, wait: bool = False,
     try:
         if _vault():
             deliver("findings", build, sender=sender, wait=wait, data_dir=data_dir)
-    except Exception:  # noqa: BLE001 — avisar nunca rompe un análisis
+    except Exception:  # noqa: BLE001 — notifying never breaks a scan
         _log.exception("notification_dispatch_failed")
 
 

@@ -42,7 +42,7 @@ class GitHubRoutesTests(HttpCase):
         with patch("tamandua.app.api.sources.app_installations", return_value=[{"installation_id": 77, "account": "acme"}]), \
                 patch("tamandua.app.api.sources.installation_details", return_value={"account": "acme", "permissions": {}}):
             status, _, _ = self.call("GET", "/oauth/callback?installation_id=999&setup_action=install")
-            self.assertEqual(status, 200)  # página de aviso, no se guarda nada
+            self.assertEqual(status, 200)  # notice page, nothing is stored
             self.assertIsNone(github_installation(self.data_dir))
             status, _, _ = self.call("GET", "/oauth/callback?installation_id=77&setup_action=install")
             self.assertEqual(status, 200)

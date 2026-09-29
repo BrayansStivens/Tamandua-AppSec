@@ -1,9 +1,9 @@
-"""EUVD (European Vulnerability Database, ENISA) como segunda fuente cuando NVD no puntúa un CVE.
+"""EUVD (European Vulnerability Database, ENISA) as a second source when NVD doesn't score a CVE.
 
-Desde abril de 2026 NVD solo enriquece una parte de los CVE (KEV, software federal y crítico): muchos quedan sin
-CVSS. EUVD, mantenida por ENISA por mandato de NIS2, publica puntuación, vector y si la vulnerabilidad se explota
-activamente. Se consulta bajo demanda, solo para el CVE que se está mirando (el identificador es público; no sale
-nada del código ni de los hallazgos), con caché en `data/feeds/euvd-cache.json`. `TAMANDUA_EUVD=off` lo apaga.
+Since April 2026 NVD only enriches part of the CVEs (KEV, federal and critical software): many are left without
+CVSS. EUVD, maintained by ENISA under the NIS2 mandate, publishes the score, the vector and whether the vulnerability
+is actively exploited. It is queried on demand, only for the CVE being viewed (the identifier is public; nothing from
+the code or the findings leaves), with a cache in `data/feeds/euvd-cache.json`. `TAMANDUA_EUVD=off` turns it off.
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def severity(score: float | None) -> str | None:
 
 
 def parse(payload: dict, cve: str) -> dict | None:
-    """El aviso de EUVD que corresponde a este CVE (por alias), con lo que nos sirve."""
+    """The EUVD advisory matching this CVE (by alias), with the fields we use."""
     for item in (payload or {}).get("items") or []:
         aliases = {alias.strip() for alias in str(item.get("aliases") or "").split("\n") if alias.strip()}
         if cve not in aliases:
@@ -68,12 +68,12 @@ def parse(payload: dict, cve: str) -> dict | None:
 
 def _fetch(cve: str) -> dict | None:
     request = Request(API.format(cve=cve), headers={"User-Agent": "Tamandua", "Accept": "application/json"})
-    with urlopen(request, timeout=5) as response:  # nosemgrep: URL fija de ENISA; solo el CVE validado va en la consulta
+    with urlopen(request, timeout=5) as response:  # nosemgrep: fixed ENISA URL; only the validated CVE is sent
         return parse(json.loads(response.read(2_000_000)), cve)
 
 
 def lookup(data_dir: Path, cve: str, *, fetch=None, now: datetime | None = None) -> dict | None:
-    """El dato de EUVD para un CVE, de la caché o de la API. None si no existe, está apagado o no responde."""
+    """EUVD data for a CVE, from the cache or the API. None if it doesn't exist, is turned off or doesn't answer."""
     if not CVE.fullmatch(cve or "") or not enabled():
         return None
     now = now or datetime.now(timezone.utc)
@@ -95,9 +95,9 @@ def lookup(data_dir: Path, cve: str, *, fetch=None, now: datetime | None = None)
     try:
         item = (fetch or _fetch)(cve)
     except (OSError, ValueError):
-        return entry.get("item") if entry else None  # sin red: lo último que se supo
+        return entry.get("item") if entry else None  # offline: the last known answer
     with _lock:
-        try:  # se relee: otra consulta pudo guardar mientras se esperaba a la red
+        try:  # read again: another lookup may have saved while this one waited on the network
             cache = json.loads(path.read_text(encoding="utf-8"))
             cache = cache if isinstance(cache, dict) else {}
         except (FileNotFoundError, ValueError, OSError):

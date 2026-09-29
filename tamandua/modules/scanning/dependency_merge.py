@@ -1,8 +1,8 @@
-"""Un aviso de dependencia, un hallazgo: aunque lo detecten varios motores y cada uno lo nombre distinto.
+"""One dependency advisory, one finding: even when several engines detect it and each names it differently.
 
-Trivy suele identificar un aviso por su CVE; OSV-Scanner, por su GHSA o PYSEC, con el CVE como
-alias. Y cada uno escribe el ecosistema a su manera (`pip`, `poetry`, `PyPI`…). Aquí se
-normaliza todo eso para reconocer el mismo aviso sobre el mismo paquete y la misma versión.
+Trivy usually identifies an advisory by its CVE; OSV-Scanner by its GHSA or PYSEC, with the CVE as an
+alias. And each writes the ecosystem its own way (`pip`, `poetry`, `PyPI`…). This normalizes all of
+that to recognize the same advisory on the same package and the same version.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def purl(dependency: dict) -> str | None:
         group, artifact = name.split(":", 1)
         path = f"{quote(group, safe='')}/{quote(artifact, safe='')}"
     elif kind in ("npm", "composer", "golang") and "/" in name:
-        # npm con ámbito (@org/nombre), composer (vendor/nombre) y módulos de Go conservan sus segmentos.
+        # Scoped npm (@org/name), composer (vendor/name) and Go modules keep their segments.
         path = "/".join(quote(part, safe="") for part in name.split("/"))
     else:
         path = quote(name, safe="")
@@ -50,11 +50,11 @@ def _key(finding: dict) -> tuple[str, str, str]:
 
 
 def merge_dependencies(primary: list[dict], *others: tuple[str, list[dict]]) -> tuple[list[dict], dict]:
-    """Une los avisos de dependencias de varios motores sin repetir ninguno.
+    """Merges the dependency advisories of several engines without repeating any.
 
-    `primary` manda (sus huellas no cambian, y con ellas el triage y los tickets ya creados).
-    Cada motor de `others` suma lo que los anteriores no vieron y, en lo que coincide, se anota
-    en `also_detected_by`, completa identificadores y aporta la versión corregida si faltaba.
+    `primary` wins (its fingerprints don't change, and with them the triage and tickets already created).
+    Each engine in `others` adds what the previous ones didn't see and, where they match, is recorded
+    in `also_detected_by`, fills in identifiers and supplies the fixed version if it was missing.
     """
     merged = list(primary)
     index: dict[tuple[str, str, str], list[dict]] = {}

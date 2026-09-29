@@ -1,14 +1,14 @@
-"""Revisión de pull requests: qué hallazgos introduce un PR y cómo contarlo en GitHub.
+"""Pull request review: which findings a PR introduces and how to report it on GitHub.
 
-Un PR no se juzga por todo lo que hay en el repositorio sino por lo que añade.
-Se escanea el commit de cabeza con los mismos motores y se cruza con dos cosas:
+A PR is judged not by everything in the repository but by what it adds.
+The head commit is scanned with the same engines and cross-checked against two things:
 
-* la **línea base**, el último escaneo completo del repositorio (rama principal):
-  una huella que ya estaba allí es preexistente, no culpa del PR;
-* el **diff**: un hallazgo de código o secreto cuenta si cae en una línea añadida
-  o modificada; uno de dependencias, si el PR toca el manifiesto que lo declara.
+* the **baseline**, the latest full scan of the repository (main branch):
+  a fingerprint that was already there is pre-existing, not the PR's fault;
+* the **diff**: a code or secret finding counts if it falls on an added or
+  modified line; a dependency finding, if the PR touches the manifest that declares it.
 
-Sin línea base se cuenta solo lo que cae en líneas cambiadas, y se dice.
+Without a baseline, only what falls on changed lines counts, and the review says so.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ GATES = ("critical", "high", "medium", "never")
 
 
 def changed_lines(files: list[dict]) -> dict[str, set[int] | None]:
-    """Líneas añadidas o modificadas por fichero. None: sin parche (binario o enorme), se trata entero."""
+    """Added or modified lines per file. None: no patch (binary or huge), the whole file counts."""
     result: dict[str, set[int] | None] = {}
     for item in files:
         name = item.get("filename")
@@ -57,13 +57,13 @@ def _touches(finding: Finding, changed: dict[str, set[int] | None]) -> bool:
     if path not in changed:
         return False
     if finding.get("scanner") == "sca":
-        return True  # el manifiesto o el lockfile cambió
+        return True  # the manifest or the lockfile changed
     lines = changed[path]
     return lines is None or finding.get("line") in lines
 
 
 def classify(findings: list[Finding], changed: dict[str, set[int] | None], baseline: set[str] | None) -> dict[str, list[Finding]]:
-    """Separa lo que introduce el PR de lo que ya existía en el código que toca."""
+    """Separates what the PR introduces from what already existed in the code it touches."""
     introduced, preexisting = [], []
     for finding in findings:
         if not _touches(finding, changed):
@@ -77,7 +77,7 @@ def classify(findings: list[Finding], changed: dict[str, set[int] | None], basel
 
 
 def verdict(introduced: list[Finding], gate: str = "high") -> dict:
-    """Estado del commit: falla si el PR introduce algo de la severidad del umbral o peor."""
+    """Commit status: fails if the PR introduces something of the threshold severity or worse."""
     counts = {level: sum(1 for item in introduced if item["severity"] == level) for level in SEVERITY_ORDER}
     if gate == "never":
         blocking = 0
@@ -94,10 +94,10 @@ def verdict(introduced: list[Finding], gate: str = "high") -> dict:
 
 
 def _cell(value, limit: int = 120) -> str:
-    """Texto de celda seguro: una línea, sin backticks ni barras que rompan la tabla o abran Markdown."""
+    """Safe cell text: one line, no backticks or pipes that break the table or open Markdown."""
     text = " ".join(str(value or "").split()).replace("`", "'").replace("|", "/")
     if len(text) > limit:
-        text = text[:limit].rsplit(" ", 1)[0].rstrip(",.;:") + "…"  # corta en palabra, no a mitad
+        text = text[:limit].rsplit(" ", 1)[0].rstrip(",.;:") + "…"  # cut at a word, not mid-word
     return text
 
 
@@ -117,7 +117,7 @@ def _rows(findings: list[Finding], locale: str | None = None, limit: int = 25) -
         line = finding.get("line") if isinstance(finding.get("line"), int) else 0
         where = (f"`{_cell(package.get('name'), 60)}` {_cell(package.get('version'), 30)}" if package.get("name")
                  else f"`{_cell(finding.get('path'), 80)}:{line}`")
-        # Solo un comando que actualiza de verdad (con su versión); «reinstala» o «instala -r» no dicen a qué.
+        # Only a command that really upgrades (with its version); "reinstall" or "install -r" don't say to what.
         commands = [item for item in (finding.get("fix") or {}).get("commands") or [] if item.get("action") == "update"]
         fix = (f"`{_cell(commands[0]['code'], 120)}`" if commands and "`" not in commands[0]["code"]
                else t("pulls.table.update_to", locale, version=_cell(package["fixed_version"], 30)) if package.get("fixed_version")
@@ -131,7 +131,7 @@ def _rows(findings: list[Finding], locale: str | None = None, limit: int = 25) -
 
 def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str | None, panel_url: str | None,
                    gate: str = "high", tools: list[dict] | None = None, locale: str | None = None) -> str:
-    """Comentario en Markdown de GitHub. Nunca incluye valores de secretos: solo regla, fichero y línea.
+    """GitHub Markdown comment. Never includes secret values: only rule, file and line.
 
     A PR comment is read by the whole team: it speaks TAMANDUA_DEFAULT_LOCALE unless told otherwise."""
     locale = locale or default_locale()
@@ -161,7 +161,7 @@ def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str 
 
 
 def render_unused_comment(new: list[dict], before: list[dict], ecosystems: list[str], locale: str | None = None) -> str:
-    """Informativo: dependencias declaradas que el código no usa, separando las que añade el PR."""
+    """Informational: declared dependencies the code doesn't use, singling out the ones the PR adds."""
     locale = locale or default_locale()
 
     def table(items: list[dict]) -> list[str]:

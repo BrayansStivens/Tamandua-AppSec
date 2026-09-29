@@ -1,4 +1,4 @@
-"""Cliente de pruebas sobre la aplicación ASGI completa (FastAPI con todas sus rutas), sin socket."""
+"""Test client over the full ASGI application (FastAPI with all its routes), without a socket."""
 
 from starlette.testclient import TestClient
 
@@ -13,12 +13,12 @@ def client_for(data_dir, state) -> TestClient:
 
 
 def request(client: TestClient, method: str, path: str, body: str | bytes | None = None, headers: dict | None = None):
-    client.cookies.clear()  # cada petición lleva solo la cookie que la prueba indique
+    client.cookies.clear()  # each request carries only the cookie the test gives it
     return client.request(method, path, content=body, headers=headers or {})
 
 
 def raw(client: TestClient, method: str, path: str, body: str | bytes | None = None, headers: dict | None = None) -> bytes:
-    """La respuesta como bytes HTTP (línea de estado, cabeceras con Mayúsculas, cuerpo), como la leían las pruebas antiguas."""
+    """The response as HTTP bytes (status line, Capitalised headers, body), the way the old tests read it."""
     response = request(client, method, path, body, headers)
     lines = [f"HTTP/1.1 {response.status_code} {response.reason_phrase}"]
     lines += [f"{'-'.join(part.capitalize() for part in name.split('-'))}: {value}" for name, value in response.headers.multi_items()]

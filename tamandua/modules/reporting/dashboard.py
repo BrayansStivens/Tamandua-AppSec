@@ -1,9 +1,9 @@
-"""Agregados del panel: qué está abierto, qué se corrigió, qué se explota y dónde.
+"""Panel aggregates: what is open, what got fixed, what is being exploited and where.
 
-"Abierto" es lo que hay en la última ejecución de cada activo menos lo que el
-triage descartó (falso positivo o riesgo aceptado vigente); "corregido" es una
-huella que estaba en una ejecución anterior de ese activo y ya no aparece en la
-última. Lo descartado se cuenta aparte para que no desaparezca sin rastro.
+"Open" is what the latest run of each asset has, minus what triage dismissed
+(false positive or a still-valid accepted risk); "fixed" is a fingerprint that
+was in an earlier run of that asset and no longer appears in the latest one.
+Dismissed findings are counted separately so they don't vanish without a trace.
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def _day(stamp: str) -> str:
 
 
 def zone(name: str | None) -> tzinfo:
-    """La zona de quien mira el panel («hoy» es su hoy, no el del servidor). Una desconocida o rara, UTC."""
+    """The viewer's time zone ("today" is their today, not the server's). An unknown or odd one means UTC."""
     if not name or len(name) > 64 or not re.fullmatch(r"[A-Za-z]+(?:[/_+-][A-Za-z0-9]+)*", name):
         return timezone.utc
     try:
@@ -64,10 +64,10 @@ def _day_in(where: tzinfo):
 
 
 def _score(open_by_severity: dict, kev: int = 0, high_epss: int = 0) -> dict:
-    """Curva explícita: nunca cae a 0 de golpe y pesa más lo explotable que lo grave.
+    """Explicit curve: it never drops to 0 all at once, and exploitable weighs more than severe.
 
-    Es un resumen, no una medida: la fórmula se muestra al lado para que nadie la
-    confunda con una certificación.
+    It is a summary, not a measurement: the formula is shown next to it so nobody
+    mistakes it for a certification.
     """
     import math
     risk = (8 * open_by_severity.get("critical", 0) + 3 * open_by_severity.get("high", 0)
@@ -77,7 +77,7 @@ def _score(open_by_severity: dict, kev: int = 0, high_epss: int = 0) -> dict:
 
 
 def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dict:
-    _day = _day_in(where)  # los días se cuentan en la zona de quien mira
+    _day = _day_in(where)  # days are counted in the viewer's time zone
     now = datetime.now(timezone.utc)
     since = now - timedelta(days=days)
     rows = list_runs(data_dir)  # every run: the activity chart counts them all
@@ -87,7 +87,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
     advisories: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
         if row["type"] == "advisory_watch" and row["status"] == "completed":
-            # Avisos publicados después de un análisis: cuentan hasta que el siguiente análisis completo manda.
+            # Advisories published after a scan: they count until the next full scan takes over.
             try:
                 record = annotate(data_dir, load_run(data_dir, row["id"]), decisions)
                 advisories[asset_key(record)].append(record)
@@ -104,19 +104,19 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
 
     by_asset: dict[str, list[dict]] = defaultdict(list)
     for record in records:
-        # Por identidad estable: un repositorio renombrado sigue siendo el mismo activo.
+        # By stable identity: a renamed repository is still the same asset.
         by_asset[asset_key(record)].append(record)
 
     first_seen: dict[str, tuple[str, dict, str]] = {}
-    deadlines: dict[tuple[str, str], dict] = {}  # por (activo, huella): la misma huella puede estar en dos activos
+    deadlines: dict[tuple[str, str], dict] = {}  # by (asset, fingerprint): the same fingerprint can be in two assets
     policy_days = sla.policy(data_dir)["days"]
     fixed: dict[str, tuple[str, str]] = {}
     open_findings: list[tuple[str, dict]] = []
     top_assets = []
     for key, runs in by_asset.items():
-        asset = runs[-1]["source"]["name"]  # el nombre más reciente
-        # Un escaneo incompleto no demuestra que algo se corrigió ni representa el estado del repositorio:
-        # cuentan los completos (y solo si no hay ninguno, el más reciente, para no esconder el activo).
+        asset = runs[-1]["source"]["name"]  # the most recent name
+        # An incomplete scan neither proves that something was fixed nor represents the repository's state:
+        # complete ones count (and only if there are none, the most recent one, so the asset isn't hidden).
         runs = [record for record in runs if record["status"] == "completed"] or runs[-1:]
         seen_before: set[str] = set()
         for index, record in enumerate(runs):
@@ -135,7 +135,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                 triage_totals.update((item.get("triage") or {}).get("status", "open") for item in current.values())
                 current = {digest: item for digest, item in current.items() if is_active(item)}
                 open_findings.extend((asset, finding) for finding in current.values())
-                # El plazo cuenta desde la primera detección en el registro (la misma fecha que ve Hallazgos).
+                # The deadline runs from the first detection in the registry (the same date Findings shows).
                 registry = findings_registry.load(data_dir, key)["findings"]
                 for digest, finding in current.items():
                     entry = registry.get(digest) or {}
@@ -191,7 +191,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
     year = [{"day": _day((now - timedelta(days=offset)).isoformat()), "runs": activity.get(_day((now - timedelta(days=offset)).isoformat()), 0)}
             for offset in range(ACTIVITY_DAYS - 1, -1, -1)]
 
-    # Los feeds solo se leen si alguna ejecución ya los descargó: abrir el panel no sale a la red.
+    # Feeds are read only if some run already downloaded them: opening the panel never goes to the network.
     feeds = load_feeds(data_dir) if (data_dir / "feeds").is_dir() else {"kev": {}}
     open_cves = {cve for _, finding in open_findings for cve in finding.get("cve", []) or []}
     kev_entries = [(cve, entry) for cve, entry in feeds.get("kev", {}).items() if cve != "__meta__" and isinstance(entry, dict)]
@@ -208,7 +208,7 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
     recent = load_recent_cves(data_dir, 7) if (data_dir / "feeds").is_dir() or records else {"__meta__": {}, "items": []}
     week_cutoff = (now - timedelta(days=7)).isoformat()
     open_packages = {((finding.get("package") or {}).get("name") or "").lower() for _, finding in open_findings} - {""}
-    # NVD entrega como mucho 2000 por página; el total real viene en la cabecera del feed.
+    # NVD returns at most 2000 per page; the real total comes in the feed's header.
     meta = recent.get("__meta__") or {}
     shown = recent["items"]
     cve_news = {"published_7d": meta.get("total_7d") or meta.get("total")
@@ -262,8 +262,8 @@ CACHE_SECONDS = 60
 
 
 def _signature(data_dir: Path) -> tuple:
-    """Lo que cambia el resultado: ejecuciones, registro y triage (en la base: recuento y última modificación), los
-    plazos, las exclusiones y los feeds (KEV, NVD)."""
+    """What changes the result: runs, registry and triage (in the database: count and last modification), the
+    deadlines, the exclusions and the feeds (KEV, NVD)."""
     from sqlalchemy import func, select
 
     from tamandua.modules.findings.tables import registry_findings, triage_decisions
@@ -288,9 +288,9 @@ def _signature(data_dir: Path) -> tuple:
 
 
 def cached(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dict:
-    """compute() lee todas las ejecuciones: con cientos de análisis, abrir el Resumen no puede repetirlo en cada visita.
+    """compute() reads every run: with hundreds of scans, opening the Summary can't repeat that on every visit.
 
-    Se recalcula si cambió algo de lo que depende, si cambió el día o pasado CACHE_SECONDS."""
+    It is recomputed when something it depends on changed, when the day changed, or after CACHE_SECONDS."""
     key = (str(data_dir), days, str(where), _signature(data_dir), datetime.now(where).date().isoformat())
     now = time.monotonic()
     with _cache_lock:

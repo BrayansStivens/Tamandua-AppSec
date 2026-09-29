@@ -1,4 +1,4 @@
-"""Revisión de PRs: diff, línea base, veredicto, comentario y el trabajo completo con GitHub simulado."""
+"""PR review: diff, baseline, verdict, comment and the full job against a simulated GitHub."""
 
 import json
 import os
@@ -25,7 +25,7 @@ wiring.configure()  # like every Tamandua process: domain events and injected re
 
 SHA = "c" * 40
 APP = "import subprocess\n\ndef old(cmd):\n    return subprocess.run(cmd, shell=True)\n\n\ndef new(user):\n    return eval(user)\n"
-# El PR añade la función `new` (líneas 7-8); `old` ya estaba en la rama principal.
+# The PR adds the function `new` (lines 7-8); `old` was already on the main branch.
 PATCH = "@@ -3,2 +3,6 @@\n def old(cmd):\n     return subprocess.run(cmd, shell=True)\n+\n+\n+def new(user):\n+    return eval(user)\n"
 
 
@@ -48,7 +48,7 @@ class LogicTests(unittest.TestCase):
         result = pr_review.classify(findings, changed, baseline={"old", "moved"})
         self.assertEqual([item["fingerprint"] for item in result["introduced"]], ["new", "dep"])
         self.assertEqual([item["fingerprint"] for item in result["preexisting"]], ["moved"])
-        # Sin línea base cuenta todo lo que cae en el diff.
+        # Without a baseline, everything that falls in the diff counts.
         self.assertEqual(len(pr_review.classify(findings, changed, baseline=None)["introduced"]), 3)
 
     def test_verdict_gate(self):
@@ -80,7 +80,7 @@ class LogicTests(unittest.TestCase):
             (root / "main.py").write_text("from fastapi import FastAPI\nfrom dotenv import load_dotenv\n")
             result = analyze(root)
         names = {item["name"] for item in result["unused"]}
-        self.assertEqual(names, {"left-pad", "requests"})  # prisma va por script, gunicorn es implícito
+        self.assertEqual(names, {"left-pad", "requests"})  # prisma is used from a script, gunicorn is implicit
         new, before = split_by_pr(result["unused"], {"package.json": {4}})
         self.assertEqual(([item["name"] for item in new], sorted(item["name"] for item in before)), (["left-pad"], ["requests"]))
 
@@ -92,7 +92,7 @@ class LogicTests(unittest.TestCase):
         outcome = {"introduced": [hostile], "preexisting": [], "verdict": pr_review.verdict([hostile])}
         body = pr_review.render_comment({"head_sha": SHA}, outcome, run_id="r" * 32, baseline_run="b", panel_url=None)
         row = next(line for line in body.splitlines() if "click" in line)
-        self.assertEqual(row.count("`"), 2)       # solo los del propio código
+        self.assertEqual(row.count("`"), 2)       # only the code's own
         self.assertNotIn("\n[click]", body)
         self.assertIn("el panel de Tamandua", body)
 
@@ -123,7 +123,7 @@ class JobTests(unittest.TestCase):
 
     def run_review(self, permissions, *, baseline=True):
         if baseline:
-            # La rama principal ya tenía `old`, con su huella.
+            # The main branch already had `old`, with its fingerprint.
             main = self.data_dir / "main"
             main.mkdir(exist_ok=True)
             (main / "app.py").write_text(APP.split("\n\n\ndef new")[0] + "\n", encoding="utf-8")
@@ -158,7 +158,7 @@ class JobTests(unittest.TestCase):
         self.assertEqual([item["rule_id"] for item in record["findings"]], ["PY-DYNAMIC-CODE"])
         self.assertEqual(record["summary"]["candidates"], 1)
         self.assertIsNotNone(record["review"]["baseline_run"])
-        self.assertEqual(record["review"]["verdict"]["state"], "success")  # media, por debajo del umbral alto
+        self.assertEqual(record["review"]["verdict"]["state"], "success")  # medium, below the high threshold
         kinds = [kind for kind, _ in self.posted]
         self.assertEqual(kinds, ["comment", "status"])
         body = self.posted[0][1][3]
@@ -171,7 +171,7 @@ class JobTests(unittest.TestCase):
 
     def test_without_write_permission_the_review_still_happens(self):
         record = self.run_review({"contents": "read", "metadata": "read"})
-        self.assertEqual(record["status"], "incomplete")  # sin Docker en las pruebas no corre ningún motor: nunca «completed»
+        self.assertEqual(record["status"], "incomplete")  # no Docker in tests, so no engine runs: never "completed"
         self.assertEqual(self.posted, [])
         self.assertIn("sin permiso", text(record["review"]["delivery"]["comment"]))
 
@@ -182,11 +182,11 @@ class JobTests(unittest.TestCase):
 
 
 class SecretInDocsTests(unittest.TestCase):
-    """Regresión: un JWT añadido en README.md se ignoraba porque la documentación no entraba en el snapshot."""
+    """Regression: a JWT added to README.md was ignored because documentation didn't make it into the snapshot."""
 
     setUp, tearDown = JobTests.setUp, JobTests.tearDown
 
-    # El JWT de ejemplo de jwt.io, armado por partes para que el repositorio no lleve el literal.
+    # The jwt.io sample JWT, assembled in parts so that the repository doesn't carry the literal.
     JWT = ".".join(("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIn0",
                     "KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"))
 
@@ -209,7 +209,7 @@ class SecretInDocsTests(unittest.TestCase):
         self.assertIn("README.md:6", comment)
 
     def _review_only(self, permissions):
-        # Mismo camino que run_review, sin línea base y con el parche que fije la prueba.
+        # Same path as run_review, without a baseline and with the patch the test sets.
         def snapshot(source_id, destination, tokens, installation, ref=None, progress=None):
             import shutil
             shutil.copytree(self.repo, destination, dirs_exist_ok=True)
@@ -275,11 +275,11 @@ class WatcherTests(unittest.TestCase):
             with patch("tamandua.modules.integrations.github.open_pull_requests", return_value=pulls) as listing, \
                     patch("tamandua.modules.integrations.github.installation_repositories", return_value=installed):
                 self.assertEqual(watcher.poll(), 1)
-                self.assertEqual(watcher.poll(), 0)  # mismo commit: no se repite
-                pulls[0]["head_sha"] = "d" * 40      # nuevo push
+                self.assertEqual(watcher.poll(), 0)  # same commit: not repeated
+                pulls[0]["head_sha"] = "d" * 40      # new push
                 self.assertEqual(watcher.poll(), 1)
             self.assertEqual(queued, [1, 1])
-            # La configuración guardada por nombre se migró a la identidad estable.
+            # The settings saved by name were migrated to the stable identity.
             self.assertEqual(set(pr_watch.load(data_dir)["repositories"]), {"github#1", "github#2"})
             self.assertEqual({call.args[1] for call in listing.call_args_list}, {"org/api"})
 
@@ -290,7 +290,7 @@ class BranchWatchTests(unittest.TestCase):
             data_dir = Path(directory)
             for index in range(1, 6):
                 pr_watch.configure(data_dir, f"github#{index}", enabled=True, by="operadora")
-            pr_watch.configure(data_dir, "github#5", branch=False, by="operadora")  # solo PRs
+            pr_watch.configure(data_dir, "github#5", branch=False, by="operadora")  # PRs only
             queued = []
 
             class Jobs:
@@ -310,15 +310,15 @@ class BranchWatchTests(unittest.TestCase):
             with patch("tamandua.modules.integrations.github.installation_repositories", return_value=installed), \
                     patch("tamandua.modules.integrations.github.open_pull_requests", return_value=[]), \
                     patch("tamandua.modules.integrations.github.branch_head", side_effect=lambda installation, name, branch: heads[name]):
-                self.assertEqual(watcher.poll(), 3)            # como mucho tres por vuelta
-                self.assertEqual(watcher.poll(), 1)            # el cuarto; el quinto solo vigila PRs
-                self.assertEqual(watcher.poll(), 0)            # sin commits nuevos no se repite
-                heads["org/r1"] = "b" * 40                     # un merge, pero dentro de la pausa mínima
+                self.assertEqual(watcher.poll(), 3)            # at most three per round
+                self.assertEqual(watcher.poll(), 1)            # the fourth; the fifth only watches PRs
+                self.assertEqual(watcher.poll(), 0)            # no new commits, no repeat
+                heads["org/r1"] = "b" * 40                     # a merge, but within the minimum pause
                 self.assertEqual(watcher.poll(), 0)
                 state = pr_watch.load(data_dir)
                 state["branches"]["github#1"]["heads"]["main"]["at"] = "2020-01-01T00:00:00+00:00"
                 pr_watch._save(data_dir, state)
-                jobs.pending_count = 5                         # cola llena: espera
+                jobs.pending_count = 5                         # queue full: waits
                 self.assertEqual(watcher.poll(), 0)
                 jobs.pending_count = 0
                 self.assertEqual(watcher.poll(), 1)
@@ -358,7 +358,7 @@ class RouteTests(HttpCase):
                 status, body, _ = self.call("GET", "/api/pull-requests?source_id=github:org/api", headers={"Cookie": cookie})
                 self.assertEqual((status, body["pulls"], body["settings"]["gate"]), (200, [], "high"))
                 self.assertIn("Pull requests", body["pulls_error"])
-                # Varios repositorios a la vez, y la vista general los refleja.
+                # Several repositories at once, and the overview reflects them.
                 status, body, _ = self.post("/api/pull-requests/settings", "pr-settings", {"source_ids": ["github:org/api", "github:org/web"], "enabled": True}, cookie)
                 self.assertEqual((status, body["updated"]), (200, 2))
                 _, overview, _ = self.call("GET", "/api/pull-requests/watch", headers={"Cookie": cookie})
@@ -367,11 +367,11 @@ class RouteTests(HttpCase):
                 self.assertEqual(([row["name"] for row in active["repositories"]], active["total"]), (["org/web"], 1))
                 status, _, _ = self.post("/api/pull-requests/settings", "pr-settings", {"source_ids": ["github:org/api", "github:otra/x"], "enabled": False}, cookie)
                 self.assertEqual(status, 400)
-                # Desactivar todos no necesita recorrer el catálogo.
+                # Disabling all of them doesn't need to walk the catalog.
                 status, body, _ = self.post("/api/pull-requests/settings", "pr-settings", {"all": True, "enabled": False}, cookie)
                 self.assertEqual((status, body["updated"]), (200, 2))
                 self.assertEqual(self.call("GET", "/api/pull-requests/watch", headers={"Cookie": cookie})[1]["enabled"], 0)
-                # Un repositorio fuera de la instalación no se acepta.
+                # A repository outside the installation is not accepted.
                 status, _, _ = self.call("GET", "/api/pull-requests?source_id=github:otra/cosa", headers={"Cookie": cookie})
                 self.assertEqual(status, 400)
                 status, _, _ = self.call("GET", "/api/pull-requests?source_id=github:org/fantasma", headers={"Cookie": cookie})

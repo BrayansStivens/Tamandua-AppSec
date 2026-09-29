@@ -1,4 +1,4 @@
-"""Avisos a Slack, Teams o un webhook: solo lo nuevo que importa, sin filtrar URLs ni bloquear análisis."""
+"""Notifications to Slack, Teams or a webhook: only new findings that matter, no leaked URLs, no blocked scans."""
 
 import hashlib
 import hmac
@@ -57,7 +57,7 @@ class NotificationTests(unittest.TestCase):
         _, secret = notifications.save("webhook", "SIEM", "https://siem.example.com/in", ["findings", "batches"], "medium", by="ana")
         record = {"id": "r" * 32, "type": "repository_scan", "source": {"name": "acme/api"}}
         notifications.on_run(record, [_finding("a" * 64, "high"), _finding("b" * 64, "medium")], sender=self.sender, wait=True)
-        self.assertEqual([item[0] for item in self.sent], ["https://siem.example.com/in"])  # nada crítico: Slack no recibe
+        self.assertEqual([item[0] for item in self.sent], ["https://siem.example.com/in"])  # nothing critical: no Slack
         _, payload, headers, body = self.sent[0]
         self.assertEqual(headers["X-Tamandua-Signature"], "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest())
         self.assertEqual((payload["event"], payload["asset"], payload["counts"]["high"]), ("findings", "acme/api", 1))
@@ -65,10 +65,10 @@ class NotificationTests(unittest.TestCase):
         self.sent.clear()
         notifications.on_run(record, [_finding("c" * 64, "critical"), *(_finding(str(index) * 64, "low") for index in range(6))], sender=self.sender, wait=True)
         slack = next(payload for url, payload, _, _ in self.sent if url == SLACK)
-        self.assertIn("1 hallazgo nuevo en acme/api", slack["text"])  # el canal de críticos cuenta solo lo suyo
+        self.assertIn("1 hallazgo nuevo en acme/api", slack["text"])  # the critical-only channel counts only its own
         self.sent.clear()
         notifications.on_run({**record, "type": "pr_review"}, [_finding("d" * 64, "critical")], sender=self.sender, wait=True)
-        self.assertEqual(self.sent, [])  # los PRs avisan en el propio PR
+        self.assertEqual(self.sent, [])  # PRs are notified on the PR itself
 
     def test_teams_gets_an_adaptive_card_and_a_test_message(self):
         row, _ = notifications.save("teams", "Equipo", "https://prod-1.westus.logic.azure.com/workflows/abc", ["batches"], "high", by="ana")
@@ -85,7 +85,7 @@ class NotificationTests(unittest.TestCase):
                 patch.object(notifications, "on_batch", side_effect=lambda summary, **_: calls.append(summary["label"])):
             data = Path(folder)
             save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high")], "2026-09-25"))
-            save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high")], "2026-09-26"))  # nada nuevo: sin aviso
+            save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high")], "2026-09-26"))  # nothing new: no alert
             save_repository_scan(data, _scan("acme/api", [_finding("a" * 64, "high"), _finding("b" * 64, "critical")], "2026-09-27"))
             batches.create(data, [{"source_id": "github:acme/a", "name": "acme/a", "installation_id": 7}], by="ana", label="uno")
             current, index = batches.take_next(data)

@@ -1,11 +1,11 @@
-"""Qué va a hacer un escaneo de este repositorio, calculado antes de lanzarlo.
+"""What a scan of this repository will do, worked out before launching it.
 
-El paso «Revisar y lanzar» del asistente se construye aquí con datos reales, no
-con texto fijo: qué motores están disponibles y en qué versión, qué lenguajes
-tiene el repositorio (leídos del árbol de git, sin descargarlo) y cuáles cubren
-las reglas SAST propias, qué manifiestos puede resolver el análisis de
-dependencias y si hay infraestructura como código. Lo que no se va a cubrir se
-dice con nombre propio.
+The wizard's «Review and launch» step is built here from real data, not fixed
+text: which engines are available and at which version, which languages the
+repository has (read from the git tree, without downloading it) and which of
+them our own SAST rules cover, which manifests dependency analysis can resolve
+and whether there is infrastructure as code. What will not be covered is named
+explicitly.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ EXTENSIONS = {
     ".rs": "Rust", ".swift": "Swift", ".scala": "Scala", ".dart": "Dart", ".c": "C", ".h": "C",
     ".cpp": "C++", ".cc": "C++", ".hpp": "C++", ".ex": "Elixir", ".exs": "Elixir", ".lua": "Lua", ".sh": "Shell",
 }
-# Nombre del lenguaje en las reglas → nombre mostrado.
+# Language name in the rules → display name.
 RULE_LANGUAGES = {"python": "Python", "javascript": "JavaScript", "typescript": "TypeScript", "java": "Java",
                   "go": "Go", "php": "PHP", "ruby": "Ruby", "csharp": "C#"}
 SKIP = {"node_modules", ".git", "vendor", "dist", "build", ".next", "venv", ".venv", "__pycache__", "target"}
@@ -44,7 +44,7 @@ def _sample(paths: list[str]) -> str:
 
 
 def rule_counts() -> Counter:
-    """Reglas propias por lenguaje, leídas de los ficheros de reglas (una línea `languages:` por regla)."""
+    """Our own rules per language, read from the rule files (one `languages:` line per rule)."""
     counts: Counter = Counter()
     for path in RULES_DIR.glob("*.yml"):
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -57,7 +57,7 @@ def rule_counts() -> Counter:
 
 
 def files_of(source_id: str, *, installation_id: int | None) -> list[str] | None:
-    """Rutas del repositorio sin descargarlo. None si el proveedor no permite listarlas."""
+    """The repository's paths without downloading it. None if the provider cannot list them."""
     if source_id.startswith("github:") and installation_id is not None:
         from tamandua.modules.integrations.github import installation_repository, repository_tree
         entry = installation_repository(installation_id, source_id)
@@ -84,7 +84,7 @@ def plan(source_id: str, *, installation_id: int | None) -> dict:
         suffix = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
         if suffix in EXTENSIONS:
             languages[EXTENSIONS[suffix]] += 1
-        # La misma definición que decide qué entra al snapshot: el plan no promete lo que no se descarga.
+        # Same definition that decides what goes into the snapshot: the plan never promises what is not downloaded.
         if is_manifest(PurePosixPath(path)):
             manifests.append(path)
         if name == "Dockerfile" or name.endswith((".tf", ".tfvars", ".bicep")) or name in ("Chart.yaml", "kustomization.yaml", "serverless.yml") \

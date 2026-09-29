@@ -1,4 +1,4 @@
-"""Fuentes de código autorizadas: workspace fijo y repositorios listados por API."""
+"""Authorised code sources: the fixed workspace and repositories listed through the API."""
 
 from __future__ import annotations
 
@@ -17,22 +17,22 @@ from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
 
-# Los topes no son una política de producto: son defensa contra descompresión
-# maliciosa y contra una ejecución desbocada. Lo que acota el trabajo real es la
-# lista de lo que los analizadores saben leer, no un presupuesto de bytes.
-MAX_ARCHIVE = 1_000_000_000      # descarga comprimida, en disco por streaming
-MAX_EXPANSION = 5_000_000_000    # bytes leídos del archivo antes de sospechar bomba
-MAX_FILES = 200_000              # freno de ejecución desbocada
-MAX_FILE = 2_000_000             # por archivo: por encima es generado o datos
-MAX_MANIFEST = 64_000_000        # manifiestos y lockfiles: se reconocen por nombre; un lockfile grande es normal
-MAX_TOTAL = 2_000_000_000        # fuente acumulada; no debería alcanzarse nunca
+# These caps are not product policy: they defend against malicious decompression
+# and runaway runs. What bounds the real work is the list of what the analysers
+# can read, not a byte budget.
+MAX_ARCHIVE = 1_000_000_000      # compressed download, streamed to disk
+MAX_EXPANSION = 5_000_000_000    # bytes read from the archive before suspecting a bomb
+MAX_FILES = 200_000              # brake on runaway runs
+MAX_FILE = 2_000_000             # per file: anything bigger is generated code or data
+MAX_MANIFEST = 64_000_000        # manifests and lockfiles: recognised by name; a large lockfile is normal
+MAX_TOTAL = 2_000_000_000        # accumulated source; should never be reached
 IGNORED = {".git", "node_modules", ".venv", "venv", "data", "dist", "build", "__pycache__", ".next",
            "coverage", "htmlcov", "site-packages", "vendor", "bower_components", "target", "out",
            ".angular", ".nuxt", ".svelte-kit", ".turbo", ".gradle", "storybook-static"}
-# Nada de esto lo mira un analizador de código, así que no debe gastar presupuesto
-# ni desplazar a un fichero fuente que sí importa.
-# Lista de admitidos, no de descartados: un repositorio de 600 MB suele tener
-# unos pocos MB de código y el resto son activos que nadie va a analizar.
+# No code analyser looks at any of this, so it must not spend budget or crowd
+# out a source file that does matter.
+# An allowlist, not a denylist: a 600 MB repository usually holds a few MB of
+# code and the rest is assets nobody is going to analyse.
 SOURCE_SUFFIXES = {
     ".py", ".pyi", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".vue", ".svelte",
     ".java", ".kt", ".kts", ".go", ".rb", ".php", ".cs", ".rs", ".swift", ".scala", ".dart",
@@ -42,7 +42,7 @@ SOURCE_SUFFIXES = {
     ".erb", ".jinja", ".jinja2", ".j2", ".twig", ".blade", ".hbs", ".ejs", ".pug",
     ".yml", ".yaml", ".json", ".toml", ".ini", ".cfg", ".conf", ".properties", ".env",
 }
-# Manifiestos y ficheros sin extensión que hacen falta para SCA, secretos e IaC.
+# Manifests and extensionless files needed for SCA, secrets and IaC.
 SOURCE_NAMES = {
     "dockerfile", "containerfile", "makefile", "rakefile", "gemfile", "procfile",
     "requirements.txt", "pipfile", "poetry.lock", "pyproject.toml", "setup.py", "setup.cfg",
@@ -50,8 +50,8 @@ SOURCE_NAMES = {
     "go.mod", "go.sum", "pom.xml", "build.gradle", "build.gradle.kts", "settings.gradle",
     "gemfile.lock", "composer.json", "composer.lock", "cargo.toml", "cargo.lock",
 }
-# Manifiestos y lockfiles de dependencias de cada ecosistema. Se reconocen por su nombre o
-# extensión, nunca por su tamaño: sin ellos el análisis de dependencias no ve nada.
+# Dependency manifests and lockfiles for each ecosystem. Recognised by name or extension,
+# never by size: without them dependency analysis sees nothing.
 MANIFEST_NAMES = {
     # JavaScript / TypeScript
     "package.json", "package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock",
@@ -81,10 +81,10 @@ def is_manifest(relative: Path) -> bool:
     return name in MANIFEST_NAMES or relative.suffix.lower() in MANIFEST_SUFFIXES or name.startswith("requirements")
 
 
-# Salida de compilación y bundles: texto, pero generado, y ahoga la señal.
-# Los secretos aparecen en cualquier texto, no solo en el código: la documentación, los
-# ejemplos de configuración y las notas son de los sitios más habituales. Estos ficheros
-# no los mira el SAST, pero Gitleaks sí, y dejarlos fuera producía falsos negativos.
+# Build output and bundles: text, but generated, and it drowns the signal.
+# Secrets show up in any text, not just code: docs, sample configuration and notes are
+# among the most common places. SAST ignores these files but Gitleaks reads them, and
+# leaving them out caused false negatives.
 TEXT_SUFFIXES = {
     ".md", ".markdown", ".mdx", ".txt", ".rst", ".adoc", ".html", ".htm", ".xml", ".csv", ".tsv", ".ipynb",
     ".log", ".pem", ".key", ".crt", ".cer", ".pub", ".asc", ".tpl", ".template", ".example", ".sample", ".dist",
@@ -93,8 +93,8 @@ TEXT_SUFFIXES = {
 SECRET_NAMES = {".npmrc", ".pypirc", ".netrc", ".dockercfg", ".git-credentials", ".htpasswd", "id_rsa", "id_dsa",
                 "id_ecdsa", "id_ed25519", "credentials", "authorized_keys", "known_hosts", ".s3cfg", ".boto"}
 SKIP_NAME_PARTS = (".min.js", ".min.css", ".bundle.js", "-bundle.js", ".chunk.js", ".d.ts")
-# Lo que empieza por punto se descarta salvo los pipelines de CI/CD (Checkov, zizmor). Los ficheros de
-# credenciales (.env, .npmrc…) siguen fuera de la instantánea a propósito.
+# Dot-prefixed entries are dropped except CI/CD pipelines (Checkov, zizmor). Credential files
+# (.env, .npmrc…) stay out of the snapshot on purpose.
 DOT_FOLDERS = {".github", ".gitlab", ".circleci", ".buildkite", ".tekton", ".devcontainer"}
 DOT_FILES = {".gitlab-ci.yml", ".gitlab-ci.yaml", ".pre-commit-config.yaml", ".pre-commit-hooks.yaml"}
 
@@ -135,7 +135,7 @@ def _request(url: str, token: str, provider: str, *, redirect_host: str | None =
             parsed = urlsplit(target)
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
                 raise SourceError(msg("sources.errors.redirect_not_allowed")) from None
-            # La URL temporal se consulta sin la credencial original.
+            # The temporary URL is fetched without the original credential.
             response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=20)
         with response:
             body = response.read(MAX_ARCHIVE + 1)
@@ -155,10 +155,10 @@ def _download_timeout() -> int:
 
 def _download_archive(url: str, token: str, provider: str, destination: Path,
                       *, redirect_host: str | None = None, progress=None) -> int:
-    """Baja el tarball a disco por trozos. Un repositorio de cientos de MB no cabe en memoria.
+    """Downloads the tarball to disk in chunks. A repository of hundreds of MB does not fit in memory.
 
-    El `timeout` del socket solo corta si no llega nada; una conexión que gotea podría
-    tardar horas sin decir nada. Por eso hay un plazo total y se informa de lo descargado."""
+    The socket `timeout` only fires when nothing arrives; a trickling connection could take
+    hours without a word. Hence an overall deadline, and progress reports on what was downloaded."""
     deadline = time.monotonic() + _download_timeout()
     headers = {"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT}
     if provider == "github":
@@ -177,7 +177,7 @@ def _download_archive(url: str, token: str, provider: str, destination: Path,
             parsed = urlsplit(target)
             if parsed.scheme != "https" or parsed.hostname != redirect_host or parsed.username or parsed.password:
                 raise SourceError(msg("sources.errors.redirect_not_allowed")) from None
-            # La URL temporal se consulta sin la credencial original.
+            # The temporary URL is fetched without the original credential.
             response = opener.open(Request(target, headers={"User-Agent": USER_AGENT}), timeout=180)
         written, reported = 0, time.monotonic()
         with response, open(destination, "wb") as handle:
@@ -233,13 +233,13 @@ def list_repositories(provider: str, token: str | None = None) -> list[dict]:
 
 
 def available_sources(tokens: dict[str, str] | None = None, installation_id: int | list[int] | None = None) -> dict:
-    """Todos los repositorios analizables (CLI). El panel usa `source_page`, que no lista organizaciones enteras."""
+    """Every analysable repository (CLI). The panel uses `source_page`, which does not list whole organisations."""
     tokens = tokens or {}
     sources = []
     statuses = {}
     installations = [installation_id] if isinstance(installation_id, int) else installation_id or []
     if installations:
-        # Cada instalación autoriza únicamente los repositorios elegidos en esa cuenta.
+        # Each installation authorises only the repositories chosen in that account.
         from tamandua.modules.integrations.github import GitHubAppError, installation_repositories
         errors = []
         seen = set()
@@ -269,7 +269,7 @@ def available_sources(tokens: dict[str, str] | None = None, installation_id: int
 
 
 def _paged(first: list[dict], fetch, per_page: int, decorate):
-    """Filas [offset, offset+limit) de un origen paginado por GitHub: como mucho dos páginas."""
+    """Rows [offset, offset+limit) of a source paginated by GitHub: two pages at most."""
     def rows(offset: int, limit: int) -> list[dict]:
         result = []
         for number in range(offset // per_page + 1, (offset + limit - 1) // per_page + 2):
@@ -282,10 +282,10 @@ def _paged(first: list[dict], fetch, per_page: int, decorate):
 
 def source_page(tokens: dict[str, str] | None = None, installations: list[int] | None = None, *, query: str = "",
                 account: str | None = None, provider: str | None = None, page: int = 1, per_page: int = 25) -> dict:
-    """Una página de repositorios analizables, con el total y búsqueda por nombre.
+    """One page of analysable repositories, with the total and search by name.
 
-    A GitHub solo se le pide la página visible (o su búsqueda): con miles de repositorios la
-    respuesta tarda lo mismo que con diez. Las cuentas de la App van en orden y se concatenan.
+    GitHub is asked only for the visible page (or its search): with thousands of repositories the
+    response takes as long as with ten. The App's accounts go in order, concatenated.
     """
     tokens = tokens or {}
     needle = query.strip().casefold()
@@ -333,7 +333,7 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
                 local(list_repositories(name, tokens.get(name)))
             except SourceError:
                 statuses[name]["error"] = msg("sources.errors.list_failed")
-    # Solo se piden a cada origen las filas que caen en la página pedida.
+    # Each source is asked only for the rows that fall on the requested page.
     total = sum(count for count, _ in segments)
     offset, remaining, sources = (page - 1) * per_page, per_page, []
     for count, rows in segments:
@@ -345,7 +345,7 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
         take = min(remaining, count - offset)
         try:
             sources.extend(rows(offset, take))
-        except Exception as exc:  # GitHubAppError: una página que falla no tumba el resto
+        except Exception as exc:  # GitHubAppError: one failing page doesn't take down the rest
             errors.append(getattr(exc, "message", None) or str(exc))
         remaining -= take
         offset = 0
@@ -356,9 +356,9 @@ def source_page(tokens: dict[str, str] | None = None, installations: list[int] |
 
 
 def find_source(tokens: dict[str, str] | None, installations: list[int] | None, source_id: str) -> dict | None:
-    """Un repositorio concreto, validado contra su credencial sin listar el catálogo entero.
+    """One specific repository, validated against its credential without listing the whole catalogue.
 
-    Acepta el identificador por nombre (`github:owner/repo`) o la identidad estable (`github#123`)."""
+    Accepts the name-based identifier (`github:owner/repo`) or the stable identity (`github#123`)."""
     if not isinstance(source_id, str):
         return None
     if installations and (source_id.startswith("github:") or source_id.startswith("github#")):
@@ -401,7 +401,7 @@ def _safe_name(name: str) -> Path | None:
 
 
 def _dot_allowed(part: str, *, last: bool, secrets: bool = False) -> bool:
-    """Carpetas de CI/CD y, como último tramo, sus ficheros; con `secrets`, también los de credenciales."""
+    """CI/CD folders and, as the last path segment, their files; with `secrets`, credential files too."""
     name = part.lower()
     if not last:
         return name in DOT_FOLDERS
@@ -418,11 +418,11 @@ def _analyzable(relative: Path) -> bool:
 
 
 def _extract_limited(blob: bytes | Path, root: Path) -> dict:
-    """Copia lo que cabe y devuelve cuentas de lo que quedó fuera.
+    """Copies what fits and returns counts of what was left out.
 
-    Pasarse de los límites no es un error: un repositorio grande se analiza en
-    parte y la ejecución declara exactamente qué no se miró. Fallar dejaría al
-    usuario sin nada, y analizar en silencio el 10 % sería peor todavía.
+    Exceeding the limits is not an error: a large repository is partly analysed
+    and the run states exactly what was not looked at. Failing would leave the
+    user with nothing, and silently analysing 10 % would be worse still.
     """
     stats = {"files": 0, "bytes": 0, "skipped_not_analyzable": 0, "skipped_too_large": 0,
              "skipped_over_budget": 0, "truncated": False}
@@ -436,8 +436,8 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
             for member in archive:
                 if not member.isfile():
                     continue
-                # Defensa contra descompresión maliciosa: un tarball pequeño puede
-                # declarar teras. Se mira el tamaño anunciado antes de leer nada.
+                # Defence against malicious decompression: a small tarball can declare
+                # terabytes. The declared size is checked before reading anything.
                 expanded += member.size
                 if expanded > MAX_EXPANSION:
                     raise SourceError(msg("sources.errors.decompression_bomb"))
@@ -447,7 +447,7 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
                 if not _analyzable(relative):
                     stats["skipped_not_analyzable"] += 1
                     continue
-                # El código de más de 2 MB es casi siempre generado; un manifiesto, no: su límite es otro.
+                # Code over 2 MB is almost always generated; a manifest isn't, so it has its own limit.
                 limit = MAX_MANIFEST if is_manifest(relative) else MAX_FILE
                 if member.size > limit:
                     stats["skipped_too_large"] += 1
@@ -476,10 +476,10 @@ def _extract_limited(blob: bytes | Path, root: Path) -> dict:
 
 
 def snapshot_directory(source: Path, destination: Path) -> dict:
-    """Copia de solo lectura de una carpeta local con los mismos filtros que un repositorio remoto.
+    """Read-only copy of a local folder with the same filters as a remote repository.
 
-    Sin enlaces simbólicos (no se sale de la carpeta), sin lo que ignora el análisis y con los
-    mismos límites: código hasta 2 MB por archivo, manifiestos y lockfiles hasta 64 MB."""
+    No symlinks (nothing escapes the folder), nothing the analysis ignores, and the same
+    limits: code up to 2 MB per file, manifests and lockfiles up to 64 MB."""
     total = count = skipped = 0
     truncated = False
     for directory, folders, filenames in os.walk(source, followlinks=False):
@@ -511,7 +511,7 @@ def snapshot_directory(source: Path, destination: Path) -> dict:
 
 def snapshot_source(source_id: str, destination: Path, tokens: dict[str, str] | None = None,
                     installation_id: int | None = None, ref: str | None = None, progress=None) -> tuple[Path, dict]:
-    """Snapshot de solo lectura. `ref` fija un commit concreto (revisión de un PR); solo GitHub."""
+    """Read-only snapshot. `ref` pins a specific commit (PR review); GitHub only."""
     if ref is not None and (not re.fullmatch(r"[0-9a-f]{40}", ref) or not source_id.startswith("github:")):
         raise SourceError(msg("sources.errors.invalid_commit"))
     if not re.fullmatch(r"(?:github:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+|gitlab:[0-9]+)", source_id):

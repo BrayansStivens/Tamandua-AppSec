@@ -1,18 +1,18 @@
-"""Conector de Jira Cloud: convierte los tickets de una ejecución en incidencias.
+"""Jira Cloud connector: turns a run's tickets into issues.
 
-* La credencial (email + API token de Atlassian) la pone un administrador desde
-  el panel y se valida contra Jira antes de guardarse. Vive en el directorio de
-  configuración con permisos 0600 y nunca vuelve al navegador: solo el email, el
-  proyecto y los cuatro últimos caracteres del token.
-* Solo se habla con ``https://<sitio>.atlassian.net``: el panel no puede usarse
-  para hacer peticiones a otros destinos (SSRF), y no se siguen redirecciones.
-* Una incidencia por trabajo de remediación: los avisos de un mismo paquete van
-  juntos, con la versión que los cierra todos; el código y los secretos, uno a uno.
-* Idempotente: cada incidencia lleva la etiqueta ``appsec-<huella>`` de cada hallazgo que cubre. Antes de
-  crear se busca por esa etiqueta, y los vínculos que ya se conocen (por activo y huella, en
-  ``findings/tickets.py``) no se vuelven a crear; exportar dos veces no duplica.
-* Jira Server/Data Center queda fuera a propósito: exigiría aceptar hosts
-  arbitrarios de la red del cliente.
+* The credential (Atlassian email + API token) is set by an administrator from
+  the panel and checked against Jira before it is saved. It lives in the
+  configuration directory with 0600 permissions and never goes back to the browser: only the email, the
+  project and the token's last four characters do.
+* Only ``https://<site>.atlassian.net`` is contacted: the panel can't be used
+  to send requests anywhere else (SSRF), and redirects are not followed.
+* One issue per remediation job: advisories for the same package go
+  together, with the version that closes them all; code and secrets, one by one.
+* Idempotent: each issue carries the ``appsec-<fingerprint>`` label of every finding it covers. Before
+  creating one it searches by that label, and links already known (by asset and fingerprint, in
+  ``findings/tickets.py``) are not created again; exporting twice doesn't duplicate.
+* Jira Server/Data Center is left out on purpose: it would mean accepting arbitrary
+  hosts on the customer's network.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ class JiraError(ValueError):
         self.message = message
 
 
-# ------------------------------------------------------------ credencial
+# ------------------------------------------------------------ credential
 
 def _load() -> dict | None:
     from tamandua.shared.vault import VaultError, get
@@ -89,7 +89,7 @@ def status() -> dict:
 
 
 def configure(site, email, token, project, issue_type, *, by: str, http=None) -> dict:
-    """Valida contra Jira (identidad, proyecto y tipo de incidencia) y solo entonces guarda."""
+    """Checks against Jira (identity, project and issue type) and only then saves."""
     host = normalize_site(site)
     if not isinstance(email, str) or not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,190}", email.strip()):
         raise JiraError(msg("integrations.jira.invalid_email"))
@@ -122,7 +122,7 @@ def forget() -> None:
 # ------------------------------------------------------------------ HTTP
 
 def _http(credentials: dict, method: str, path: str, body: dict | None = None) -> dict:
-    """Petición a la API REST v3. Los errores se traducen sin exponer la respuesta cruda."""
+    """A request to the REST API v3. Errors become our own messages, never exposing the raw response."""
     token = base64.b64encode(f"{credentials['email']}:{credentials['token']}".encode()).decode("ascii")
     request = Request(f"https://{credentials['site']}{path}", method=method,
                       data=json.dumps(body).encode("utf-8") if body is not None else None,
@@ -158,10 +158,10 @@ def _http(credentials: dict, method: str, path: str, body: dict | None = None) -
     return payload if isinstance(payload, dict) else {}
 
 
-# ------------------------------------------------------ incidencias
+# ------------------------------------------------------ issues
 
 def _adf(text: str) -> dict:
-    """Atlassian Document Format mínimo: un párrafo por línea, los títulos en negrita."""
+    """Minimal Atlassian Document Format: one paragraph per line, headings in bold."""
     content = []
     for line in text.splitlines()[:200]:
         line = line.rstrip()[:2000]
@@ -182,7 +182,7 @@ def label_for(fingerprint: str) -> str:
 
 def export(tickets: list[dict], fingerprints: list, known: dict, remember, *, by: str, run_id: str, http=None,
            locale: str | None = None) -> dict:
-    """Crea en Jira las incidencias de los tickets pedidos. Devuelve creadas, existentes y fallos.
+    """Creates the Jira issues for the requested tickets. Returns the created, existing and failed ones.
 
     `known`: the links already recorded for these findings (fingerprint → link); `remember(fingerprint, link)` records a
     new one. The issues are read by the whole team, so they speak TAMANDUA_DEFAULT_LOCALE unless told otherwise."""
@@ -206,7 +206,7 @@ def export(tickets: list[dict], fingerprints: list, known: dict, remember, *, by
         try:
             link = next((known[item] for item in prints if item in known), None)
             if link is None:
-                # Otra instalación o una exportación anterior pudo crearla: se busca por las etiquetas.
+                # Another installation or an earlier export may have created it: search by the labels.
                 labels = ", ".join(f'"{label_for(item)}"' for item in prints)
                 found = client(credentials, "POST", "/rest/api/3/search/jql",
                                {"jql": f'project = "{credentials["project"]}" AND labels in ({labels})', "maxResults": 1, "fields": ["key"]})
@@ -237,7 +237,7 @@ PRIORITY_ORDER = ("Highest", "High", "Medium", "Low")
 
 
 def _work_items(tickets: list[dict]) -> list[list[dict]]:
-    """Agrupa por paquete instalado; todo lo demás es un trabajo por hallazgo."""
+    """Groups by installed package; everything else is one job per finding."""
     groups: dict[str, list[dict]] = {}
     for ticket in tickets:
         package = ticket.get("package") or {}
@@ -278,7 +278,7 @@ def _issue_fields(credentials: dict, group: list[dict], locale: str) -> dict:
 
 
 def _create(client, credentials: dict, fields: dict, state: dict) -> dict:
-    # Muchos proyectos no exponen el campo prioridad en la pantalla de alta: se reintenta sin él.
+    # Many projects don't expose the priority field on the create screen: retry without it.
     if not state["priority"]:
         fields.pop("priority", None)
     try:

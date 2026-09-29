@@ -142,7 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "scan":
-        # Se ejecuta dentro del repositorio del usuario: sus datos (y la caché de avisos) no van a parar a él.
+        # Runs inside the user's repository: Tamandua's data (and the advisory cache) must not end up in it.
         args.data_dir = args.data_dir or (Path(settings.text("TAMANDUA_DATA_DIR")) if settings.is_set("TAMANDUA_DATA_DIR")
                                           else Path.home() / ".cache" / "tamandua")
         return _scan_command(args)
@@ -156,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
             print(t("cli.settings.ok"))
             return 0
     try:
-        if not (args.command == "worker" and args.check):  # el healthcheck no migra nada: solo mira el latido
+        if not (args.command == "worker" and args.check):  # healthcheck: migrates nothing, only reads the heartbeat
             upgrade_data(args.data_dir)
     except DataTooNew as error:
         print(_detail(error), file=sys.stderr)

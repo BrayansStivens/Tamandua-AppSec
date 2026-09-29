@@ -1,15 +1,15 @@
-"""Avisos nuevos sin reanalizar: una vez al día, las dependencias ya analizadas contra la base OSV actualizada.
+"""New advisories without rescanning: once a day, already-scanned dependencies against the updated OSV database.
 
-Un CVE se publica mañana para una librería que ya usabas hoy. Sin esto, nadie se entera hasta el siguiente
-análisis. Cada análisis completo guarda sus paquetes con versión (`dependencies`, de Trivy); aquí se
-convierten en un SBOM CycloneDX y se pasan a OSV-Scanner **sin conexión**: se descargan las bases de avisos,
-pero la lista de dependencias no sale de esta máquina.
+A CVE is published tomorrow for a library you already used today. Without this, nobody finds out until the next
+scan. Each full scan keeps its packages with their versions (`dependencies`, from Trivy); here they become a
+CycloneDX SBOM that goes to OSV-Scanner **offline**: the advisory databases are downloaded, but the dependency
+list never leaves this machine.
 
-Solo se abren avisos que el registro del activo no conocía (por identificador y paquete, en cualquier estado:
-un riesgo aceptado no vuelve a abrirse con otro nombre). Se guardan como una ejecución `advisory_watch`, que
-añade al registro y nunca remedia nada: el siguiente análisis completo manda. Los paquetes del sistema
-operativo de una imagen no entran (su aviso depende de la versión de la distribución): esos llegan al
-reanalizar la imagen.
+Only advisories the asset's registry didn't know are opened (by identifier and package, in any state: an
+accepted risk isn't reopened under another name). They are saved as an `advisory_watch` run, which adds to the
+registry and never remediates anything: the next full scan takes over. An image's operating system packages
+are left out (their advisories depend on the distribution version): those arrive when the image is
+rescanned.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ _log = logging_setup.get("advisory_watch")
 
 
 def hours() -> int:
-    """Cada cuántas horas se contrasta (TAMANDUA_ADVISORY_WATCH_HOURS; 0 lo apaga)."""
+    """How many hours between checks (TAMANDUA_ADVISORY_WATCH_HOURS; 0 turns it off)."""
     try:
         return settings.integer("TAMANDUA_ADVISORY_WATCH_HOURS")
     except ValueError:
@@ -63,9 +63,9 @@ def _save_state(data_dir: Path, state: dict) -> None:
 
 
 def latest_complete(data_dir: Path) -> list[dict]:
-    """El último análisis completo de cada repositorio o imagen que guarda sus dependencias."""
+    """The latest full scan of each repository or image that keeps its dependencies."""
     seen, result = set(), []
-    for row in find_runs(data_dir, types=FULL_SCANS, statuses=("completed",)):  # de más reciente a más antiguo
+    for row in find_runs(data_dir, types=FULL_SCANS, statuses=("completed",)):  # newest first
         key = asset_key(row)
         if key in seen:
             continue
@@ -80,7 +80,7 @@ def latest_complete(data_dir: Path) -> list[dict]:
 
 
 def known(data_dir: Path, key: str) -> set[tuple[str, str, str, str]]:
-    """(familia, paquete, versión, identificador) de todo lo que el registro ya conoce, en cualquier estado."""
+    """(family, package, version, identifier) of everything the registry already knows, in any state."""
     result = set()
     for entry in registry.load(data_dir, key).get("findings", {}).values():
         finding = entry.get("finding") or {}
@@ -114,7 +114,7 @@ def _repath(value, old: str, new: str):
 
 
 def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] | None:
-    """Avisos de OSV-Scanner (sin conexión) para las dependencias guardadas de un análisis. None si no se pudo."""
+    """OSV-Scanner advisories (offline) for a scan's saved dependencies. None if it couldn't run."""
     document = sbom(record.get("dependencies") or [])
     if not document["components"]:
         return []
@@ -144,7 +144,7 @@ def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] 
         except ValueError:
             return None
     findings = engines.parse_osv_scanner(payload, feeds)
-    # El SBOM es un archivo temporal: cada aviso vuelve al manifiesto donde se declaró el paquete.
+    # The SBOM is a temporary file: each advisory goes back to the manifest that declared the package.
     where = {}
     for item in record.get("dependencies") or []:
         where.setdefault((package_name(item.get("ecosystem") or "", item["name"]), item["version"]), item.get("path") or "")
@@ -161,7 +161,7 @@ def match(record: dict, *, data_dir: Path, feeds: dict, run=None) -> list[dict] 
 
 
 def check(data_dir: Path, *, run=None, now: datetime | None = None) -> dict:
-    """Una pasada sobre todos los activos. Devuelve cuántos se revisaron y cuántos avisos nuevos se abrieron."""
+    """One pass over every asset. Returns how many were checked and how many new advisories were opened."""
     now = now or datetime.now(timezone.utc)
     feeds = load_feeds(data_dir)
     checked = opened = failed = 0
@@ -199,7 +199,7 @@ def check(data_dir: Path, *, run=None, now: datetime | None = None) -> dict:
 
 
 class Watcher:
-    """Hilo que contrasta los avisos una vez cada `hours()` horas. Tras reiniciar, respeta la última pasada."""
+    """Thread that checks advisories once every `hours()` hours. After a restart, it honors the last pass."""
 
     def __init__(self, data_dir: Path):
         self.data_dir = data_dir
@@ -222,7 +222,7 @@ class Watcher:
 
     def _loop(self) -> None:
         _log.info("advisory_watch_started", extra={"reason": f"cada {hours()} h"})
-        delay = 600  # tras arrancar, deja que el panel y los motores se asienten
+        delay = 600  # after startup, let the panel and the engines settle
         while not self._stop.wait(delay):
             delay = 1800
             if not self.due(datetime.now(timezone.utc)):
@@ -231,5 +231,5 @@ class Watcher:
                 result = check(self.data_dir)
                 _log.info("advisory_watch_done", extra={"reason": f"{result['checked']} activos, {result['opened']} avisos nuevos, "
                                                                   f"{result['failed']} sin poder contrastar"})
-            except Exception:  # noqa: BLE001 — un fallo no debe matar al vigilante
+            except Exception:  # noqa: BLE001 — a failure must not kill the watcher
                 _log.exception("advisory_watch_failed")

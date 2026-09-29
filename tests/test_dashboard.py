@@ -1,4 +1,4 @@
-"""Índice de ejecuciones, paginación, cobertura OWASP real y agregados del panel."""
+"""Run index, pagination, real OWASP coverage and panel aggregates."""
 
 import json
 import tempfile
@@ -42,7 +42,7 @@ class IndexAndPagingTests(unittest.TestCase):
                                      created_at=(now - timedelta(minutes=index)).isoformat())
             rows = list_runs(data_dir)
             self.assertEqual(len(rows), 30)
-            # Las filas del índice no arrastran los hallazgos.
+            # Index rows don't carry the findings along.
             self.assertNotIn("findings", rows[0])
             page = page_runs(data_dir, limit=10, offset=10, kind="repository_scan")
             self.assertEqual((len(page["items"]), page["total"], page["offset"]), (10, 30, 10))
@@ -73,7 +73,7 @@ class IndexAndPagingTests(unittest.TestCase):
 
 class ConcurrentIndexTests(unittest.TestCase):
     def test_concurrent_writers_do_not_fail_or_lose_rows(self):
-        """Antes (archivos): temporal con nombre fijo y sin cerrojo → FileExistsError y filas perdidas. Ahora es la base."""
+        """Before (files): fixed-name temp file, no lock → FileExistsError and lost rows. Now it is the database."""
         import threading
         from tamandua.modules.runs.store import list_runs, save_record
         with tempfile.TemporaryDirectory() as temporary:
@@ -85,7 +85,7 @@ class ConcurrentIndexTests(unittest.TestCase):
                     for offset in range(25):
                         save_record(data_dir, {"id": f"{start + offset:032x}", "type": "repository_scan", "status": "completed",
                                                 "created_at": "2026-09-26T00:00:00+00:00"})
-                except Exception as exc:  # noqa: BLE001 — cualquier fallo cuenta
+                except Exception as exc:  # noqa: BLE001 — any failure counts
                     errors.append(exc)
             threads = [threading.Thread(target=writer, args=(block * 100,)) for block in range(4)]
             for thread in threads:
@@ -112,9 +112,9 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(rows["A05"]["status"], "partial")
         self.assertIn("reglas de Tamandua", rows["A05"]["reason"])
         self.assertEqual(rows["A05"]["findings"], 1)
-        # Sin archivos de infraestructura, A02 lo dice en vez de fingir cobertura.
+        # With no infrastructure files, A02 says so instead of faking coverage.
         self.assertIn("no encontró archivos de infraestructura", rows["A02"]["reason"])
-        # Lo que un análisis estático no cubre se declara con su motivo concreto.
+        # What static analysis doesn't cover is declared with its specific reason.
         self.assertEqual(rows["A06"]["status"], "not_tested")
         self.assertIn("modelado de amenazas", rows["A06"]["reason"])
         without = {item["id"]: item for item in localize(owasp_coverage([], sast_ran=False, sca_status="not_tested", iac_ran=False,
@@ -138,7 +138,7 @@ class DashboardTests(unittest.TestCase):
             save_repository_scan(data_dir, _scan("org/app", [_finding("keep", "critical", kev=kev), _finding("new", "high", epss={"score": 0.42, "percentile": 0.99})], second.isoformat()), created_at=second.isoformat())
             result = dashboard.compute(data_dir, 30)
         kpis = result["kpis"]
-        # Abierto = última ejecución del activo; corregido = huella que desapareció.
+        # Open = the asset's latest run; fixed = a fingerprint that disappeared.
         self.assertEqual(kpis["open"]["total"], 2)
         self.assertEqual(kpis["open"]["critical"], 1)
         self.assertEqual(kpis["fixed_in_window"], 2)
@@ -146,7 +146,7 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(kpis["fix_rate"], 50.0)
         self.assertAlmostEqual(kpis["mttr_days"], 4.0, delta=0.1)
         self.assertEqual(kpis["kev_open"], 1)
-        # riesgo = 8·1 crítico + 3·1 alto + 15·1 KEV + 5·1 EPSS alto = 31 → 100·e^(−31/150)
+        # risk = 8·1 critical + 3·1 high + 15·1 KEV + 5·1 high EPSS = 31 → 100·e^(−31/150)
         self.assertEqual(kpis["security_score"]["value"], 81.3)
         self.assertEqual(kpis["security_score"]["risk"], 31.0)
         self.assertIn("e^", localize(kpis["security_score"]["formula"]))
@@ -162,10 +162,10 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(sum(day["runs"] for day in result["activity"]), 2)
 
     def test_days_are_counted_in_the_viewer_timezone_and_cached(self):
-        """«Hoy» es el de quien mira: en Bogotá, un análisis a las 21:00 del 25 cuenta el 25, no el 26 (UTC)."""
+        """«Today» is the viewer's: in Bogotá, a scan at 21:00 on the 25th counts on the 25th, not the 26th (UTC)."""
         with tempfile.TemporaryDirectory() as temporary:
             data_dir = Path(temporary)
-            evening = datetime(2026, 9, 26, 2, 0, tzinfo=timezone.utc)  # 21:00 del 25 en Bogotá
+            evening = datetime(2026, 9, 26, 2, 0, tzinfo=timezone.utc)  # 21:00 on the 25th in Bogotá
             save_repository_scan(data_dir, _scan("org/app", [], evening.isoformat()), created_at=evening.isoformat())
             bogota = dashboard.zone("America/Bogota")
             with patch.object(dashboard, "datetime", wraps=datetime) as clock:
@@ -176,9 +176,9 @@ class DashboardTests(unittest.TestCase):
             for bad in ("../../etc/passwd", "Nada/Inventado", "", None, "x" * 80):
                 self.assertIs(dashboard.zone(bad), timezone.utc)
             first = dashboard.cached(data_dir, 30, bogota)
-            self.assertIs(dashboard.cached(data_dir, 30, bogota), first)  # sin cambios: no recalcula
+            self.assertIs(dashboard.cached(data_dir, 30, bogota), first)  # unchanged: not recomputed
             save_repository_scan(data_dir, _scan("org/otra", [], evening.isoformat()))
-            self.assertIsNot(dashboard.cached(data_dir, 30, bogota), first)  # una ejecución nueva invalida
+            self.assertIsNot(dashboard.cached(data_dir, 30, bogota), first)  # a new run invalidates it
 
     def test_nvd_feed_parses_scores_and_descriptions(self):
         body = json.dumps({"totalResults": 1, "timestamp": "2026-09-23T00:00:00", "vulnerabilities": [{"cve": {
@@ -213,7 +213,7 @@ class NvdRefreshTests(unittest.TestCase):
             advisories.refresh_recent_cves(Path(directory), pause=0, fetch=fetch)
             page = calls[-1]
             self.assertEqual((page["resultsPerPage"], page["startIndex"]), (2000, 3381 - 2000))
-            self.assertEqual(len([call for call in calls if call["resultsPerPage"] == 1]), 9)  # 7 días, 30 días y 7 por día
+            self.assertEqual(len([call for call in calls if call["resultsPerPage"] == 1]), 9)  # 7d, 30d and 7 per day
             with patch("tamandua.modules.intel.advisories._refresh_in_background"):
                 advisories._feed_cache.pop("nvd-recent", None)
                 recent = advisories.load_recent_cves(Path(directory))

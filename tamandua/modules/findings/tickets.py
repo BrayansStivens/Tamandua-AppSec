@@ -26,7 +26,7 @@ def _remember(data_dir: Path, asset: str, fingerprint: str, link: dict) -> None:
 
 
 def annotate(data_dir: Path, record: dict) -> dict:
-    """Añade a cada hallazgo el ticket ya creado, si lo hay."""
+    """Adds to each finding the ticket already created for it, if any."""
     if record.get("type") not in (*FINDING_RUNS, "asset_state"):
         return record
     links = load_links(data_dir).get(asset_key(record), {})

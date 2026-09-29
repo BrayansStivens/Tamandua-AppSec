@@ -1,4 +1,4 @@
-"""Esquema de PostgreSQL: migraciones de Alembic al arrancar (antes que cualquier lectura)."""
+"""PostgreSQL schema: Alembic migrations at startup (before any read)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ SCRIPTS = Path(__file__).resolve().parent / "alembic"
 
 
 def tables() -> None:
-    """Registra todas las tablas en `db.metadata` (la fuente de las migraciones)."""
+    """Registers every table in `db.metadata` (the source of the migrations)."""
     import tamandua.modules.findings.tables  # noqa: F401
     import tamandua.modules.identity.tables  # noqa: F401
     import tamandua.modules.integrations.tables  # noqa: F401
@@ -33,13 +33,13 @@ def config() -> Config:
 
 
 def upgrade() -> None:
-    """Lleva el esquema a la última versión. En pruebas (esquema por carpeta de datos) lo crea `db` al vuelo."""
+    """Brings the schema to the latest version. In tests (one schema per data folder) `db` creates it on the fly."""
     tables()
     if settings.text("TAMANDUA_DB_ISOLATE") == "data-dir":
         return
     with db.engine().begin() as connection:
-        # API y worker arrancan a la vez: sin cerrojo, los dos crearían las mismas tablas y uno fallaría.
-        # El segundo espera aquí y, al entrar, Alembic ya ve el esquema al día.
+        # API and worker start together: without a lock both would create the same tables and one would fail.
+        # The second one waits here and, once in, Alembic already sees the schema up to date.
         db.lock(connection, "schema-upgrade")
         alembic = config()
         alembic.attributes["connection"] = connection

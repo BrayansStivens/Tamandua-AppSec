@@ -1,8 +1,8 @@
-"""Fuente de cada aviso de dependencias: de qué base viene y bajo qué licencia.
+"""Source of each dependency advisory: which database it comes from and under what license.
 
-Los avisos que muestra Tamandua salen de bases públicas con licencias distintas (ver THIRD_PARTY_NOTICES.md).
-Cada hallazgo guarda su fuente para poder atribuirla en el panel y en los informes, y para que un servicio
-gestionado sepa qué fuentes no admiten uso comercial. Licencias revisadas el 2026-09-25.
+The advisories Tamandua shows come from public databases with different licenses (see THIRD_PARTY_NOTICES.md).
+Each finding keeps its source so it can be attributed in the panel and in reports, and so a managed service
+knows which sources don't allow commercial use. Licenses reviewed on 2026-09-25.
 """
 
 from __future__ import annotations
@@ -14,9 +14,9 @@ UNDECLARED = msg("intel.sources.licenses.undeclared")
 NO_LICENSE = {"intel.sources.licenses.undeclared", "intel.sources.licenses.undeclared_copyright",
               "intel.sources.licenses.undeclared_restrictive", "intel.sources.licenses.unreviewed"}
 
-# terms: «open» (sin condiciones), «attribution», «share-alike», «non-commercial», «unclear» (sin licencia o ambigua)
+# terms: "open" (no conditions), "attribution", "share-alike", "non-commercial", "unclear" (no license or ambiguous)
 _CATALOG: dict[str, tuple[str, str | dict, str, str]] = {
-    # id: (nombre, licencia, página, términos)
+    # id: (name, license, page, terms)
     "ghsa": ("GitHub Advisory Database", "CC BY 4.0", "https://github.com/advisories", "attribution"),
     "glad": ("GitLab Advisory Database (community)", "MIT", "https://gitlab.com/gitlab-org/advisories-community", "attribution"),
     "govulndb": ("Go Vulnerability Database", "CC BY 4.0", "https://pkg.go.dev/vuln/", "attribution"),
@@ -60,17 +60,17 @@ _CATALOG: dict[str, tuple[str, str | dict, str, str]] = {
     "secureos": ("SecureOS", UNDECLARED, "https://security.secureos.io", "unclear"),
     "aqua": ("Aqua Security", "Apache-2.0", "https://github.com/aquasecurity/vuln-list-aqua", "attribution"),
 }
-# Variantes con las que Trivy o Grype nombran la misma base.
+# Other names Trivy or Grype use for the same database.
 _ALIASES = {"redhat-oval": "redhat", "redhat-csaf-vex": "redhat", "hummingbird": "redhat", "rhel": "redhat",
             "github": "ghsa", "sles": "suse-cvrf", "suse": "suse-cvrf", "oracle": "oracle-oval", "oraclelinux": "oracle-oval",
             "mariner": "cbl-mariner", "azurelinux": "azure", "arch": "arch-linux", "amazonlinux": "amazon", "almalinux": "alma",
             "go": "govulndb", "chainguard-libraries": "chainguard", "chainguard_libraries": "chainguard"}
-# Prefijo del identificador OSV → base de origen.
+# OSV identifier prefix → source database.
 _OSV_PREFIX = {"MAL-": "ossf-malicious", "GHSA-": "ghsa", "PYSEC-": "pypa", "RUSTSEC-": "rustsec", "GO-": "govulndb", "JLSEC-": "julia",
                "BIT-": "bitnami", "CGA-": "chainguard", "ALSA-": "alma", "ALBA-": "alma", "RLSA-": "rocky", "UBUNTU-": "ubuntu",
                "USN-": "ubuntu", "DSA-": "debian", "DLA-": "debian", "DEBIAN-": "debian", "SUSE-": "suse-cvrf", "RHSA-": "redhat"}
 
-# Nombre corto para columnas estrechas (el completo va en «Fuentes de los avisos»).
+# Short name for narrow columns (the full one goes in "Advisory sources").
 _SHORT = {"ghsa": "GitHub", "glad": "GitLab", "govulndb": "Go", "julia": "Julia", "k8s": "Kubernetes", "nodejs-security-wg": "Node.js",
           "php-security-advisories": "PHP", "ruby-advisory-db": "RubySec", "pypa": "PyPA", "rustsec": "RustSec", "osv": "OSV",
           "nvd": "NVD", "euvd": "EUVD", "redhat": "Red Hat", "suse-cvrf": "SUSE", "ubuntu": "Ubuntu", "alpine": "Alpine", "debian": "Debian",
@@ -85,7 +85,7 @@ TERMS_LABEL = {"open": msg("intel.sources.terms.open"), "attribution": msg("inte
 
 
 def describe(source_id: str, *, url: str | None = None, name: str | None = None) -> dict:
-    """{id, name, url, license, terms} de una base; lo desconocido queda como «sin licencia clara»."""
+    """{id, name, url, license, terms} of a database; an unknown one is left without a clear license."""
     key = _ALIASES.get(source_id, source_id)
     known = _CATALOG.get(key)
     if known:
@@ -124,7 +124,7 @@ def _no_license(value) -> bool:
 
 
 def attribution(findings: list[dict], *, locale: str | None = None) -> list[str]:
-    """Líneas de atribución de un informe: cada base usada, su licencia y su página, más los avisos de NVD, KEV y EPSS."""
+    """A report's attribution lines: each database used, its license and page, plus the NVD, KEV and EPSS notices."""
     used: dict[str, tuple[dict, int]] = {}
     for finding in findings:
         source = finding.get("source")

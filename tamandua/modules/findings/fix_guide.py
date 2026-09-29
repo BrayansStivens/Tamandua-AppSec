@@ -1,14 +1,14 @@
-"""Cómo corregir cada hallazgo, en concreto: el comando del gestor de paquetes, el ejemplo de código, los pasos.
+"""How to fix each finding, concretely: the package manager command, the code example, the steps.
 
-- Dependencias: el gestor sale del archivo donde se declaró (package-lock.json → npm, poetry.lock → Poetry…)
-  y la corrección depende de si la dependencia es directa o transitiva (en una transitiva se fuerza con un
-  override). La versión es la que cierra todos los avisos de ese paquete, no solo el del hallazgo.
-- Código: un ejemplo antes/después de la regla (fix_examples), en su lenguaje.
-- Secretos: rotar primero; borrar del código no basta, ya está en el historial.
-- Paquetes del sistema de una imagen: en el Dockerfile.
+- Dependencies: the manager comes from the file that declared it (package-lock.json → npm, poetry.lock → Poetry…)
+  and the fix depends on whether the dependency is direct or transitive (a transitive one is forced with an
+  override). The version is the one that closes every advisory for that package, not just this finding's.
+- Code: a before/after example for the rule (fix_examples), in its language.
+- Secrets: rotate first; removing them from the code isn't enough, they're already in the history.
+- An image's system packages: in the Dockerfile.
 
-Todo lo que se interpola viene del repositorio analizado (nombres de paquete, rutas): se usa como texto y
-quien lo pinta lo escapa. Los nombres raros (espacios, comillas) no generan comando: solo pasos.
+Everything interpolated comes from the scanned repository (package names, paths): it is used as text and
+whoever renders it escapes it. Odd names (spaces, quotes) get no command, only steps.
 """
 
 from __future__ import annotations
@@ -21,10 +21,10 @@ from tamandua.modules.findings.fix_examples import EXAMPLES
 from tamandua.shared.i18n import msg
 from tamandua.shared.model import Finding
 
-# Lo que entra en una orden: sin metacaracteres de shell y sin empezar por «-» (se leería como una opción del gestor).
+# What goes into a command: no shell metacharacters and no leading "-" (the manager would read it as an option).
 SAFE_NAME = re.compile(r"[A-Za-z0-9@._][A-Za-z0-9@/._:+-]{0,199}")
 SAFE_VERSION = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+~:-]{0,99}")
-# «Reverificar» analiza la rama principal remota (o la imagen publicada), no la copia local.
+# "Re-verify" scans the remote main branch (or the published image), not the local copy.
 VERIFY = msg("findings.fix.verify")
 VERIFY_DEPENDENCY = msg("findings.fix.verify_dependency")
 VERIFY_IMAGE = msg("findings.fix.verify_image")
@@ -32,7 +32,7 @@ VERIFY_IMAGE = msg("findings.fix.verify_image")
 COMMAND_LABELS = {"update": msg("findings.fix.commands.update"), "reinstall": msg("findings.fix.commands.reinstall"),
                   "install": msg("findings.fix.commands.install")}
 
-# Archivo de dependencias → gestor.
+# Dependency file → package manager.
 MANAGERS = {"package-lock.json": "npm", "npm-shrinkwrap.json": "npm", "package.json": "npm", "yarn.lock": "yarn",
             "pnpm-lock.yaml": "pnpm", "bun.lock": "bun", "bun.lockb": "bun", "poetry.lock": "poetry", "uv.lock": "uv",
             "pipfile.lock": "pipenv", "pdm.lock": "pdm", "go.mod": "go", "go.sum": "go", "cargo.lock": "cargo", "cargo.toml": "cargo",
@@ -73,7 +73,7 @@ def _dependency(finding: Finding, target: str | None) -> dict:
                 "commands": [], "example": None}
     add = lambda action, code: commands.append({"label": COMMAND_LABELS[action], "action": action, "code": code})
     transitive = direct is False
-    dev = bool(package.get("dev"))  # de desarrollo: el comando no debe moverla a producción
+    dev = bool(package.get("dev"))  # a dev dependency: the command must not move it to production
     fixed = package.get("fixed_version")
     if fixed and fixed != target:
         steps.append(msg("findings.fix.closes_all", version=target, package=name, fixed=fixed))
@@ -101,7 +101,7 @@ def _dependency(finding: Finding, target: str | None) -> dict:
     elif tool == "pdm":
         add("update", f"pdm update {name}" if transitive else f'pdm add{" -d" if dev else ""} "{name}>={target}"')
     elif tool == "go" and name in ("stdlib", "toolchain"):
-        # La librería estándar de Go no se actualiza con go get: se compila con una versión de Go corregida.
+        # Go's standard library isn't updated with go get: rebuild with a fixed Go version.
         steps.append(msg("findings.fix.go_stdlib", version=target.lstrip("v")))
         add("update", f"go mod edit -toolchain=go{target.lstrip('v')}")
     elif tool == "go":
@@ -158,7 +158,7 @@ def _secret(finding: Finding) -> dict:
 def guide(finding: Finding, *, target: str | None = None) -> dict | None:
     scanner = finding.get("scanner")
     if finding.get("malicious"):
-        # Nada que actualizar: se quita y se da por comprometido lo que lo instaló (ver advisories.malicious_finding).
+        # Nothing to update: remove it; whatever installed it is compromised (see advisories.malicious_finding).
         return {"kind": "dependency", "steps": [finding.get("remediation") or "", VERIFY], "commands": [], "example": None}
     if scanner == "sca" and (finding.get("package") or {}).get("name"):
         return _dependency(finding, target or (finding.get("package") or {}).get("fixed_version"))
@@ -175,9 +175,9 @@ def guide(finding: Finding, *, target: str | None = None) -> dict | None:
 
 
 def attach(findings: list[Finding]) -> list[Finding]:
-    """Añade `fix` a cada hallazgo. En dependencias, la versión que cierra todos los avisos del mismo paquete."""
+    """Adds `fix` to each finding. For dependencies, the version that closes every advisory for the same package."""
     targets: dict[tuple, str] = {}
-    # Un paquete malicioso no se actualiza: sus otros avisos tampoco deben proponer «actualiza a…».
+    # A malicious package is not upgraded: its other advisories must not suggest "upgrade to…" either.
     hostile = {(item.get("path"), (item.get("package") or {}).get("name"), (item.get("package") or {}).get("version"))
                for item in findings if item.get("malicious")}
     for finding in findings:

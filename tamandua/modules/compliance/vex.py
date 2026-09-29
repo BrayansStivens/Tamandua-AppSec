@@ -1,15 +1,15 @@
-"""VEX (OpenVEX 0.2.0): el triage convertido en declaraciones estándar sobre cada vulnerabilidad.
+"""VEX (OpenVEX 0.2.0): triage turned into standard statements about each vulnerability.
 
-Un VEX responde «¿esta vulnerabilidad de una dependencia afecta a mi producto?». Tamandua ya guarda esa decisión
-con su motivo, autor y fecha; aquí se traduce, sin inventar más de lo que se decidió:
+A VEX answers "does this dependency vulnerability affect my product?". Tamandua already stores that decision with
+its reason, author and date; this maps it over, claiming nothing beyond what was decided:
 
-* **Abierto, sin decidir** → `under_investigation`: el escáner lo encontró, nadie lo ha confirmado.
-* **En curso** → `affected`, con la corrección como acción.
-* **Riesgo aceptado** → `affected`, con el motivo y la caducidad como acción.
-* **Falso positivo** → `not_affected`, con el motivo como declaración de impacto.
-* **Remediado** (a mano o porque dejó de aparecer) → `fixed`.
+* **Open, undecided** → `under_investigation`: the scanner found it, nobody has confirmed it.
+* **In progress** → `affected`, with the fix as the action.
+* **Risk accepted** → `affected`, with the reason and the expiry as the action.
+* **False positive** → `not_affected`, with the reason as the impact statement.
+* **Remediated** (by hand or because it stopped showing up) → `fixed`.
 
-Solo entran avisos de dependencias con identificador (CVE, GHSA…): el código propio no se describe con VEX.
+Only dependency advisories with an identifier (CVE, GHSA…) are included: first-party code is not described with VEX.
 """
 
 from __future__ import annotations

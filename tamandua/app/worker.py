@@ -1,9 +1,9 @@
-"""Proceso worker: ejecuta los análisis de la cola y las tareas periódicas. Es el único que necesita Docker.
+"""Worker process: runs the queued scans and the periodic tasks. It is the only one that needs Docker.
 
-* Análisis: reclama trabajos de la cola de PostgreSQL (varios workers pueden correr a la vez).
-* Tareas periódicas —vigilancia de PRs y de la rama principal, avisos nuevos diarios, sincronización de NVD y el
-  buzón de avisos—: solo las corre un worker, el que tiene el cerrojo de líder en PostgreSQL. Si ese worker muere,
-  su conexión se cierra, el cerrojo se libera y otro lo toma.
+* Scans: claims jobs from the PostgreSQL queue (several workers can run at once).
+* Periodic tasks (PR and main-branch watching, daily new advisories, NVD sync and the notification outbox): only
+  one worker runs them, the one holding the leader lock in PostgreSQL. If that worker dies, its connection closes,
+  the lock is released and another worker takes it.
 """
 
 from __future__ import annotations
@@ -27,13 +27,13 @@ LEADER_KEY = int.from_bytes(hashlib.sha256(b"tamandua:worker-leader").digest()[:
 
 
 def start_periodic(data_dir: Path, jobs: ScanJobs) -> list:
-    """Arranca las tareas periódicas (hilos). Las usan el worker líder y el modo de un solo proceso."""
+    """Starts the periodic tasks (threads). Used by the leader worker and by single-process mode."""
     from tamandua.modules.integrations.installations import github_installations
     from tamandua.modules.runs.advisory_watch import Watcher as AdvisoryWatcher
     from tamandua.modules.intel.cve_db import Syncer
     from tamandua.modules.pullrequests.watch import Watcher
     tasks = [Watcher(data_dir, jobs, lambda: github_installations(data_dir)), Syncer(data_dir),
-             # Una vez al día, las dependencias ya analizadas contra los avisos publicados después (sin conexión).
+             # Once a day, the already scanned dependencies against advisories published since (offline).
              AdvisoryWatcher(data_dir), OutboxDrainer(data_dir)]
     for task in tasks:
         task.start()
@@ -41,7 +41,7 @@ def start_periodic(data_dir: Path, jobs: ScanJobs) -> list:
 
 
 class OutboxDrainer:
-    """Entrega el buzón de avisos cada pocos segundos (con reintentos; ver notifications.drain)."""
+    """Delivers the notification outbox every few seconds (with retries; see notifications.drain)."""
 
     def __init__(self, data_dir: Path, interval: float = 10.0):
         self.data_dir, self.interval = data_dir, interval
@@ -60,7 +60,7 @@ class OutboxDrainer:
         while not self._stop.wait(self.interval):
             try:
                 notifications.drain(self.data_dir)
-            except Exception:  # noqa: BLE001 — un canal o la base caídos no paran el worker
+            except Exception:  # noqa: BLE001 — a channel or the database being down doesn't stop the worker
                 log.exception("outbox_drain_failed")
 
 
@@ -123,7 +123,7 @@ def run(data_dir: Path) -> None:
 
 
 def healthy(data_dir: Path) -> bool:
-    """Para el healthcheck del contenedor: algún worker de esta máquina (hostname) latió hace poco."""
+    """For the container healthcheck: some worker on this machine (hostname) sent a heartbeat recently."""
     import socket
     from tamandua.modules.runs import queue
     host = socket.gethostname()

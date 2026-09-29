@@ -1,19 +1,19 @@
-"""Decisiones de triage que sobreviven entre escaneos.
+"""Triage decisions that survive across scans.
 
-La decisión se ata a la huella estable del hallazgo dentro de un activo (el
-repositorio), no a una ejecución: si mañana se vuelve a escanear y el hallazgo
-sigue ahí, sigue marcado como falso positivo o riesgo aceptado. «Corregido» no se
-guarda: se deduce cuando la huella deja de aparecer.
+A decision is tied to the finding's stable fingerprint within an asset (the
+repository), not to a run: if it is scanned again tomorrow and the finding is
+still there, it stays marked as a false positive or accepted risk. "Fixed" is not
+stored: it is inferred when the fingerprint stops appearing.
 
-Estados:
-* ``open``: por defecto, sin decisión.
-* ``in_progress``: alguien lo está corrigiendo.
-* ``false_positive``: no aplica; exige motivo.
-* ``fixed``: remediado a mano, con justificación; se reabre si reaparece.
-* ``accepted``: riesgo asumido; exige motivo, lo decide un administrador y
-  caduca (máximo un año). Al caducar vuelve a contar como abierto.
+States:
+* ``open``: the default, no decision.
+* ``in_progress``: someone is fixing it.
+* ``false_positive``: doesn't apply; requires a reason.
+* ``fixed``: remediated by hand, with a justification; reopens if it shows up again.
+* ``accepted``: risk accepted; requires a reason, is decided by an administrator and
+  expires (one year at most). Once expired it counts as open again.
 
-Cada cambio queda en el historial del hallazgo con quién, cuándo y por qué.
+Every change is kept in the finding's history with who, when and why.
 """
 
 from __future__ import annotations
@@ -50,20 +50,20 @@ LABELS = {"open": msg("findings.triage.status.open"), "in_progress": msg("findin
           "fixed": msg("findings.triage.status.fixed")}
 TOO_LONG = {"reason": "findings.triage.errors.reason_too_long", "note": "findings.triage.errors.note_too_long"}
 CONTROL = {"reason": "findings.triage.errors.reason_control_characters", "note": "findings.triage.errors.note_control_characters"}
-# Lo que deja de contar como trabajo pendiente en paneles, tickets y SARIF. «Remediado» a mano exige
-# justificación y se reabre solo si el hallazgo vuelve a aparecer.
+# What no longer counts as pending work in dashboards, tickets and SARIF. Marking it remediated by hand requires a
+# justification, and it reopens only if the finding appears again.
 SUPPRESSED = ("false_positive", "accepted", "fixed")
 REASON_MIN, REASON_MAX, NOTE_MAX = 10, 500, 1000
 MAX_BATCH, HISTORY_MAX = 500, 50
 ACCEPT_DEFAULT_DAYS, ACCEPT_MAX_DAYS = 90, 365
 
 
-# `asset_key` vive en sources/assets.py: identidad estable del repositorio (id numérico de GitHub).
-# Las decisiones viven en PostgreSQL (tabla triage_decisions), una fila por activo y huella.
+# `asset_key` lives in sources/assets.py: the repository's stable identity (GitHub's numeric id).
+# Decisions live in PostgreSQL (table triage_decisions), one row per asset and fingerprint.
 
 
 def load(data_dir: Path) -> dict:
-    """Todas las decisiones: {activo: {huella: decisión}}. Para un solo activo, `load_asset` (más barato)."""
+    """Every decision: {asset: {fingerprint: decision}}. For a single asset, `load_asset` (cheaper)."""
     result: dict = {}
     with db.transaction(data_dir) as connection:
         for key, digest, decision in connection.execute(select(triage_decisions.c.asset_key, triage_decisions.c.fingerprint,
@@ -97,7 +97,7 @@ def forget_asset(data_dir: Path, key: str) -> int:
 
 
 def rename_asset(data_dir: Path, old: str, new: str) -> None:
-    """Un activo gana identidad estable (p. ej. github#id): sus decisiones pasan a la clave nueva; mandan las ya existentes allí."""
+    """An asset gains a stable identity (e.g. github#id): its decisions move to the new key; those already there win."""
     with db.transaction(data_dir) as connection:
         db.lock(connection, "triage", new)
         merged = {**load_asset(data_dir, old), **load_asset(data_dir, new)}
@@ -125,7 +125,7 @@ def _clean_text(value, *, limit: int, field: str) -> str:
 
 
 def effective(entry: dict | None, today: date | None = None) -> dict:
-    """Estado que cuenta hoy: una aceptación caducada vuelve a ser un hallazgo abierto."""
+    """The status that counts today: an expired acceptance is an open finding again."""
     if not entry:
         return {"status": "open"}
     status = entry.get("status", "open")
@@ -143,7 +143,7 @@ def effective(entry: dict | None, today: date | None = None) -> dict:
 
 
 def annotate(data_dir: Path, record: RunRecord, decisions: dict | None = None) -> RunRecord:
-    """Copia de la ejecución con el estado de triage en cada hallazgo y el recuento en el resumen."""
+    """A copy of the run with each finding's triage status and the counts in the summary."""
     if record.get("type") not in FINDING_RUNS:
         return record
     key = asset_key(record)
@@ -156,7 +156,7 @@ def annotate(data_dir: Path, record: RunRecord, decisions: dict | None = None) -
         findings.append({**finding, "triage": state})
     summary = {**record.get("summary", {}), "triage": counts,
                "actionable": counts["open"] + counts["in_progress"]}
-    # Cómo corregir cada hallazgo (comando, ejemplo, pasos): se calcula al servirlo, así mejora sin reanalizar.
+    # How to fix each finding (command, example, steps) is computed when served, so it improves without rescanning.
     from tamandua.modules.findings.fix_guide import attach
     from tamandua.modules.findings.verifications import annotate as verified
     return {**record, "findings": verified(data_dir, asset_key(record), attach(findings)), "summary": summary}
@@ -168,7 +168,7 @@ def is_active(finding: dict) -> bool:
 
 def decide(data_dir: Path, record: RunRecord, fingerprints, status, *, reason=None, note=None, expires_at=None,
            user: dict, system_note: dict | None = None) -> RunRecord:
-    """Aplica una decisión a varios hallazgos de una ejecución. Solo huellas que la ejecución contiene.
+    """Applies one decision to several findings of a run. Only fingerprints the run contains.
 
     `system_note`: a message written by Tamandua itself (never from a request), stored instead of `note`."""
     if status not in STATUSES:
@@ -202,7 +202,7 @@ def decide(data_dir: Path, record: RunRecord, fingerprints, status, *, reason=No
              "expires_at": expires_at, "run_id": record["id"]}
     key = asset_key(record)
     with db.transaction(data_dir) as connection:
-        db.lock(connection, "triage", key)  # dos decisiones a la vez sobre el mismo activo no se pisan el historial
+        db.lock(connection, "triage", key)  # concurrent decisions on one asset don't overwrite each other's history
         asset = load_asset(data_dir, key)
         for digest in dict.fromkeys(fingerprints):
             entry = asset.get(digest, {"history": []})

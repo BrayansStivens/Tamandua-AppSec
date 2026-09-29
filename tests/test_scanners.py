@@ -1,4 +1,4 @@
-"""Contrato de los motores en contenedor: parsers contra salidas reales, sin secretos y sin fingir."""
+"""Contract of the containerised engines: parsers against real outputs, no secrets and no faking."""
 
 import json
 import unittest
@@ -32,7 +32,7 @@ class TrivyParserTests(unittest.TestCase):
         self.assertEqual(lodash["severity"], "high")
         self.assertIn("de 4.17.20 a 4.17.21", text(lodash["remediation"]))
         self.assertEqual(lodash["cve"], ["CVE-2021-23337"])
-        # Misma huella que produciría el camino OSV para el mismo aviso: no duplica tickets entre motores.
+        # Same fingerprint the OSV path would produce for the same advisory: no duplicate tickets across engines.
         from tamandua.modules.intel.advisories import fingerprint
         self.assertEqual(lodash["fingerprint"], fingerprint("sca", "CVE-2021-23337", "npm", "lodash", "4.17.20"))
 
@@ -71,7 +71,7 @@ class GitleaksParserTests(unittest.TestCase):
         finding = findings[0]
         self.assertEqual((finding["rule_id"], finding["path"], finding["line"]), ("slack-bot-token", "config.py", 4))
         self.assertEqual(finding["severity"], "critical")
-        # El valor no viaja: ni las claves crudas de gitleaks ni el token, ni siquiera redactado.
+        # The value never travels: neither gitleaks' raw keys nor the token, not even redacted.
         self.assertFalse({"Secret", "Match", "Fingerprint"} & set(finding))
         serialized = json.dumps(finding)
         for forbidden in ("REDACTED", "xoxb"):
@@ -161,12 +161,12 @@ class DevDependencyTests(unittest.TestCase):
                                 "Vulnerabilities": [vuln("postcss", "postcss@1.0.0"), vuln("express", "express@1.0.0")]}]}
         by_name = {item["package"]["name"]: item for item in parse_trivy(payload, {})}
         self.assertTrue(by_name["postcss"]["package"]["dev"])
-        # Crítica sin KEV ni EPSS alto: «atender» en producción, un nivel menos por ser de desarrollo.
+        # Critical without KEV or high EPSS: «attend» in production, one level lower for a dev dependency.
         self.assertEqual((by_name["express"]["priority"]["action"], by_name["postcss"]["priority"]["action"]), ("attend", "track"))
         self.assertIn("desarrollo", " ".join(text(item) for item in by_name["postcss"]["priority"]["factors"]))
         self.assertFalse(by_name["express"]["package"]["dev"])
         self.assertTrue(by_name["express"]["package"]["direct"])
-        # Con EPSS alto, «actuar ya» baja a «atender»; en CISA KEV no se rebaja aunque sea de desarrollo.
+        # With high EPSS, «act» drops to «attend»; in CISA KEV it is not lowered even for a dev dependency.
         epss = {"epss": {"CVE-2026-7000": (0.5, 0.99)}}
         self.assertEqual({item["package"]["name"]: item for item in parse_trivy(payload, epss)}["postcss"]["priority"]["action"], "attend")
         kev = {"kev": {"CVE-2026-7000": {"date_added": "2026-09-01"}}}

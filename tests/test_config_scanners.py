@@ -62,7 +62,7 @@ class MergeTests(unittest.TestCase):
         logging = [item for item in merged if cs.trivy_id(item["rule_id"]) == "AWS-0089"]
         self.assertTrue(logging and all(item["related_rules"] == ["CKV_AWS_18"] for item in logging))
         self.assertTrue(all("checkov" in item["also_detected_by"] for item in logging))
-        # Mismo archivo y regla equivalente, pero otro bucket: no es el mismo hallazgo.
+        # Same file and equivalent rule, but another bucket: not the same finding.
         self.assertTrue(any(item["tool"] == "checkov" and item["rule_id"] == "CKV_AWS_18" for item in merged))
         keys = [(item["path"], item["rule_id"], item["line"]) for item in merged]
         self.assertEqual(len(keys), len(set(keys)))
@@ -97,7 +97,7 @@ class ZizmorTests(unittest.TestCase):
     def test_parse_translates_and_locates(self):
         findings = cs.parse_zizmor(load("zizmor.json"))
         unpinned = next(item for item in findings if item["rule_id"] == "unpinned-uses")
-        self.assertEqual(unpinned["severity"], "medium")  # zizmor dice alta; se rebaja un nivel, documentado.
+        self.assertEqual(unpinned["severity"], "medium")  # zizmor says high; lowered one level, documented.
         self.assertEqual(unpinned["scanner"], "cicd")
         self.assertTrue(unpinned["path"].startswith(".github/workflows/"))
         self.assertGreater(unpinned["line"], 1)
@@ -118,7 +118,7 @@ class ImageTests(unittest.TestCase):
         text, step_of = cs.dockerfile_from_history(load("image-history.json"))
         lines = text.splitlines()
         self.assertEqual(lines[0], "FROM scratch")
-        self.assertEqual(lines[1], "COPY rootfs /")  # la capa base no es un ADD del autor
+        self.assertEqual(lines[1], "COPY rootfs /")  # the base layer isn't an ADD by the author
         self.assertIn("RUN curl -k https://example.com/install.sh | sh", lines)
         self.assertIn("RUN pip install --trusted-host pypi.example.com flask", lines)
         self.assertIn("EXPOSE 22/tcp 8080/tcp", lines)
@@ -140,7 +140,7 @@ class ImageTests(unittest.TestCase):
         merged, joined = cs.merge_image(own, [], checkov)
         rules = {item["rule_id"] for item in merged}
         self.assertTrue({"IMG-ROOT", "IMG-SSH", "IMG-NO-HEALTHCHECK"} <= rules)
-        self.assertFalse(rules & {"CKV_DOCKER_1", "CKV_DOCKER_2", "CKV_DOCKER_8"})  # ya cubiertas por reglas propias
+        self.assertFalse(rules & {"CKV_DOCKER_1", "CKV_DOCKER_2", "CKV_DOCKER_8"})  # already covered by our own rules
         self.assertTrue({"CKV2_DOCKER_2", "CKV2_DOCKER_4", "CKV2_DOCKER_6"} <= rules)  # curl -k, pip --trusted-host, NODE_TLS
         curl = next(item for item in merged if item["rule_id"] == "CKV2_DOCKER_2")
         self.assertEqual(curl["path"], "image-history/step-5")
@@ -186,7 +186,7 @@ class OpengrepDuplicatesTests(unittest.TestCase):
 
 
 class EngineUserTests(unittest.TestCase):
-    """En Linux, root sin capacidades no entra en las carpetas 0700 de la app: los motores corren con su UID."""
+    """On Linux, root without capabilities can't enter the app's 0700 folders: the engines run with its UID."""
 
     def setUp(self):
         testenv.docker_runner(self)

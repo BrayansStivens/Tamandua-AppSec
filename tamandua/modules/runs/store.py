@@ -1,4 +1,4 @@
-"""Persistencia local de ejecuciones, sin aceptar nombres de archivo del usuario."""
+"""Local persistence of runs, never accepting file names from the user."""
 
 from __future__ import annotations
 from tamandua.modules.findings.triage import LABELS as TRIAGE_LABELS, SUPPRESSED
@@ -61,7 +61,7 @@ def _persist(data_dir: Path, record: dict, report: str, sarif: dict | None = Non
 
 
 def save_record(data_dir: Path, record: RunRecord) -> None:
-    """Guarda el registro de una ejecución (progreso, estado, resultado) sin tocar su informe ni su SARIF."""
+    """Saves a run's record (progress, status, result) without touching its report or its SARIF."""
     values = _values(record)
     statement = insert(runs).values(tenant_id=TENANT, id=_check_id(record["id"]), **values)
     with db.transaction(data_dir) as connection:
@@ -73,7 +73,7 @@ def _row(record: dict) -> dict:
     for key in ("variant", "source", "context", "started_at", "finished_at", "pull_request", "trigger"):
         if key in record and record[key] is not None:
             item[key] = record[key]
-    # La lista no lleva hallazgos: solo lo necesario para una fila.
+    # The listing carries no findings: only what a row needs.
     if isinstance(item.get("summary"), dict):
         item["summary"] = {key: value for key, value in item["summary"].items() if key != "tools"} | {"tools": item["summary"].get("tools", [])}
     return item
@@ -81,7 +81,7 @@ def _row(record: dict) -> dict:
 
 def page_runs(data_dir: Path, *, limit: int = 25, offset: int = 0, status: str | None = None,
               kind: str | None = None, query: str | None = None, asset: str | None = None) -> dict:
-    """Filtra, cuenta y pagina en la base (antes se cargaban todas las filas en memoria)."""
+    """Filters, counts and paginates in the database (all rows used to be loaded into memory)."""
     conditions = [runs.c.tenant_id == TENANT]
     if asset:
         conditions.append(runs.c.asset_key == asset)
@@ -103,7 +103,7 @@ def page_runs(data_dir: Path, *, limit: int = 25, offset: int = 0, status: str |
 
 
 def artifact(data_dir: Path, run_id: str, name: str) -> bytes:
-    """Informe Markdown o SARIF guardados con la ejecución."""
+    """The Markdown report or the SARIF stored with the run."""
     column = {"report.md": runs.c.report, "findings.sarif": runs.c.sarif}[name]
     with db.transaction(data_dir) as connection:
         value = connection.execute(select(column).where(runs.c.tenant_id == TENANT, runs.c.id == _check_id(run_id))).scalar_one_or_none()
@@ -120,10 +120,10 @@ def delete_runs(data_dir: Path, run_ids: list[str]) -> int:
 
 
 def save_repository_scan(data_dir: Path, scan: RunRecord, *, run_id: str | None = None, created_at: str | None = None) -> RunRecord:
-    # Un escaneo en segundo plano ya tiene su identificador y su carpeta desde que se encoló.
+    # A background scan already has its ID and its folder from the moment it was queued.
     record = {"schema_version": "0.3.0", "id": run_id or uuid.uuid4().hex,
               "created_at": created_at or datetime.now(timezone.utc).isoformat(), **scan}
-    # Rutas excluidas por un administrador: salen del informe, del SARIF y del panel, contadas en los límites.
+    # Paths excluded by an administrator drop out of the report, the SARIF and the panel, counted in the limits.
     from tamandua.modules.sources.assets import asset_key
     from tamandua.modules.findings.exclusions import apply_to_record
     from tamandua.modules.findings.kinds import FINDING_RUNS
@@ -134,9 +134,9 @@ def save_repository_scan(data_dir: Path, scan: RunRecord, *, run_id: str | None 
     # The run, the findings registry and the outbox entries land together or not at all.
     with db.transaction(data_dir):
         saved = _persist(data_dir, record, report, sarif, replace=run_id is not None)
-        # Toda ejecución terminada, venga de donde venga (trabajador o CLI), actualiza el registro de hallazgos.
+        # Every finished run, wherever it comes from (worker or CLI), updates the findings registry.
         changes = apply(data_dir, saved)
-        # Lo nuevo que importa, a los canales configurados (Slack, Teams, webhook), vía el buzón de salida.
+        # What is new and matters goes to the configured channels (Slack, Teams, webhook) through the outbox.
         if changes.get("new"):
             from tamandua.modules.integrations import notifications
             from tamandua.modules.findings import triage
@@ -536,7 +536,7 @@ def load_run(data_dir: Path, run_id: str) -> RunRecord:
 
 
 def list_runs(data_dir: Path) -> list[dict]:
-    """Las filas de listado, de la más reciente a la más antigua. To look for some of them, `find_runs`."""
+    """The listing rows, newest first. To look for some of them, `find_runs`."""
     return find_runs(data_dir)
 
 

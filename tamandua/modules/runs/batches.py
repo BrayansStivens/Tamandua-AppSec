@@ -1,14 +1,14 @@
-"""Lotes de análisis: varios repositorios, o una organización entera, sin ir uno por uno.
+"""Scan batches: several repositories, or a whole organization, without going one by one.
 
-Un lote es una lista persistida (`data/batches/<id>.json`). No crea cientos de ejecuciones en
-cola de golpe: el trabajador toma el siguiente repositorio **solo cuando no tiene otra cosa**,
-así un análisis manual o la revisión de un PR nunca esperan detrás de 900 repositorios. Si el
-servidor se reinicia, el lote sigue donde iba. El progreso sale de las ejecuciones reales (el
-índice), no de un contador aparte que pueda desincronizarse.
+A batch is a persisted list (`data/batches/<id>.json`). It doesn't queue hundreds of runs at
+once: the worker takes the next repository **only when it has nothing else to do**, so a
+manual scan or a PR review never waits behind 900 repositories. If the server restarts, the
+batch resumes where it was. Progress comes from the real runs (the index), not from a
+separate counter that could drift out of sync.
 
-Repositorios de la GitHub App (su acceso se renueva solo; los tokens personales viven en memoria de la
-sesión y no sirven para un trabajo de horas) o imágenes de contenedor (con las credenciales de registro
-guardadas, si las hay).
+GitHub App repositories (their access renews itself; personal tokens live in the session's memory
+and are no use for a job that takes hours) or container images (with the stored registry
+credentials, if any).
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from pathlib import Path
 from tamandua.shared import documents
 from tamandua.shared.i18n import msg, text
 
-MAX_SELECTED = 100      # selección a mano, cualquier miembro
-MAX_ITEMS = 5000        # organización entera (administración)
+MAX_SELECTED = 100      # hand-picked, any member
+MAX_ITEMS = 5000        # whole organization (admins)
 ID = re.compile(r"[0-9a-f]{32}")
 
 
@@ -67,8 +67,8 @@ def active(data_dir: Path) -> dict | None:
 
 
 def create(data_dir: Path, items: list[dict], *, by: str, label: str, allow_osv_upload: bool = False, context: str = "") -> dict:
-    """`items`: repositorios ya validados ({source_id, name, uid, installation_id}) o imágenes ya validadas
-    ({kind: "image", image, name}). Uno activo a la vez."""
+    """`items`: already validated repositories ({source_id, name, uid, installation_id}) or already validated
+    images ({kind: "image", image, name}). One active at a time."""
     if not items:
         raise BatchError(msg("runs.batch.empty"))
     if len(items) > MAX_ITEMS:
@@ -76,7 +76,7 @@ def create(data_dir: Path, items: list[dict], *, by: str, label: str, allow_osv_
     with documents.lock(data_dir, "batches"):
         if active(data_dir):
             raise BatchError(msg("runs.batch.already_running"))
-        # Una imagen se identifica por su referencia completa (dos etiquetas del mismo repositorio son dos análisis).
+        # An image is identified by its full reference (two tags of the same repository are two scans).
         unique = list({(item["image"]["reference"] if item.get("kind") == "image" else item["source_id"]): item for item in items}.values())
         batch = {"id": uuid.uuid4().hex, "created_at": _now(), "by": by, "label": label[:120], "status": "running",
                  "allow_osv_upload": bool(allow_osv_upload), "context": " ".join(context.split())[:400],
@@ -98,7 +98,7 @@ def cancel(data_dir: Path, batch_id: str, *, by: str) -> dict:
 
 
 def take_next(data_dir: Path) -> tuple[dict, int] | None:
-    """El siguiente repositorio pendiente del lote activo (y lo marca como tomado). None si no queda nada."""
+    """The next pending repository of the active batch (and marks it as taken). None if nothing is left."""
     finished = None
     with documents.lock(data_dir, "batches"):
         batch = active(data_dir)
@@ -112,14 +112,14 @@ def take_next(data_dir: Path) -> tuple[dict, int] | None:
         batch.update(status="done", finished_at=_now())
         _write(data_dir, batch)
         finished = batch
-    # Fuera del cerrojo: el aviso consulta el progreso real (las ejecuciones) y no bloquea a nadie.
+    # Outside the lock: the notification reads the real progress (the runs) and blocks no one.
     from tamandua.modules.integrations import notifications
     notifications.on_batch(summary(data_dir, finished), data_dir=data_dir)
     return None
 
 
 def release_taken(data_dir: Path) -> None:
-    """Al arrancar: un repositorio tomado pero sin ejecución (el proceso murió entre medias) vuelve a la cola."""
+    """On startup: a repository taken but without a run (the process died in between) goes back to the queue."""
     with documents.lock(data_dir, "batches"):
         batch = active(data_dir)
         if batch and any(item.get("run_id") == "pending" for item in batch["items"]):
@@ -140,7 +140,7 @@ def attach(data_dir: Path, batch_id: str, index: int, *, run_id: str | None = No
 
 
 def summary(data_dir: Path, batch: dict) -> dict:
-    """Progreso derivado de las ejecuciones reales, con estimación del tiempo restante."""
+    """Progress derived from the real runs, with an estimate of the time left."""
     from tamandua.modules.runs.store import find_runs
     runs = {row["id"]: row for row in find_runs(data_dir, ids=[item["run_id"] for item in batch["items"] if item.get("run_id")])}
     counts = {"pending": 0, "running": 0, "done": 0, "failed": 0}

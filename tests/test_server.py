@@ -1,4 +1,4 @@
-"""Pruebas sin socket del límite de acción del panel local."""
+"""Socketless tests of the local panel's action boundary."""
 
 import json
 import os
@@ -18,23 +18,23 @@ class ServerTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.data_dir = Path(self.directory.name)
-        # El almacén de credenciales del proveedor se aísla: si no, las pruebas
-        # verían la App real de quien las ejecuta y dejarían de ser deterministas.
+        # The provider credential store is isolated: otherwise the tests would see
+        # the real App of whoever runs them and stop being deterministic.
         store = patch("tamandua.shared.paths.CONFIG_DIR", self.data_dir / "config")
         store.start()
         self.addCleanup(store.stop)
-        # El camino con motores en contenedor se prueba en test_scanners; aquí no se lanza Docker.
+        # The containerised-engine path is tested in test_scanners; no Docker is launched here.
         engines = patch.dict("tamandua.modules.scanning.engines._docker_state", {"ok": False}, clear=True)
         engines.start()
         self.addCleanup(engines.stop)
-        # Estas pruebas cubren otras cosas; la política de TOTP tiene las suyas.
+        # These tests cover other things; the TOTP policy has its own.
         policy = patch.dict(os.environ, {"TAMANDUA_REQUIRE_TOTP": "none"})
         policy.start()
         self.addCleanup(policy.stop)
         self.state = build_state(self.data_dir)
         self.client = asgi.client_for(self.data_dir, self.state)
         self.origin = "http://127.0.0.1:8766"
-        # Todas las rutas exigen sesión: las pruebas entran como un administrador creado por la CLI.
+        # Every route requires a session: the tests sign in as an admin created by the CLI.
         Users(self.data_dir).create("operadora", "correcto-caballo-bateria", role="admin")
         self.cookie = self.login("operadora", "correcto-caballo-bateria")
 
@@ -100,7 +100,7 @@ class ServerTests(unittest.TestCase):
     def test_user_supplies_own_ai_key_and_it_never_returns_to_the_browser(self):
         secret = "sk-user-owned-key-000111222333"
         headers = {"Origin": self.origin, "X-Tamandua-Action": "save-ai-key"}
-        # Una clave que el proveedor rechaza no se guarda.
+        # A key the provider rejects is not saved.
         with patch("tamandua.modules.integrations.ai_providers.check_provider",
                    return_value={"provider": "openai", "status": "invalid_credentials",
                                  "message": "El proveedor rechazó la comprobación"}):
@@ -112,7 +112,7 @@ class ServerTests(unittest.TestCase):
         status, listing = self.request("GET", "/api/providers")
         self.assertFalse(json.loads(listing)[0]["configured"])
 
-        # Aceptada: se guarda, y ni el guardado ni el listado devuelven la clave.
+        # Accepted: it is saved, and neither the save nor the listing returns the key.
         with patch("tamandua.modules.integrations.ai_providers.check_provider",
                    return_value={"provider": "openai", "status": "connected", "message": "ok"}):
             status, payload = self.request("POST", "/api/providers/keys",
@@ -127,7 +127,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(openai["owner"], "user")
         self.assertEqual(openai["last4"], "2333")
 
-        # Retirarla la borra del almacén.
+        # Removing it deletes it from the vault.
         status, _ = self.request("POST", "/api/providers/keys",
                                  json.dumps({"provider": "openai", "action": "remove"}), headers)
         self.assertEqual(status, 200)
@@ -169,7 +169,7 @@ class ServerTests(unittest.TestCase):
         status, _ = self.request("POST", "/api/repositories/scans",
                                  json.dumps({"source_id": "https://example.com", "allow_osv_upload": False}), headers)
         self.assertEqual(status, 400)
-        # Sin decir si se autoriza OSV no se encola nada; un repositorio que la credencial no ve, tampoco.
+        # Nothing is queued without saying whether OSV is allowed, nor for a repository the credential can't see.
         status, _ = self.request("POST", "/api/repositories/scans", json.dumps({"source_id": "github:acme/api"}), headers)
         self.assertEqual(status, 400)
         status, _ = self.request("POST", "/api/repositories/scans",
@@ -183,16 +183,16 @@ class ServerTests(unittest.TestCase):
             root = Path(temporary)
             (root / "app.py").write_text('db.execute(f"SELECT {user_id}")\n')
             snapshot.return_value = root, {**source, "files": 1}
-            # La petición vuelve al instante con el identificador; el trabajo corre en segundo plano.
+            # The request returns at once with the id; the work runs in the background.
             status, payload = self.request("POST", "/api/repositories/scans",
                                            json.dumps({"source_id": "github:acme/api", "allow_osv_upload": False}), headers)
             self.assertEqual(status, 202)
             queued = json.loads(payload)["run"]
             self.assertEqual(queued["status"], "queued")
             record = self._wait_for_run(queued["id"])
-        self.assertEqual(record["status"], "incomplete")  # sin Docker en las pruebas no corre ningún motor: nunca «completed»
+        self.assertEqual(record["status"], "incomplete")  # no Docker in tests, so no engine runs: never «completed»
         self.assertEqual(record["summary"]["sast"], 1)
-        # El progreso es para el usuario: sin rutas del servidor ni salidas crudas.
+        # Progress is for the user: no server paths or raw output.
         messages = [event["message"] for event in record["progress"]]
         self.assertTrue(any("Terminado" in message for message in messages), messages)
         self.assertFalse(any("/var/" in message or "Traceback" in message for message in messages))

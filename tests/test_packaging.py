@@ -1,4 +1,4 @@
-"""El empaquetado no se desincroniza: versión, rutas de build y scripts de arranque."""
+"""Packaging stays in sync: version, build paths and startup scripts."""
 
 import json
 import os
@@ -25,8 +25,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn(IMAGES["opengrep"]["image"], compose)
 
     def test_host_settings_never_reach_the_app(self):
-        """.env entra entero en el contenedor (env_file): una variable del host con el nombre de una de la app la pisaría
-        (p. ej. la interfaz publicada en el host acabaría siendo la de escucha dentro del contenedor)."""
+        """.env goes whole into the container (env_file): a host variable named like an app variable would override
+        it (e.g. the interface published on the host would become the one listened on inside the container)."""
         compose = "\n".join((ROOT / name).read_text() for name in COMPOSE_FILES)
         host = {name for line in compose.splitlines() if re.match(r"\s*(- |user:|image:|FROM )", line)
                 for name in re.findall(r"\$\{(TAMANDUA_[A-Z_]+)", line)}
