@@ -8,7 +8,7 @@ With a fresh server and a DNS record already pointing at it, it's four commands:
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9.0                                   # the release you want (see Upgrades)
+git checkout v0.9.1                                   # the release you want (see Upgrades)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS with Caddy + published images
 make up                                             # prints https://tamandua.example.com and the setup code
 ```
@@ -101,7 +101,7 @@ As the `tamandua` user:
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9.0
+git checkout v0.9.1
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
 ```
@@ -186,7 +186,7 @@ If `config/master.key` is lost (or `TAMANDUA_MASTER_KEY` changes), the secrets c
 ## Upgrades
 
 ```bash
-git fetch --tags && git checkout v0.9.1    # or stay on main and let make update pull it
+git fetch --tags && git checkout v0.9.2    # or stay on main and let make update pull it
 make update
 ```
 

@@ -8,7 +8,7 @@ Con un servidor recién creado y un registro DNS que ya apunte a él, son cuatro
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9.0                                   # la versión que quieras (ver Actualizar)
+git checkout v0.9.1                                   # la versión que quieras (ver Actualizar)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS con Caddy + imágenes publicadas
 make up                                             # muestra https://tamandua.example.com y el código de configuración
 ```
@@ -101,7 +101,7 @@ Con el usuario `tamandua`:
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9.0
+git checkout v0.9.1
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
 ```
@@ -186,7 +186,7 @@ Si se pierde `config/master.key` (o cambia `TAMANDUA_MASTER_KEY`), los secretos 
 ## Actualizar
 
 ```bash
-git fetch --tags && git checkout v0.9.1    # o quédate en main y deja que make update lo traiga
+git fetch --tags && git checkout v0.9.2    # o quédate en main y deja que make update lo traiga
 make update
 ```
 
