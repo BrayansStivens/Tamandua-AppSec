@@ -8,7 +8,7 @@ Con un servidor recién creado y un registro DNS que ya apunte a él, son cuatro
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.10.0                                   # la versión que quieras (ver Actualizar)
+git checkout v0.10.1                                   # la versión que quieras (ver Actualizar)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS con Caddy + imágenes publicadas
 make up                                             # muestra https://tamandua.example.com y el código de configuración
 ```
@@ -102,7 +102,7 @@ deploy key, como explica [Acceso mientras el repositorio sea privado](despliegue
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.10.0
+git checkout v0.10.1
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
 ```

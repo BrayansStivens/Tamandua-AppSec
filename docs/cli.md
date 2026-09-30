@@ -30,10 +30,20 @@ HIGH     settings.py:1  Exposed GitHub personal access token
 
 4 already existed in the code you're touching: they don't block.
 
+Fixed by this change (1): it was in the starting point, it's gone, and its file changed.
+  HIGH     db.py:14  SQL built by concatenating strings
+
 Engines: Opengrep 1.30.0, Gitleaks 8.30.1, Trivy 0.74.0, OSV-Scanner 2.6.0
 
 BLOCKED · threshold: high or above · 7 new findings at severity high or above
 ```
+
+**What the change fixes.** Comparing both scans also shows what the starting point had and the change no
+longer has. It is credited as **fixed** only when both scans finished and its file is one the change
+modified. If it went away because the file was deleted, or although its file wasn't touched, the output
+says so and doesn't count it as a fix; if either scan was incomplete, it says nothing can be verified. A
+finding that only moved (same rule, same file) isn't reported. This works for what Tamandua's engines
+detect; findings imported from other tools are verified by importing that tool's results again.
 
 Advisories for the same dependency are collapsed into one line, with the version that fixes all of
 them. `--format json` and `--format sarif` keep every advisory separate.
@@ -54,6 +64,7 @@ JSON and SARIF alike. In a container, pass it with `-e TAMANDUA_DEFAULT_LOCALE=e
 | `--allow-incomplete` | Don't fail if an engine couldn't run. By default it fails: an analysis that didn't finish is not the same as "clean". |
 | `--allow-osv-upload` | Allow external lookups (dependency names and versions to OSV and deps.dev, to resolve transitive dependencies). By default nothing leaves the machine. |
 | `--name` | Display name (useful inside a container, where the folder is called `/src`). |
+| `--summary FILE` | Also append a Markdown summary: verdict, what the change introduces and what it fixes (the Action writes it to the run's summary page). |
 | `--quiet` | No progress messages. |
 
 Progress goes to stderr, so stdout stays clean for `json` and `sarif`.
@@ -132,7 +143,7 @@ jobs:
           fetch-depth: 0              # history is needed to compare against the base
           persist-credentials: false
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.0   # pin it to the tag's commit SHA, as with the other actions
+        uses: BrayansStivens/appsec-agent@v0.10.1   # pin it to the tag's commit SHA, as with the other actions
         with:
           exclude: |
             fixtures/
@@ -170,6 +181,8 @@ in English unless the step sets `env: TAMANDUA_DEFAULT_LOCALE: es`.
 | `sarif` | Path of the SARIF the scan wrote (empty if it didn't write one). |
 | `exit-code` | `0` pass, `1` blocked, `2` usage error, `3` incomplete. With `import-sarif` too, the scan's code wins unless it is `0`. |
 
+The run's summary page shows the verdict, what the pull request introduces and what it fixes.
+
 How it runs: `docker run` of the image as the runner's user, with no capabilities, a read-only filesystem, the
 workspace mounted read-only and the engine caches in `$RUNNER_TEMP/tamandua` (several steps in the same job share
 them). The engines can't get an empty network of their own there (a plain `docker run` doesn't allow the user
@@ -190,7 +203,7 @@ logs in with `--password-stdin` and throws the credential away after the pull:
     steps:
       # …
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.0
+        uses: BrayansStivens/appsec-agent@v0.10.1
         with:
           registry-token: ${{ secrets.GHCR_TOKEN }}   # or ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -207,7 +220,7 @@ own scan:
         run: |
           python -m pip install semgrep   # pin the version
           semgrep scan --config p/ci --metrics off --sarif --output semgrep.sarif
-      - uses: BrayansStivens/appsec-agent@v0.10.0
+      - uses: BrayansStivens/appsec-agent@v0.10.1
         if: always()
         with:
           scan: false

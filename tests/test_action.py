@@ -178,7 +178,7 @@ class ActionScriptTests(unittest.TestCase):
         argv = calls[0]["argv"]
         self.assertEqual(self.command(calls[0]), ["python", "-m", "tamandua", "scan", "/src", "--name", "shop",
                                                   "--fail-on", "high", "--format", "sarif", "--output",
-                                                  "/data/result.sarif", "--base", "origin/main"])
+                                                  "/data/result.sarif", "--summary", "/data/summary.md", "--base", "origin/main"])
         self.assertEqual(argv[:2], ["run", "--rm"])
         self.assertIn(f"{self.root / 'workspace'}:/src:ro", argv)
         self.assertIn(f"{self.root / 'temp' / 'tamandua'}:/data", argv)
@@ -199,7 +199,7 @@ class ActionScriptTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertEqual(self.command(calls[0]), [
             "python", "-m", "tamandua", "scan", "/src/sub/dir", "--name", "$(touch pwned)", "--fail-on", "critical",
-            "--format", "sarif", "--output", "/data/result.sarif", "--base", "main; touch pwned",
+            "--format", "sarif", "--output", "/data/result.sarif", "--summary", "/data/summary.md", "--base", "main; touch pwned",
             "--exclude", "fixtures/", "--exclude", "**/testdata", "--allow-incomplete"])
         self.assertEqual(outputs, {"sarif": str(self.root / "workspace" / "out" / "tamandua.sarif"), "exit-code": "1"})
         self.assertEqual(list(self.root.rglob("pwned")), [])

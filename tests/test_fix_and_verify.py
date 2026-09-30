@@ -41,14 +41,14 @@ class FixGuideTests(unittest.TestCase):
         self.assertEqual(fix_guide.guide(dev)["commands"][0]["code"], "yarn add -D jest@29.7.0")  # stays dev-only
 
     def test_the_pull_request_table_only_shows_a_command_that_updates(self):
-        from tamandua.modules.pullrequests.review import _rows
+        from tamandua.modules.pullrequests.review import markdown_rows
         finding = {**_finding("e" * 64, "high", package="minimist"), "path": "package-lock.json",
                    "package": {"ecosystem": "npm", "name": "minimist", "version": "0.0.8", "fixed_version": "1.2.6", "direct": False}}
-        row = _rows([finding])[-1]
+        row = markdown_rows([finding])[-1]
         self.assertIn("Actualizar a `1.2.6`", row)   # transitive: the command would just be "npm install"
         self.assertNotIn("`npm install`", row)
         direct = {**finding, "package": {**finding["package"], "direct": True}}
-        self.assertIn("`npm install minimist@1.2.6`", _rows([direct])[-1])
+        self.assertIn("`npm install minimist@1.2.6`", markdown_rows([direct])[-1])
 
     def test_transitive_os_and_unfixable_dependencies_get_steps_not_wrong_commands(self):
         transitive = fix_guide.guide(dependency("package-lock.json", "minimist", "0.0.8", "1.2.6", direct=False))

@@ -107,9 +107,11 @@ GATE_LABEL = {"critical": msg("pulls.gate.critical"), "high": msg("pulls.gate.hi
               "low": msg("pulls.gate.low"), "never": msg("pulls.gate.never")}
 
 
-def _rows(findings: list[Finding], locale: str | None = None, limit: int = 25) -> list[str]:
+def markdown_rows(findings: list[Finding], locale: str | None = None, limit: int = 25, *, fix: bool = True,
+                  more: str = "pulls.table.more") -> list[str]:
+    """`fix=False`: without the fix column (findings already fixed). `more`: where the rows past `limit` are."""
     locale = locale or default_locale()
-    lines = [t("pulls.table.header", locale), "|---|---|---|---|"]
+    lines = [t("pulls.table.header", locale), "|---|---|---|---|"] if fix else [t("pulls.table.header_resolved", locale), "|---|---|---|"]
     from tamandua.modules.findings.fix_guide import attach
     ordered = attach([Finding(**item) for item in sorted(findings, key=lambda item: SEVERITY_ORDER.index(item["severity"]) if item["severity"] in SEVERITY_ORDER else 9)])
     for finding in ordered[:limit]:
@@ -119,13 +121,14 @@ def _rows(findings: list[Finding], locale: str | None = None, limit: int = 25) -
                  else f"`{_cell(finding.get('path'), 80)}:{line}`")
         # Only a command that really upgrades (with its version); "reinstall" or "install -r" don't say to what.
         commands = [item for item in (finding.get("fix") or {}).get("commands") or [] if item.get("action") == "update"]
-        fix = (f"`{_cell(commands[0]['code'], 120)}`" if commands and "`" not in commands[0]["code"]
-               else t("pulls.table.update_to", locale, version=_cell(package["fixed_version"], 30)) if package.get("fixed_version")
-               else _cell(text(finding.get("remediation"), locale), 140))
+        remedy = (f"`{_cell(commands[0]['code'], 120)}`" if commands and "`" not in commands[0]["code"]
+                  else t("pulls.table.update_to", locale, version=_cell(package["fixed_version"], 30)) if package.get("fixed_version")
+                  else _cell(text(finding.get("remediation"), locale), 140))
         severity = text(SEVERITY_LABEL.get(finding["severity"], finding["severity"]), locale)
-        lines.append(f"| {severity} | {_cell(text(finding['title'], locale), 80)} | {where} | {fix} |")
+        row = f"| {severity} | {_cell(text(finding['title'], locale), 80)} | {where} |"
+        lines.append(f"{row} {remedy} |" if fix else row)
     if len(ordered) > limit:
-        lines.append(f"| | {t('pulls.table.more', locale, count=len(ordered) - limit)} | | |")
+        lines.append(f"| | {t(more, locale, count=len(ordered) - limit)} | |" + (" |" if fix else ""))
     return lines
 
 
@@ -148,10 +151,10 @@ def render_comment(pull: dict, outcome: dict, *, run_id: str, baseline_run: str 
     else:
         lines += ["> [!TIP]", "> " + t("pulls.comment.clean", locale, commit=commit)]
     if introduced:
-        lines += ["", t("pulls.comment.attention", locale, count=len(introduced)), "", *_rows(introduced, locale)]
+        lines += ["", t("pulls.comment.attention", locale, count=len(introduced)), "", *markdown_rows(introduced, locale)]
     if preexisting:
         lines += ["", "<details>", f"<summary>{t('pulls.comment.preexisting', locale, count=len(preexisting), branch=base)}</summary>", "",
-                  *_rows(preexisting, locale, 15), "", "</details>"]
+                  *markdown_rows(preexisting, locale, 15), "", "</details>"]
     engines = ", ".join(f"{item['name'].capitalize()} {item['version']}" for item in (tools or []) if item.get("status") in ("completed", "partial"))
     basis = t("pulls.comment.basis_baseline" if baseline_run else "pulls.comment.basis_none", locale, branch=base)
     where = t("pulls.comment.where_link", locale, url=panel_url) if panel_url else t("pulls.comment.where_plain", locale)

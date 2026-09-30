@@ -23,7 +23,8 @@
   "table": {
     "header": "| Severidad | Hallazgo | Ubicación | Corrección |",
     "update_to": "Actualizar a `{{version}}`",
-    "more": "… y {{count}} más en el panel"
+    "more": "… y {{count}} más en el panel",
+    "header_resolved": "| Severidad | Hallazgo | Ubicación |"
   },
   "comment": {
     "heading": "## Revisión de seguridad",

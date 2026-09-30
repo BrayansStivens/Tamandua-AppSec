@@ -30,10 +30,20 @@ ALTA     settings.py:1  Token personal de GitHub expuesto
 
 4 ya existían en el código que tocas: no bloquean.
 
+Corregido en este cambio (1): estaba en el punto de partida, ya no está y su archivo cambió.
+  ALTA     db.py:14  SQL construido concatenando cadenas
+
 Motores: Opengrep 1.30.0, Gitleaks 8.30.1, Trivy 0.74.0, OSV-Scanner 2.6.0
 
 BLOQUEA · umbral: alta o superior · 7 hallazgos nuevos de severidad alta o superior
 ```
+
+**Lo que corrige el cambio.** Al comparar los dos análisis también sale lo que tenía el punto de partida y el
+cambio ya no tiene. Cuenta como **corregido** solo si los dos análisis terminaron y su archivo es uno de los que el
+cambio modificó. Si desapareció porque se borró el archivo, o sin que se tocara su archivo, la salida lo dice y no lo
+cuenta como corrección; si alguno de los dos análisis quedó incompleto, dice que no se puede verificar. Un hallazgo
+que solo se movió (misma regla, mismo archivo) no se reporta. Sirve para lo que detectan los motores de Tamandua; los
+hallazgos importados de otras herramientas se verifican importando de nuevo los resultados de esa herramienta.
 
 Los avisos de una misma dependencia salen en una línea con la versión que los cierra todos.
 `--format json` y `--format sarif` conservan cada aviso por separado.
@@ -51,6 +61,7 @@ Los avisos de una misma dependencia salen en una línea con la versión que los 
 | `--allow-incomplete` | No falla si un motor no pudo ejecutarse. Por defecto sí falla: un análisis que no terminó no equivale a «limpio». |
 | `--allow-osv-upload` | Autoriza consultas externas (nombres y versiones de dependencias a OSV y deps.dev para resolver transitivas). Por defecto no sale nada. |
 | `--name` | Nombre a mostrar (útil dentro de un contenedor, donde la carpeta se llama `/src`). |
+| `--summary ARCHIVO` | Añade además un resumen en Markdown: veredicto, lo que el cambio introduce y lo que corrige (la Action lo escribe en la página de resumen de la ejecución). |
 | `--quiet` | Sin mensajes de progreso. |
 
 El progreso va a la salida de errores; la salida estándar queda limpia para `json` y `sarif`.
@@ -129,7 +140,7 @@ jobs:
           fetch-depth: 0              # hace falta la historia para comparar con la base
           persist-credentials: false
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.0   # fíjala al SHA del commit de la etiqueta, como las demás
+        uses: BrayansStivens/appsec-agent@v0.10.1   # fíjala al SHA del commit de la etiqueta, como las demás
         with:
           exclude: |
             fixtures/
@@ -167,6 +178,8 @@ log, en inglés salvo que el paso ponga `env: TAMANDUA_DEFAULT_LOCALE: es`.
 | `sarif` | Ruta del SARIF que escribió el análisis (vacía si no escribió ninguno). |
 | `exit-code` | `0` pasa, `1` bloquea, `2` error de uso, `3` incompleto. Si además importa, manda el código del análisis salvo que sea `0`. |
 
+La página de resumen de la ejecución muestra el veredicto, lo que la pull request introduce y lo que corrige.
+
 Cómo corre: `docker run` de la imagen con el usuario del runner, sin capabilities, con el sistema de archivos de
 solo lectura, el workspace montado en solo lectura y las cachés de los motores en `$RUNNER_TEMP/tamandua` (varios
 pasos del mismo job las comparten). Ahí los motores no pueden tener una red vacía propia (un `docker run` normal no
@@ -187,7 +200,7 @@ La Action inicia sesión con `--password-stdin` y descarta la credencial despué
     steps:
       # …
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.0
+        uses: BrayansStivens/appsec-agent@v0.10.1
         with:
           registry-token: ${{ secrets.GHCR_TOKEN }}   # o ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -204,7 +217,7 @@ sin el análisis propio de Tamandua:
         run: |
           python -m pip install semgrep   # fija la versión
           semgrep scan --config p/ci --metrics off --sarif --output semgrep.sarif
-      - uses: BrayansStivens/appsec-agent@v0.10.0
+      - uses: BrayansStivens/appsec-agent@v0.10.1
         if: always()
         with:
           scan: false

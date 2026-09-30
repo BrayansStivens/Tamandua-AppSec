@@ -23,7 +23,8 @@
   "table": {
     "header": "| Severity | Finding | Location | Fix |",
     "update_to": "Update to `{{version}}`",
-    "more": "… and {{count}} more in the panel"
+    "more": "… and {{count}} more in the panel",
+    "header_resolved": "| Severity | Finding | Location |"
   },
   "comment": {
     "heading": "## Security review",

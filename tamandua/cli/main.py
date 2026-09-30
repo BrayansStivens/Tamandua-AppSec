@@ -38,7 +38,8 @@ def _json(value) -> str:
 
 
 def _scan_command(args) -> int:
-    from tamandua.modules.runs.local import EXIT_ERROR, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, render_json, render_sarif, render_text, run
+    from tamandua.modules.runs.local import (EXIT_ERROR, EXIT_INCOMPLETE, EXIT_OK, LocalScanError, render_json, render_markdown,
+                                             render_sarif, render_text, run)
 
     def progress(level: str, message: str) -> None:
         # Progress goes to stderr so stdout stays clean for JSON or SARIF.
@@ -59,6 +60,9 @@ def _scan_command(args) -> int:
             print(render_text(result), end="", file=sys.stderr)
     else:
         print(rendered, end="")
+    if args.summary:
+        with args.summary.open("a", encoding="utf-8") as summary:  # append: $GITHUB_STEP_SUMMARY may hold other steps'
+            summary.write(render_markdown(result))
     code = result["exit_code"]
     return EXIT_OK if code == EXIT_INCOMPLETE and args.allow_incomplete else code
 
@@ -94,6 +98,8 @@ def build_parser() -> argparse.ArgumentParser:
     local.add_argument("--exclude", action="append", default=[], metavar="PATTERN",
                        help="Path whose findings don't count (glob relative to the root: fixtures/**, **/testdata/**). Repeatable")
     local.add_argument("--name", help="Name to display (default: the folder's; useful inside a container)")
+    local.add_argument("--summary", type=Path, metavar="FILE",
+                       help="Also write a Markdown summary (what the change introduces and fixes), e.g. $GITHUB_STEP_SUMMARY")
     imported = commands.add_parser("import-sarif", help="Import another tool's SARIF 2.1.0 findings into an existing asset",
                                    description="Imports the findings of any tool (Semgrep, CodeQL, Snyk, Trivy…) into the registry of an "
                                                "asset Tamandua already knows. Several files are one import. A full import (the default) "

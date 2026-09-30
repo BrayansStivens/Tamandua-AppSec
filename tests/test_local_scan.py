@@ -79,6 +79,38 @@ class GitTests(unittest.TestCase):
         # The baseline is really scanned: its copy comes from git, not from the working tree.
         self.assertTrue(result["comparison"]["baseline"])
 
+    def test_what_the_change_fixes_is_reported_with_how_it_went_away(self):
+        moved_before = {**finding("moved-old", "app.py", 1), "rule_id": "same-rule"}
+        moved_after = {**finding("moved-new", "app.py", 3), "rule_id": "same-rule"}
+        base = [finding("eval-fixed", "app.py", 2, "critical"), finding("gone", "borrado.py", 1), moved_before]
+        scans = iter([scan_result([moved_after]), scan_result(base)])
+        with tempfile.TemporaryDirectory() as data, \
+                patch.object(local_scan, "scan_repository", side_effect=lambda *args, **kwargs: next(scans)), \
+                patch("tamandua.modules.scanning.engines.docker_available", return_value=True):
+            result = run(self.repo, data_dir=Path(data), base="main")
+        self.assertEqual([(item["fingerprint"], item["resolution"]) for item in result["resolved"]],
+                         [("eval-fixed", "fixed"), ("gone", "deleted")])
+        self.assertEqual(result["comparison"]["resolved"], {"fixed": 1, "deleted": 1, "unattributed": 0})
+        self.assertTrue(result["comparison"]["resolved_verifiable"])
+        output = local_scan.render_text(result, locale="en")
+        self.assertIn("Fixed by this change (1)", output)
+        self.assertIn("1 went away because its file was deleted", output)
+        summary = local_scan.render_markdown(result, locale="en")
+        self.assertIn("#### Fixed by this change (1)", summary)
+        self.assertIn("app.py:2", summary)
+        self.assertEqual([item["resolution"] for item in json.loads(local_scan.render_json(result, locale="en"))["resolved"]],
+                         ["fixed", "deleted"])
+
+    def test_nothing_counts_as_fixed_when_either_scan_is_incomplete(self):
+        for head_status, base_status in (("incomplete", "completed"), ("completed", "incomplete")):
+            scans = iter([scan_result([], head_status), scan_result([finding("eval", "app.py", 2)], base_status)])
+            with tempfile.TemporaryDirectory() as data, \
+                    patch.object(local_scan, "scan_repository", side_effect=list(scans)), \
+                    patch("tamandua.modules.scanning.engines.docker_available", return_value=True):
+                result = run(self.repo, data_dir=Path(data), base="main")
+            self.assertEqual((result["resolved"], result["comparison"]["resolved_verifiable"]), ([], False))
+            self.assertIn("can't be verified", local_scan.render_text(result, locale="en"))
+
     def test_the_base_snapshot_is_the_merge_base_tree(self):
         with tempfile.TemporaryDirectory() as out:
             local_scan.snapshot_commit(self.repo, merge_base(self.repo, "main"), Path(out) / "base")
@@ -98,6 +130,20 @@ class GitTests(unittest.TestCase):
             self.assertEqual(list((Path(out) / "old").iterdir()), [])
 
 
+class ResolvedTests(unittest.TestCase):
+    def test_a_finding_is_credited_only_when_its_file_changed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name in ("app.py", "other.py"):
+                (root / name).write_text("x = 1\n")
+            before = [finding("a", "app.py", 1), finding("b", "other.py", 1), finding("c", "gone.py", 1),
+                      finding("kept", "app.py", 5), {**finding("prev", "app.py", 7), "rule_id": "r"}]
+            after = [finding("kept", "app.py", 6), {**finding("new", "app.py", 8), "previous_fingerprint": "prev", "rule_id": "r"}]
+            gone = local_scan.resolved_findings(before, after, {"app.py": {1}}, root)
+        self.assertEqual({item["fingerprint"]: item["resolution"] for item in gone},
+                         {"a": "fixed", "b": "unattributed", "c": "deleted"})
+
+
 class GateTests(unittest.TestCase):
     def run_with(self, findings, *, status="completed", failed=(), docker=True, fail_on="high", exclude=None):
         with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as data, \
@@ -105,6 +151,19 @@ class GateTests(unittest.TestCase):
                 patch("tamandua.modules.scanning.engines.docker_available", return_value=docker), \
                 patch("tamandua.modules.scanning.engines.docker_problem", return_value="Docker no responde."):
             return run(Path(folder), data_dir=Path(data), fail_on=fail_on, exclude=exclude)
+
+    def test_the_markdown_summary_groups_packages_and_points_to_the_full_list(self):
+        lodash = {"ecosystem": "npm", "name": "lodash", "version": "4.17.0"}
+        advisories = [finding(f"lodash-{index}", "package.json", 1, "high", "sca", {**lodash, "fixed_version": f"4.17.{20 + index}"})
+                      for index in range(3)]
+        many = [finding(f"f{index}", f"src/{index}.py", 1, "low") for index in range(30)]
+        summary = local_scan.render_markdown(self.run_with(advisories + many), locale="en")
+        self.assertEqual(summary.count("`lodash` 4.17.0"), 1)
+        self.assertIn("4.17.22", summary)
+        self.assertIn("#### Introduced by this change (31)", summary)
+        self.assertIn("more: every one is in `--format json`", summary)
+        self.assertNotIn("panel", summary)
+        self.assertIn("Engines:", summary)
 
     def test_exit_codes(self):
         self.assertEqual(self.run_with([])["exit_code"], EXIT_OK)

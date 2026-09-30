@@ -452,7 +452,8 @@
     "upgrade_partial": "update to {{version}} (some advisories have no fixed version)",
     "no_fix": "no fixed version published",
     "package_row": "{{package}} {{version}}: {{advisories}} ({{counts}}) → {{advice}}",
-    "scope_changes": "changes since {{base}} (merge-base {{commit}}, {{files}} files)",
+    "scope_changes_one": "changes since {{base}} (merge-base {{commit}}, 1 file)",
+    "scope_changes_other": "changes since {{base}} (merge-base {{commit}}, {{count}} files)",
     "scope_all": "whole folder",
     "no_baseline": "Starting point not analyzed (--no-baseline): everything on changed lines counts.",
     "more": "… and {{count}} more (use --format json or sarif to see them all)",
@@ -465,7 +466,24 @@
     "no_engines": "none",
     "not_analyzed": "Not analyzed: {{item}}",
     "incomplete": "the analysis didn't finish: this doesn't mean «no findings»",
-    "verdict_line": "{{verdict}} · threshold: {{threshold}} · {{detail}}"
+    "verdict_line": "{{verdict}} · threshold: {{threshold}} · {{detail}}",
+    "resolved": {
+      "fixed_one": "Fixed by this change (1): it was in the starting point, it's gone, and its file changed.",
+      "fixed_other": "Fixed by this change ({{count}}): they were in the starting point, they're gone, and their files changed.",
+      "deleted_one": "1 went away because its file was deleted: that isn't a fix.",
+      "deleted_other": "{{count}} went away because their files were deleted: that isn't a fix.",
+      "unattributed_one": "1 went away although its file wasn't touched: not credited to this change.",
+      "unattributed_other": "{{count}} went away although their files weren't touched: not credited to this change.",
+      "unverifiable": "What this change fixes can't be verified: the starting point or the change wasn't fully analyzed."
+    },
+    "summary": {
+      "heading": "### Tamandua · {{name}}",
+      "introduced_one": "#### Introduced by this change (1)",
+      "introduced_other": "#### Introduced by this change ({{count}})",
+      "fixed_one": "#### Fixed by this change (1)",
+      "fixed_other": "#### Fixed by this change ({{count}})",
+      "more": "… and {{count}} more: every one is in `--format json` and in the SARIF."
+    }
   },
   "secret_rules": {
     "errors": {

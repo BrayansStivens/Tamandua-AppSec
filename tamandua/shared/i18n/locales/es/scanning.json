@@ -452,7 +452,8 @@
     "upgrade_partial": "actualiza a {{version}} (hay avisos sin versión corregida)",
     "no_fix": "sin versión corregida publicada",
     "package_row": "{{package}} {{version}}: {{advisories}} ({{counts}}) → {{advice}}",
-    "scope_changes": "cambios respecto a {{base}} (merge-base {{commit}}, {{files}} archivos)",
+    "scope_changes_one": "cambios respecto a {{base}} (merge-base {{commit}}, 1 archivo)",
+    "scope_changes_other": "cambios respecto a {{base}} (merge-base {{commit}}, {{count}} archivos)",
     "scope_all": "toda la carpeta",
     "no_baseline": "Sin analizar el punto de partida (--no-baseline): cuenta todo lo que cae en líneas cambiadas.",
     "more": "… y {{count}} más (usa --format json o sarif para verlos todos)",
@@ -465,7 +466,24 @@
     "no_engines": "ninguno",
     "not_analyzed": "Sin analizar: {{item}}",
     "incomplete": "el análisis no terminó: no equivale a «sin hallazgos»",
-    "verdict_line": "{{verdict}} · umbral: {{threshold}} · {{detail}}"
+    "verdict_line": "{{verdict}} · umbral: {{threshold}} · {{detail}}",
+    "resolved": {
+      "fixed_one": "Corregido en este cambio (1): estaba en el punto de partida, ya no está y su archivo cambió.",
+      "fixed_other": "Corregidos en este cambio ({{count}}): estaban en el punto de partida, ya no están y sus archivos cambiaron.",
+      "deleted_one": "1 desapareció porque se borró su archivo: eso no es una corrección.",
+      "deleted_other": "{{count}} desaparecieron porque se borraron sus archivos: eso no es una corrección.",
+      "unattributed_one": "1 desapareció sin que se tocara su archivo: no se atribuye a este cambio.",
+      "unattributed_other": "{{count}} desaparecieron sin que se tocaran sus archivos: no se atribuyen a este cambio.",
+      "unverifiable": "No se puede verificar qué corrige este cambio: el punto de partida o el cambio no se analizaron por completo."
+    },
+    "summary": {
+      "heading": "### Tamandua · {{name}}",
+      "introduced_one": "#### Introducido en este cambio (1)",
+      "introduced_other": "#### Introducidos en este cambio ({{count}})",
+      "fixed_one": "#### Corregido en este cambio (1)",
+      "fixed_other": "#### Corregidos en este cambio ({{count}})",
+      "more": "… y {{count}} más: todos están en `--format json` y en el SARIF."
+    }
   },
   "secret_rules": {
     "errors": {

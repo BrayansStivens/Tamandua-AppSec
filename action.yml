@@ -139,7 +139,7 @@ runs:
           while [ "${target%/}" != "$target" ]; do target="${target%/}"; done
           [ "$target" != . ] || target=""
           scan=(python -m tamandua scan "/src${target:+/$target}" --name "${NAME:-${GITHUB_REPOSITORY#*/}}"
-                --fail-on "$FAIL_ON" --format sarif --output /data/result.sarif)
+                --fail-on "$FAIL_ON" --format sarif --output /data/result.sarif --summary /data/summary.md)
           case "$BASE" in
             none) ;;
             "") if [ -n "${GITHUB_BASE_REF:-}" ]; then scan+=(--base "origin/$GITHUB_BASE_REF"); fi ;;
@@ -192,8 +192,10 @@ runs:
 
         scan_code=0
         if [ "$SCAN" = true ]; then
-          rm -f "$data/result.sarif"
+          rm -f "$data/result.sarif" "$data/summary.md"
           "${run[@]}" "$IMAGE" "${scan[@]}" || scan_code=$?
+          # What the change introduces and fixes, on the run's summary page.
+          if [ -s "$data/summary.md" ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat "$data/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
           if [ -s "$data/result.sarif" ]; then
             sarif="${SARIF:-$RUNNER_TEMP/tamandua.sarif}"
             case "$sarif" in /*) ;; *) sarif="$GITHUB_WORKSPACE/$sarif" ;; esac
