@@ -7,11 +7,16 @@ import { jiraBatchesQuery, keys, type JiraBatches, type JiraQueued } from '@/sha
 export type JiraQueueBody = PostBody<'/api/integrations/jira/issues/queue'>
 export type JiraSelectionBody = JiraQueueBody['selections'][number]
 
+// Batches queued from this tab and not announced yet: the shell says they started whenever it first sees them, whether
+// or not it had read my batches before (so the toast never depends on which request came first).
+export const toAnnounce = new Set<string>()
+
 // Queues a selection (with `force`, new issues even for findings that already have one) and adds the batch to the
 // background work, which starts following it at once.
 export async function queueJira(client: QueryClient, selections: JiraSelectionBody[], force = false): Promise<JiraQueued> {
   const body: JiraQueueBody = force ? { selections, force: true } : { selections }
   const queued = await api.post<JiraQueued>('/api/integrations/jira/issues/queue', 'export-jira', body)
+  toAnnounce.add(queued.batch)
   client.setQueryData<JiraBatches>(keys.jiraBatches, previous => ({ ...previous, items: [queued, ...(previous?.items ?? []).filter(item => item.batch !== queued.batch)] }))
   return queued
 }

@@ -6,7 +6,7 @@ import { Button } from '@/shared/ui/button'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/shared/ui/popover'
 import { assetQuery, jiraBatchesQuery, keys, type JiraQueued } from '@/shared/api/queries'
 import { formatDate } from '@/shared/i18n/format'
-import { byAsset, queueJira, useJiraSettled } from '@/features/integrations/jira-batches'
+import { byAsset, queueJira, toAnnounce, useJiraSettled } from '@/features/integrations/jira-batches'
 
 type Notice = (tone: 'ok' | 'error', text: string) => void
 const doneOf = (batch: JiraQueued) => batch.created + batch.existing + batch.skipped + batch.failed
@@ -20,15 +20,14 @@ export function JiraBackgroundWork({ onNotice }: { onNotice: Notice }) {
   const queryClient = useQueryClient()
   const data = useQuery(jiraBatchesQuery()).data
   const items = data?.items ?? []
-  const known = useRef<Set<string> | null>(null)
   const notice = useRef(onNotice)
   useEffect(() => { notice.current = onNotice })
-  // A batch that appears while the app is open was just queued from here: say it runs in the background.
+  // A batch queued from this tab: say once that it runs in the background.
   useEffect(() => {
-    if (!data) return
-    if (known.current) for (const item of data.items) if (!known.current.has(item.batch))
+    for (const item of data?.items ?? []) {
+      if (!toAnnounce.delete(item.batch)) continue
       notice.current('ok', item.queued ? t('jira.background.started', { count: item.queued }) : item.linked ? t('jira.background.nothing', { count: item.linked }) : t('jira.background.none_routed'))
-    known.current = new Set(data.items.map(item => item.batch))
+    }
   }, [data, t])
   useJiraSettled(batch => {
     notice.current(batch.failed ? 'error' : 'ok', batch.failed
