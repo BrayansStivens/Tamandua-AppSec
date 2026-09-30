@@ -149,7 +149,8 @@
       "advisory_watch": "avisos publicados después del último análisis",
       "image_scan": "análisis de la imagen",
       "full_scan": "análisis completo del repositorio",
-      "branch": "reanálisis automático tras un cambio en una rama vigilada"
+      "branch": "reanálisis automático tras un cambio en una rama vigilada",
+      "sarif_import": "importación de hallazgos de {{tool}}"
     },
     "findings_title_one": "1 hallazgo nuevo en {{asset}}",
     "findings_title_other": "{{count}} hallazgos nuevos en {{asset}}",

@@ -66,5 +66,17 @@
   "setup_code": {
     "code": "Setup code: {{code}}",
     "none": "An administrator already exists: sign in with your user."
+  },
+  "import_sarif": {
+    "asset_line": "Imported into {{name}} ({{asset}})",
+    "run_full": "{{tool}} · run {{id}} · findings {{findings}} · opened {{opened}} · fixed {{fixed}}",
+    "run_partial": "{{tool}} · run {{id}} · findings {{findings}} · opened {{opened}} · partial import: nothing is marked fixed",
+    "no_token": "Set TAMANDUA_IMPORT_TOKEN in the environment to send to a server (it's never a command-line flag)",
+    "insecure_server": "The server must be an https:// address (plain http only for this machine): {{server}}",
+    "unreadable": "Couldn't read {{file}}: {{detail}}",
+    "not_json": "{{file}} isn't valid JSON",
+    "too_large": "The SARIF exceeds {{max}} MB: split it by tool or by folder",
+    "http_error": "The server answered {{status}}: {{detail}}",
+    "unreachable": "Couldn't reach the server: {{detail}}"
   }
 }

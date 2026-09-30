@@ -5,5 +5,7 @@ FULL_SCANS = ("repository_scan", "image_scan")
 # Advisories published after the last scan, checked against its dependencies (advisory_watch). They only add:
 # they are not a full scan and remediate nothing.
 ADVISORY_RUNS = ("advisory_watch",)
+# Findings another tool reported (SARIF). A full import remediates only what that same tool stopped reporting.
+IMPORT_RUNS = ("sarif_import",)
 # Everything that feeds the findings registry and accepts triage.
-FINDING_RUNS = FULL_SCANS + ("pr_review",) + ADVISORY_RUNS
+FINDING_RUNS = FULL_SCANS + ("pr_review",) + ADVISORY_RUNS + IMPORT_RUNS

@@ -1536,6 +1536,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/imports/sarif": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Panel Import
+         * @description Imports another tool's findings into an asset that already exists; one run per tool in the document.
+         */
+        post: operations["panel_import_api_imports_sarif_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ci/sarif": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ci Import
+         * @description The same import for a pipeline, authenticated by TAMANDUA_IMPORT_TOKEN instead of a session.
+         */
+        post: operations["ci_import_api_ci_sarif_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notifications": {
         parameters: {
             query?: never;
@@ -2483,6 +2523,32 @@ export interface components {
             /** Relayout */
             relayout: boolean;
         };
+        /**
+         * ImportedRun
+         * @description The `sarif_import` run created for one tool, and what it changed in the asset's registry.
+         */
+        ImportedRun: {
+            /** Id */
+            id: string;
+            /** Tool */
+            tool: string;
+            /** Version */
+            version: string | null;
+            /** Scope */
+            scope: string;
+            /** Status */
+            status: string;
+            /** Findings */
+            findings: number;
+            /** Excluded */
+            excluded: number;
+            /** Skipped */
+            skipped: number;
+            /** Opened */
+            opened: number;
+            /** Fixed */
+            fixed: number;
+        };
         /** InstallLink */
         InstallLink: {
             /** Url */
@@ -3003,6 +3069,15 @@ export interface components {
             } | null;
         } & {
             [key: string]: unknown;
+        };
+        /** SarifImportResult */
+        SarifImportResult: {
+            /** Asset */
+            asset: string;
+            /** Name */
+            name: string;
+            /** Runs */
+            runs: components["schemas"]["ImportedRun"][];
         };
         /** ScanBranch */
         ScanBranch: {
@@ -6322,6 +6397,169 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Registries"];
                 };
+            };
+        };
+    };
+    panel_import_api_imports_sarif_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Asset
+                     * @description Asset key or name (e.g. owner/repo)
+                     */
+                    asset: string;
+                    /**
+                     * Tool
+                     * @description Overrides runs[].tool.driver.name
+                     */
+                    tool?: string | null;
+                    /**
+                     * Scope
+                     * @default full
+                     * @enum {string}
+                     */
+                    scope?: "full" | "partial";
+                    /** Commit */
+                    commit?: string | null;
+                    /** Branch */
+                    branch?: string | null;
+                    /**
+                     * Sarif
+                     * @description SARIF 2.1.0 document
+                     */
+                    sarif: {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SarifImportResult"];
+                };
+            };
+            /** @description Unknown asset */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The name matches several assets */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ci_import_api_ci_sarif_post: {
+        parameters: {
+            query?: {
+                /** @description With a bare SARIF body: asset */
+                asset?: string;
+                /** @description With a bare SARIF body: tool */
+                tool?: string;
+                /** @description With a bare SARIF body: scope */
+                scope?: string;
+                /** @description With a bare SARIF body: commit */
+                commit?: string;
+                /** @description With a bare SARIF body: branch */
+                branch?: string;
+            };
+            header?: {
+                /** @description Who triggered the pipeline, recorded as requested_by ci:<actor> */
+                "X-Tamandua-Actor"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Asset
+                     * @description Asset key or name (e.g. owner/repo)
+                     */
+                    asset: string;
+                    /**
+                     * Tool
+                     * @description Overrides runs[].tool.driver.name
+                     */
+                    tool?: string | null;
+                    /**
+                     * Scope
+                     * @default full
+                     * @enum {string}
+                     */
+                    scope?: "full" | "partial";
+                    /** Commit */
+                    commit?: string | null;
+                    /** Branch */
+                    branch?: string | null;
+                    /**
+                     * Sarif
+                     * @description SARIF 2.1.0 document
+                     */
+                    sarif: {
+                        [key: string]: unknown;
+                    };
+                } | {
+                    /**
+                     * Version
+                     * @constant
+                     */
+                    version: "2.1.0";
+                    /** Runs */
+                    runs: {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SarifImportResult"];
+                };
+            };
+            /** @description Missing or wrong bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Off (no TAMANDUA_IMPORT_TOKEN), or unknown asset */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The name matches several assets */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

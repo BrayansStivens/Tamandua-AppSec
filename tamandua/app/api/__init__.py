@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from tamandua.app.api import assets, auth, compliance, cron, findings, images, intel, metrics, notifications, onboarding, pullrequests, reporting, repositories, runs, scanning, sources, static, system, threats
+from tamandua.app.api import assets, auth, compliance, cron, findings, images, imports, intel, metrics, notifications, onboarding, pullrequests, reporting, repositories, runs, scanning, sources, static, system, threats
 from tamandua.app.api.deps import ApiError
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
 from tamandua.modules.identity.auth import COOKIE_NAME
@@ -25,7 +25,7 @@ from tamandua.shared.i18n import localize, msg, negotiate
 from tamandua.shared.vault import VaultError
 from tamandua.version import VERSION
 
-ROUTERS = (auth, system, metrics, cron, reporting, intel, findings, compliance, pullrequests, repositories, scanning, sources, threats, runs, assets, images, notifications, onboarding, static)
+ROUTERS = (auth, system, metrics, cron, reporting, intel, findings, compliance, pullrequests, repositories, scanning, sources, threats, runs, assets, images, imports, notifications, onboarding, static)
 
 
 def _security_headers(response, port: int) -> None:
@@ -43,6 +43,8 @@ def _security_headers(response, port: int) -> None:
 # FastAPI reads a typed route's body before its guard runs: cap it here, by the declared length, before anything
 # is read (the server never reads more than Content-Length). Each route then applies its own, smaller limit.
 MAX_BODY = 1_000_000
+# The only routes allowed more: SARIF imports (a large repository's results).
+LARGE_BODIES = dict.fromkeys(imports.PATHS, imports.MAX_BYTES)
 
 
 def _body_problem(request: Request) -> int | None:
@@ -52,7 +54,7 @@ def _body_problem(request: Request) -> int | None:
     if declared is None:
         return 411 if request.headers.get("transfer-encoding") else None
     try:
-        return 413 if int(declared) > MAX_BODY else None
+        return 413 if int(declared) > LARGE_BODIES.get(request.url.path, MAX_BODY) else None
     except ValueError:
         return 400
 
@@ -150,6 +152,7 @@ def openapi_document(data_dir: Path | None = None) -> str:
     document.setdefault("components", {})["securitySchemes"] = {
         "session": {"type": "apiKey", "in": "cookie", "name": COOKIE_NAME, "description": "Session signed in to the panel."},
         "metrics": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_METRICS_TOKEN (Prometheus scraper)."},
-        "cron": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_CRON_TOKEN or CRON_SECRET (external scheduler)."}}
+        "cron": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_CRON_TOKEN or CRON_SECRET (external scheduler)."},
+        "import": {"type": "http", "scheme": "bearer", "description": "TAMANDUA_IMPORT_TOKEN (CI uploading SARIF)."}}
     document["security"] = [{"session": []}]
     return json.dumps(document, ensure_ascii=False, indent=2) + "\n"

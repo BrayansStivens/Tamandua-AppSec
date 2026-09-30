@@ -42,6 +42,16 @@ def load_registry(data_dir: Path) -> dict:
         return dict(connection.execute(select(repo_registry.c.uid, repo_registry.c.entry).where(repo_registry.c.tenant_id == TENANT)).all())
 
 
+def registered(data_dir: Path, name: str) -> list[dict]:
+    """Repositories in the registry (not removed) named `name`, ignoring case: [{"uid", "name", "source_id"}]."""
+    with db.transaction(data_dir) as connection:
+        rows = connection.execute(select(repo_registry.c.uid, repo_registry.c.entry)
+                                  .where(repo_registry.c.tenant_id == TENANT, func.lower(repo_registry.c.entry["name"].astext) == name.lower())
+                                  .order_by(repo_registry.c.uid)).all()
+    return [{"uid": row.uid, "name": row.entry.get("name"), "source_id": row.entry.get("source_id")} for row in rows
+            if not row.entry.get("removed_at")]
+
+
 def _entry(connection, uid: str) -> dict | None:
     return connection.execute(select(repo_registry.c.entry).where(repo_registry.c.tenant_id == TENANT, repo_registry.c.uid == uid)).scalar_one_or_none()
 

@@ -48,6 +48,7 @@ SETTINGS: dict[str, Setting] = {
     "TAMANDUA_METRICS_TOKEN": Setting(kind="token"),
     "TAMANDUA_CRON_TOKEN": Setting(kind="token"),
     "CRON_SECRET": Setting(kind="token"),  # what Vercel Cron sends; accepted as the cron token
+    "TAMANDUA_IMPORT_TOKEN": Setting(kind="token"),  # CI uploading SARIF (POST /api/ci/sarif, `import-sarif --server`)
     "TAMANDUA_REQUIRE_TOTP": Setting(default="admins", kind="choice", choices=("admins", "all", "none")),
     # Behaviour
     "TAMANDUA_DEFAULT_LOCALE": Setting(default="en", kind="choice", choices=("en", "es")),

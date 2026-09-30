@@ -1,0 +1,215 @@
+# Tamandua as a GitHub Action: `python -m tamandua scan` from the published worker image, which carries the seven
+# engines and runs them as local processes (TAMANDUA_ENGINE_RUNNER=local): no build and no Docker socket.
+# Optionally sends other tools' SARIF to a Tamandua server (`import-sarif`). Documented in docs/cli.md ("In CI").
+#
+# Every input reaches the scripts through `env:` and is quoted; arguments are built as bash arrays (no eval).
+# tests/test_action.py runs these scripts against a fake `docker` and checks the pins and the default image tag.
+name: Tamandua
+description: Block pull requests on the vulnerabilities, secrets and misconfigurations they introduce. SARIF for code scanning.
+author: BrayansStivens
+branding:
+  icon: shield
+  color: purple
+
+inputs:
+  path:
+    description: Folder to scan, relative to the workspace.
+    default: "."
+  base:
+    description: >-
+      Branch or commit to compare against: only what the change introduces counts. Empty: `origin/<base branch>` on
+      pull requests, a full scan otherwise. `none`: always a full scan.
+    default: ""
+  fail-on:
+    description: "Severity that fails the step: critical, high, medium, low or never."
+    default: high
+  exclude:
+    description: Paths whose findings don't count, one pattern per line (like `--exclude`).
+    default: ""
+  name:
+    description: "Name shown in the results. Empty: the repository's name."
+    default: ""
+  sarif:
+    description: "Where to write the SARIF. Empty: `$RUNNER_TEMP/tamandua.sarif`."
+    default: ""
+  image:
+    description: Tamandua worker image.
+    default: ghcr.io/brayansstivens/tamandua-worker:0.9
+  allow-incomplete:
+    description: "`true`: don't fail if an engine couldn't run."
+    default: "false"
+  scan:
+    description: "`false`: skip the scan (only `import-sarif`)."
+    default: "true"
+  import-sarif:
+    description: SARIF files from other tools to send to a Tamandua server, one path per line.
+    default: ""
+  server:
+    description: Tamandua server URL, for `import-sarif`.
+    default: ""
+  token:
+    description: Import token for `import-sarif` (use a secret). Reaches the container only as an environment variable.
+    default: ""
+  asset:
+    description: "Asset the imported results belong to. Empty: `owner/name` of the repository."
+    default: ""
+  import-partial:
+    description: "`true`: the imported SARIF covers part of the asset; findings it doesn't mention stay open. Always on for pull requests."
+    default: "false"
+  registry-token:
+    description: "Token to pull the image from a private registry (`GITHUB_TOKEN` with `packages: read` for GHCR)."
+    default: ""
+  registry-user:
+    description: "User for `registry-token`. Empty: the actor that triggered the workflow."
+    default: ""
+
+outputs:
+  sarif:
+    description: Path of the SARIF written by the scan (empty if there is none).
+    value: ${{ steps.tamandua.outputs.sarif }}
+  exit-code:
+    description: 0 pass, 1 blocked, 2 usage error, 3 incomplete (the CLI's codes).
+    value: ${{ steps.tamandua.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Pull the Tamandua image
+      if: inputs.registry-token != ''
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        REGISTRY_TOKEN: ${{ inputs.registry-token }}
+        REGISTRY_USER: ${{ inputs.registry-user }}
+      run: |
+        # A throwaway Docker config: the credential doesn't outlive this step (nor reach later steps of the job).
+        config="$(mktemp -d "$RUNNER_TEMP/tamandua-docker.XXXXXX")"
+        trap 'rm -rf "$config"' EXIT
+        registry=docker.io
+        case "$IMAGE" in
+          */*) first="${IMAGE%%/*}"
+               case "$first" in *.*|*:*|localhost) registry="$first" ;; esac ;;
+        esac
+        printf '%s' "$REGISTRY_TOKEN" |
+          DOCKER_CONFIG="$config" docker login "$registry" --username "${REGISTRY_USER:-$GITHUB_ACTOR}" --password-stdin
+        DOCKER_CONFIG="$config" docker pull --quiet "$IMAGE"
+
+    - name: Tamandua
+      id: tamandua
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        SCAN: ${{ inputs.scan }}
+        SCAN_PATH: ${{ inputs.path }}
+        BASE: ${{ inputs.base }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        EXCLUDE: ${{ inputs.exclude }}
+        NAME: ${{ inputs.name }}
+        SARIF: ${{ inputs.sarif }}
+        ALLOW_INCOMPLETE: ${{ inputs.allow-incomplete }}
+        IMPORT_SARIF: ${{ inputs.import-sarif }}
+        IMPORT_PARTIAL: ${{ inputs.import-partial }}
+        SERVER: ${{ inputs.server }}
+        TOKEN: ${{ inputs.token }}
+        ASSET: ${{ inputs.asset }}
+      run: |
+        usage() {
+          echo "::error title=Tamandua::$1"
+          echo "exit-code=2" >> "$GITHUB_OUTPUT"
+          exit 2
+        }
+        lines() {  # one trimmed, non-empty line per output line
+          while IFS= read -r line || [ -n "$line" ]; do
+            line="${line#"${line%%[![:space:]]*}"}"
+            line="${line%"${line##*[![:space:]]}"}"
+            if [ -n "$line" ]; then printf '%s\n' "$line"; fi
+          done <<< "$1"
+        }
+        for flag in SCAN ALLOW_INCOMPLETE IMPORT_PARTIAL; do
+          case "${!flag}" in true|false) ;; *) usage "$flag must be true or false" ;; esac
+        done
+        [ "$SCAN" = true ] || [ -n "$IMPORT_SARIF" ] || usage "nothing to do: scan is false and import-sarif is empty"
+        data="$RUNNER_TEMP/tamandua"  # engine caches, reused by later runs in the same job
+        mkdir -p "$data"
+
+        # Everything is checked (and the files to import staged) before any container starts.
+        if [ "$SCAN" = true ]; then
+          case "/${SCAN_PATH:-.}/" in //*|*/../*) usage "path must be a folder inside the workspace" ;; esac
+          target="${SCAN_PATH#./}"
+          while [ "${target%/}" != "$target" ]; do target="${target%/}"; done
+          [ "$target" != . ] || target=""
+          scan=(python -m tamandua scan "/src${target:+/$target}" --name "${NAME:-${GITHUB_REPOSITORY#*/}}"
+                --fail-on "$FAIL_ON" --format sarif --output /data/result.sarif)
+          case "$BASE" in
+            none) ;;
+            "") if [ -n "${GITHUB_BASE_REF:-}" ]; then scan+=(--base "origin/$GITHUB_BASE_REF"); fi ;;
+            *) scan+=(--base "$BASE") ;;
+          esac
+          while IFS= read -r pattern; do
+            if [ -n "$pattern" ]; then scan+=(--exclude "$pattern"); fi
+          done <<< "$(lines "$EXCLUDE")"
+          if [ "$ALLOW_INCOMPLETE" = true ]; then scan+=(--allow-incomplete); fi
+        fi
+        staged="$data/import"
+        rm -rf "$staged"
+        if [ -n "$IMPORT_SARIF" ]; then
+          [ -n "$SERVER" ] || usage "import-sarif needs server"
+          [ -n "$TOKEN" ] || usage "import-sarif needs token"
+          # Copied next to the caches: the container sees these files and nothing else of the runner's.
+          mkdir -p "$staged"
+          files=()
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            case "$file" in /*) ;; *) file="$GITHUB_WORKSPACE/$file" ;; esac
+            [ -f "$file" ] || usage "SARIF file not found: $file"
+            copy="$((${#files[@]} + 1))-$(basename "$file")"
+            cp "$file" "$staged/$copy"
+            files+=("/data/import/$copy")
+          done <<< "$(lines "$IMPORT_SARIF")"
+          import=(python -m tamandua import-sarif "${files[@]}" --asset "${ASSET:-$GITHUB_REPOSITORY}" --server "$SERVER")
+          if [ -n "${GITHUB_BASE_REF:-}" ]; then
+            # A pull request's results describe its branch, not the asset: they may add, never remediate.
+            import+=(--partial)
+          else
+            if [ "$IMPORT_PARTIAL" = true ]; then import+=(--partial); fi
+            if [ -n "${GITHUB_SHA:-}" ]; then import+=(--commit "$GITHUB_SHA"); fi
+            if [ "${GITHUB_REF_TYPE:-}" = branch ]; then import+=(--branch "$GITHUB_REF_NAME"); fi
+          fi
+        fi
+
+        # The container runs as the runner's user, without capabilities, with the workspace read-only and a read-only
+        # filesystem except the data folder and /tmp (exec: Opengrep launches helpers from there).
+        # The local runner would put each engine in an empty network namespace, but a plain `docker run` doesn't allow
+        # user namespaces (seccomp, and AppArmor on Ubuntu 24.04). Unlocking them would take
+        # `--security-opt seccomp=unconfined` (and `apparmor=unconfined`), which loosens the whole container: instead
+        # the engines share its network and run with their offline flags. The code is never executed.
+        # GIT_CONFIG_*: `path` can be a subfolder, and git checks ownership on the repository root.
+        run=(docker run --rm --user "$(id -u):$(id -g)" --cap-drop ALL --security-opt no-new-privileges
+             --read-only --tmpfs /tmp:exec
+             -e HOME=/tmp -e TAMANDUA_ENGINE_RUNNER=local -e TAMANDUA_DEFAULT_LOCALE
+             -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/src
+             -v "$GITHUB_WORKSPACE:/src:ro" -v "$data:/data")
+
+        scan_code=0
+        if [ "$SCAN" = true ]; then
+          rm -f "$data/result.sarif"
+          "${run[@]}" "$IMAGE" "${scan[@]}" || scan_code=$?
+          if [ -s "$data/result.sarif" ]; then
+            sarif="${SARIF:-$RUNNER_TEMP/tamandua.sarif}"
+            case "$sarif" in /*) ;; *) sarif="$GITHUB_WORKSPACE/$sarif" ;; esac
+            mkdir -p "$(dirname "$sarif")"
+            cp "$data/result.sarif" "$sarif"
+            echo "sarif=$sarif" >> "$GITHUB_OUTPUT"
+          fi
+        fi
+        import_code=0
+        if [ -n "$IMPORT_SARIF" ]; then
+          # `-e NAME` without a value: Docker reads it from its own environment, never from the command line.
+          TAMANDUA_IMPORT_TOKEN="$TOKEN" "${run[@]}" -e TAMANDUA_IMPORT_TOKEN "$IMAGE" "${import[@]}" || import_code=$?
+          rm -rf "$staged"
+        fi
+
+        code=$scan_code
+        [ "$code" -ne 0 ] || code=$import_code
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit "$code"

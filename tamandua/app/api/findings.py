@@ -157,6 +157,8 @@ def reverify_finding(context: Context = Depends(guard(Policy(action="reverify-fi
     origin = entry.get("origin") or {}
     if origin.get("kind") == "pr" and not origin.get("merged"):
         raise ApiError(409, msg("api.finding_from_open_pr"))
+    if origin.get("kind") == "import":  # only that tool can say whether it is still there
+        raise ApiError(409, msg("api.finding_from_import", tool=origin.get("tool") or "SARIF"))
     by = context.user["username"]
     current = run_assets.in_flight(data_dir, key)
     if current:

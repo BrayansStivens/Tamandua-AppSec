@@ -521,5 +521,18 @@
       "nested_class": "una clase de caracteres dentro de otra",
       "repeat": "un conteo de repetición sin mínimo o mayor que 1000"
     }
+  },
+  "sarif": {
+    "reason": "{{tool}} reporta: {{message}}",
+    "remediation": "Corrígelo siguiendo la guía de {{tool}} para esta regla. La próxima importación completa de {{tool}} lo marca como remediado cuando deje de reportarlo.",
+    "remediation_help": "Guía de {{tool}}: {{help}}",
+    "priority": "Reportado por {{tool}}, severidad {{severity}}",
+    "errors": {
+      "version": "Solo se pueden importar documentos SARIF 2.1.0",
+      "no_runs": "El SARIF no trae ejecuciones (runs) para importar",
+      "too_many_runs": "Una importación SARIF admite como máximo {{max}} ejecuciones (runs)",
+      "too_many_results": "Una importación SARIF admite como máximo {{max}} resultados: divídela por herramienta o por carpeta",
+      "no_tool": "Indica la herramienta: el SARIF no dice cuál lo generó"
+    }
   }
 }

@@ -85,6 +85,18 @@ class GitTests(unittest.TestCase):
             self.assertEqual((Path(out) / "base" / "app.py").read_text(), "a = 1\nb = 2\n")
             self.assertFalse((Path(out) / "base" / "nuevo.py").exists())
 
+    def test_the_base_snapshot_of_a_subfolder_holds_only_that_folder(self):
+        base = merge_base(self.repo, "main")
+        (self.repo / "svc").mkdir()
+        (self.repo / "svc" / "api.py").write_text("x = 1\n")
+        self.git("add", "svc")
+        self.git("commit", "-qm", "svc")
+        with tempfile.TemporaryDirectory() as out:
+            local_scan.snapshot_commit(self.repo / "svc", "HEAD", Path(out) / "base")
+            self.assertEqual([item.name for item in (Path(out) / "base").iterdir()], ["api.py"])
+            local_scan.snapshot_commit(self.repo / "svc", base, Path(out) / "old")
+            self.assertEqual(list((Path(out) / "old").iterdir()), [])
+
 
 class GateTests(unittest.TestCase):
     def run_with(self, findings, *, status="completed", failed=(), docker=True, fail_on="high", exclude=None):

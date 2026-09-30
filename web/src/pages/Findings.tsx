@@ -77,7 +77,7 @@ export function Findings({ user, requestedRun, onNew, onOpenPolicies }: { user: 
 
   const searchRuns = useCallback(async (text: string) => {
     if (!asset) return { options: [], total: 0 }
-    const page = await api.get<Page<RunRow>>(`/api/runs/page?${query({ asset: asset.key, type: 'repository_scan,image_scan,pr_review', q: text || undefined, limit: 50 })}`)
+    const page = await api.get<Page<RunRow>>(`/api/runs/page?${query({ asset: asset.key, type: 'repository_scan,image_scan,pr_review,sarif_import', q: text || undefined, limit: 50 })}`)
     const current: ComboOption = { id: CURRENT, label: t('page.current'), hint: t('page.current_hint') }
     return { options: [...(text ? [] : [current]), ...page.items.map(runOption)], total: page.total + (text ? 0 : 1) }
   }, [asset, t])
@@ -109,7 +109,8 @@ export function Findings({ user, requestedRun, onNew, onOpenPolicies }: { user: 
 function runOption(row: RunRow | Detail): ComboOption {
   const pull = (row as Detail).pull_request ?? (row as RunRow & { pull_request?: { number: number; title: string } }).pull_request
   const kind = row.type === 'pr_review' ? (pull ? i18n.t('findings:page.kind_pr_number', { number: pull.number }) : i18n.t('findings:page.kind_pr'))
-    : row.type === 'advisory_watch' ? i18n.t('findings:page.kind_advisory') : i18n.t('findings:page.kind_scan')
+    : row.type === 'advisory_watch' ? i18n.t('findings:page.kind_advisory')
+    : row.type === 'sarif_import' ? i18n.t('findings:page.kind_import', { tool: row.trigger?.tool ?? 'SARIF' }) : i18n.t('findings:page.kind_scan')
   const status = RUN_STATUS[row.status] ? i18n.t(RUN_STATUS[row.status]) : row.status
   return { id: row.id, label: `${kind} · ${formatDate(row.created_at)}`, hint: `${status} · ${i18n.t('common:count.findings', { count: row.summary?.candidates ?? 0 })}${pull?.title ? ` · ${pull.title}` : ''}` }
 }

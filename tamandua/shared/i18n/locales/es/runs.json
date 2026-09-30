@@ -47,5 +47,24 @@
     "too_many": "Como mucho {{max}} elementos por lote",
     "already_running": "Ya hay un lote en curso: espera a que termine o cancélalo",
     "item_failed": "El análisis falló"
+  },
+  "imports": {
+    "step": "{{tool}} (importación SARIF)",
+    "detail_full_one": "{{count}} hallazgo de los {{results}} resultados del SARIF ({{skipped}} suprimidos o sin fallo, no se importan). Importación completa: lo que {{tool}} ya no reporte queda remediado.",
+    "detail_full_other": "{{count}} hallazgos de los {{results}} resultados del SARIF ({{skipped}} suprimidos o sin fallo, no se importan). Importación completa: lo que {{tool}} ya no reporte queda remediado.",
+    "detail_partial_one": "{{count}} hallazgo de los {{results}} resultados del SARIF ({{skipped}} suprimidos o sin fallo, no se importan). Importación parcial: no se remedia nada.",
+    "detail_partial_other": "{{count}} hallazgos de los {{results}} resultados del SARIF ({{skipped}} suprimidos o sin fallo, no se importan). Importación parcial: no se remedia nada.",
+    "limitations": {
+      "third_party": "Hallazgos reportados por {{tool}} e importados tal como llegaron: Tamandua no analizó el código en esta ejecución.",
+      "partial": "Importación parcial: los hallazgos que {{tool}} ya no reporte siguen abiertos hasta una importación completa o una corrección manual."
+    },
+    "errors": {
+      "invalid_request": "Importación no válida: envía asset, el documento SARIF y, si quieres, tool, scope (full o partial), commit y branch",
+      "invalid_asset": "Indica el activo: su clave o su nombre, como owner/repo",
+      "unknown_asset": "No hay ningún activo llamado {{asset}}: analízalo o conecta su repositorio primero",
+      "ambiguous_asset": "Varios activos se llaman {{asset}}: usa la clave del activo",
+      "invalid_scope": "El alcance debe ser full o partial",
+      "invalid_commit": "Commit no válido: usa su SHA (de 7 a 64 caracteres hexadecimales)"
+    }
   }
 }

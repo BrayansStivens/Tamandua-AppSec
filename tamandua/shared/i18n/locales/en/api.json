@@ -68,5 +68,7 @@
     "images_one": "1 image",
     "images_other": "{{count}} images"
   },
-  "cron_token_required": "Send the cron token as a bearer token (Authorization: Bearer …)"
+  "cron_token_required": "Send the cron token as a bearer token (Authorization: Bearer …)",
+  "import_token_required": "Send the import token as a bearer token (Authorization: Bearer …)",
+  "finding_from_import": "{{tool}} reported this finding: import a new full SARIF from {{tool}} to check whether it's still there"
 }

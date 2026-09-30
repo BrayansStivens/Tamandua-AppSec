@@ -47,5 +47,24 @@
     "too_many": "At most {{max}} items per batch",
     "already_running": "A batch is already running: wait for it to finish or cancel it",
     "item_failed": "The scan failed"
+  },
+  "imports": {
+    "step": "{{tool}} (SARIF import)",
+    "detail_full_one": "{{count}} finding from the {{results}} results in the SARIF ({{skipped}} suppressed or passing, not imported). Full import: whatever {{tool}} no longer reports is marked fixed.",
+    "detail_full_other": "{{count}} findings from the {{results}} results in the SARIF ({{skipped}} suppressed or passing, not imported). Full import: whatever {{tool}} no longer reports is marked fixed.",
+    "detail_partial_one": "{{count}} finding from the {{results}} results in the SARIF ({{skipped}} suppressed or passing, not imported). Partial import: nothing is marked fixed.",
+    "detail_partial_other": "{{count}} findings from the {{results}} results in the SARIF ({{skipped}} suppressed or passing, not imported). Partial import: nothing is marked fixed.",
+    "limitations": {
+      "third_party": "Findings reported by {{tool}} and imported as they came: Tamandua didn't analyze the code in this run.",
+      "partial": "Partial import: findings {{tool}} no longer reports stay open until a full import or a manual fix."
+    },
+    "errors": {
+      "invalid_request": "Invalid import: send asset, the SARIF document and, optionally, tool, scope (full or partial), commit and branch",
+      "invalid_asset": "Name the asset: its key or its name, such as owner/repo",
+      "unknown_asset": "There's no asset named {{asset}}: scan it or connect its repository first",
+      "ambiguous_asset": "Several assets are named {{asset}}: use the asset key",
+      "invalid_scope": "The scope must be full or partial",
+      "invalid_commit": "Invalid commit: use its SHA (7 to 64 hexadecimal characters)"
+    }
   }
 }

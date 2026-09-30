@@ -120,9 +120,14 @@ def diff_files(path: Path, commit: str) -> list[dict]:
 def snapshot_commit(path: Path, commit: str, destination: Path) -> dict:
     """The folder as it was at `commit`, with the same filters as the current scan."""
     prefix = _git(path, "rev-parse", "--show-prefix").strip()
-    archive = _git(path, "archive", "--format=tar", f"{commit}:{prefix}" if prefix else commit, binary=True, timeout=600)
+    # From the top level: older git (2.39, in the image) applies the subfolder's prefix twice to `commit:prefix`.
+    top = Path(_git(path, "rev-parse", "--show-toplevel").strip()) if prefix else path
     raw = destination.parent / f"{destination.name}-raw"
     raw.mkdir(parents=True, exist_ok=True)
+    if prefix and _git(top, "ls-tree", "-d", "--name-only", commit, "--", prefix.rstrip("/")).strip() == "":
+        destination.mkdir(parents=True, exist_ok=True)  # the change creates the folder: the baseline is empty
+        return snapshot_directory(raw, destination)
+    archive = _git(top, "archive", "--format=tar", f"{commit}:{prefix}" if prefix else commit, binary=True, timeout=600)
     with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
         # "data" filter (PEP 706): no absolute paths, no escaping the folder, no devices or links pointing outside.
         bundle.extractall(raw, filter="data")

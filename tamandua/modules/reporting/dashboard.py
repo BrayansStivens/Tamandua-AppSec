@@ -3,6 +3,8 @@
 "Open" is what the latest run of each asset has, minus what triage dismissed
 (false positive or a still-valid accepted risk); "fixed" is a fingerprint that
 was in an earlier run of that asset and no longer appears in the latest one.
+Findings imported from other tools (SARIF) come from the registry, which already
+keeps them per tool: the open ones count, and so do the ones an import fixed.
 Dismissed findings are counted separately so they don't vanish without a trace.
 """
 
@@ -18,7 +20,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.findings import sla
-from tamandua.modules.findings.kinds import FULL_SCANS
+from tamandua.modules.findings.kinds import FULL_SCANS, IMPORT_RUNS
 from tamandua.modules.intel.advisories import load_feeds, load_recent_cves
 from tamandua.modules.sources.assets import asset_key
 from tamandua.modules.runs.store import list_runs, load_run
@@ -76,6 +78,23 @@ def _score(open_by_severity: dict, kev: int = 0, high_epss: int = 0) -> dict:
             "formula": msg("reports.dashboard.score_formula")}
 
 
+def _imported(data_dir: Path, rows: list[dict], decisions: dict) -> dict[str, tuple[dict, list[dict]]]:
+    """Per asset with SARIF imports: its open imported findings shaped like its latest import (triage applied), and
+    every imported registry entry."""
+    latest: dict[str, dict] = {}
+    for row in rows:  # newest first
+        if row["type"] in IMPORT_RUNS and row["status"] == "completed":
+            latest.setdefault(asset_key(row), row)
+    result = {}
+    for key, row in latest.items():
+        entries = [entry for entry in findings_registry.load(data_dir, key)["findings"].values()
+                   if (entry.get("origin") or {}).get("kind") == "import" and entry.get("finding")]
+        record = {"id": row["id"], "type": row["type"], "status": "completed", "created_at": row["created_at"], "source": row.get("source") or {},
+                  "findings": [entry["finding"] for entry in entries if entry.get("status") == "open"]}
+        result[key] = (annotate(data_dir, record, decisions), entries)
+    return result
+
+
 def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dict:
     _day = _day_in(where)  # days are counted in the viewer's time zone
     now = datetime.now(timezone.utc)
@@ -111,6 +130,16 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
     deadlines: dict[tuple[str, str], dict] = {}  # by (asset, fingerprint): the same fingerprint can be in two assets
     policy_days = sla.policy(data_dir)["days"]
     fixed: dict[str, tuple[str, str]] = {}
+    imported = _imported(data_dir, rows, decisions)
+    for key, (record, entries) in imported.items():
+        if key not in by_asset:
+            by_asset[key] = [record]  # only other tools' findings so far
+        name = (by_asset[key][-1].get("source") or {}).get("name") or key
+        for entry in entries:
+            digest = entry["finding"]["fingerprint"]
+            first_seen.setdefault(digest, (entry.get("first_seen") or record["created_at"], entry["finding"], name))
+            if entry.get("status") == "fixed" and (entry.get("fixed") or {}).get("at"):
+                fixed.setdefault(digest, (first_seen[digest][0], entry["fixed"]["at"]))
     open_findings: list[tuple[str, dict]] = []
     top_assets = []
     for key, runs in by_asset.items():
@@ -132,6 +161,8 @@ def compute(data_dir: Path, days: int = 30, where: tzinfo = timezone.utc) -> dic
                         for item in later.get("findings", []):
                             current.setdefault(item["fingerprint"], item)
                             first_seen.setdefault(item["fingerprint"], (later["created_at"], item, asset))
+                for item in imported[key][0]["findings"] if key in imported else []:
+                    current.setdefault(item["fingerprint"], item)
                 triage_totals.update((item.get("triage") or {}).get("status", "open") for item in current.values())
                 current = {digest: item for digest, item in current.items() if is_active(item)}
                 open_findings.extend((asset, finding) for finding in current.values())

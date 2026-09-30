@@ -72,7 +72,8 @@
     "reappeared": "Reapareció en la ejecución {{run}}",
     "gone_from_scan": "Ya no aparece en el escaneo completo del {{date}}",
     "fixed_in_pr": "Corregido en el commit {{commit}} del PR #{{number}}",
-    "pr_closed": "El PR #{{number}} se cerró sin merge"
+    "pr_closed": "El PR #{{number}} se cerró sin merge",
+    "gone_from_import": "Ya no aparece en la importación de {{tool}} del {{date}}"
   },
   "triage": {
     "status": {

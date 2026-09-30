@@ -58,7 +58,7 @@ El panel sigue el idioma de tu navegador y tiene un selector de idioma en la bar
 | [Dónde desplegar](docs/es/despliegue.md) | Un archivo de compose para cualquier servidor o panel de Docker, Render, Railway, Vercel para la API, Kubernetes |
 | [Desplegar en un VPS](docs/es/despliegue-vps.md) | Tu propio servidor con dominio: HTTPS, copias, actualizaciones, monitorización, Coolify y Dokploy |
 | [Conectar GitHub](docs/es/github-app.md) | Crear la GitHub App paso a paso y revisar PRs |
-| [Terminal y CI](docs/es/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos para CI |
+| [Terminal y CI](docs/es/cli.md) | `scan`: analiza una carpeta o lo que introduce un cambio, con salida SARIF y códigos de salida; en CI, un solo paso con la GitHub Action |
 | [Skills para asistentes](skills/README.md) | Claude Code, Cursor o Codex corrigen lo que encuentra Tamandua y lo verifican, o lo montan en tu CI |
 | [Funcionalidades](docs/es/funcionalidades.md) | Qué hace cada parte y con qué criterio |
 | [Configuración](docs/es/configuracion.md) | Variables de `.env` |

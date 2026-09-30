@@ -44,6 +44,8 @@ x-env: &env
   TAMANDUA_DEFAULT_LOCALE: "${TAMANDUA_DEFAULT_LOCALE:-en}"
   TAMANDUA_REQUIRE_TOTP: "${TAMANDUA_REQUIRE_TOTP:-admins}"
   TAMANDUA_METRICS_TOKEN: "${TAMANDUA_METRICS_TOKEN:-}"
+  # CI importing SARIF through POST /api/ci/sarif. Empty = off.
+  TAMANDUA_IMPORT_TOKEN: "${TAMANDUA_IMPORT_TOKEN:-}"
   TAMANDUA_NVD_API_KEY: "${TAMANDUA_NVD_API_KEY:-}"
   TAMANDUA_LOG_FORMAT: "${TAMANDUA_LOG_FORMAT:-text}"
   # leader: the leader worker runs the periodic tasks. external: a scheduler calls GET /api/cron with this token.

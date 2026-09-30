@@ -149,7 +149,8 @@
       "advisory_watch": "advisories published after the last analysis",
       "image_scan": "image analysis",
       "full_scan": "full repository analysis",
-      "branch": "automatic re-analysis after a change on a watched branch"
+      "branch": "automatic re-analysis after a change on a watched branch",
+      "sarif_import": "import of {{tool}} findings"
     },
     "findings_title_one": "1 new finding in {{asset}}",
     "findings_title_other": "{{count}} new findings in {{asset}}",

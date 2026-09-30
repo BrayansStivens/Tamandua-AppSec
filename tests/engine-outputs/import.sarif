@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "semanticVersion": "1.90.0",
+          "rules": [
+            {
+              "id": "python.flask.security.injection.raw-sql",
+              "shortDescription": {"text": "SQL built by string concatenation"},
+              "help": {"text": "Use parameterized queries."},
+              "defaultConfiguration": {"level": "error"},
+              "properties": {"precision": "high", "tags": ["CWE-89: Improper Neutralization of Special Elements used in an SQL Command", "OWASP-A03:2021 - Injection", "security"]}
+            },
+            {
+              "id": "python.lang.security.audit.eval-detected",
+              "shortDescription": {"text": "Use of eval"},
+              "defaultConfiguration": {"level": "warning"},
+              "properties": {"tags": ["CWE-95: Eval Injection"]}
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "python.flask.security.injection.raw-sql",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {"text": "User input flows into a raw SQL query."},
+          "locations": [{"physicalLocation": {"artifactLocation": {"uri": "file:///src/app/db.py", "uriBaseId": "%SRCROOT%"},
+                                               "region": {"startLine": 42, "snippet": {"text": "cursor.execute(\"SELECT * FROM users WHERE id=\" + user_id)"}}}}]
+        },
+        {
+          "ruleId": "python.lang.security.audit.eval-detected",
+          "message": {"text": "Detected the use of eval()."},
+          "locations": [{"physicalLocation": {"artifactLocation": {"uri": "./app/tools.py"}, "region": {"startLine": 7, "snippet": {"text": "eval(expression)"}}}}]
+        },
+        {
+          "ruleId": "python.lang.security.audit.eval-detected",
+          "message": {"text": "Detected the use of eval()."},
+          "suppressions": [{"kind": "inSource"}],
+          "locations": [{"physicalLocation": {"artifactLocation": {"uri": "app/legacy.py"}, "region": {"startLine": 3, "snippet": {"text": "eval(code)"}}}}]
+        }
+      ]
+    },
+    {
+      "tool": {
+        "driver": {"name": "CodeQL", "semanticVersion": "2.19.0"},
+        "extensions": [
+          {
+            "name": "codeql/javascript-queries",
+            "rules": [
+              {
+                "id": "js/xss",
+                "shortDescription": {"text": "Client-side cross-site scripting"},
+                "fullDescription": {"text": "Writing user input directly to the DOM allows cross-site scripting."},
+                "properties": {"security-severity": "9.3", "tags": ["security", "external/cwe/cwe-079", "external/cwe/cwe-116"]}
+              }
+            ]
+          }
+        ]
+      },
+      "results": [
+        {
+          "ruleId": "js/xss",
+          "rule": {"id": "js/xss", "index": 0, "toolComponent": {"index": 0}},
+          "message": {"text": "Cross-site scripting vulnerability due to a user-provided value."},
+          "partialFingerprints": {"primaryLocationLineHash": "7f3a91c2d4e5b6a8:1"},
+          "locations": [{"physicalLocation": {"artifactLocation": {"uri": "web/src/render.js", "uriBaseId": "%SRCROOT%"}, "region": {"startLine": 18}}}]
+        }
+      ]
+    }
+  ]
+}

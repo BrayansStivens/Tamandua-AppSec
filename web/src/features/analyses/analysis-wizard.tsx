@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { api, query } from '@/shared/api/http'
-import { ArrowLeft, ArrowRight, Boxes, Check, CircleAlert, Code2, Globe2, KeyRound, Layers3, LoaderCircle, LockKeyhole, Plus, Search, SearchCheck, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Boxes, Check, CircleAlert, Code2, FileUp, Globe2, KeyRound, Layers3, LoaderCircle, LockKeyhole, Plus, Search, SearchCheck, ShieldCheck, Trash2, TriangleAlert, X } from 'lucide-react'
 import { AddDomainDialog, VerifyDomainDialog, kindLabel, type Domain } from '@/features/sources/domain-dialogs'
 import { SoonBadge } from '@/shared/ui/coming-soon'
 import { Badge } from '@/shared/ui/badge'
@@ -14,12 +14,14 @@ import { SourceSearch } from '@/features/sources/source-search'
 import { fetchSource, type Source, type SourcePage } from '@/features/sources/sources'
 import { SkeletonCard, SkeletonList } from '@/shared/ui/loading'
 import { useBatches } from '@/features/analyses/batches'
+import { SarifImport } from '@/features/analyses/sarif-import'
 
 type ScanPlan = { languages: { name: string; files: number; rules: number }[]; runs: string[]; skips: string[]; osv_needed: boolean; files: number | null; manifests: string[]; iac: string[]; pipelines?: string[] }
-type Kind = 'code' | 'web' | 'image'
+type Kind = 'code' | 'web' | 'image' | 'import'
+type ScanKind = Exclude<Kind, 'import'>
 type Registry = { registry: string; username: string; last4: string }
 
-const STEPS: Record<Kind, { id: string; label: string }[]> = {
+const STEPS: Record<ScanKind, { id: string; label: string }[]> = {
   code: [{ id: 'source', label: 'wizard.steps.source' }, { id: 'context', label: 'wizard.steps.context' }, { id: 'review', label: 'wizard.steps.review' }],
   web: [{ id: 'targets', label: 'wizard.steps.targets' }, { id: 'context', label: 'wizard.steps.context' }, { id: 'review', label: 'wizard.steps.review' }],
   image: [{ id: 'image', label: 'wizard.steps.image' }, { id: 'context', label: 'wizard.steps.context' }, { id: 'review', label: 'wizard.steps.review' }],
@@ -81,7 +83,7 @@ export function AnalysisWizard({ onComplete, onBatchStarted, onManageConnections
   useEffect(() => { void loadDomains() }, [])
   useEffect(() => { api.get<{ registries: Registry[] }>('/api/registries').then(data => setRegistries(data.registries)).catch(() => {}) }, [])
 
-  const steps = kind ? STEPS[kind] : []
+  const steps = kind && kind !== 'import' ? STEPS[kind] : []
   const chosenTargets = (domains ?? []).filter(item => targets.includes(item.id))
   const references = Array.from(new Set(reference.split('\n').map(line => line.trim()).filter(Boolean)))
   const invalidReferences = references.filter(item => !registryOf(item))
@@ -122,17 +124,21 @@ export function AnalysisWizard({ onComplete, onBatchStarted, onManageConnections
 
   if (!kind) return <div className="space-y-6">
     <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">{t('wizard.choose_type')}</h2><Button variant="ghost" onClick={onCancel}><ArrowLeft /> {t('common:actions.back')}</Button></div>
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
       {([['code', Code2, t('run_type.repository_scan'), t('wizard.kinds.code.description'), [t('wizard.kinds.code.sast'), t('wizard.kinds.code.secrets'), t('wizard.kinds.code.dependencies'), t('wizard.kinds.code.iac')]],
          ['image', Boxes, t('run_type.image_scan'), t('wizard.kinds.image.description'), [t('wizard.kinds.image.packages'), t('wizard.kinds.image.secrets'), t('wizard.kinds.image.config')]],
+         ['import', FileUp, t('run_type.sarif_import'), t('wizard.kinds.import.description'), [t('wizard.kinds.import.tools'), t('wizard.kinds.import.existing'), t('wizard.kinds.import.fixes')]],
          ['web', Globe2, t('run_type.dast'), t('wizard.kinds.web.description'), [t('wizard.kinds.web.dns'), t('wizard.kinds.web.isolated'), t('wizard.kinds.web.evidence')]]] as const).map(([id, Icon, title, description, bullets]) => { const soon = id === 'web'; return <button key={id} disabled={soon} onClick={() => setChoice(id)} aria-pressed={choice === id} className={`rounded-2xl border p-6 text-left transition ${soon ? 'cursor-not-allowed border-dashed border-app-line bg-inset/40 opacity-60' : choice === id ? 'border-brand/60 bg-brand/[0.07]' : 'border-app-line bg-panel hover:border-brand/30'}`}>
-        <div className="flex items-start justify-between gap-3"><div className={`flex size-11 items-center justify-center rounded-2xl ${id === 'code' ? 'bg-brand/15 text-brand' : id === 'image' ? 'bg-brand/15 text-brand' : 'bg-info-soft text-info'}`}><Icon /></div>{soon ? <SoonBadge /> : <span className={`mt-1 flex size-4 items-center justify-center rounded-full border ${choice === id ? 'border-primary bg-primary' : 'border-app-line'}`}>{choice === id && <Check className="size-3 text-primary-foreground" />}</span>}</div>
+        <div className="flex items-start justify-between gap-3"><div className={`flex size-11 items-center justify-center rounded-2xl ${id === 'web' ? 'bg-info-soft text-info' : 'bg-brand/15 text-brand'}`}><Icon /></div>{soon ? <SoonBadge /> : <span className={`mt-1 flex size-4 items-center justify-center rounded-full border ${choice === id ? 'border-primary bg-primary' : 'border-app-line'}`}>{choice === id && <Check className="size-3 text-primary-foreground" />}</span>}</div>
         <h3 className="mt-6 text-lg font-semibold">{title}</h3><p className="mt-2 text-sm leading-6 text-app-muted">{description}</p>
         <ul className="mt-5 space-y-1.5">{bullets.map(item => <li key={item} className="flex items-center gap-2 text-xs text-app-subtle"><SearchCheck className="size-3.5 shrink-0" />{item}</li>)}</ul>
       </button> })}
     </div>
     <div className="flex justify-end"><Button onClick={() => { setKind(choice); setStep(0) }} className="bg-primary text-primary-foreground hover:bg-primary/90">{t('wizard.continue')} <ArrowRight /></Button></div>
   </div>
+
+  // Importing is one form, not a scan with steps: the created runs are already finished.
+  if (kind === 'import') return <SarifImport onOpenRun={onComplete} onBack={() => { setKind(null); setStep(0) }} />
 
   const current = steps[step].id
   return <div className="space-y-6">

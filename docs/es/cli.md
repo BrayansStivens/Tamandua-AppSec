@@ -64,8 +64,8 @@ El progreso va a la salida de errores; la salida estándar queda limpia para `js
 | `2` | Error de uso: carpeta inexistente, referencia de git inválida o inexistente (¿falta `git fetch`?). |
 | `3` | Incompleto: algún motor no se ejecutó (Docker, imágenes, red). Revisa las líneas «Sin analizar». |
 
-`make` convierte cualquier fallo en su propio código 2; en CI usa `docker run` (abajo) para conservar
-el código exacto.
+`make` convierte cualquier fallo en su propio código 2; en CI, la Action y `docker run` (abajo)
+conservan el código exacto.
 
 ## Antes de subir (pre-push)
 
@@ -77,83 +77,182 @@ Un análisis completo tarda del orden de medio minuto, así que encaja mejor en 
 make -s -C ~/tamandua scan DIR="$(git rev-parse --show-toplevel)" ARGS="--base origin/main --quiet"
 ```
 
+## Importar resultados de otras herramientas (`import-sarif`)
+
+```sh
+python -m tamandua import-sarif ARCHIVO [ARCHIVO...] --asset NOMBRE [--tool NOMBRE] [--partial] [--commit SHA] [--branch NOMBRE] [--server URL]
+```
+
+Añade los hallazgos de cualquier herramienta que escriba SARIF 2.1.0 (Semgrep, CodeQL, Snyk, Trivy, Strix…) al
+registro de un activo que Tamandua ya conoce, por su clave o por su nombre (`owner/repo`). Desde ese momento siguen el
+mismo ciclo que los de Tamandua: triage, plazos, incidencias y avisos.
+
+- **Completa por defecto:** lo que esa misma herramienta deje de reportar queda remediado. Los análisis de Tamandua
+  nunca remedian un hallazgo importado, porque sus motores no ven lo que encontró otra herramienta.
+- `--partial`: la herramienta miró solo una parte del activo; la importación abre y actualiza, nunca remedia.
+- `--tool` reemplaza el nombre de herramienta que trae el SARIF. Varios archivos forman una sola importación.
+- `--server https://…` envía los archivos a `/api/ci/sarif` de ese servidor con el token de `TAMANDUA_IMPORT_TOKEN`
+  (una variable de entorno, nunca una opción; `http://` sin cifrar solo para localhost). Sin `--server` importa en
+  la base de datos local (en el propio servidor).
+
+Muestra una línea por herramienta. Códigos de salida: `0` importado, `2` error de uso, del documento o del servidor.
+En el panel, **Nuevo análisis → Importar SARIF** hace lo mismo desde el navegador.
+
 ## En CI
 
-Tamandua corre como contenedor y lanza los motores como contenedores hermanos, así que el runner
-necesita el socket de Docker (los runners Linux de GitHub Actions lo tienen). La carpeta de datos
-(`/data`) guarda en caché las bases de avisos entre pasos.
+En CI, Tamandua corre desde la imagen publicada del worker, `ghcr.io/brayansstivens/tamandua-worker:0.9`, que trae
+los motores dentro y los ejecuta como procesos propios: nada que construir y sin socket de Docker.
 
 ### GitHub Actions
 
+Un paso con la Action de Tamandua. En un pull request compara por su cuenta con la rama base, y deja un SARIF listo
+para code scanning:
+
 ```yaml
 name: Tamandua
-on: pull_request
+on:
+  pull_request:
+  push:
+    branches: [main]
 
-permissions:
-  contents: read
-  security-events: write   # para subir el SARIF a code scanning
+permissions: {}
 
 jobs:
   scan:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write   # para subir el SARIF a code scanning
     steps:
-      # Fija las acciones por SHA en tu organización.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0              # hace falta la historia para comparar con la base
           persist-credentials: false
-      - name: Construir Tamandua
+      - id: tamandua
+        uses: BrayansStivens/appsec-agent@v0.9   # fíjala al SHA del commit de la etiqueta, como las demás
+        with:
+          exclude: |
+            fixtures/
+      - uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2  # v4.38.2
+        if: always() && steps.tamandua.outputs.sarif != ''
+        with:
+          sarif_file: ${{ steps.tamandua.outputs.sarif }}
+          category: tamandua
+```
+
+El paso termina con el mismo código que `scan` (tabla de arriba): falla con `1`, `2` y `3`. El informe sale en el
+log, en inglés salvo que el paso ponga `env: TAMANDUA_DEFAULT_LOCALE: es`.
+
+| Entrada | Por defecto | Qué hace |
+| --- | --- | --- |
+| `path` | `.` | Carpeta a analizar, relativa al workspace. |
+| `base` | vacío | Como `--base`. Vacío: `origin/<rama base>` en un pull request y análisis completo en lo demás; `none`: siempre completo. |
+| `fail-on` | `high` | Como `--fail-on`: `critical`, `high`, `medium`, `low` o `never`. |
+| `exclude` | vacío | Un patrón por línea; cada uno se convierte en un `--exclude`. |
+| `name` | el nombre del repositorio | Como `--name`. |
+| `sarif` | `$RUNNER_TEMP/tamandua.sarif` | Dónde escribir el SARIF (las rutas relativas parten del workspace). |
+| `image` | `ghcr.io/brayansstivens/tamandua-worker:0.9` | Imagen del worker. Fíjala por digest (`…@sha256:…`) si no quieres que nada cambie sin avisar. |
+| `allow-incomplete` | `false` | `true`: como `--allow-incomplete`. |
+| `scan` | `true` | `false`: no analiza, solo importa (más abajo). |
+| `import-sarif` | vacío | SARIF de otras herramientas que se envían a un servidor Tamandua, uno por línea. |
+| `server` | vacío | El servidor Tamandua (`https://…`) para `import-sarif`. |
+| `token` | vacío | El `TAMANDUA_IMPORT_TOKEN` del servidor, desde un secreto. Al contenedor solo le llega como variable de entorno. |
+| `asset` | `owner/name` del repositorio | Activo (que el servidor ya conoce) al que se suman los hallazgos importados. |
+| `import-partial` | `false` | `true`: la herramienta importada miró solo una parte del activo, así que lo que no reporta sigue abierto. En una pull request siempre está activo: sus resultados son de la rama, no del activo. |
+| `registry-token` | vacío | Token para descargar la imagen mientras sea privada (ver abajo). |
+| `registry-user` | quien lanzó el workflow | Usuario de `registry-token`. |
+
+| Salida | Qué es |
+| --- | --- |
+| `sarif` | Ruta del SARIF que escribió el análisis (vacía si no escribió ninguno). |
+| `exit-code` | `0` pasa, `1` bloquea, `2` error de uso, `3` incompleto. Si además importa, manda el código del análisis salvo que sea `0`. |
+
+Cómo corre: `docker run` de la imagen con el usuario del runner, sin capabilities, con el sistema de archivos de
+solo lectura, el workspace montado en solo lectura y las cachés de los motores en `$RUNNER_TEMP/tamandua` (varios
+pasos del mismo job las comparten). Ahí los motores no pueden tener una red vacía propia (un `docker run` normal no
+permite los espacios de nombres de usuario que hacen falta), así que comparten la red del contenedor y corren con sus
+opciones sin conexión; tu código sigue sin enviarse a ningún sitio.
+
+**Mientras el repositorio sea privado.** Otro repositorio solo puede usar la Action si este lo permite
+(*Settings → Actions → General → Access*), y descargar la imagen pide un token con `read:packages`: el
+`GITHUB_TOKEN` del job (con `packages: read`) si el paquete le da acceso a tu repositorio, o si no un token clásico
+en un secreto (ver [Acceso mientras el repositorio sea privado](despliegue.md#acceso-mientras-el-repositorio-sea-privado)).
+La Action inicia sesión con `--password-stdin` y descarta la credencial después de descargar:
+
+```yaml
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    steps:
+      # …
+      - id: tamandua
+        uses: BrayansStivens/appsec-agent@v0.9
+        with:
+          registry-token: ${{ secrets.GHCR_TOKEN }}   # o ${{ secrets.GITHUB_TOKEN }}
+```
+
+#### Resultados de otras herramientas
+
+Con `import-sarif`, la Action envía el SARIF de cualquier herramienta (Semgrep, CodeQL, Snyk…) a tu servidor
+Tamandua, que suma sus hallazgos al registro del activo junto a los suyos. El servidor necesita
+`TAMANDUA_IMPORT_TOKEN` ([configuración](configuracion.md)) y debe conocer ya el activo. Por ejemplo, solo Semgrep,
+sin el análisis propio de Tamandua:
+
+```yaml
+      - name: Semgrep
         run: |
-          git clone --depth 1 https://github.com/BrayansStivens/appsec-agent "$RUNNER_TEMP/tamandua"
-          make -C "$RUNNER_TEMP/tamandua" build
-      - name: Analizar lo que introduce el PR
-        env:
-          BASE_REF: ${{ github.base_ref }}      # nunca interpolado directamente en el script
-          REPO_NAME: ${{ github.event.repository.name }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/tamandua-data"
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)" \
-            --user "$(id -u):$(id -g)" -e HOME=/tmp \
-            -v "$PWD":/src:ro -v "$RUNNER_TEMP/tamandua-data":/data \
-            localhost/tamandua/app:0.9 python -m tamandua scan /src --name "$REPO_NAME" \
-            --base "origin/$BASE_REF" --format sarif --output /data/tamandua.sarif
-      - uses: github/codeql-action/upload-sarif@v4
+          python -m pip install semgrep   # fija la versión
+          semgrep scan --config p/ci --metrics off --sarif --output semgrep.sarif
+      - uses: BrayansStivens/appsec-agent@v0.9
         if: always()
         with:
-          sarif_file: ${{ runner.temp }}/tamandua-data/tamandua.sarif
+          scan: false
+          import-sarif: semgrep.sarif
+          server: https://tamandua.example.com
+          token: ${{ secrets.TAMANDUA_IMPORT_TOKEN }}
 ```
+
+Deja `scan` en `true` para analizar e importar en el mismo paso. La importación necesita `import-sarif` en la
+imagen, que llega con la próxima versión después de la 0.9.1.
 
 ### GitLab CI
 
-Necesita un runner con acceso al socket de Docker del host (ejecutor `shell`, o `docker` con
-`/var/run/docker.sock` montado). Con Docker-in-Docker (`dind`) los motores no verían las carpetas.
+La imagen del worker como imagen del job: ya trae git, Python y los motores, y corre con un usuario sin privilegios.
+Sin socket de Docker y sin Docker-in-Docker.
 
 ```yaml
 tamandua:
   stage: test
+  image: ghcr.io/brayansstivens/tamandua-worker:0.9
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    GIT_DEPTH: "0"   # hace falta la historia para comparar con la base
+    BASE: $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
   script:
-    - git fetch origin "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-    - git clone --depth 1 https://github.com/BrayansStivens/appsec-agent /tmp/tamandua
-    - make -C /tmp/tamandua build
-    - mkdir -p /tmp/tamandua-data
-    - >
-      docker run --rm -v /var/run/docker.sock:/var/run/docker.sock --group-add "$(stat -c %g /var/run/docker.sock)"
-      --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/src:ro -v /tmp/tamandua-data:/data
-      localhost/tamandua/app:0.9 python -m tamandua scan /src --name "$CI_PROJECT_NAME"
-      --base "origin/$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    # El checkout es de otro usuario: hay que decirle a git que es de confianza.
+    - git -c safe.directory="$CI_PROJECT_DIR" fetch origin "$BASE:refs/remotes/origin/$BASE"
+    - python -m tamandua scan . --name "$CI_PROJECT_NAME" --base "origin/$BASE"
 ```
 
-> El propio repositorio de Tamandua usa esta plantilla en [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
-> (con `--exclude fixtures/` para sus ejemplos vulnerables a propósito). La de GitLab está comprobada con el
-> mismo `docker run` en local, pero aún no en un runner real. Si algo falla, el error de Docker o del motor
-> aparece en la línea «Sin analizar».
+Mientras la imagen sea privada, el runner necesita credenciales de `ghcr.io` en `DOCKER_AUTH_CONFIG`. En un runner
+con ejecutor `shell`, usa `docker run` como hace la Action, sin el socket:
 
-**Exclusiones en CI.** `--exclude` vive en el workflow, que un pull request puede modificar. Protege
-`.github/workflows/` con CODEOWNERS y revisión obligatoria para que nadie se excluya a sí mismo sin que se vea.
-(En el panel las exclusiones viven en el servidor por eso mismo.)
+```sh
+mkdir -p /tmp/tamandua-data   # la creas tú, no Docker: tiene que ser de tu usuario
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/src:ro -v /tmp/tamandua-data:/data \
+  ghcr.io/brayansstivens/tamandua-worker:0.9 python -m tamandua scan /src --name "$CI_PROJECT_NAME" --base "origin/$BASE"
+```
+
+> El propio repositorio de Tamandua usa la Action en [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), y
+> además se analiza con la imagen construida en cada commit (con `--exclude fixtures/` para sus ejemplos vulnerables
+> a propósito). La plantilla de GitLab está comprobada en local con la misma imagen y un checkout de otro usuario,
+> pero aún no en un runner real. Si algo falla, el motivo aparece en la línea «Sin analizar».
+
+**Exclusiones en CI.** `exclude` vive en el workflow, que un pull request puede modificar. Protege
+`.github/workflows/` (o `.gitlab-ci.yml`) con CODEOWNERS y revisión obligatoria para que nadie se excluya a sí mismo
+sin que se vea. (En el panel las exclusiones viven en el servidor por eso mismo.)
 
 ## Privacidad
 

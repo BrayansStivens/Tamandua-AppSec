@@ -521,5 +521,18 @@
       "nested_class": "a character class inside another",
       "repeat": "a repetition count that's missing its minimum or exceeds 1000"
     }
+  },
+  "sarif": {
+    "reason": "{{tool}} reports: {{message}}",
+    "remediation": "Fix it following {{tool}}'s guidance for this rule. The next full import from {{tool}} marks it fixed once it no longer reports it.",
+    "remediation_help": "Guidance from {{tool}}: {{help}}",
+    "priority": "Reported by {{tool}}, {{severity}} severity",
+    "errors": {
+      "version": "Only SARIF 2.1.0 documents can be imported",
+      "no_runs": "The SARIF has no runs to import",
+      "too_many_runs": "A SARIF import takes at most {{max}} runs",
+      "too_many_results": "A SARIF import takes at most {{max}} results: split it by tool or by folder",
+      "no_tool": "Name the tool: the SARIF doesn't say which one produced it"
+    }
   }
 }

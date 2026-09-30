@@ -184,7 +184,10 @@
     "no_fix": "sin corrección",
     "detail_truncated": "Se detallan {{shown}} de {{total}} críticos y altos; el resto está en el panel, el JSON y el SARIF.",
     "more_in_panel": "… y {{count}} más en el panel",
-    "annex_more": "… y {{count}} más en el JSON y el SARIF"
+    "annex_more": "… y {{count}} más en el JSON y el SARIF",
+    "identity_import": "importado de {{tool}} (SARIF)",
+    "identity_import_commit": "importado de {{tool}} (SARIF) en el commit `{{commit}}`",
+    "title_import": "Hallazgos importados · {{name}}"
   },
   "asset": {
     "title": "Estado actual de hallazgos · {{name}}",
@@ -271,7 +274,8 @@
           "missing": "Agregar validación y aprobación del responsable"
         }
       }
-    }
+    },
+    "scope_import": "`{{name}}`, hallazgos reportados por {{tool}} e importados como SARIF; Tamandua no analizó el código en esta ejecución."
   },
   "audit": {
     "status": {
@@ -539,7 +543,8 @@
       "image_scan": "Análisis de imagen",
       "pr_review": "Revisión de pull request",
       "asset_state": "Estado acumulado",
-      "default": "Análisis"
+      "default": "Análisis",
+      "sarif_import": "Importación SARIF"
     },
     "eyebrow": "Informe técnico de hallazgos · {{kind}}",
     "subtitle_state": "Estado acumulado al {{date}}",

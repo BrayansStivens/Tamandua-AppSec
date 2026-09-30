@@ -6,6 +6,9 @@
 #   On a PR only what the PR introduces counts, and it blocks from high severity up; on main it analyzes
 #   everything and reports. fixtures/ are intentionally vulnerable examples: they are excluded and the output
 #   says how many there are.
+# - action: the GitHub Action (action.yml) as users run it, with the published worker image: a clean folder passes and
+#   the vulnerable examples block. The job above stays: it checks this commit's scanner, rules and Docker runner,
+#   while the action runs the last release.
 #
 # Actions pinned by commit; least-privilege permissions per job; no credentials persisted in the checkout.
 name: CI
@@ -149,3 +152,43 @@ jobs:
         with:
           sarif_file: ${{ runner.temp }}/tamandua-data/tamandua.sarif
           category: tamandua
+
+  action:
+    name: GitHub Action (uses ./)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read  # pull the worker image while the package is private
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: A clean folder passes
+        id: clean
+        # This commit's action.yml, from our own checkout (nothing earlier writes to the workspace). The `$/` syntax
+        # (July 2026) isn't verified yet for an action at the repository root.
+        uses: ./  # zizmor: ignore[self-repository]
+        with:
+          path: skills
+          base: none
+          registry-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: The vulnerable examples block
+        id: blocked
+        continue-on-error: true
+        uses: ./  # zizmor: ignore[self-repository]
+        with:
+          path: fixtures
+          base: none
+          sarif: blocked.sarif
+      - name: Exit codes and SARIF
+        env:
+          CLEAN_CODE: ${{ steps.clean.outputs.exit-code }}
+          CLEAN_SARIF: ${{ steps.clean.outputs.sarif }}
+          BLOCKED_CODE: ${{ steps.blocked.outputs.exit-code }}
+          BLOCKED_OUTCOME: ${{ steps.blocked.outcome }}
+          BLOCKED_SARIF: ${{ steps.blocked.outputs.sarif }}
+        run: |
+          test "$CLEAN_CODE" = 0 && test -s "$CLEAN_SARIF"
+          test "$BLOCKED_CODE" = 1 && test "$BLOCKED_OUTCOME" = failure
+          test "$BLOCKED_SARIF" = "$GITHUB_WORKSPACE/blocked.sarif" && grep -q '"results"' "$BLOCKED_SARIF"

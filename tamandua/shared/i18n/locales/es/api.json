@@ -68,5 +68,7 @@
     "images_one": "1 imagen",
     "images_other": "{{count}} imágenes"
   },
-  "cron_token_required": "Envía el token de cron como token bearer (Authorization: Bearer …)"
+  "cron_token_required": "Envía el token de cron como token bearer (Authorization: Bearer …)",
+  "import_token_required": "Envía el token de importación como bearer token (Authorization: Bearer …)",
+  "finding_from_import": "Este hallazgo lo reportó {{tool}}: importa un nuevo SARIF completo de {{tool}} para comprobar si sigue ahí"
 }

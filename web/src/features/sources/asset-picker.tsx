@@ -21,7 +21,9 @@ export const assetOption = (asset: Asset): ComboOption => {
 }
 
 // Selector de repositorio con búsqueda en el servidor; arranca con el de actividad más reciente o el pedido.
-export function AssetPicker({ value, onChange, initialKey }: { value: Asset | null; onChange: (asset: Asset | null) => void; initialKey?: string | null }) {
+// `onLoaded` tells an empty workspace (0) from a failed first load ('error').
+export function AssetPicker({ value, onChange, initialKey, label, placeholder, onLoaded }: { value: Asset | null; onChange: (asset: Asset | null) => void; initialKey?: string | null
+  label?: string; placeholder?: string; onLoaded?: (total: number | 'error') => void }) {
   const { t } = useTranslation('sources')
   const [ready, setReady] = useState(false)
   const search = useCallback(async (text: string) => {
@@ -32,8 +34,8 @@ export function AssetPicker({ value, onChange, initialKey }: { value: Asset | nu
     if (value || ready) return
     setReady(true)
     api.get<Page<Asset>>(`/api/assets?${query({ key: initialKey || undefined, limit: 1 })}`)
-      .then(page => onChange(page.items[0] ?? null)).catch(() => onChange(null))
-  }, [value, ready, initialKey, onChange])
+      .then(page => { onChange(page.items[0] ?? null); onLoaded?.(page.total) }).catch(() => { onChange(null); onLoaded?.('error') })
+  }, [value, ready, initialKey, onChange, onLoaded])
   const pick = (option: ComboOption) => { void search(option.label).then(result => onChange(result.items.find(item => item.key === option.id) ?? null)) }
-  return <Combobox label={t('asset.label')} placeholder={t('asset.placeholder')} value={value ? assetOption(value) : null} search={search} onSelect={pick} />
+  return <Combobox label={label ?? t('asset.label')} placeholder={placeholder ?? t('asset.placeholder')} value={value ? assetOption(value) : null} search={search} onSelect={pick} />
 }

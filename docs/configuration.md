@@ -35,6 +35,7 @@ Every variable is optional and goes in `.env` (a copy of `.env.example`). After 
 | `TAMANDUA_LOG_FORMAT` | `text` | `json`: one JSON object per line on the process output. |
 | `TAMANDUA_LOG_FILE` | empty (Compose: `logs/app.log`) | Also write JSON logs to this file, rotated at 10 MB × 5; a relative path is under the data folder. |
 | `TAMANDUA_METRICS_TOKEN` | empty (off) | Turns on `/api/metrics` (Prometheus) for requests with `Authorization: Bearer <token>`. At least 32 characters: `openssl rand -hex 32`. |
+| `TAMANDUA_IMPORT_TOKEN` | empty (off) | Turns on `POST /api/ci/sarif`, which lets CI import another tool's SARIF 2.1.0 into an existing asset with `Authorization: Bearer <token>` (no session). At least 32 characters: `openssl rand -hex 32`. Also what `tamandua import-sarif --server` sends, read from the environment. |
 
 **Server with a domain** ([deploy-vps.md](deploy-vps.md)). Read by Compose, not by the app; `make setup DOMAIN=… [PREBUILT=1]` writes them.
 

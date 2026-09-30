@@ -53,4 +53,16 @@ describe('launching an analysis', () => {
     const scan = calls.find(call => call.path === '/api/repositories/scans')
     expect(scan?.body).toMatchObject({ allow_osv_upload: true })
   })
+
+  it('offers importing SARIF next to the scan types', async () => {
+    mockApi(call => call.path.startsWith('/api/assets') ? { body: { items: [], total: 0, limit: 1, offset: 0 } } : undefined)
+    const user = userEvent.setup()
+    renderWithQueries(<AnalysisWizard onComplete={async () => {}} onBatchStarted={() => {}} onManageConnections={() => {}} onCancel={() => {}}
+      initialSourceId={null} isAdmin={false} />)
+    await user.click(screen.getByRole('button', { name: new RegExp(i18n.t('analyses:run_type.sarif_import')) }))
+    await user.click(screen.getByRole('button', { name: new RegExp(i18n.t('analyses:wizard.continue')) }))
+
+    expect(await screen.findByText(i18n.t('analyses:import.title'))).toBeTruthy()
+    expect(await screen.findByText(i18n.t('analyses:import.no_asset'))).toBeTruthy()
+  })
 })

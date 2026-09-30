@@ -5,15 +5,25 @@
     "asset_placeholder": "Busca un repositorio o una imagen…",
     "run": "Ejecución",
     "current": "Estado actual",
-    "current_hint": "escaneos y PRs juntos, con lo remediado aparte",
-    "current_hint_short": "escaneos y PRs",
+    "current_hint": "análisis, PRs e importaciones juntos, con lo remediado aparte",
+    "current_hint_short": "análisis, PRs e importaciones",
     "no_runs": "Sin ejecuciones que coincidan",
     "removed": "GitHub ya no da acceso a este repositorio (se borró o se quitó de la App) desde el {{date}}. Si no vuelve, sus hallazgos, triage y tickets enlazados se borran a las 24 horas.",
     "tabs": { "open": "Abiertos", "fixed": "Remediados", "excluded": "Excluidos" },
     "kind_scan": "Escaneo completo",
     "kind_advisory": "Avisos nuevos",
     "kind_pr": "PR",
-    "kind_pr_number": "PR #{{number}}"
+    "kind_pr_number": "PR #{{number}}",
+    "kind_import": "Importación · {{tool}}"
+  },
+  "import": {
+    "eyebrow": "Importación SARIF · {{tool}}",
+    "new": "Nuevo análisis",
+    "full": "importación completa",
+    "partial": "importación parcial",
+    "commit": "commit <code>{{commit}}</code>",
+    "help_full": "Una nueva importación completa de {{tool}} marca como remediado lo que ya no reporte. Los análisis de Tamandua nunca cierran estos hallazgos.",
+    "help_partial": "Importación parcial: no se marca nada como remediado. Solo una importación completa de {{tool}} o una corrección manual cierra estos hallazgos."
   },
   "state": {
     "eyebrow": "Estado actual · {{provider}}",
@@ -114,6 +124,7 @@
     "no_fix": "sin corrección publicada",
     "pr": "PR #{{number}}",
     "pr_merged": "PR #{{number}} · mergeado",
+    "imported": "Importado",
     "malicious": "Malicioso",
     "malicious_hint": "Paquete malicioso conocido (OpenSSF): elimínalo y rota los secretos de donde se instaló",
     "mixed": "Estados mixtos: {{statuses}}"
@@ -178,6 +189,7 @@
     "from_pr_merged": "introducido en el PR #{{number}}, ya fusionado",
     "from_pr_branch_merged": "introducido en el PR #{{number}} ({{branch}}), ya fusionado",
     "main": "detectado en la rama principal",
+    "from_import": "importado desde {{tool}}",
     "first_seen": "visto por primera vez {{date}}",
     "last_seen": "última vez {{date}}",
     "reopened": "reabierto",
@@ -275,7 +287,8 @@
     "again": "Volver a verificar",
     "start": "Reverificar",
     "demo": "Datos de demostración: se vuelven a analizar con «make demo».",
-    "open_pr": "Viene de un pull request abierto: se verifica solo en cada push del PR."
+    "open_pr": "Viene de un pull request abierto: se verifica solo en cada push del PR.",
+    "imported": "Lo reportó {{tool}}, así que solo {{tool}} puede confirmar si ya no está: importa un SARIF completo nuevo de esa herramienta."
   },
   "audit": {
     "frameworks": {

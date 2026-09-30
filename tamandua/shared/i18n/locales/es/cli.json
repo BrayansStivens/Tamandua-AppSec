@@ -66,5 +66,17 @@
   "setup_code": {
     "code": "Código de configuración: {{code}}",
     "none": "Ya hay un administrador: inicia sesión con tu usuario."
+  },
+  "import_sarif": {
+    "asset_line": "Importado en {{name}} ({{asset}})",
+    "run_full": "{{tool}} · ejecución {{id}} · hallazgos {{findings}} · abiertos {{opened}} · remediados {{fixed}}",
+    "run_partial": "{{tool}} · ejecución {{id}} · hallazgos {{findings}} · abiertos {{opened}} · importación parcial: no se remedia nada",
+    "no_token": "Define TAMANDUA_IMPORT_TOKEN en el entorno para enviar a un servidor (nunca va como opción de la línea de comandos)",
+    "insecure_server": "El servidor debe ser una dirección https:// (http sin cifrar solo para este equipo): {{server}}",
+    "unreadable": "No se pudo leer {{file}}: {{detail}}",
+    "not_json": "{{file}} no es JSON válido",
+    "too_large": "El SARIF supera {{max}} MB: divídelo por herramienta o por carpeta",
+    "http_error": "El servidor respondió {{status}}: {{detail}}",
+    "unreachable": "No se pudo contactar al servidor: {{detail}}"
   }
 }

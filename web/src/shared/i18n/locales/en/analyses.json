@@ -1,7 +1,7 @@
 {
   "run_type": {
     "repository_scan": "Code scan", "image_scan": "Container image", "pr_review": "PR review",
-    "advisory_watch": "New advisories", "dast": "Dynamic web app or API testing"
+    "advisory_watch": "New advisories", "sarif_import": "SARIF import", "dast": "Dynamic web app or API testing"
   },
   "duration": { "minutes": "~{{value}} min", "hours": "~{{value}} h", "under_two_minutes": "under 2 min" },
   "listing_more": "{{names}} and {{rest}} more",
@@ -25,6 +25,11 @@
       "web": {
         "description": "Active scanning (DAST) against your running application, on verified domains. Not producing results yet.",
         "dns": "Ownership verified through DNS", "isolated": "DAST in an isolated container", "evidence": "Evidence with request and response"
+      },
+      "import": {
+        "description": "Brings findings from another tool into an asset you already have, so you triage them alongside everything else.",
+        "tools": "Semgrep, CodeQL, Snyk, Trivy… (SARIF 2.1.0)", "existing": "Into a repository or image already in Tamandua",
+        "fixes": "A full import marks as fixed what the tool stopped reporting"
       }
     }
   },
@@ -172,6 +177,47 @@
     "progress_failed_one": " ({{count}} failed)", "progress_failed_other": " ({{count}} failed)",
     "show_failed": "Show failed"
   },
+  "import": {
+    "title": "Import SARIF",
+    "description": "Findings from another tool, added to an asset Tamandua already knows. Each tool in the file becomes its own run.",
+    "asset": "Asset",
+    "asset_error": "Couldn't load the assets. Reload the page to try again.",
+    "no_asset": "There are no assets yet: scan a repository or an image first, then import its SARIF.",
+    "file": {
+      "label": "SARIF file",
+      "hint": "(.sarif or .json, up to {{max}} MB)",
+      "summary_one": "{{name}} · {{size}} · {{tools}} · {{count}} result",
+      "summary_other": "{{name}} · {{size}} · {{tools}} · {{count}} results",
+      "unknown_tool": "unnamed tool",
+      "too_large": "{{name}} is {{size}}, over the {{max}} MB limit. Split it by tool or by module and import each part as partial.",
+      "invalid_json": "{{name}} isn't valid JSON.",
+      "not_sarif": "{{name}} doesn't look like SARIF: it has no runs."
+    },
+    "scope": {
+      "label": "Scope",
+      "full": "Full", "full_hint": "Everything the tool checked in this asset: what it no longer reports is marked fixed",
+      "partial": "Partial", "partial_hint": "Only some files or one module: adds and updates, never marks anything fixed",
+      "note": "Tamandua's own scans never close imported findings, and imports never close theirs."
+    },
+    "more": "More options",
+    "optional": "(optional)",
+    "tool": "Tool name", "tool_hint": "Replaces the name in the file.",
+    "commit": "Commit", "commit_invalid": "Use the commit SHA: 7 to 64 hexadecimal characters.",
+    "branch": "Branch", "branch_invalid": "That isn't a valid branch name.",
+    "submit": "Import findings", "submitting": "Importing…",
+    "too_large": "The file is over the server's {{max}} MB limit.",
+    "result": {
+      "title": "Imported into {{name}}",
+      "description_full": "One run per tool. Whatever each tool no longer reports is now marked fixed.",
+      "description_partial": "One run per tool. Partial import: nothing was marked fixed.",
+      "findings_one": "{{count}} finding", "findings_other": "{{count}} findings",
+      "opened_one": "{{count}} new", "opened_other": "{{count}} new",
+      "fixed_one": "{{count}} fixed", "fixed_other": "{{count}} fixed",
+      "skipped_one": "{{count}} not imported (suppressed or passing)", "skipped_other": "{{count}} not imported (suppressed or passing)",
+      "open": "View findings", "open_label": "View findings from {{tool}}",
+      "another": "Import another file"
+    }
+  },
   "picker": {
     "search": "Search runs",
     "placeholder": "Repository, ID…",
@@ -200,6 +246,8 @@
     "trigger_branch_sha": "· automatic: the branch changed ({{sha}})",
     "on_branch": "· branch {{branch}}",
     "trigger_advisories": "· automatic: published after the last scan",
+    "trigger_import": "· from {{tool}}",
+    "trigger_import_partial": "· from {{tool}}, partial",
     "severity_letter": { "critical": "C", "high": "H", "medium": "M", "low": "L" },
     "severity_count": "{{severity}}: {{value}}",
     "noun": "scans"

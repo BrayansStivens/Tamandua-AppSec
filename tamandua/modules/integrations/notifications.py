@@ -179,6 +179,8 @@ def findings_message(record: dict, opened: list[dict], locale: str | None = None
               "image_scan": msg("integrations.notifications.origin.image_scan")}.get(record.get("type"), msg("integrations.notifications.origin.full_scan"))
     if (record.get("trigger") or {}).get("kind") == "branch":
         origin = msg("integrations.notifications.origin.branch")
+    elif record.get("type") == "sarif_import":
+        origin = msg("integrations.notifications.origin.sarif_import", tool=(record.get("trigger") or {}).get("tool"))
     summary = ", ".join(_count(level, counts[level], locale) for level in ORDER if counts[level])
     kev = sum(1 for item in opened if item.get("kev"))
     return {"event": "findings", "title": t("integrations.notifications.findings_title", locale, count=len(opened), asset=name),

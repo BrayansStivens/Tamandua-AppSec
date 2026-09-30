@@ -184,7 +184,10 @@
     "no_fix": "no fix",
     "detail_truncated": "Detailing {{shown}} of {{total}} critical and high findings; the rest are in the panel, the JSON and the SARIF.",
     "more_in_panel": "… and {{count}} more in the panel",
-    "annex_more": "… and {{count}} more in the JSON and the SARIF"
+    "annex_more": "… and {{count}} more in the JSON and the SARIF",
+    "identity_import": "imported from {{tool}} (SARIF)",
+    "identity_import_commit": "imported from {{tool}} (SARIF) at commit `{{commit}}`",
+    "title_import": "Imported findings · {{name}}"
   },
   "asset": {
     "title": "Current state of findings · {{name}}",
@@ -271,7 +274,8 @@
           "missing": "Add the owner's validation and approval"
         }
       }
-    }
+    },
+    "scope_import": "`{{name}}`, findings reported by {{tool}} and imported as SARIF; Tamandua didn't analyze the code in this run."
   },
   "audit": {
     "status": {
@@ -539,7 +543,8 @@
       "image_scan": "Image scan",
       "pr_review": "Pull request review",
       "asset_state": "Cumulative state",
-      "default": "Scan"
+      "default": "Scan",
+      "sarif_import": "SARIF import"
     },
     "eyebrow": "Technical findings report · {{kind}}",
     "subtitle_state": "Cumulative state as of {{date}}",

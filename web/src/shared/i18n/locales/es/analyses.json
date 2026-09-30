@@ -1,7 +1,7 @@
 {
   "run_type": {
     "repository_scan": "Análisis de código", "image_scan": "Imagen de contenedor", "pr_review": "Revisión de PR",
-    "advisory_watch": "Avisos nuevos", "dast": "Pruebas dinámicas de app web o API"
+    "advisory_watch": "Avisos nuevos", "sarif_import": "Importación SARIF", "dast": "Pruebas dinámicas de app web o API"
   },
   "duration": { "minutes": "~{{value}} min", "hours": "~{{value}} h", "under_two_minutes": "menos de 2 min" },
   "listing_more": "{{names}} y {{rest}} más",
@@ -25,6 +25,11 @@
       "web": {
         "description": "Escaneo activo (DAST) contra tu aplicación en marcha, sobre dominios verificados. Todavía no dan resultados.",
         "dns": "Verificación de propiedad por DNS", "isolated": "DAST en contenedor aislado", "evidence": "Evidencia con petición y respuesta"
+      },
+      "import": {
+        "description": "Trae los hallazgos de otra herramienta a un activo que ya tienes, para hacer su triage junto con todo lo demás.",
+        "tools": "Semgrep, CodeQL, Snyk, Trivy… (SARIF 2.1.0)", "existing": "En un repositorio o una imagen que ya está en Tamandua",
+        "fixes": "Una importación completa marca como remediado lo que la herramienta dejó de reportar"
       }
     }
   },
@@ -172,6 +177,47 @@
     "progress_failed_one": " ({{count}} fallido)", "progress_failed_other": " ({{count}} fallidos)",
     "show_failed": "Ver fallidos"
   },
+  "import": {
+    "title": "Importar SARIF",
+    "description": "Hallazgos de otra herramienta, sumados a un activo que Tamandua ya conoce. Cada herramienta del archivo queda como una ejecución propia.",
+    "asset": "Activo",
+    "asset_error": "No se pudieron cargar los activos. Recarga la página para volver a intentarlo.",
+    "no_asset": "Aún no hay activos: analiza primero un repositorio o una imagen y luego importa su SARIF.",
+    "file": {
+      "label": "Archivo SARIF",
+      "hint": "(.sarif o .json, hasta {{max}} MB)",
+      "summary_one": "{{name}} · {{size}} · {{tools}} · {{count}} resultado",
+      "summary_other": "{{name}} · {{size}} · {{tools}} · {{count}} resultados",
+      "unknown_tool": "herramienta sin nombre",
+      "too_large": "{{name}} pesa {{size}} y el límite es {{max}} MB. Divídelo por herramienta o por módulo e importa cada parte como parcial.",
+      "invalid_json": "{{name}} no es un JSON válido.",
+      "not_sarif": "{{name}} no parece un SARIF: no trae ninguna ejecución (runs)."
+    },
+    "scope": {
+      "label": "Alcance",
+      "full": "Completa", "full_hint": "Todo lo que la herramienta revisó en este activo: lo que ya no reporte se marca como remediado",
+      "partial": "Parcial", "partial_hint": "Solo algunos archivos o un módulo: agrega y actualiza, no marca nada como remediado",
+      "note": "Los análisis de Tamandua nunca cierran hallazgos importados, ni una importación cierra los suyos."
+    },
+    "more": "Más opciones",
+    "optional": "(opcional)",
+    "tool": "Nombre de la herramienta", "tool_hint": "Reemplaza el nombre que trae el archivo.",
+    "commit": "Commit", "commit_invalid": "Usa el SHA del commit: de 7 a 64 caracteres hexadecimales.",
+    "branch": "Rama", "branch_invalid": "Ese no es un nombre de rama válido.",
+    "submit": "Importar hallazgos", "submitting": "Importando…",
+    "too_large": "El archivo supera el límite de {{max}} MB del servidor.",
+    "result": {
+      "title": "Importado en {{name}}",
+      "description_full": "Una ejecución por herramienta. Lo que cada una ya no reporta quedó como remediado.",
+      "description_partial": "Una ejecución por herramienta. Importación parcial: no se marcó nada como remediado.",
+      "findings_one": "{{count}} hallazgo", "findings_other": "{{count}} hallazgos",
+      "opened_one": "{{count}} nuevo", "opened_other": "{{count}} nuevos",
+      "fixed_one": "{{count}} remediado", "fixed_other": "{{count}} remediados",
+      "skipped_one": "{{count}} sin importar (suprimido o sin problemas)", "skipped_other": "{{count}} sin importar (suprimidos o sin problemas)",
+      "open": "Ver hallazgos", "open_label": "Ver hallazgos de {{tool}}",
+      "another": "Importar otro archivo"
+    }
+  },
   "picker": {
     "search": "Buscar ejecución",
     "placeholder": "Repositorio, id…",
@@ -200,6 +246,8 @@
     "trigger_branch_sha": "· automático: cambió la rama ({{sha}})",
     "on_branch": "· rama {{branch}}",
     "trigger_advisories": "· automático: publicados después del último análisis",
+    "trigger_import": "· desde {{tool}}",
+    "trigger_import_partial": "· desde {{tool}}, parcial",
     "severity_letter": { "critical": "C", "high": "A", "medium": "M", "low": "B" },
     "severity_count": "{{severity}}: {{value}}",
     "noun": "análisis"

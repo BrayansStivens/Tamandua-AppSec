@@ -5,15 +5,25 @@
     "asset_placeholder": "Search for a repository or image…",
     "run": "Run",
     "current": "Current state",
-    "current_hint": "scans and PRs combined, fixed items shown separately",
-    "current_hint_short": "scans and PRs",
+    "current_hint": "scans, PRs and imports combined, fixed items shown separately",
+    "current_hint_short": "scans, PRs and imports",
     "no_runs": "No matching runs",
     "removed": "GitHub has had no access to this repository since {{date}} (it was deleted or removed from the App). If access doesn't come back, its findings, triage and linked tickets are deleted after 24 hours.",
     "tabs": { "open": "Open", "fixed": "Fixed", "excluded": "Excluded" },
     "kind_scan": "Full scan",
     "kind_advisory": "New advisories",
     "kind_pr": "PR",
-    "kind_pr_number": "PR #{{number}}"
+    "kind_pr_number": "PR #{{number}}",
+    "kind_import": "Import · {{tool}}"
+  },
+  "import": {
+    "eyebrow": "SARIF import · {{tool}}",
+    "new": "New analysis",
+    "full": "full import",
+    "partial": "partial import",
+    "commit": "commit <code>{{commit}}</code>",
+    "help_full": "A new full import from {{tool}} marks fixed whatever it no longer reports. Tamandua's own scans never close these findings.",
+    "help_partial": "Partial import: nothing is marked fixed. Only a full import from {{tool}} or a manual fix closes these findings."
   },
   "state": {
     "eyebrow": "Current state · {{provider}}",
@@ -114,6 +124,7 @@
     "no_fix": "no fix published",
     "pr": "PR #{{number}}",
     "pr_merged": "PR #{{number}} · merged",
+    "imported": "Imported",
     "malicious": "Malicious",
     "malicious_hint": "Known malicious package (OpenSSF): remove it and rotate any secrets on the machines where it was installed",
     "mixed": "Mixed statuses: {{statuses}}"
@@ -178,6 +189,7 @@
     "from_pr_merged": "introduced in PR #{{number}}, already merged",
     "from_pr_branch_merged": "introduced in PR #{{number}} ({{branch}}), already merged",
     "main": "detected on the main branch",
+    "from_import": "imported from {{tool}}",
     "first_seen": "first seen {{date}}",
     "last_seen": "last seen {{date}}",
     "reopened": "reopened",
@@ -275,7 +287,8 @@
     "again": "Verify again",
     "start": "Reverify",
     "demo": "Demo data: rescan it with “make demo”.",
-    "open_pr": "It comes from an open pull request, so it's verified on every push to the PR."
+    "open_pr": "It comes from an open pull request, so it's verified on every push to the PR.",
+    "imported": "{{tool}} reported it, so only {{tool}} can tell whether it's gone: import a new full SARIF from it."
   },
   "audit": {
     "frameworks": {

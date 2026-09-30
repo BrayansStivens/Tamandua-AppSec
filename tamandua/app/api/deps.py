@@ -80,7 +80,7 @@ async def json_body(request: Request) -> Any:
     the route's guard: FastAPI solves dependencies in order, so the body is only read once the request is authorized."""
     try:
         return json.loads(await request.body())
-    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as exc:  # RecursionError: nested too deep
         raise ApiError(400, msg("api.invalid_json")) from exc
 
 

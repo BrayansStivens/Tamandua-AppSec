@@ -78,7 +78,8 @@ class PackagingTests(unittest.TestCase):
             with self.subTest(workflow=workflow.name):
                 self.assertRegex(text, r"(?m)^permissions: \{\}$")
                 for action in re.findall(r"^\s*(?:- )?uses: *(\S+)", text, re.M):
-                    self.assertRegex(action, r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
+                    if action != "./":  # this commit's own action (ci.yml's self-test)
+                        self.assertRegex(action, r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
         release = (ROOT / ".github/workflows/release.yml").read_text()
         for needed in ("platforms: linux/amd64,linux/arm64", "sbom: true", "provenance: mode=max", "cosign sign --yes",
                        "id-token: write", "packages: write"):

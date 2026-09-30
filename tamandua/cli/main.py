@@ -94,6 +94,20 @@ def build_parser() -> argparse.ArgumentParser:
     local.add_argument("--exclude", action="append", default=[], metavar="PATTERN",
                        help="Path whose findings don't count (glob relative to the root: fixtures/**, **/testdata/**). Repeatable")
     local.add_argument("--name", help="Name to display (default: the folder's; useful inside a container)")
+    imported = commands.add_parser("import-sarif", help="Import another tool's SARIF 2.1.0 findings into an existing asset",
+                                   description="Imports the findings of any tool (Semgrep, CodeQL, Snyk, Trivy…) into the registry of an "
+                                               "asset Tamandua already knows. Several files are one import. A full import (the default) "
+                                               "marks fixed what the same tool no longer reports. Exit codes: 0 imported · 2 usage, "
+                                               "document or server error.")
+    imported.add_argument("files", nargs="+", type=Path, metavar="FILE", help="SARIF 2.1.0 file(s)")
+    imported.add_argument("--asset", required=True, help="Asset key or name, e.g. owner/repo")
+    imported.add_argument("--tool", help="Tool name to record (default: each run's tool.driver.name)")
+    imported.add_argument("--partial", action="store_true",
+                          help="The tool looked at part of the asset: open and update, never mark anything fixed")
+    imported.add_argument("--commit", help="Commit the results belong to")
+    imported.add_argument("--branch", help="Branch the results belong to")
+    imported.add_argument("--server", help="Send to this Tamandua (https://…) with the token in TAMANDUA_IMPORT_TOKEN; "
+                                           "without it, import into the local database")
     image = commands.add_parser("scan-image", help="Analyze a container image from its registry, without running it")
     image.add_argument("--reference", required=True, help="registry/repository:tag, e.g. ghcr.io/acme/api:1.4")
     demo = commands.add_parser("demo", help="Load demo data: analyzes the vulnerable examples and imports a threat model")
@@ -146,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
         args.data_dir = args.data_dir or (Path(settings.text("TAMANDUA_DATA_DIR")) if settings.is_set("TAMANDUA_DATA_DIR")
                                           else Path.home() / ".cache" / "tamandua")
         return _scan_command(args)
+    if args.command == "import-sarif" and args.server:
+        return _import_remote(args)  # a client: no database here
     args.data_dir = args.data_dir or Path(settings.text("TAMANDUA_DATA_DIR") or "data")
     if args.command == "check-config" or args.command == "serve" or (args.command == "worker" and not args.check):
         problems = settings.problems()
@@ -234,6 +250,8 @@ def main(argv: list[str] | None = None) -> int:
                 state = t("cli.engines.ready") if row["ready"] else t("cli.engines.missing")
                 print(f"{state:6} {row['name']} {row['version']}  {row['image']}" + (f"  ({_say(row['action'])})" if row.get("action") else ""))
             return 0 if all(row["ready"] for row in rows) else 3
+        if args.command == "import-sarif":
+            return _import_local(args)
         if args.command == "user":
             return _user_command(args)
         if args.command == "integrity":
@@ -246,6 +264,113 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     except (SourceError, GitHubAppError, VaultError, FileNotFoundError, ValueError) as exc:
         parser.exit(1, t("cli.error", detail=_detail(exc)) + "\n")
+
+
+EXIT_IMPORT_ERROR = 2
+
+
+def _sarif_document(files: list[Path]) -> dict:
+    """The files as one SARIF document (their runs together): several files are one import."""
+    from tamandua.modules.scanning.sarif_import import MAX_BYTES, SarifError
+    runs: list = []
+    total = 0
+    for path in files:
+        try:
+            total += path.stat().st_size
+            content = path.read_bytes() if total <= MAX_BYTES else b""
+        except OSError as exc:
+            raise SarifError(msg("cli.import_sarif.unreadable", file=str(path), detail=exc.strerror or str(exc))) from exc
+        if total > MAX_BYTES:
+            raise SarifError(msg("cli.import_sarif.too_large", max=MAX_BYTES // 1_000_000))
+        try:
+            document = json.loads(content)
+        except (ValueError, RecursionError) as exc:
+            raise SarifError(msg("cli.import_sarif.not_json", file=str(path))) from exc
+        if not isinstance(document, dict) or document.get("version") != "2.1.0" or not isinstance(document.get("runs"), list):
+            raise SarifError(msg("scanning.sarif.errors.version"))
+        runs.extend(document["runs"])
+    return {"version": "2.1.0", "runs": runs}
+
+
+def _import_options(args) -> dict:
+    return {"asset": args.asset, "scope": "partial" if args.partial else "full",
+            **{name: getattr(args, name) for name in ("tool", "commit", "branch") if getattr(args, name) is not None}}
+
+
+def _print_import(result: dict) -> None:
+    print(t("cli.import_sarif.asset_line", name=result["name"], asset=result["asset"]))
+    for run in result["runs"]:
+        print(t("cli.import_sarif.run_full" if run["scope"] == "full" else "cli.import_sarif.run_partial", tool=run["tool"], id=run["id"],
+                findings=run["findings"], opened=run["opened"], fixed=run["fixed"]))
+
+
+def _import_local(args) -> int:
+    from tamandua.modules.runs.imports import ImportRefused, import_sarif
+    from tamandua.modules.scanning.sarif_import import SarifError
+    try:
+        options = _import_options(args)
+        result = import_sarif(args.data_dir, _sarif_document(args.files), asset=options.pop("asset"), requested_by="cli", **options)
+    except (SarifError, ImportRefused) as exc:
+        print(t("cli.error", detail=_detail(exc)), file=sys.stderr)
+        return EXIT_IMPORT_ERROR
+    _print_import(result)
+    return 0
+
+
+def _server_url(server: str) -> str | None:
+    """`server` + the CI route, if it is HTTPS (plain HTTP only for this machine)."""
+    import ipaddress
+    from urllib.parse import urlsplit
+    parts = urlsplit(server.strip())
+    host = parts.hostname or ""
+    try:
+        loopback = host == "localhost" or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        loopback = False
+    if not host or parts.query or parts.fragment or parts.username or not (parts.scheme == "https" or (parts.scheme == "http" and loopback)):
+        return None
+    return f"{server.strip().rstrip('/')}/api/ci/sarif"
+
+
+def _import_remote(args) -> int:
+    from urllib.error import HTTPError, URLError
+    from urllib.request import Request
+    from tamandua.modules.scanning.sarif_import import MAX_BYTES, SarifError
+    from tamandua.shared.http import opener
+    from tamandua.shared.i18n import default_locale
+    token = settings.text("TAMANDUA_IMPORT_TOKEN")
+    url = _server_url(args.server)
+    if not token:
+        print(t("cli.error", detail=t("cli.import_sarif.no_token")), file=sys.stderr)
+        return EXIT_IMPORT_ERROR
+    if url is None:
+        print(t("cli.error", detail=t("cli.import_sarif.insecure_server", server=args.server)), file=sys.stderr)
+        return EXIT_IMPORT_ERROR
+    try:
+        payload = json.dumps({**_import_options(args), "sarif": _sarif_document(args.files)}, ensure_ascii=False).encode("utf-8")
+        if len(payload) > MAX_BYTES:
+            raise SarifError(msg("cli.import_sarif.too_large", max=MAX_BYTES // 1_000_000))
+    except SarifError as exc:
+        print(t("cli.error", detail=_detail(exc)), file=sys.stderr)
+        return EXIT_IMPORT_ERROR
+    request = Request(url, data=payload, method="POST", headers={
+        "Authorization": f"Bearer {token}", "Content-Type": "application/json", "Accept": "application/json",
+        "Accept-Language": default_locale()})
+    try:
+        with opener().open(request, timeout=300) as response:
+            result = json.loads(response.read(1_000_000))
+    except HTTPError as exc:
+        try:
+            detail = str(json.loads(exc.read(10_000)).get("error") or exc.reason)
+        except (ValueError, AttributeError):
+            detail = str(exc.reason)
+        print(t("cli.error", detail=t("cli.import_sarif.http_error", status=exc.code, detail=detail[:300])), file=sys.stderr)
+        return EXIT_IMPORT_ERROR
+    except (URLError, OSError, ValueError) as exc:
+        print(t("cli.error", detail=t("cli.import_sarif.unreachable", detail=str(getattr(exc, "reason", exc))[:300])), file=sys.stderr)
+        return EXIT_IMPORT_ERROR
+    _print_import(result)
+    return 0
 
 
 INTEGRITY_RELATIONS = {"registry_without_runs": "cli.integrity.registry_without_runs",

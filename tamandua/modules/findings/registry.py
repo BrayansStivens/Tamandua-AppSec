@@ -18,6 +18,11 @@ open. It is updated only when a run finishes:
   PR had introduced and is no longer in its new commit is fixed. A PR closed without
   merging withdraws its findings; a merged one leaves them waiting for the next full
   scan, which confirms whether they reached the main branch.
+* **Imports** (`sarif_import`, findings from another tool): what shows up opens with origin
+  "import" and the tool's name. Only a later complete import of the **same tool** with scope
+  "full" fixes what that tool no longer reports; a partial import (some files, one module) only
+  opens and updates. Tamandua's own scans and PR reviews never fix an imported finding, nor
+  does an import fix theirs: each tool vouches only for what it looks at.
 
 Manual remediation is a triage decision with a mandatory justification; if the finding
 reappears in a later run, it reopens on its own.
@@ -35,7 +40,7 @@ from tamandua.modules.findings.tables import registry_assets, registry_findings
 from tamandua.shared import db
 from tamandua.shared.db import TENANT
 
-from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS
+from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS, IMPORT_RUNS
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import msg, text
 from tamandua.modules.findings import sla
@@ -88,6 +93,17 @@ def _locked(data_dir: Path, key: str):
     with db.transaction(data_dir) as connection:
         db.lock(connection, "registry", key)
         yield load(data_dir, key)
+
+
+def find_assets(data_dir: Path, wanted: str) -> list[dict]:
+    """Assets whose key is `wanted`, or else whose name is (ignoring case): [{"asset", "name"}]."""
+    with db.transaction(data_dir) as connection:
+        rows = connection.execute(select(registry_assets.c.asset_key, registry_assets.c.name)
+                                  .where(registry_assets.c.tenant_id == TENANT, registry_assets.c.asset_key == wanted)).all() \
+            or connection.execute(select(registry_assets.c.asset_key, registry_assets.c.name)
+                                  .where(registry_assets.c.tenant_id == TENANT, func.lower(registry_assets.c.name) == wanted.lower())
+                                  .order_by(registry_assets.c.asset_key)).all()
+    return [{"asset": row.asset_key, "name": row.name} for row in rows]
 
 
 def forget_asset(data_dir: Path, key: str) -> None:
@@ -151,6 +167,15 @@ def carry_over(data_dir: Path, key: str, moved: dict[str, str]) -> None:
     _log.info("registry_rekeyed", extra={"reason": f"{key}: {len(moved)}"})
 
 
+def _origin(record: RunRecord, imported: dict | None) -> dict:
+    if imported is not None:
+        return {"kind": "import", "tool": imported.get("tool")}
+    if record["type"] == "pr_review":
+        pull = record.get("pull_request") or {}
+        return {"kind": "pr", "pr": pull.get("number"), "branch": pull.get("head_ref")}
+    return {"kind": "advisory"} if record["type"] == "advisory_watch" else {"kind": "scan"}
+
+
 def apply(data_dir: Path, record: RunRecord) -> dict:
     """Adds a finished run to its repository's registry. Idempotent per run."""
     if record.get("type") not in FINDING_RUNS or record.get("status") not in ("completed", "incomplete"):
@@ -158,6 +183,8 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
     key = asset_key(record)
     stamp = record.get("finished_at") or record["created_at"]
     pull = record.get("pull_request") or {}
+    kind = record["type"]
+    imported = (record.get("trigger") or {}) if kind in IMPORT_RUNS else None
     with _locked(data_dir, key) as state:
         if record["id"] in state.setdefault("applied", []):
             return {"opened": 0, "fixed": 0}
@@ -170,10 +197,7 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
         for digest, finding in present.items():
             entry = entries.get(digest)
             if entry is None:
-                entry = entries[digest] = {"first_seen": stamp, "first_run": record["id"],
-                                           "origin": {"kind": "pr", "pr": pull.get("number"), "branch": pull.get("head_ref")}
-                                           if record["type"] == "pr_review" else {"kind": "advisory"}
-                                           if record["type"] == "advisory_watch" else {"kind": "scan"}}
+                entry = entries[digest] = {"first_seen": stamp, "first_run": record["id"], "origin": _origin(record, imported)}
                 opened += 1
                 new.append(digest)
             elif entry["status"] == "fixed":
@@ -186,13 +210,13 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
             entry.pop("fixed", None)
             entry.pop("excluded", None)
         excluded_now = set()
-        if record["type"] in FULL_SCANS:
+        if record["type"] in FULL_SCANS or imported is not None:
             for finding in record.get("excluded_findings") or []:
                 digest = finding["fingerprint"]
                 if digest in present:
                     continue
                 excluded_now.add(digest)
-                entry = entries.setdefault(digest, {"first_seen": stamp, "first_run": record["id"], "origin": {"kind": "scan"}})
+                entry = entries.setdefault(digest, {"first_seen": stamp, "first_run": record["id"], "origin": _origin(record, imported)})
                 entry.update(status="excluded", finding=_clean(finding), excluded=_exclusion(finding, stamp),
                              last_seen=stamp, last_run=record["id"])
         # An incomplete scan can't prove something disappeared: it fixes nothing.
@@ -209,6 +233,9 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
                 how = msg("findings.registry.gone_from_scan", date=stamp[:10])
             elif record["type"] == "pr_review" and origin.get("kind") == "pr" and origin.get("pr") == pull.get("number"):
                 how = msg("findings.registry.fixed_in_pr", commit=str(pull.get("head_sha") or "")[:7], number=pull.get("number"))
+            elif imported is not None and imported.get("scope") == "full" and origin.get("kind") == "import" \
+                    and str(origin.get("tool") or "").lower() == str(imported.get("tool") or "").lower():
+                how = msg("findings.registry.gone_from_import", tool=imported.get("tool"), date=stamp[:10])
             else:
                 continue
             entry.update(status="fixed", fixed={"at": stamp, "run_id": record["id"], "how": how, "auto": True})

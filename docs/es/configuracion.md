@@ -35,6 +35,7 @@ Todas las variables son opcionales y se ponen en `.env` (copia de `.env.example`
 | `TAMANDUA_LOG_FORMAT` | `text` | `json`: un objeto JSON por línea en la salida del proceso. |
 | `TAMANDUA_LOG_FILE` | vacío (Compose: `logs/app.log`) | Escribe además los registros en JSON en este archivo, rotado a 10 MB × 5; una ruta relativa va dentro de la carpeta de datos. |
 | `TAMANDUA_METRICS_TOKEN` | vacío (apagado) | Activa `/api/metrics` (Prometheus) para peticiones con `Authorization: Bearer <token>`. Mínimo 32 caracteres: `openssl rand -hex 32`. |
+| `TAMANDUA_IMPORT_TOKEN` | vacío (apagado) | Activa `POST /api/ci/sarif`, con el que la CI importa el SARIF 2.1.0 de otra herramienta en un activo existente usando `Authorization: Bearer <token>` (sin sesión). Mínimo 32 caracteres: `openssl rand -hex 32`. También es lo que envía `tamandua import-sarif --server`, leído del entorno. |
 
 **Servidor con dominio** ([despliegue-vps.md](despliegue-vps.md)). Las lee Compose, no la app; `make setup DOMAIN=… [PREBUILT=1]` las escribe.
 

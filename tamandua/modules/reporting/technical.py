@@ -23,7 +23,7 @@ from tamandua.modules.reporting.design import (ATTENTION, ATTENTION_BG, BRAND, B
 from tamandua.shared import i18n
 from tamandua.shared.i18n import default_locale, localize, msg
 
-KINDS = ("repository_scan", "image_scan", "pr_review", "asset_state")
+KINDS = ("repository_scan", "image_scan", "pr_review", "sarif_import", "asset_state")
 ACTIVE = ("open", "in_progress")
 ANNEX_LIMIT = 600
 DETAIL_LIMIT = 150   # detail blocks for critical or high code findings
@@ -63,7 +63,7 @@ def render_technical_pdf(record: dict, *, version: str, locale: str | None = Non
                    t("reports.technical.subtitle_state" if record.get("type") == "asset_state" else "reports.technical.subtitle_scan", date=when))
     engines = [step for step in record.get("steps") or [] if (step.get("tool") or {}).get("version")]
     story.append(meta([(t("reports.technical.meta.asset"), name), (t("reports.technical.meta.type"), kind), (t("reports.technical.meta.date"), when),
-                       (t("reports.technical.meta.revision"), " · ".join(value for value in (source.get("branch"), (source.get("sha256") or "")[:12]) if value) or "—"),
+                       (t("reports.technical.meta.revision"), " · ".join(value for value in (source.get("branch"), (source.get("sha256") or source.get("commit") or "")[:12]) if value) or "—"),
                        (t("reports.technical.meta.engines"), ", ".join(step["name"] for step in engines) or "—"),
                        (t("reports.technical.meta.reference"), str(record.get("id") or "—")[:32])]))
     summary = t("reports.technical.summary", pending=msg("reports.count.pending_findings", count=len(active)),

@@ -72,7 +72,8 @@
     "reappeared": "Reappeared in run {{run}}",
     "gone_from_scan": "No longer found in the full scan of {{date}}",
     "fixed_in_pr": "Fixed in commit {{commit}} of PR #{{number}}",
-    "pr_closed": "PR #{{number}} was closed without merging"
+    "pr_closed": "PR #{{number}} was closed without merging",
+    "gone_from_import": "No longer in the {{tool}} import of {{date}}"
   },
   "triage": {
     "status": {

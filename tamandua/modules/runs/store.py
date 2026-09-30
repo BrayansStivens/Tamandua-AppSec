@@ -120,6 +120,12 @@ def delete_runs(data_dir: Path, run_ids: list[str]) -> int:
 
 
 def save_repository_scan(data_dir: Path, scan: RunRecord, *, run_id: str | None = None, created_at: str | None = None) -> RunRecord:
+    return save_and_apply(data_dir, scan, run_id=run_id, created_at=created_at)[0]
+
+
+def save_and_apply(data_dir: Path, scan: RunRecord, *, run_id: str | None = None,
+                   created_at: str | None = None) -> tuple[RunRecord, dict]:
+    """Saves a finished run and applies it to the findings registry; also returns what the registry changed."""
     # A background scan already has its ID and its folder from the moment it was queued.
     record = {"schema_version": "0.3.0", "id": run_id or uuid.uuid4().hex,
               "created_at": created_at or datetime.now(timezone.utc).isoformat(), **scan}
@@ -143,7 +149,7 @@ def save_repository_scan(data_dir: Path, scan: RunRecord, *, run_id: str | None 
             opened = set(changes["new"])
             active = [item for item in triage.annotate(data_dir, saved).get("findings", []) if item["fingerprint"] in opened and triage.is_active(item)]
             notifications.on_run(saved, active, data_dir=data_dir)
-    return saved
+    return saved, changes
 
 
 ACTION_ORDER = {"act": 0, "attend": 1, "track": 2}
@@ -246,12 +252,17 @@ def render_repository_report(record: dict, *, locale: str | None = None) -> str:
     priorities = summary.get("priorities") or {}
     findings = _ordered_findings(record)
     image = source.get("image") or {}
-    if image:
+    imported = (record.get("trigger") or {}) if record.get("type") == "sarif_import" else None
+    if imported is not None:
+        identity = (t("reports.markdown.identity_import_commit", locale, tool=imported.get("tool"), commit=str(source["commit"])[:12])
+                    if source.get("commit") else t("reports.markdown.identity_import", locale, tool=imported.get("tool")))
+    elif image:
         identity = (t("reports.markdown.identity_image_digest", locale, reference=image.get("reference"), digest=image["resolved_digest"])
                     if image.get("resolved_digest") else t("reports.markdown.identity_image", locale, reference=image.get("reference")))
     else:
         identity = t("reports.markdown.identity_snapshot", locale, sha=source.get("sha256"))
-    lines = ["# " + t("reports.markdown.title_image" if image else "reports.markdown.title_code", locale, name=source["name"]), "",
+    heading = "reports.markdown.title_import" if imported is not None else "reports.markdown.title_image" if image else "reports.markdown.title_code"
+    lines = ["# " + t(heading, locale, name=source["name"]), "",
              t("reports.markdown.run_line", locale, id=record["id"], date=record["created_at"], provider=source["provider"], identity=identity),
              t("reports.markdown.status_line", locale, status=record["status"], files=summary["files"], dependencies=summary["dependencies"]), "",
              "## " + t("reports.markdown.executive_summary", locale), "",
@@ -489,7 +500,7 @@ def profile_pdf_titles(profile: str, *, locale: str | None = None) -> dict:
 def render_profile_report(record: dict, profile: str, title: str = "", *, locale: str | None = None) -> str:
     """Technical dossier; it is not an audit opinion or a certification."""
     locale = locale or default_locale()
-    if profile not in PROFILES or record.get("type") not in ("repository_scan", "image_scan", "pr_review", "asset_state"):
+    if profile not in PROFILES or record.get("type") not in ("repository_scan", "image_scan", "pr_review", "sarif_import", "asset_state"):
         raise ReportInputError(msg("reports.errors.unsupported_profile"))
     if title and (len(title) > 100 or not all(ch.isprintable() and ch not in "#`[]<>" for ch in title)):
         raise ReportInputError(msg("reports.errors.invalid_title"))
@@ -500,6 +511,8 @@ def render_profile_report(record: dict, profile: str, title: str = "", *, locale
     source = localize(record["source"], locale)
     if is_state:
         scope = t("reports.profile.scope_state", locale, name=source["name"])
+    elif record["type"] == "sarif_import":
+        scope = t("reports.profile.scope_import", locale, name=source["name"], tool=(record.get("trigger") or {}).get("tool"))
     elif source.get("image"):
         scope = t("reports.profile.scope_image", locale, name=source["name"], reference=source["image"].get("reference"))
     else:
