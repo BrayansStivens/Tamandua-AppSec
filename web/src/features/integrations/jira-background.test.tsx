@@ -14,7 +14,7 @@ const tr = (key: string, options?: Record<string, unknown>) => i18n.t(`integrati
 const print = (index: number) => index.toString(16).padStart(64, '0')
 const MANY = Array.from({ length: 120 }, (_, index) => ({ fingerprint: print(index), label: `Finding ${index}` }))
 const QUEUED: JiraQueued = { batch: 'b1', by: 'ana', started_at: '2026-09-30T10:00:00Z', finished_at: null, queued: 80, findings: 118, linked: 1, created: 0, existing: 0,
-  skipped: 0, failed: 0, pending: 80, last_error: null, force: false, rejected: [{ fingerprint: print(5), asset: 'github#1', error: 'No Jira destination for this repository' }] }
+  skipped: 0, failed: 0, pending: 80, last_error: null, force: false, relinked: 0, rejected: [{ fingerprint: print(5), asset: 'github#1', error: 'No Jira destination for this repository' }] }
 
 function setup(element: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -36,6 +36,7 @@ describe('large selections run in the background', () => {
     const calls = mockApi(call => call.path === '/api/integrations/jira/issues/queue' ? { status: 202, body: QUEUED }
       : call.path === '/api/integrations/jira/issues/batches' ? { body: polls.length > 1 ? polls.shift() : polls[0] } : undefined)
     vi.useFakeTimers({ shouldAdvanceTime: true })
+    vi.setSystemTime(new Date('2026-09-30T10:00:30Z'))  // the batches below start at 10:00: "recent" can't depend on today's clock
     try {
       const notice = vi.fn(), close = vi.fn(), settled = vi.fn()
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })

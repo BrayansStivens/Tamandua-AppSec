@@ -55,7 +55,7 @@ class FakeJira:
     """The REST calls Tamandua makes, answered from memory. Pages of 3 so pagination is exercised."""
 
     def __init__(self, *, priority_field=True, existing_label=None, page=3):
-        self.calls, self.issues, self.comments = [], {}, {}
+        self.calls, self.issues, self.comments, self.deleted = [], {}, {}, set()
         self.priority_field, self.existing_label, self.page = priority_field, existing_label, page
         self.projects = {"SEC": {"id": "10000", "key": "SEC", "name": "Seguridad"}, "PAY": {"id": "10001", "key": "PAY", "name": "Pagos"}}
 
@@ -90,6 +90,10 @@ class FakeJira:
                 return self._paged([{"id": "10001", "name": "Task", "subtask": False}, {"id": "10002", "name": "Bug", "subtask": False}],
                                    "issueTypes", query)
             return self._paged(TASK_FIELDS if segments[8] == "10001" else BUG_FIELDS, "fields", query)
+        if route == "/rest/api/3/issue/bulkfetch":
+            known = {*self.issues, "SEC-7"} - self.deleted
+            return {"issues": [{"key": key} for key in body["issueIdsOrKeys"] if key in known],
+                    "issueErrors": [{"key": key} for key in body["issueIdsOrKeys"] if key not in known]}
         if route == "/rest/api/3/search/jql":
             hit = self.existing_label and self.existing_label in body["jql"]
             return {"issues": [{"key": "SEC-7"}] if hit else []}
@@ -103,6 +107,8 @@ class FakeJira:
             return {"key": key}
         if route.endswith("/comment"):
             key = route.split("/")[5]
+            if key in self.deleted:
+                raise jira.JiraError("Issue does not exist or you do not have permission to see it.", status=404)
             if method == "GET":
                 return {"comments": self.comments.get(key, [])}
             self.comments.setdefault(key, []).append(body)
@@ -631,6 +637,27 @@ class QueuedExportTests(JiraCase):
         self.rule(id="default", destination=self.sec["id"], enabled=False)
         queued = jira_sync.queue_export(self.data_dir, [(triage.annotate(self.data_dir, record), [FP_A])], by="Ana")
         self.assertEqual((queued["queued"], [item["fingerprint"] for item in queued["rejected"]]), (0, [FP_A]))
+
+
+class DeletedInJiraTests(QueuedExportTests):
+    def test_issues_deleted_in_jira_are_created_again(self):
+        prints = [f"{index:064x}" for index in range(1, 61)]
+        record = triage.annotate(self.data_dir, self.scan("org/api", [_finding(item, package=f"pkg{index}") for index, item in enumerate(prints)]))
+        jira_sync.export(self.data_dir, [(record, prints[:2])], by="ana")
+        self.fake.deleted |= {"SEC-101"}  # someone deletes one in Jira
+        again = jira_sync.export(self.data_dir, [(record, prints[:2])], by="ana")
+        self.assertEqual((len(again["created"]), len(again["existing"]), again["relinked"]), (1, 1, 1))
+        self.fake.deleted |= set(self.fake.issues)  # and then all of them
+        queued = jira_sync.queue_export(self.data_dir, [(record, prints)], by="ana", user="ana")
+        self.assertEqual((queued["queued"], queued["linked"], queued["relinked"]), (60, 0, 2))
+
+    def test_a_comment_on_a_deleted_issue_forgets_the_link(self):
+        record = triage.annotate(self.data_dir, self.scan("org/api", [_finding(FP_A)]))
+        jira_sync.export(self.data_dir, [(record, [FP_A])], by="ana")
+        self.fake.deleted.add("SEC-101")
+        self.scan("org/api", [], when=self.now + timedelta(minutes=1))
+        self.drain()
+        self.assertNotIn(FP_A, jira_links.load_links(self.data_dir).get("github:org/api", {}))
 
 
 class DuplicateTests(QueuedExportTests):

@@ -73,6 +73,7 @@ export function JiraExportDialog({ selection, findings, target, onClose, onDone 
   const summary = result ? [
     t('jira.export.created', { count: created }), t('jira.export.existing', { count: links.length - created }),
     ...(result.failed.length ? [t('jira.export.failed', { count: result.failed.length })] : []),
+    ...(result.relinked ? [t('jira.export.relinked', { count: result.relinked })] : []),
   ].join(' · ') : `${target ? t('jira.export.intro_target', { target }) : t('jira.export.intro')}${large ? ` ${t('jira.queue.intro', { max: JIRA_SYNC_MAX })}` : ''}`
   return <Dialog open onOpenChange={next => { if (!next) onClose() }}><DialogContent className="max-w-lg">
     <DialogHeader><DialogTitle>{t('jira.export.title', { count: findings.length })}</DialogTitle><DialogDescription>{summary}</DialogDescription></DialogHeader>

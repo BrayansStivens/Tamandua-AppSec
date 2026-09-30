@@ -9566,6 +9566,11 @@
             "type": "array",
             "maxItems": 50,
             "title": "Failed"
+          },
+          "relinked": {
+            "type": "integer",
+            "title": "Relinked",
+            "default": 0
           }
         },
         "type": "object",
@@ -10030,6 +10035,11 @@
             "type": "array",
             "maxItems": 5000,
             "title": "Linked Items"
+          },
+          "relinked": {
+            "type": "integer",
+            "title": "Relinked",
+            "default": 0
           },
           "force": {
             "type": "boolean",

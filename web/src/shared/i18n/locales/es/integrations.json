@@ -268,7 +268,9 @@
       "failed_title": "Sin crear",
       "done": "Hecho",
       "submit_one": "Crear incidencia",
-      "submit_other": "Crear incidencias"
+      "submit_other": "Crear incidencias",
+      "relinked_one": "{{count}} tenía una incidencia que se borró en Jira: se crea de nuevo",
+      "relinked_other": "{{count}} tenían incidencias que se borraron en Jira: se crean de nuevo"
     },
     "queue": {
       "intro": "Más de {{max}} hallazgos pasan por la cola: esta ventana se cierra y Tamandua crea las incidencias en segundo plano, con unos segundos entre una y otra. Síguelas desde el indicador de Jira arriba.",

@@ -218,6 +218,7 @@ class JiraExport(BaseModel):
     created: list[JiraExportItem] = Field(max_length=jira.MAX_BATCH)
     existing: list[JiraExportItem] = Field(max_length=jira.MAX_BATCH)
     failed: list[JiraExportItem] = Field(max_length=jira.MAX_BATCH)
+    relinked: int = 0  # findings whose linked issue had been deleted in Jira: created again
 
 
 class JiraQueued(BaseModel):
@@ -238,6 +239,7 @@ class JiraQueued(BaseModel):
     rejected: list[JiraExportItem] = Field(default_factory=list, max_length=jira_sync.MANUAL_MAX)
     # The findings skipped because they already have an issue (only in the queue's first answer): «create anyway».
     linked_items: list[JiraExportItem] = Field(default_factory=list, max_length=jira_sync.MANUAL_MAX)
+    relinked: int = 0  # findings whose linked issue had been deleted in Jira: queued again
     force: bool = False
 
 

@@ -30,6 +30,21 @@ def _remember(data_dir: Path, asset: str, fingerprint: str, link: dict) -> None:
 remember = _remember
 
 
+def forget_issues(data_dir: Path, keys: set[str]) -> int:
+    """Drops every link to these issues (they no longer exist in Jira). Returns how many findings lost their link."""
+    if not keys:
+        return 0
+    dropped = 0
+    with documents.lock(data_dir, "jira-links"):
+        links = load_links(data_dir)
+        for asset in links.values():
+            for fingerprint in [item for item, link in asset.items() if isinstance(link, dict) and link.get("key") in keys]:
+                del asset[fingerprint]
+                dropped += 1
+        documents.save(data_dir, "jira-links", links)
+    return dropped
+
+
 def mark(data_dir: Path, asset: str, key: str, state: str, run_id: str) -> None:
     """Records on every finding linked to issue `key` what Tamandua last told the issue (see the module notes)."""
     with documents.edit(data_dir, "jira-links", {}) as payload:

@@ -268,7 +268,9 @@
       "failed_title": "Not created",
       "done": "Done",
       "submit_one": "Create issue",
-      "submit_other": "Create issues"
+      "submit_other": "Create issues",
+      "relinked_one": "{{count}} had an issue that was deleted in Jira: created again",
+      "relinked_other": "{{count}} had issues that were deleted in Jira: created again"
     },
     "queue": {
       "intro": "More than {{max}} findings go through the queue: this window closes and Tamandua creates the issues in the background, a few seconds apart. Follow them from the Jira indicator at the top.",

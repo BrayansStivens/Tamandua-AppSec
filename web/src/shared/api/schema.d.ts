@@ -3013,6 +3013,11 @@ export interface components {
             existing: components["schemas"]["JiraExportItem"][];
             /** Failed */
             failed: components["schemas"]["JiraExportItem"][];
+            /**
+             * Relinked
+             * @default 0
+             */
+            relinked: number;
         };
         /** JiraExportItem */
         JiraExportItem: {
@@ -3179,6 +3184,11 @@ export interface components {
             rejected?: components["schemas"]["JiraExportItem"][];
             /** Linked Items */
             linked_items?: components["schemas"]["JiraExportItem"][];
+            /**
+             * Relinked
+             * @default 0
+             */
+            relinked: number;
             /**
              * Force
              * @default false

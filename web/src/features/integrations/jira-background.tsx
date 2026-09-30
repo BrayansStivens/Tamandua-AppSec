@@ -26,7 +26,8 @@ export function JiraBackgroundWork({ onNotice }: { onNotice: Notice }) {
   useEffect(() => {
     for (const item of data?.items ?? []) {
       if (!toAnnounce.delete(item.batch)) continue
-      notice.current('ok', item.queued ? t('jira.background.started', { count: item.queued }) : item.linked ? t('jira.background.nothing', { count: item.linked }) : t('jira.background.none_routed'))
+      const started = item.queued ? t('jira.background.started', { count: item.queued }) : item.linked ? t('jira.background.nothing', { count: item.linked }) : t('jira.background.none_routed')
+      notice.current('ok', item.relinked ? `${started}. ${t('jira.export.relinked', { count: item.relinked })}` : started)
     }
   }, [data, t])
   useJiraSettled(batch => {

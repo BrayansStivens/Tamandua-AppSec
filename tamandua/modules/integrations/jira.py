@@ -428,6 +428,21 @@ def search_labels(project_key: str, fingerprints: list[str], *, http=None) -> st
     return issues[0]["key"] if issues else None
 
 
+def missing_issues(keys: list[str], *, http=None) -> set[str]:
+    """Which of these issue keys Jira no longer has (deleted, moved, or out of this account's reach): Tamandua's
+    links can go stale when someone deletes issues in Jira. Asked 100 at a time (bulk fetch); a key Jira reports as
+    missing is missing, and a key it leaves unmentioned too."""
+    wanted = sorted({key for key in keys if isinstance(key, str) and ISSUE_KEY.fullmatch(key)})
+    missing: set[str] = set()
+    client, found = _client(http), credentials()
+    for start in range(0, len(wanted), 100):
+        chunk = wanted[start:start + 100]
+        answer = client(found, "POST", "/rest/api/3/issue/bulkfetch", {"issueIdsOrKeys": chunk, "fields": ["key"]})
+        present = {str(item.get("key")) for item in answer.get("issues") or [] if isinstance(item, dict)}
+        missing |= {key for key in chunk if key not in present}
+    return missing
+
+
 def create_issue(fields: dict, *, http=None) -> str:
     result = _client(http)(credentials(), "POST", "/rest/api/3/issue", {"fields": fields})
     key = str(result.get("key", ""))

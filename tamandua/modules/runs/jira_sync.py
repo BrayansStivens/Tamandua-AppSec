@@ -218,6 +218,21 @@ def _deliver(data_dir: Path, key: str, group: list[dict], issue_values: dict, de
     return outcome, link
 
 
+def _prune(data_dir: Path, selections: list[tuple[dict, list]], http) -> int:
+    """Before trusting "it already has an issue": asks Jira whether the linked issues still exist and forgets the ones
+    that don't (someone deleted them), so their findings are created again. Returns how many findings it relinked."""
+    links = tickets.load_links(data_dir)
+    keys = {link["key"] for record, prints in selections for item in prints
+            if isinstance(link := links.get(asset_key(record), {}).get(item), dict) and link.get("key")}
+    if not keys:
+        return 0
+    gone = jira.missing_issues(sorted(keys), http=http)
+    dropped = tickets.forget_issues(data_dir, gone)
+    if gone:
+        _log.info("jira_links_pruned", extra={"reason": f"{len(gone)} issues gone from Jira, {dropped} findings unlinked"})
+    return dropped
+
+
 def _public(link: dict) -> dict:
     return {name: link.get(name) for name in ("key", "url", "linked_at", "by", "project", "destination")}
 
@@ -232,6 +247,7 @@ def export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, http
     if (not 1 <= total <= jira.MAX_BATCH or any(not isinstance(prints, list) or not prints for _, prints in selections)
             or not all(isinstance(item, str) and FINGERPRINT.fullmatch(item) for _, prints in selections for item in prints)):
         raise jira.JiraError(msg("integrations.jira.batch_size", max=jira.MAX_BATCH))
+    relinked = 0 if force else _prune(data_dir, selections, http)
     state = routing.load(data_dir)
     prepared = []
     for record, prints in selections:
@@ -261,7 +277,7 @@ def export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, http
             (created if outcome == "created" else existing).extend(
                 {"fingerprint": ticket["fingerprint"], "asset": key, **_public(link)} for ticket in group)
     _log.info("jira_export", extra={"user": by, "reason": f"{len(created)} created, {len(existing)} existing, {len(failed)} failed"})
-    return {"created": created, "existing": existing, "failed": failed}
+    return {"created": created, "existing": existing, "failed": failed, "relinked": relinked}
 
 
 def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, user: str = "", force: bool = False) -> dict:
@@ -272,6 +288,7 @@ def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str
     if (not 1 <= total <= MANUAL_MAX or any(not isinstance(prints, list) or not prints for _, prints in selections)
             or not all(isinstance(item, str) and FINGERPRINT.fullmatch(item) for _, prints in selections for item in prints)):
         raise jira.JiraError(msg("integrations.jira.batch_size", max=MANUAL_MAX))
+    relinked = 0 if force else _prune(data_dir, selections, None)
     state, locale = routing.load(data_dir), default_locale()
     queued, links, work, failed, linked = _queued_creates(data_dir), tickets.load_links(data_dir), [], [], 0
     linked_items: list[dict] = []
@@ -306,7 +323,7 @@ def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str
                 status.pop(old, None)
         _queue(data_dir, rows)
     _log.info("jira_export_queued", extra={"user": by, "reason": f"{len(rows)} issues, {entry['findings']} findings, {len(failed)} failed"})
-    return {**entry, "pending": len(rows), "rejected": failed, "linked_items": linked_items}
+    return {**entry, "pending": len(rows), "rejected": failed, "linked_items": linked_items, "relinked": relinked}
 
 
 def manual_batches(data_dir: Path, user: str) -> list[dict]:
@@ -651,6 +668,8 @@ def drain(data_dir: Path, *, http=None, limit: int = PER_DRAIN) -> int:
             _count(data_dir, row.payload, outcome)
         except jira.JiraError as exc:
             error = text(exc.message, "en")
+            if exc.status == 404 and row.payload.get("type") == "comment":
+                tickets.forget_issues(data_dir, {str(row.payload.get("key"))})  # deleted in Jira: nothing to tell it again
             if exc.retryable and attempts < len(RETRY_MINUTES):
                 wait = max(RETRY_MINUTES[attempts - 1] * 60, exc.retry_after or 0)
                 values_.update(last_error=error, next_attempt_at=func.now() + timedelta(seconds=wait))
