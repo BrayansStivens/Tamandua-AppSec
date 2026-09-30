@@ -112,7 +112,14 @@
       "fixed": "Verified as fixed by Tamandua in run {{run_id}} on {{date}}.",
       "fixed_group": "All {{count}} findings in this issue were verified as fixed by Tamandua in run {{run_id}} on {{date}}.",
       "reopened": "Tamandua found this again in run {{run_id}} on {{date}}: it is open again.",
-      "panel": "See it in Tamandua: {{url}}"
+      "panel": "See it in Tamandua: {{url}}",
+      "manual_fixed": "{{by}} marked this as fixed in Tamandua on {{date}}{{part}}. It's a person's decision: no scan has verified it yet.",
+      "false_positive": "{{by}} marked this as a false positive in Tamandua on {{date}}{{part}}.",
+      "accepted": "{{by}} accepted this risk in Tamandua on {{date}} until {{expires}}{{part}}.",
+      "triage_reopened": "{{by}} reopened this in Tamandua on {{date}}{{part}}.",
+      "part_one": " (1 of the {{total}} findings in this issue)",
+      "part_other": " ({{count}} of the {{total}} findings in this issue)",
+      "reason": "Reason: {{reason}}"
     },
     "variables": {
       "summary": "Tamandua's issue title",

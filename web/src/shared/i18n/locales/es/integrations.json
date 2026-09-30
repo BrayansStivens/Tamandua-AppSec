@@ -269,6 +269,26 @@
       "done": "Hecho",
       "submit_one": "Crear incidencia",
       "submit_other": "Crear incidencias"
+    },
+    "queue": {
+      "intro": "Más de {{max}} hallazgos pasan por la cola: Tamandua crea las incidencias en segundo plano, con unos segundos entre una y otra, y puedes cerrar esta ventana.",
+      "background": "Tamandua crea estas incidencias en segundo plano, con unos segundos entre una y otra, y reintenta si Jira falla. Puedes cerrar esta ventana: sigue avanzando.",
+      "progress_one": "{{done}} de {{total}} incidencias · {{pending}} en cola",
+      "progress_other": "{{done}} de {{total}} incidencias · {{pending}} en cola",
+      "finished_one": "Terminado: {{count}} incidencia procesada",
+      "finished_other": "Terminado: {{count}} incidencias procesadas",
+      "progress_label": "Incidencias procesadas",
+      "findings_one": "{{count}} hallazgo",
+      "findings_other": "{{count}} hallazgos",
+      "linked_one": "{{count}} ya tenía incidencia",
+      "linked_other": "{{count}} ya tenían incidencia",
+      "skipped_one": "{{count}} omitida",
+      "skipped_other": "{{count}} omitidas",
+      "failed_one": "{{count}} incidencia con error.",
+      "failed_other": "{{count}} incidencias con error.",
+      "last_error": "Último error: {{error}}",
+      "rejected_one": "{{count}} hallazgo sin poner en cola:",
+      "rejected_other": "{{count}} hallazgos sin poner en cola:"
     }
   },
   "notifications": {

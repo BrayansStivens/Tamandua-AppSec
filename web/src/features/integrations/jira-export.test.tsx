@@ -109,6 +109,52 @@ describe('the export result', () => {
   })
 })
 
+describe('a large selection', () => {
+  const MANY = Array.from({ length: 120 }, (_, index) => ({ fingerprint: index.toString(16).padStart(64, '0'), label: `Finding ${index}` }))
+  const QUEUED = { batch: 'b1', by: 'ana', started_at: '2026-09-30T10:00:00Z', finished_at: null, queued: 80, findings: 118, linked: 1, created: 0, existing: 0, skipped: 0, failed: 0, pending: 80, last_error: null,
+    rejected: [{ fingerprint: MANY[5].fingerprint, asset: 'github#1', error: 'No Jira destination for this repository' }] }
+
+  it('goes through the queue and follows it only while issues are pending', async () => {
+    const progress = [{ ...QUEUED, created: 40, existing: 2, pending: 38, rejected: undefined },
+      { ...QUEUED, created: 76, existing: 2, failed: 2, pending: 0, finished_at: '2026-09-30T10:03:00Z', last_error: 'Jira responded 400', rejected: undefined }]
+    const calls = mockApi(call => call.path === '/api/integrations/jira/issues/queue' ? { status: 202, body: QUEUED }
+      : call.path === '/api/integrations/jira/issues/batches/b1' ? { body: progress.shift() ?? progress[0] } : undefined)
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const done = vi.fn()
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      renderWithQueries(<JiraExportDialog selection={{ asset: 'github#1' }} findings={MANY} onClose={() => {}} onDone={done} />)
+      expect(screen.getByText(new RegExp(tr('jira.queue.intro', { max: 50 }).slice(0, 30)))).toBeTruthy()
+      await user.click(screen.getByRole('button', { name: tr('jira.export.submit', { count: 120 }) }))
+
+      expect(calls.filter(call => call.path.endsWith('/queue'))).toEqual([{ method: 'POST', path: '/api/integrations/jira/issues/queue', action: 'export-jira',
+        body: { selections: [{ asset: 'github#1', fingerprints: MANY.map(item => item.fingerprint) }] } }])
+      expect(calls.some(call => call.path === '/api/integrations/jira/issues')).toBe(false)
+      expect(await screen.findByText(tr('jira.queue.background'))).toBeTruthy()
+      expect(screen.getByText(/Finding 5/).parentElement?.textContent).toContain('No Jira destination for this repository')
+      expect(await screen.findByText(tr('jira.queue.progress', { done: 42, total: 80, pending: 38, count: 38 }))).toBeTruthy()
+      expect(done).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(3100)
+      expect(await screen.findByText(tr('jira.queue.finished', { count: 80 }))).toBeTruthy()
+      expect(screen.getByRole('alert').textContent).toContain(tr('jira.queue.last_error', { error: 'Jira responded 400' }))
+      expect(screen.getByText(new RegExp(tr('jira.queue.linked', { count: 1 })))).toBeTruthy()
+      expect(done).toHaveBeenCalledOnce()
+      const polls = calls.filter(call => call.path.endsWith('/batches/b1')).length
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(calls.filter(call => call.path.endsWith('/batches/b1'))).toHaveLength(polls)
+    } finally { vi.useRealTimers() }
+  })
+
+  it('50 or fewer still use the synchronous endpoint', async () => {
+    const calls = mockApi(() => ({ body: { created: [], existing: [], failed: [] } }))
+    const user = userEvent.setup()
+    renderWithQueries(<JiraExportDialog selection={{ asset: 'github#1' }} findings={MANY.slice(0, 50)} onClose={() => {}} onDone={() => {}} />)
+    await user.click(screen.getByRole('button', { name: tr('jira.export.submit', { count: 50 }) }))
+    await vi.waitFor(() => expect(calls.map(call => call.path)).toEqual(['/api/integrations/jira/issues']))
+  })
+})
+
 describe('a finding linked from a Jira issue', () => {
   const finding = (fingerprint: string, title: string): RepositoryFinding => ({ finding_id: fingerprint.slice(0, 8), fingerprint, scanner: 'sast', rule_id: 'r', title, path: 'app.py', line: 1,
     severity: 'high', confidence: 8, verdict: 'candidate', cwe: [], cve: [], ghsa: [], owasp: [], reason: '', remediation: '', lifecycle: { status: 'open' } })

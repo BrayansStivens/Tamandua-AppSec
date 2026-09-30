@@ -144,7 +144,8 @@ def save_and_apply(data_dir: Path, scan: RunRecord, *, run_id: str | None = None
         changes = apply(data_dir, saved)
         # What is new and matters goes to the configured channels (Slack, Teams, webhook) through the outbox, and to
         # Jira: issues for automatic rules, comments on fixed or reappeared findings (runs/jira_sync.py).
-        if changes.get("new") or changes.get("fixed_now") or changes.get("reopened"):
+        # Present findings count too: one fixed by hand in triage that shows up again changes nothing in the registry.
+        if changes.get("new") or changes.get("fixed_now") or changes.get("reopened") or saved.get("findings"):
             from tamandua.modules.integrations import notifications
             from tamandua.modules.findings import triage
             from tamandua.modules.runs import jira_sync

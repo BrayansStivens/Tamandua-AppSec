@@ -112,7 +112,14 @@
       "fixed": "Tamandua verificó la corrección en la ejecución {{run_id}} del {{date}}.",
       "fixed_group": "Tamandua verificó la corrección de los {{count}} hallazgos de esta incidencia en la ejecución {{run_id}} del {{date}}.",
       "reopened": "Tamandua volvió a detectarlo en la ejecución {{run_id}} del {{date}}: está abierto otra vez.",
-      "panel": "Míralo en Tamandua: {{url}}"
+      "panel": "Míralo en Tamandua: {{url}}",
+      "manual_fixed": "{{by}} lo marcó como remediado en Tamandua el {{date}}{{part}}. Es una decisión de una persona: ningún análisis lo ha verificado todavía.",
+      "false_positive": "{{by}} lo marcó como falso positivo en Tamandua el {{date}}{{part}}.",
+      "accepted": "{{by}} aceptó este riesgo en Tamandua el {{date}}, hasta el {{expires}}{{part}}.",
+      "triage_reopened": "{{by}} lo reabrió en Tamandua el {{date}}{{part}}.",
+      "part_one": " (1 de los {{total}} hallazgos de esta incidencia)",
+      "part_other": " ({{count}} de los {{total}} hallazgos de esta incidencia)",
+      "reason": "Motivo: {{reason}}"
     },
     "variables": {
       "summary": "Título de la incidencia según Tamandua",

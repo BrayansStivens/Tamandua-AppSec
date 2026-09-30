@@ -557,6 +557,82 @@ class CommentTests(JiraCase):
         self.assertEqual(self.rows()[-1].payload["count"], 2)
 
 
+class TriageCommentTests(CommentTests):
+    def linked(self):
+        record = self.scan("org/api", [_finding(FP_A)])
+        jira_sync.export(self.data_dir, [(triage.annotate(self.data_dir, record), [FP_A])], by="analista")
+        return record
+
+    def decide(self, record, status, reason="Se parchea en la librería", **extra):
+        triage.decide(self.data_dir, record, [FP_A], status, reason=reason, user={"username": "ana", "role": "admin"}, **extra)
+        return jira_sync.on_triage(self.data_dir, "github:org/api", [FP_A], status, by="Ana", reason=reason, **extra)
+
+    def test_a_manual_fix_is_commented_then_verified_by_a_scan(self):
+        record = self.linked()
+        self.assertEqual(self.decide(record, "fixed"), 1)
+        self.drain()
+        body = json.dumps(self.fake.comments["SEC-101"][0]["body"], ensure_ascii=False)
+        self.assertIn("Ana lo marcó como remediado", body)
+        self.assertIn("ningún análisis lo ha verificado", body)
+        self.assertIn("Motivo: Se parchea en la librería", body)
+        self.scan("org/api", [], when=self.now + timedelta(minutes=1))
+        self.assertEqual(self.comments(), [("manual_fixed", "SEC-101"), ("fixed", "SEC-101")])
+
+    def test_a_manual_fix_that_reappears_is_commented(self):
+        record = self.linked()
+        self.decide(record, "fixed")
+        self.scan("org/api", [_finding(FP_A)], when=self.now + timedelta(minutes=1))
+        self.assertEqual(self.comments(), [("manual_fixed", "SEC-101"), ("reopened", "SEC-101")])
+
+    def test_false_positive_accepted_and_reopened(self):
+        record = self.linked()
+        self.decide(record, "false_positive")
+        self.decide(record, "open", reason=None)
+        self.decide(record, "accepted", expires_at=(self.now + timedelta(days=30)).date().isoformat())
+        self.assertEqual([event for event, _ in self.comments()], ["false_positive", "triage_reopened", "accepted"])
+        self.drain()
+        self.assertIn("aceptó este riesgo", json.dumps(self.fake.comments["SEC-101"][-1]["body"], ensure_ascii=False))
+        # Still present in a later scan: dismissed findings don't count as reappearing.
+        self.scan("org/api", [_finding(FP_A)], when=self.now + timedelta(minutes=1))
+        self.assertEqual(len(self.comments()), 3)
+
+    def test_findings_without_an_issue_and_in_progress_comment_nothing(self):
+        record = self.scan("org/api", [_finding(FP_A)])
+        self.assertEqual(self.decide(record, "fixed"), 0)
+        record = self.linked()
+        self.assertEqual(self.decide(record, "in_progress", reason=None), 0)
+
+
+class QueuedExportTests(JiraCase):
+    def setUp(self):
+        super().setUp()
+        self.connect()
+        self.sec = self.destination("SEC")
+        self.rule(id="default", destination=self.sec["id"])
+
+    def test_a_large_selection_is_queued_and_followed(self):
+        prints = [f"{index:064x}" for index in range(1, 61)]
+        record = self.scan("org/api", [_finding(item, package=f"pkg{index}") for index, item in enumerate(prints)])
+        queued = jira_sync.queue_export(self.data_dir, [(triage.annotate(self.data_dir, record), prints)], by="Ana")
+        self.assertEqual((queued["queued"], queued["findings"], queued["pending"], queued["rejected"]), (60, 60, 60, []))
+        # Queued again while pending: nothing twice.
+        again = jira_sync.queue_export(self.data_dir, [(triage.annotate(self.data_dir, record), prints)], by="Ana")
+        self.assertEqual(again["queued"], 0)
+        self.drain()
+        status = jira_sync.manual_status(self.data_dir, queued["batch"])
+        self.assertEqual((status["created"], status["pending"], bool(status["finished_at"])), (60, 0, True))
+        self.assertEqual(len(self.fake.issues), 60)
+        self.assertEqual({link["by"] for link in jira_links.load_links(self.data_dir)["github:org/api"].values()}, {"Ana"})
+
+    def test_limits_and_unrouted_assets(self):
+        record = self.scan("org/api", [_finding(FP_A)])
+        with self.assertRaises(jira.JiraError):
+            jira_sync.queue_export(self.data_dir, [(triage.annotate(self.data_dir, record), ["f" * 64] * (jira_sync.MANUAL_MAX + 1))], by="Ana")
+        self.rule(id="default", destination=self.sec["id"], enabled=False)
+        queued = jira_sync.queue_export(self.data_dir, [(triage.annotate(self.data_dir, record), [FP_A])], by="Ana")
+        self.assertEqual((queued["queued"], [item["fingerprint"] for item in queued["rejected"]]), (0, [FP_A]))
+
+
 class RouteTests(HttpCase):
     def setUp(self):
         super().setUp()
@@ -632,6 +708,11 @@ class RouteTests(HttpCase):
         self.assertEqual((status, len(result["created"]), len(result["existing"])), (200, 1, 1))
         status, _, _ = self.post("/api/integrations/jira/issues", "export-jira", {"run_id": record["id"], "asset": "x", "fingerprints": [FP_A]},
                                       self.member)
+        self.assertEqual(status, 400)
+        status, queued, _ = self.post("/api/integrations/jira/issues/queue", "export-jira",
+                                      {"selections": [{"asset": "github:org/api", "fingerprints": [FP_A, FP_B]}]}, self.member)
+        self.assertEqual((status, queued["queued"], queued["linked"]), (202, 0, 2))  # both already linked
+        status, _, _ = self.post("/api/integrations/jira/issues/queue", "export-jira", {"selections": []}, self.member)
         self.assertEqual(status, 400)
 
 

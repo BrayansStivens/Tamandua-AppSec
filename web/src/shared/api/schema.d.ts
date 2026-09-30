@@ -1428,6 +1428,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/integrations/jira/issues/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Jira Export Queue
+         * @description Queues the issues of a large selection; `GET …/issues/batches/{batch}` follows them.
+         */
+        post: operations["jira_export_queue_api_integrations_jira_issues_queue_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/issues/batches/{batch}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jira Export Batch
+         * @description Progress of a queued selection: counts only.
+         */
+        get: operations["jira_export_batch_api_integrations_jira_issues_batches__batch__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/threat-models": {
         parameters: {
             query?: never;
@@ -3072,6 +3112,43 @@ export interface components {
             limit: number;
             /** Last */
             last: boolean;
+        };
+        /**
+         * JiraQueued
+         * @description A selection sent through the queue: progress of its issues, and the findings no rule routes (failed at once).
+         */
+        JiraQueued: {
+            /** Batch */
+            batch: string;
+            /** By */
+            by: string;
+            /** Started At */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Queued */
+            queued: number;
+            /** Findings */
+            findings: number;
+            /**
+             * Linked
+             * @default 0
+             */
+            linked: number;
+            /** Created */
+            created: number;
+            /** Existing */
+            existing: number;
+            /** Skipped */
+            skipped: number;
+            /** Failed */
+            failed: number;
+            /** Pending */
+            pending: number;
+            /** Last Error */
+            last_error: string | null;
+            /** Rejected */
+            rejected?: components["schemas"]["JiraExportItem"][];
         };
         /** JiraRouting */
         JiraRouting: {
@@ -6802,6 +6879,78 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["JiraExport"];
                 };
+            };
+        };
+    };
+    jira_export_queue_api_integrations_jira_issues_queue_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Selections */
+                    selections: {
+                        /** Run Id */
+                        run_id?: string | null;
+                        /** Asset */
+                        asset?: string | null;
+                        /** Fingerprints */
+                        fingerprints: string[];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraQueued"];
+                };
+            };
+        };
+    };
+    jira_export_batch_api_integrations_jira_issues_batches__batch__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraQueued"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown batch */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

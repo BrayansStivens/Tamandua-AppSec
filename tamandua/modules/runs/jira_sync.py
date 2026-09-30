@@ -52,6 +52,9 @@ SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
 PRIORITY_ORDER = ("Highest", "High", "Medium", "Low")
 BACKFILL_DOCUMENT = "jira-backfill"
 BACKFILL_MAX = 5000        # findings queued by one backfill; the rest waits for the next one
+MANUAL_DOCUMENT = "jira-manual"
+MANUAL_MAX = 5000          # findings one person can send at once; above jira.MAX_BATCH they go through the queue
+MANUAL_KEPT = 20           # batches whose progress is kept
 BACKFILL_SPACING = 2       # seconds between two queued issues of a backfill
 PER_DRAIN = 10             # outbox rows delivered per round (the worker runs one every few seconds)
 OUTBOX_LEASE = timedelta(minutes=5)
@@ -237,6 +240,58 @@ def export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, http
     return {"created": created, "existing": existing, "failed": failed}
 
 
+def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str) -> dict:
+    """A selection too big to create while the browser waits: each issue is queued (spaced, retried, idempotent) and
+    `manual_status` follows it. Findings no rule routes fail right away, like in `export`."""
+    jira.credentials()
+    total = sum(len(prints) if isinstance(prints, list) else 0 for _, prints in selections)
+    if (not 1 <= total <= MANUAL_MAX or any(not isinstance(prints, list) or not prints for _, prints in selections)
+            or not all(isinstance(item, str) and FINGERPRINT.fullmatch(item) for _, prints in selections for item in prints)):
+        raise jira.JiraError(msg("integrations.jira.batch_size", max=MANUAL_MAX))
+    state, locale = routing.load(data_dir), default_locale()
+    queued, links, work, failed, linked = _queued_creates(data_dir), tickets.load_links(data_dir), [], [], 0
+    for record, prints in selections:
+        by_fingerprint, _, _, _ = _prepared(data_dir, record, locale)
+        if any(item not in by_fingerprint for item in prints):
+            raise jira.JiraError(msg("integrations.jira.not_pending"))
+        key, name = asset_key(record), (record.get("source") or {}).get("name")
+        rule = routing.resolve(state, key, name)
+        target = routing.destination(state, rule["destination"]) if rule else None
+        if target is None:
+            failed += [{"fingerprint": item, "asset": key, "error": msg("integrations.jira.no_destination")} for item in prints]
+            continue
+        already = links.get(key, {})
+        linked += sum(1 for item in dict.fromkeys(prints) if item in already)
+        wanted = [by_fingerprint[item] for item in dict.fromkeys(prints) if (key, item) not in queued and item not in already]
+        work += [(key, target["id"], [ticket["fingerprint"] for ticket in group]) for group in _groups(wanted)]
+    batch, now = uuid.uuid4().hex[:16], datetime.now(timezone.utc)
+    rows = [{"payload": {"type": "create", "trigger": "manual", "asset": key, "destination": destination, "batch": batch,
+                         "by": str(by)[:80], "fingerprints": prints},
+             "next_attempt_at": now + timedelta(seconds=index * BACKFILL_SPACING)} for index, (key, destination, prints) in enumerate(work)]
+    entry = {"batch": batch, "by": str(by)[:80], "started_at": _stamp(), "finished_at": None if rows else _stamp(), "queued": len(rows),
+             "findings": sum(len(prints) for _, _, prints in work), "linked": linked, "created": 0, "existing": 0, "skipped": 0,
+             "failed": 0, "last_error": None}
+    with db.transaction(data_dir):
+        with documents.edit(data_dir, MANUAL_DOCUMENT, {}) as status:
+            status[batch] = entry
+            for old in sorted(status, key=lambda item: str(status[item].get("started_at")))[:-MANUAL_KEPT]:
+                status.pop(old, None)
+        _queue(data_dir, rows)
+    _log.info("jira_export_queued", extra={"user": by, "reason": f"{len(rows)} issues, {entry['findings']} findings, {len(failed)} failed"})
+    return {**entry, "pending": len(rows), "rejected": failed}
+
+
+def manual_status(data_dir: Path, batch: str) -> dict | None:
+    entry = documents.load(data_dir, MANUAL_DOCUMENT, {}).get(batch)
+    if not isinstance(entry, dict):
+        return None
+    with db.transaction(data_dir) as connection:
+        pending = connection.execute(select(func.count()).select_from(outbox).where(
+            outbox.c.tenant_id == db.TENANT, outbox.c.channel_id == JIRA_CHANNEL, outbox.c.status == "pending",
+            outbox.c.payload["batch"].astext == batch)).scalar_one()
+    return {**entry, "pending": pending}
+
+
 # ------------------------------------------------------------------ the queue
 
 def _queue(data_dir: Path, rows: list[dict]) -> None:
@@ -282,6 +337,9 @@ def _on_run(data_dir: Path, record: dict, changes: dict, active: list[dict]) -> 
             rows += [{"payload": {"type": "create", "trigger": "auto", "asset": key, "rule": rule["id"], "run_id": record["id"],
                                   "fingerprints": [item["fingerprint"] for item in group]}} for group in _groups(wanted)]
     fixed, reopened = set(changes.get("fixed_now") or []), set(changes.get("reopened") or [])
+    if kind != "pr_review":
+        # A finding fixed by hand (triage) shows up again: the registry never closed it, the issue was told it was fixed.
+        reopened |= {item["fingerprint"] for item in record.get("findings") or []}
     if (fixed and kind in VERIFYING_RUNS) or (reopened and kind != "pr_review"):
         rows += _comments(data_dir, record, key, fixed if kind in VERIFYING_RUNS else set(), reopened if kind != "pr_review" else set())
     _queue(data_dir, rows)
@@ -303,7 +361,7 @@ def _comments(data_dir: Path, record: dict, key: str, fixed: set[str], reopened:
         event = None
         if fixed & set(prints) and state != "fixed" and all((entries.get(item) or {}).get("status", "fixed") == "fixed" for item in prints):
             event = "fixed"
-        elif reopened & set(prints) and state == "fixed":
+        elif reopened & set(prints) and state in ("fixed", "manual_fixed") and not _manual_fix_is_newer(data_dir, key, prints, stamp):
             event = "reopened"
         if event is None:
             continue
@@ -311,6 +369,52 @@ def _comments(data_dir: Path, record: dict, key: str, fixed: set[str], reopened:
         rows.append({"payload": {"type": "comment", "event": event, "asset": key, "key": issue, "run_id": record["id"],
                                  "date": stamp[:10], "count": len(prints)}})
     return rows
+
+
+def _manual_fix_is_newer(data_dir: Path, key: str, prints: list[str], stamp: str) -> bool:
+    """A rebuild replays old runs: a finding marked fixed by hand after this run didn't reappear."""
+    decisions = triage.load_asset(data_dir, key)
+    return any((decisions.get(item) or {}).get("status") == "fixed" and str((decisions[item].get("at") or "")) >= stamp
+               for item in prints)
+
+
+TRIAGE_EVENTS = {"fixed": "manual_fixed", "false_positive": "false_positive", "accepted": "accepted"}
+
+
+def on_triage(data_dir: Path, key: str, fingerprints: list[str], status: str, *, by: str, reason: str | None = None,
+              expires_at: str | None = None) -> int:
+    """A person's triage decision reaches the issues linked to those findings as a comment (never closing them):
+    fixed by hand, false positive, accepted risk, or reopened after one of those. Returns how many comments it queued."""
+    try:
+        if not jira.configured():
+            return 0
+        links = tickets.load_links(data_dir).get(key, {})
+        issues: dict[str, list[str]] = {}
+        for digest, link in links.items():
+            if isinstance(link, dict) and link.get("key"):
+                issues.setdefault(link["key"], []).append(digest)
+        chosen, stamp, rows = set(fingerprints), _stamp(), []
+        for issue, prints in issues.items():
+            touched = [item for item in prints if item in chosen]
+            if not touched:
+                continue
+            state = links[prints[0]].get("sync")
+            if status in TRIAGE_EVENTS:
+                # "manual_fixed", not "fixed": a later scan that verifies it still tells the issue.
+                event, sync = TRIAGE_EVENTS[status], "manual_fixed" if status == "fixed" else "dismissed"
+            elif status == "open" and state in ("fixed", "manual_fixed", "dismissed"):
+                event, sync = "triage_reopened", "open"
+            else:
+                continue
+            tickets.mark(data_dir, key, issue, sync, f"triage:{stamp}")
+            rows.append({"payload": {"type": "comment", "event": event, "asset": key, "key": issue, "run_id": f"triage:{stamp}",
+                                     "date": stamp[:10], "by": str(by)[:80], "reason": str(reason or "")[:500],
+                                     "expires_at": expires_at, "count": len(touched), "total": len(prints)}})
+        _queue(data_dir, rows)
+        return len(rows)
+    except Exception:  # noqa: BLE001 — Jira never breaks a triage decision
+        _log.exception("jira_triage_queue_failed")
+        return 0
 
 
 # ------------------------------------------------------------------ backfill
@@ -409,10 +513,11 @@ def backfill_status(data_dir: Path) -> list[dict]:
 
 
 def _count(data_dir: Path, payload: dict, outcome: str, error=None) -> None:
-    if payload.get("trigger") != "backfill":
+    if payload.get("trigger") not in ("backfill", "manual"):
         return
-    with documents.edit(data_dir, BACKFILL_DOCUMENT, {}) as status:
-        entry = status.get(payload.get("rule"))
+    manual = payload["trigger"] == "manual"
+    with documents.edit(data_dir, MANUAL_DOCUMENT if manual else BACKFILL_DOCUMENT, {}) as status:
+        entry = status.get(payload.get("batch") if manual else payload.get("rule"))
         if not isinstance(entry, dict) or entry.get("batch") != payload.get("batch"):
             return
         entry[outcome] = entry.get(outcome, 0) + 1
@@ -436,10 +541,14 @@ def _deliver_create(data_dir: Path, payload: dict, http) -> str:
     state = routing.load(data_dir)
     view = registry.view(data_dir, key, status="open")
     name = (view.get("source") or {}).get("name")
-    rule = routing.resolve(state, key, name)
-    if rule is None or rule["id"] != payload.get("rule") or rule.get("mode") != "auto":
-        return "skipped"  # the routing changed while it waited: the current rules no longer create it
-    target = routing.destination(state, rule["destination"])
+    if payload.get("trigger") == "manual":
+        # A person chose these findings and where the rules sent them then: that destination, if it still exists.
+        target = routing.destination(state, payload.get("destination"))
+    else:
+        rule = routing.resolve(state, key, name)
+        if rule is None or rule["id"] != payload.get("rule") or rule.get("mode") != "auto":
+            return "skipped"  # the routing changed while it waited: the current rules no longer create it
+        target = routing.destination(state, rule["destination"])
     if target is None:
         return "skipped"
     locale = default_locale()
@@ -448,13 +557,21 @@ def _deliver_create(data_dir: Path, payload: dict, http) -> str:
     if not group:
         return "skipped"  # fixed, dismissed or excluded meanwhile
     issue = values(group, findings, key=key, asset=text(name, locale) or key, first_seen=seen, days=days, locale=locale)
-    outcome, _ = _deliver(data_dir, key, group, issue, target, by="tamandua", http=http)
+    outcome, _ = _deliver(data_dir, key, group, issue, target, by=payload.get("by") or "tamandua", http=http)
     return outcome
 
 
 def _deliver_comment(data_dir: Path, payload: dict, http) -> str:
     locale = default_locale()
-    if payload["event"] == "fixed":
+    event = payload["event"]
+    if event in ("manual_fixed", "false_positive", "accepted", "triage_reopened"):
+        part = (t("integrations.jira.comment.part", locale, count=payload["count"], total=payload["total"])
+                if payload.get("total", 1) > 1 and payload.get("count") != payload.get("total") else "")
+        body = t(f"integrations.jira.comment.{event}", locale, by=payload.get("by") or "?", date=payload["date"],
+                 expires=payload.get("expires_at") or "", part=part)
+        if payload.get("reason"):
+            body += "\n" + t("integrations.jira.comment.reason", locale, reason=payload["reason"])
+    elif event == "fixed":
         body = (t("integrations.jira.comment.fixed_group", locale, count=payload.get("count", 1), run_id=payload["run_id"][:12], date=payload["date"])
                 if payload.get("count", 1) > 1 else t("integrations.jira.comment.fixed", locale, run_id=payload["run_id"][:12], date=payload["date"]))
     else:

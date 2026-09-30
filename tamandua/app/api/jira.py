@@ -6,6 +6,8 @@ The token never leaves the server; Jira is only reached at `https://<site>.atlas
 
 from __future__ import annotations
 
+import re
+
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -218,6 +220,24 @@ class JiraExport(BaseModel):
     failed: list[JiraExportItem] = Field(max_length=jira.MAX_BATCH)
 
 
+class JiraQueued(BaseModel):
+    """A selection sent through the queue: progress of its issues, and the findings no rule routes (failed at once)."""
+    batch: str
+    by: str
+    started_at: str
+    finished_at: str | None
+    queued: int
+    findings: int
+    linked: int = 0
+    created: int
+    existing: int
+    skipped: int
+    failed: int
+    pending: int
+    last_error: str | None
+    rejected: list[JiraExportItem] = Field(default_factory=list, max_length=jira_sync.MANUAL_MAX)
+
+
 # --- requests ------------------------------------------------------------------------------------------------------
 
 class JiraRemoveIn(BaseModel):
@@ -286,6 +306,16 @@ class JiraSelectionIn(BaseModel):
     run_id: str | None = Field(None, max_length=400)
     asset: str | None = Field(None, max_length=300)
     fingerprints: list[str] = Field(min_length=1, max_length=jira.MAX_BATCH)
+
+
+class JiraQueueSelectionIn(JiraSelectionIn):
+    fingerprints: list[str] = Field(min_length=1, max_length=jira_sync.MANUAL_MAX)
+
+
+class JiraQueueIn(BaseModel):
+    """A large selection (up to 5000 findings): its issues are created in the background."""
+    model_config = ConfigDict(extra="forbid")
+    selections: list[JiraQueueSelectionIn] = Field(min_length=1, max_length=100)
 
 
 class JiraExportIn(BaseModel):
@@ -552,3 +582,24 @@ def jira_export(context: Context = Depends(guard(Policy(action="export-jira", bo
         return context.render(jira_sync.export(context.data_dir, selections, by=_by(context), locale=default_locale()))
     except jira.JiraError as exc:
         raise ApiError(400, problem(exc)) from exc
+
+
+@router.post("/api/integrations/jira/issues/queue", response_model=JiraQueued, status_code=202,
+             openapi_extra=documented(JiraQueueIn))
+def jira_export_queue(context: Context = Depends(guard(Policy(action="export-jira", body=400_000))),
+                      data: JiraQueueIn = Depends(body(JiraQueueIn, msg("integrations.jira.invalid_export")))) -> Any:
+    """Queues the issues of a large selection; `GET …/issues/batches/{batch}` follows them."""
+    selections = [(_record(context, item.run_id, item.asset), item.fingerprints) for item in data.selections]
+    try:
+        return context.render(jira_sync.queue_export(context.data_dir, selections, by=_by(context)))
+    except jira.JiraError as exc:
+        raise ApiError(400, problem(exc)) from exc
+
+
+@router.get("/api/integrations/jira/issues/batches/{batch}", response_model=JiraQueued, responses={404: {"description": "Unknown batch"}})
+def jira_export_batch(batch: str, context: Context = Depends(guard(Policy()))) -> Any:
+    """Progress of a queued selection: counts only."""
+    found = jira_sync.manual_status(context.data_dir, batch) if re.fullmatch(r"[0-9a-f]{16}", batch) else None
+    if found is None:
+        raise ApiError(404, msg("api.not_found"))
+    return context.render(found)

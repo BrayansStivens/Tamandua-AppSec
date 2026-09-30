@@ -4462,6 +4462,141 @@
         }
       }
     },
+    "/api/integrations/jira/issues/queue": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Export Queue",
+        "description": "Queues the issues of a large selection; `GET …/issues/batches/{batch}` follows them.",
+        "operationId": "jira_export_queue_api_integrations_jira_issues_queue_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "selections": {
+                    "items": {
+                      "properties": {
+                        "run_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 400
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Run Id"
+                        },
+                        "asset": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 300
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Asset"
+                        },
+                        "fingerprints": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array",
+                          "maxItems": 5000,
+                          "minItems": 1,
+                          "title": "Fingerprints"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "fingerprints"
+                      ],
+                      "title": "JiraQueueSelectionIn"
+                    },
+                    "type": "array",
+                    "maxItems": 100,
+                    "minItems": 1,
+                    "title": "Selections"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "selections"
+                ],
+                "title": "JiraQueueIn",
+                "description": "A large selection (up to 5000 findings): its issues are created in the background."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraQueued"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/issues/batches/{batch}": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Export Batch",
+        "description": "Progress of a queued selection: counts only.",
+        "operationId": "jira_export_batch_api_integrations_jira_issues_batches__batch__get",
+        "parameters": [
+          {
+            "name": "batch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Batch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraQueued"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown batch"
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/threat-models": {
       "get": {
         "tags": [
@@ -9760,6 +9895,102 @@
           "last"
         ],
         "title": "JiraProjectPage"
+      },
+      "JiraQueued": {
+        "properties": {
+          "batch": {
+            "type": "string",
+            "title": "Batch"
+          },
+          "by": {
+            "type": "string",
+            "title": "By"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued"
+          },
+          "findings": {
+            "type": "integer",
+            "title": "Findings"
+          },
+          "linked": {
+            "type": "integer",
+            "title": "Linked",
+            "default": 0
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "existing": {
+            "type": "integer",
+            "title": "Existing"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "rejected": {
+            "items": {
+              "$ref": "#/components/schemas/JiraExportItem"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Rejected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batch",
+          "by",
+          "started_at",
+          "finished_at",
+          "queued",
+          "findings",
+          "created",
+          "existing",
+          "skipped",
+          "failed",
+          "pending",
+          "last_error"
+        ],
+        "title": "JiraQueued",
+        "description": "A selection sent through the queue: progress of its issues, and the findings no rule routes (failed at once)."
       },
       "JiraRouting": {
         "properties": {

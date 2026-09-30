@@ -122,6 +122,11 @@ def triage_findings(context: Context = Depends(guard(Policy(action="triage", bod
         raise ApiError(400, problem(exc)) from exc
     context.state.log.info("triage", extra={"user": user["username"], "run_id": record["id"], "reason":
                                             f"{data.status}: {len(data.fingerprints)} hallazgos"})
+    from tamandua.modules.runs import jira_sync
+    key = asset_key(record)
+    expiry = (triage.load_asset(context.data_dir, key).get(data.fingerprints[0]) or {}).get("expires_at") if data.status == "accepted" else None
+    jira_sync.on_triage(context.data_dir, key, data.fingerprints, data.status, by=user.get("display_name") or user["username"],
+                        reason=data.reason, expires_at=expiry)
     return context.render({"summary": updated["summary"]})
 
 

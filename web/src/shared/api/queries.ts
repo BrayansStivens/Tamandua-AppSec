@@ -4,6 +4,7 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 import { api, query } from '@/shared/api/http'
 import { apiGet, type Response } from '@/shared/api/client'
 import type { Dashboard, Page, RunRow } from '@/shared/lib/types'
+import type { components } from '@/shared/api/schema'
 
 export const keys = {
   runs: ['runs'] as const,
@@ -25,6 +26,7 @@ export const keys = {
   jira: ['jira'] as const,
   jiraRouting: ['jira', 'routing'] as const,
   jiraBackfill: ['jira', 'backfill'] as const,
+  jiraBatch: (batch: string) => ['jira', 'batch', batch] as const,
   jiraVariables: ['jira', 'variables'] as const,
   jiraProjects: (q: string) => ['jira', 'projects', q] as const,
   jiraIssueTypes: (project: string) => ['jira', 'issue-types', project] as const,
@@ -123,4 +125,11 @@ export const jiraFieldsQuery = (project: string, issueType: string) => queryOpti
 export const jiraFieldValuesQuery = (project: string, issueType: string, field: string, q: string) => queryOptions({
   queryKey: keys.jiraFieldValues(project, issueType, field, q), staleTime: 60_000,
   queryFn: ({ signal }) => api.get<JiraFieldValues>(`/api/integrations/jira/projects/${encodeURIComponent(project)}/issue-types/${encodeURIComponent(issueType)}/fields/${encodeURIComponent(field)}/values?${query({ q, limit: 50 })}`, { signal }),
+})
+// A large selection queued for Jira: polled only while issues are still waiting in the queue.
+export type JiraQueued = components['schemas']['JiraQueued']
+export const jiraBatchQuery = (batch: string) => queryOptions({
+  queryKey: keys.jiraBatch(batch),
+  queryFn: ({ signal }) => api.get<JiraQueued>(`/api/integrations/jira/issues/batches/${encodeURIComponent(batch)}`, { signal }),
+  refetchInterval: query => (query.state.data?.pending ?? 1) > 0 ? 3000 : false,
 })

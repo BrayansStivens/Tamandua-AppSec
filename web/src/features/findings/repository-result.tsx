@@ -12,7 +12,7 @@ import { Menu, MenuContent, MenuGroup, MenuItem, MenuTrigger } from '@/shared/ui
 import { AuditReportDialog } from '@/features/findings/audit-report'
 import { Pagination } from '@/shared/ui/pagination'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
-import { JiraExportDialog, JiraFindingAction, type TicketLink } from '@/features/integrations/jira-export'
+import { JIRA_QUEUE_MAX, JiraExportDialog, JiraFindingAction, type TicketLink } from '@/features/integrations/jira-export'
 import { useJiraAvailability } from '@/features/integrations/jira-availability'
 import { SUPPRESSED, TRIAGE_LABEL, TriageActions, TriageBadge, TriageDialog, TriageHistory, type TriageState, type TriageStatus } from '@/features/findings/triage'
 import { api, query as buildQuery } from '@/shared/api/http'
@@ -147,7 +147,7 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, canManage =
   const pageFingerprints = page.flatMap(group => group.findings.map(item => item.fingerprint))
   const toggle = (fingerprints: string[], on: boolean) => setSelected(previous => { const next = new Set(previous); for (const item of fingerprints) { if (on) next.add(item); else next.delete(item) } return next })
   // Why the selection can't go to Jira, said next to the button (a title alone reaches neither keyboard nor touch).
-  const jiraBlocked = jira.blocked ?? (selected.size > 50 ? t('selection.jira_limit')
+  const jiraBlocked = jira.blocked ?? (selected.size > JIRA_QUEUE_MAX ? t('selection.jira_max', { max: formatNumber(JIRA_QUEUE_MAX) })
     : findings.some(item => selected.has(item.fingerprint) && !isPending(item)) ? t('selection.jira_dismissed') : null)
   const allOnPage = pageFingerprints.length > 0 && pageFingerprints.every(item => selected.has(item))
   const decided = () => { setDecision(null); setSelected(new Set()); onChanged() }

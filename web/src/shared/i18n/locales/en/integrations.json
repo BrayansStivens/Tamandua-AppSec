@@ -269,6 +269,26 @@
       "done": "Done",
       "submit_one": "Create issue",
       "submit_other": "Create issues"
+    },
+    "queue": {
+      "intro": "More than {{max}} findings go through the queue: Tamandua creates the issues in the background, a few seconds apart, and you can close this window.",
+      "background": "Tamandua creates these issues in the background, a few seconds apart, retrying if Jira fails. You can close this window: it keeps going.",
+      "progress_one": "{{done}} of {{total}} issues · {{pending}} in the queue",
+      "progress_other": "{{done}} of {{total}} issues · {{pending}} in the queue",
+      "finished_one": "Done: {{count}} issue processed",
+      "finished_other": "Done: {{count}} issues processed",
+      "progress_label": "Issues processed",
+      "findings_one": "{{count}} finding",
+      "findings_other": "{{count}} findings",
+      "linked_one": "{{count}} already had an issue",
+      "linked_other": "{{count}} already had an issue",
+      "skipped_one": "{{count}} skipped",
+      "skipped_other": "{{count}} skipped",
+      "failed_one": "{{count}} issue failed.",
+      "failed_other": "{{count}} issues failed.",
+      "last_error": "Last error: {{error}}",
+      "rejected_one": "{{count}} finding not queued:",
+      "rejected_other": "{{count}} findings not queued:"
     }
   },
   "notifications": {
