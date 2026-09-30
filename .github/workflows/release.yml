@@ -40,6 +40,7 @@ jobs:
           - image: tamandua
             context: .
             file: docker/app/Dockerfile
+            target: app   # not the last stage (worker-standalone, whose command is the worker)
           - image: tamandua-worker
             context: .
             file: docker/app/Dockerfile

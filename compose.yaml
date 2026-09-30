@@ -24,6 +24,7 @@ x-app: &app
   build:
     context: .
     dockerfile: docker/app/Dockerfile
+    target: app  # not the last stage (worker-standalone, whose command is the worker)
     args:
       VERSION: ${TAMANDUA_VERSION:-0.9}
   image: localhost/tamandua/app:${TAMANDUA_VERSION:-0.9}

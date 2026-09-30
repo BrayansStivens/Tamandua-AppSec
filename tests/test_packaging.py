@@ -24,6 +24,16 @@ class PackagingTests(unittest.TestCase):
             self.assertTrue((ROOT / path).exists() or (ROOT / path / "Dockerfile").exists(), path)
         self.assertIn(IMAGES["opengrep"]["image"], compose)
 
+    def test_the_app_image_is_built_from_its_own_stage(self):
+        """The Dockerfile's last stage is worker-standalone (its command runs the worker): building the app image
+        without a target gives an API container that never serves the panel."""
+        compose = (ROOT / "compose.yaml").read_text()
+        self.assertRegex(compose, r"dockerfile: docker/app/Dockerfile\n\s+target: app\b")
+        release = (ROOT / ".github/workflows/release.yml").read_text()
+        entries = re.findall(r"- image: (\S+)\n((?:\s{12}\S.*\n)+)", release)
+        targets = {image: re.search(r"target: (\S+)", body).group(1) for image, body in entries if "docker/app/Dockerfile" in body}
+        self.assertEqual(targets, {"tamandua": "app", "tamandua-worker": "worker-standalone"})
+
     def test_host_settings_never_reach_the_app(self):
         """.env goes whole into the container (env_file): a host variable named like an app variable would override
         it (e.g. the interface published on the host would become the one listened on inside the container)."""
