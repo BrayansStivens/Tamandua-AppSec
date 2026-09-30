@@ -194,6 +194,8 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
         present = {item["fingerprint"]: item for item in record.get("findings", [])}
         opened = fixed = 0
         new: list[str] = []
+        reopened: list[str] = []
+        fixed_now: list[str] = []
         for digest, finding in present.items():
             entry = entries.get(digest)
             if entry is None:
@@ -203,6 +205,7 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
             elif entry["status"] == "fixed":
                 opened += 1
                 new.append(digest)
+                reopened.append(digest)
                 entry["reopened_at"] = stamp
             if record["type"] in FULL_SCANS:
                 entry["origin"] = {"kind": "scan"}  # already on the main branch
@@ -241,13 +244,14 @@ def apply(data_dir: Path, record: RunRecord) -> dict:
             entry.update(status="fixed", fixed={"at": stamp, "run_id": record["id"], "how": how, "auto": True})
             entry.pop("excluded", None)
             fixed += 1
+            fixed_now.append(digest)
         state["applied"] = state["applied"][-500:] + [record["id"]]
         _save(data_dir, state, set(moved))
     carry_over(data_dir, key, moved)
     _reopen_manual(data_dir, record, set(present))
     if opened or fixed:
         _log.info("registry_updated", extra={"run_id": record["id"], "reason": f"{key}: {opened} abiertos, {fixed} remediados"})
-    return {"opened": opened, "fixed": fixed, "new": new}
+    return {"opened": opened, "fixed": fixed, "new": new, "reopened": reopened, "fixed_now": fixed_now}
 
 
 def apply_exclusions(data_dir: Path, key: str, active: list[str], *, when: str) -> dict:

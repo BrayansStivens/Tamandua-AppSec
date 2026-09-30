@@ -1145,6 +1145,269 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/integrations/jira/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jira Projects
+         * @description Projects the credential can see, by name or key (`q`), a page at a time.
+         */
+        get: operations["jira_projects_api_integrations_jira_projects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/projects/{project}/issue-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jira Issue Types */
+        get: operations["jira_issue_types_api_integrations_jira_projects__project__issue_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/projects/{project}/issue-types/{issue_type}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jira Fields
+         * @description The create screen's fields, normalized, and the mapping Tamandua suggests for them.
+         */
+        get: operations["jira_fields_api_integrations_jira_projects__project__issue_types__issue_type__fields_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/projects/{project}/issue-types/{issue_type}/fields/{field}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jira Field Values
+         * @description Searches a field's allowed values by name: for fields whose `allowed_truncated` is true.
+         */
+        get: operations["jira_field_values_api_integrations_jira_projects__project__issue_types__issue_type__fields__field__values_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/variables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jira Variables */
+        get: operations["jira_variables_api_integrations_jira_variables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/routing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jira Routing */
+        get: operations["jira_routing_api_integrations_jira_routing_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/destinations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Jira Destination Save
+         * @description Creates (no `id`) or updates a destination, validated against Jira's live create metadata.
+         */
+        post: operations["jira_destination_save_api_integrations_jira_destinations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/destinations/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Jira Destination Remove */
+        post: operations["jira_destination_remove_api_integrations_jira_destinations_remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Jira Rule Save
+         * @description Creates (no `id`) or updates a rule. An automatic rule with backfill starts its backfill when saved new,
+         *     enabled or changed in what it covers (`backfill` in the answer).
+         */
+        post: operations["jira_rule_save_api_integrations_jira_rules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/rules/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Jira Rule Remove */
+        post: operations["jira_rule_remove_api_integrations_jira_rules_remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/rules/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Jira Rule Order
+         * @description The rules in their new order (all but `default`, which stays last).
+         */
+        post: operations["jira_rule_order_api_integrations_jira_rules_order_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Jira Rule Preview
+         * @description How many open findings this rule (as sent, saved or not) would backfill. Nothing is queued.
+         */
+        post: operations["jira_rule_preview_api_integrations_jira_rules_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/rules/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Jira Rule Backfill
+         * @description Runs an automatic rule's backfill again (what already has an issue is skipped).
+         */
+        post: operations["jira_rule_backfill_api_integrations_jira_rules_backfill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/integrations/jira/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Jira Backfill Status */
+        get: operations["jira_backfill_status_api_integrations_jira_backfill_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/integrations/jira/issues": {
         parameters: {
             query?: never;
@@ -1154,7 +1417,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Jira Export */
+        /**
+         * Jira Export
+         * @description Creates the issues of the selected findings, each in the destination its asset's rules pick.
+         */
         post: operations["jira_export_api_integrations_jira_issues_post"];
         delete?: never;
         options?: never;
@@ -2554,25 +2820,334 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** JiraAllowedValue */
+        JiraAllowedValue: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * JiraBackfill
+         * @description One rule's last backfill: issues queued and what became of them (`pending` still in the queue).
+         */
+        JiraBackfill: {
+            /** Rule */
+            rule: string;
+            /** Batch */
+            batch?: string | null;
+            /** By */
+            by?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /**
+             * Queued
+             * @default 0
+             */
+            queued: number;
+            /**
+             * Findings
+             * @default 0
+             */
+            findings: number;
+            /**
+             * Created
+             * @default 0
+             */
+            created: number;
+            /**
+             * Existing
+             * @default 0
+             */
+            existing: number;
+            /**
+             * Skipped
+             * @default 0
+             */
+            skipped: number;
+            /**
+             * Failed
+             * @default 0
+             */
+            failed: number;
+            /**
+             * Pending
+             * @default 0
+             */
+            pending: number;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+            /** Last Error */
+            last_error?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** JiraBackfills */
+        JiraBackfills: {
+            /** Items */
+            items: components["schemas"]["JiraBackfill"][];
+        };
+        /**
+         * JiraDestination
+         * @description Project + issue type + mapping. `fields`: the snapshot of the mapped fields (null for one migrated from the
+         *     single project of earlier versions, `legacy`, until it is saved again).
+         */
+        JiraDestination: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Project */
+            project: {
+                [key: string]: unknown;
+            };
+            /** Issue Type */
+            issue_type: {
+                [key: string]: unknown;
+            };
+            /** Mapping */
+            mapping: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Fields */
+            fields?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            } | null;
+            /** Legacy */
+            legacy?: boolean | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /** JiraDestinationSaved */
+        JiraDestinationSaved: {
+            destination: components["schemas"]["JiraDestination"];
+            /** Warnings */
+            warnings: components["schemas"]["JiraFieldError"][];
+            routing: components["schemas"]["JiraRouting"];
+        };
         /**
          * JiraExport
          * @description Each finding exported: an issue created, one that already existed, or why it failed.
          */
         JiraExport: {
             /** Created */
-            created: {
-                [key: string]: unknown;
-            }[];
+            created: components["schemas"]["JiraExportItem"][];
             /** Existing */
-            existing: {
-                [key: string]: unknown;
-            }[];
+            existing: components["schemas"]["JiraExportItem"][];
             /** Failed */
-            failed: {
+            failed: components["schemas"]["JiraExportItem"][];
+        };
+        /** JiraExportItem */
+        JiraExportItem: {
+            /** Fingerprint */
+            fingerprint: string;
+            /** Asset */
+            asset?: string | null;
+            /** Key */
+            key?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Project */
+            project?: string | null;
+            /** Error */
+            error?: string | null;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * JiraField
+         * @description A create field. `type` says what Tamandua can put in it; `fillable` false: it can only be left empty.
+         */
+        JiraField: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Required */
+            required: boolean;
+            /** Has Default */
+            has_default: boolean;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "rich_text" | "number" | "date" | "datetime" | "option" | "options" | "priority" | "labels" | "strings" | "unsupported" | "managed";
+            schema: components["schemas"]["JiraFieldSchema"];
+            /** Allowed */
+            allowed: components["schemas"]["JiraAllowedValue"][];
+            /** Allowed Truncated */
+            allowed_truncated: boolean;
+            /** Fillable */
+            fillable: boolean;
+        };
+        /** JiraFieldError */
+        JiraFieldError: {
+            /** Field */
+            field: string;
+            /** Error */
+            error: string;
+        };
+        /** JiraFieldSchema */
+        JiraFieldSchema: {
+            /** Type */
+            type: string;
+            /** Items */
+            items?: string | null;
+            /** System */
+            system?: string | null;
+            /** Custom */
+            custom?: string | null;
+        };
+        /**
+         * JiraFieldValues
+         * @description Allowed values of one field matching a search (lists too long for `allowed`).
+         */
+        JiraFieldValues: {
+            /** Items */
+            items: components["schemas"]["JiraAllowedValue"][];
+            /** Total */
+            total: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /**
+         * JiraFields
+         * @description The fields of an issue type's create screen and the mapping Tamandua proposes for them.
+         */
+        JiraFields: {
+            /** Fields */
+            fields: components["schemas"]["JiraField"][];
+            /** Truncated */
+            truncated: boolean;
+            /** Suggested */
+            suggested: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** JiraIssueType */
+        JiraIssueType: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Subtask */
+            subtask: boolean;
+        };
+        /** JiraIssueTypes */
+        JiraIssueTypes: {
+            /** Items */
+            items: components["schemas"]["JiraIssueType"][];
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** JiraProject */
+        JiraProject: {
+            /** Id */
+            id: string;
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+        };
+        /** JiraProjectPage */
+        JiraProjectPage: {
+            /** Items */
+            items: components["schemas"]["JiraProject"][];
+            /** Total */
+            total: number;
+            /** Start */
+            start: number;
+            /** Limit */
+            limit: number;
+            /** Last */
+            last: boolean;
+        };
+        /** JiraRouting */
+        JiraRouting: {
+            /** Destinations */
+            destinations: components["schemas"]["JiraDestination"][];
+            /** Rules */
+            rules: components["schemas"]["JiraRule"][];
+            /** History */
+            history: {
                 [key: string]: unknown;
             }[];
+            /** Limits */
+            limits: {
+                [key: string]: number;
+            };
         };
-        /** JiraStatus */
+        /**
+         * JiraRule
+         * @description A routing rule; the last one (`default`) matches every asset. First enabled match wins.
+         */
+        JiraRule: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Default */
+            default?: boolean | null;
+            /** Assets */
+            assets: string[];
+            /** Patterns */
+            patterns: string[];
+            /** Destination */
+            destination?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "manual" | "auto";
+            /**
+             * Min Severity
+             * @enum {string}
+             */
+            min_severity: "critical" | "high" | "medium" | "low" | "info";
+            /** Backfill */
+            backfill: boolean;
+            /** Enabled */
+            enabled: boolean;
+        } & {
+            [key: string]: unknown;
+        };
+        /**
+         * JiraRulePreview
+         * @description What a backfill of this rule would queue now (up to the backfill limit).
+         */
+        JiraRulePreview: {
+            /** Assets */
+            assets: number;
+            /** Findings */
+            findings: number;
+            /** Issues */
+            issues: number;
+            /** Linked */
+            linked: number;
+            /** Truncated */
+            truncated: boolean;
+        };
+        /** JiraRuleSaved */
+        JiraRuleSaved: {
+            rule: components["schemas"]["JiraRule"];
+            backfill: components["schemas"]["JiraBackfill"] | null;
+            routing: components["schemas"]["JiraRouting"];
+        };
+        /**
+         * JiraStatus
+         * @description The credential (never the token: its last four characters) and, for earlier panels, the default destination.
+         */
         JiraStatus: {
             /** Configured */
             configured: boolean;
@@ -2580,20 +3155,60 @@ export interface components {
             site?: string | null;
             /** Email */
             email?: string | null;
-            /** Project */
-            project?: string | null;
-            /** Project Name */
-            project_name?: string | null;
-            /** Issue Type */
-            issue_type?: string | null;
             /** Last4 */
             last4?: string | null;
             /** Saved At */
             saved_at?: string | null;
             /** Saved By */
             saved_by?: string | null;
+            /** Project */
+            project?: string | null;
+            /** Project Name */
+            project_name?: string | null;
+            /** Issue Type */
+            issue_type?: string | null;
+            /** Destinations */
+            destinations?: number | null;
+            /** Rules */
+            rules?: number | null;
+            /** Automatic */
+            automatic?: boolean | null;
         } & {
             [key: string]: unknown;
+        };
+        /** JiraVariable */
+        JiraVariable: {
+            /** Key */
+            key: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "rich_text" | "number" | "date" | "datetime" | "labels";
+            /** Label */
+            label: string;
+        };
+        /**
+         * JiraVariables
+         * @description What a mapping can use: Tamandua's variables (`source: tamandua`, or `{{key}}` in a template).
+         */
+        JiraVariables: {
+            /** Variables */
+            variables: components["schemas"]["JiraVariable"][];
+            /** Sources */
+            sources: string[];
+            /** Fits */
+            fits: {
+                [key: string]: string[];
+            };
+            /** By Name */
+            by_name: {
+                [key: string]: string[];
+            };
+            /** Limits */
+            limits: {
+                [key: string]: number;
+            };
         };
         /** LinkInfo */
         LinkInfo: {
@@ -3597,6 +4212,11 @@ export interface components {
              * @description In the reader's language.
              */
             error: string;
+            /** @description When the error is about fields, one per field. */
+            errors?: {
+                field: string;
+                error: string;
+            }[];
         };
     };
     responses: never;
@@ -5658,11 +6278,8 @@ export interface operations {
                     /** Token */
                     token: unknown;
                     /** Project */
-                    project: unknown;
-                    /**
-                     * Issue Type
-                     * @default Task
-                     */
+                    project?: unknown;
+                    /** Issue Type */
                     issue_type?: unknown;
                 } | {
                     /**
@@ -5685,6 +6302,469 @@ export interface operations {
             };
         };
     };
+    jira_projects_api_integrations_jira_projects_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                start?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraProjectPage"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    jira_issue_types_api_integrations_jira_projects__project__issue_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraIssueTypes"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    jira_fields_api_integrations_jira_projects__project__issue_types__issue_type__fields_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+                issue_type: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraFields"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    jira_field_values_api_integrations_jira_projects__project__issue_types__issue_type__fields__field__values_get: {
+        parameters: {
+            query?: {
+                q?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                project: string;
+                issue_type: string;
+                field: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraFieldValues"];
+                };
+            };
+            /** @description Invalid parameters */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    jira_variables_api_integrations_jira_variables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraVariables"];
+                };
+            };
+        };
+    };
+    jira_routing_api_integrations_jira_routing_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraRouting"];
+                };
+            };
+        };
+    };
+    jira_destination_save_api_integrations_jira_destinations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Id */
+                    id?: string | null;
+                    /** Name */
+                    name: string;
+                    /** Project */
+                    project: string;
+                    /** Issue Type */
+                    issue_type: string;
+                    /** Mapping */
+                    mapping?: {
+                        [key: string]: {
+                            /**
+                             * Source
+                             * @enum {string}
+                             */
+                            source: "tamandua" | "fixed" | "template";
+                            /** Key */
+                            key?: string | null;
+                            /** Value */
+                            value?: string | number | string[] | null;
+                            /** Text */
+                            text?: string | null;
+                        } | null;
+                    } | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraDestinationSaved"];
+                };
+            };
+        };
+    };
+    jira_destination_remove_api_integrations_jira_destinations_remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Id */
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraRouting"];
+                };
+            };
+        };
+    };
+    jira_rule_save_api_integrations_jira_rules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Id */
+                    id?: string | null;
+                    /** Name */
+                    name?: string | null;
+                    /** Assets */
+                    assets?: string[];
+                    /** Patterns */
+                    patterns?: string[];
+                    /** Destination */
+                    destination?: string | null;
+                    /**
+                     * Mode
+                     * @default manual
+                     * @enum {string}
+                     */
+                    mode?: "manual" | "auto";
+                    /**
+                     * Min Severity
+                     * @default high
+                     * @enum {string}
+                     */
+                    min_severity?: "critical" | "high" | "medium" | "low" | "info";
+                    /**
+                     * Backfill
+                     * @default false
+                     */
+                    backfill?: boolean;
+                    /**
+                     * Enabled
+                     * @default true
+                     */
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraRuleSaved"];
+                };
+            };
+        };
+    };
+    jira_rule_remove_api_integrations_jira_rules_remove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Id */
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraRouting"];
+                };
+            };
+        };
+    };
+    jira_rule_order_api_integrations_jira_rules_order_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Ids */
+                    ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraRouting"];
+                };
+            };
+        };
+    };
+    jira_rule_preview_api_integrations_jira_rules_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Id */
+                    id?: string | null;
+                    /** Name */
+                    name?: string | null;
+                    /** Assets */
+                    assets?: string[];
+                    /** Patterns */
+                    patterns?: string[];
+                    /** Destination */
+                    destination?: string | null;
+                    /**
+                     * Mode
+                     * @default manual
+                     * @enum {string}
+                     */
+                    mode?: "manual" | "auto";
+                    /**
+                     * Min Severity
+                     * @default high
+                     * @enum {string}
+                     */
+                    min_severity?: "critical" | "high" | "medium" | "low" | "info";
+                    /**
+                     * Backfill
+                     * @default false
+                     */
+                    backfill?: boolean;
+                    /**
+                     * Enabled
+                     * @default true
+                     */
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraRulePreview"];
+                };
+            };
+        };
+    };
+    jira_rule_backfill_api_integrations_jira_rules_backfill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Id */
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraBackfill"];
+                };
+            };
+        };
+    };
+    jira_backfill_status_api_integrations_jira_backfill_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraBackfills"];
+                };
+            };
+        };
+    };
     jira_export_api_integrations_jira_issues_post: {
         parameters: {
             query?: never;
@@ -5696,9 +6776,20 @@ export interface operations {
             content: {
                 "application/json": {
                     /** Run Id */
-                    run_id: string;
+                    run_id?: string | null;
+                    /** Asset */
+                    asset?: string | null;
                     /** Fingerprints */
-                    fingerprints: unknown;
+                    fingerprints?: unknown;
+                    /** Selections */
+                    selections?: {
+                        /** Run Id */
+                        run_id?: string | null;
+                        /** Asset */
+                        asset?: string | null;
+                        /** Fingerprints */
+                        fingerprints: string[];
+                    }[] | null;
                 };
             };
         };

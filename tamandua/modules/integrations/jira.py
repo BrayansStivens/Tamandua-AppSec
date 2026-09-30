@@ -1,18 +1,14 @@
-"""Jira Cloud connector: turns a run's tickets into issues.
+"""Jira Cloud connector: the credential, the REST calls and discovery of projects, issue types and create fields.
 
-* The credential (Atlassian email + API token) is set by an administrator from
-  the panel and checked against Jira before it is saved. It lives in the
-  configuration directory with 0600 permissions and never goes back to the browser: only the email, the
-  project and the token's last four characters do.
-* Only ``https://<site>.atlassian.net`` is contacted: the panel can't be used
-  to send requests anywhere else (SSRF), and redirects are not followed.
-* One issue per remediation job: advisories for the same package go
-  together, with the version that closes them all; code and secrets, one by one.
-* Idempotent: each issue carries the ``appsec-<fingerprint>`` label of every finding it covers. Before
-  creating one it searches by that label, and links already known (by asset and fingerprint, in
-  ``findings/tickets.py``) are not created again; exporting twice doesn't duplicate.
-* Jira Server/Data Center is left out on purpose: it would mean accepting arbitrary
-  hosts on the customer's network.
+* The credential (Atlassian email + API token) is set by an administrator from the panel and checked against Jira
+  before it is saved. It is sealed in the vault ("jira") and never goes back to the browser: only the email and the
+  token's last four characters do.
+* Only ``https://<site>.atlassian.net`` is contacted: the panel can't be used to send requests anywhere else (SSRF),
+  redirects are not followed and responses are capped. Every path is built here from validated identifiers.
+* Jira Server/Data Center is left out on purpose: it would mean accepting arbitrary hosts on the customer's network.
+
+What goes into each issue (destinations, field mapping, routing rules) is `jira_mapping.py` and `jira_routing.py`;
+creating issues from findings, `runs/jira_sync.py`.
 """
 
 from __future__ import annotations
@@ -22,28 +18,44 @@ import json
 import re
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request
 
-from tamandua.shared import log as logging_setup
 from tamandua.shared import http
-from tamandua.modules.intel.advisories import compare_versions
-from tamandua.shared.i18n import default_locale, msg, t, text
+from tamandua.shared import log as logging_setup
+from tamandua.shared.i18n import msg, text
 from tamandua.version import USER_AGENT
 
 SITE_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.atlassian\.net")
 PROJECT_PATTERN = re.compile(r"[A-Z][A-Z0-9_]{1,9}")
+PROJECT_REF = re.compile(r"[A-Z][A-Z0-9_]{1,9}|[0-9]{1,18}")
+NUMERIC_ID = re.compile(r"[0-9]{1,18}")
+ISSUE_KEY = re.compile(r"[A-Z][A-Z0-9_]{1,9}-[0-9]{1,12}")
+FIELD_ID = re.compile(r"[A-Za-z0-9_.\-]{1,64}")
 MAX_BATCH = 50
 RESPONSE_LIMIT = 2_000_000
+PAGE = 50
+MAX_ISSUE_TYPES = 200
+MAX_FIELDS = 500
+MAX_ALLOWED_VALUES = 200          # sent to the panel per field; longer lists are searched (`field_values`)
+MAX_ALLOWED_CHECKED = 20_000      # read in full to validate a chosen value and to search
+MAX_VALUE_RESULTS = 50
+NAME_MAX = 255
+COMMENT_PROPERTY = "tamandua"
 _log = logging_setup.get("jira")
 
 
 class JiraError(ValueError):
-    """`message` is what people read (rendered per reader); str() stays English, for logs."""
+    """`message` is what people read (rendered per reader); str() stays English, for logs. `status` is Jira's HTTP code
+    (None when it couldn't be reached) and `retry_after` its Retry-After, to tell a retry from a permanent failure."""
 
-    def __init__(self, message):
+    def __init__(self, message, *, status: int | None = None, retry_after: int | None = None):
         super().__init__(text(message, "en"))
-        self.message = message
+        self.message, self.status, self.retry_after = message, status, retry_after
+
+    @property
+    def retryable(self) -> bool:
+        return self.status is None or self.status == 429 or self.status >= 500
 
 
 # ------------------------------------------------------------ credential
@@ -57,6 +69,17 @@ def _load() -> dict | None:
     return data if isinstance(data, dict) and data.get("token") else None
 
 
+def credentials() -> dict:
+    data = _load()
+    if not data:
+        raise JiraError(msg("integrations.jira.not_configured"))
+    return data
+
+
+def configured() -> bool:
+    return _load() is not None
+
+
 def _write(data: dict) -> None:
     from tamandua.shared.vault import put
     put("jira", data)
@@ -65,11 +88,11 @@ def _write(data: dict) -> None:
 def normalize_site(value) -> str:
     if not isinstance(value, str) or len(value) > 120:
         raise JiraError(msg("integrations.jira.invalid_site"))
-    text = value.strip().lower()
-    if "://" not in text:
-        text = "https://" + text
+    site = value.strip().lower()
+    if "://" not in site:
+        site = "https://" + site
     try:
-        parts = urlsplit(text)
+        parts = urlsplit(site)
         host, port = (parts.hostname or "").rstrip("."), parts.port
     except ValueError:
         raise JiraError(msg("integrations.jira.use_cloud_url")) from None
@@ -83,34 +106,29 @@ def status() -> dict:
     data = _load()
     if not data:
         return {"configured": False}
-    return {"configured": True, "site": data["site"], "email": data["email"], "project": data["project"],
-            "project_name": data.get("project_name"), "issue_type": data["issue_type"],
-            "last4": data["token"][-4:], "saved_at": data.get("saved_at"), "saved_by": data.get("saved_by")}
+    return {"configured": True, "site": data["site"], "email": data["email"], "last4": data["token"][-4:],
+            "saved_at": data.get("saved_at"), "saved_by": data.get("saved_by")}
 
 
-def configure(site, email, token, project, issue_type, *, by: str, http=None) -> dict:
-    """Checks against Jira (identity, project and issue type) and only then saves."""
+def check_project_key(project) -> str:
+    project = project.strip().upper() if isinstance(project, str) else ""
+    if not PROJECT_PATTERN.fullmatch(project):
+        raise JiraError(msg("integrations.jira.invalid_project"))
+    return project
+
+
+def configure(site, email, token, *, by: str, http=None) -> dict:
+    """Checks the credential against Jira (who it belongs to) and only then saves it. Returns the status."""
     host = normalize_site(site)
     if not isinstance(email, str) or not re.fullmatch(r"[^@\s]{1,64}@[^@\s]{1,190}", email.strip()):
         raise JiraError(msg("integrations.jira.invalid_email"))
     if (not isinstance(token, str) or not 16 <= len(token) <= 400
             or any(character.isspace() or ord(character) < 33 or ord(character) > 126 for character in token)):
         raise JiraError(msg("integrations.jira.invalid_token"))
-    project = (project or "").strip().upper() if isinstance(project, str) else ""
-    if not PROJECT_PATTERN.fullmatch(project):
-        raise JiraError(msg("integrations.jira.invalid_project"))
-    issue_type = " ".join(issue_type.split())[:60] if isinstance(issue_type, str) and issue_type.strip() else "Task"
-    credentials = {"site": host, "email": email.strip(), "token": token}
-    client = http or _http
-    me = client(credentials, "GET", "/rest/api/3/myself")
-    found = client(credentials, "GET", f"/rest/api/3/project/{quote(project)}")
-    types = [item.get("name") for item in found.get("issueTypes", []) if isinstance(item, dict)]
-    if types and issue_type not in types:
-        raise JiraError(msg("integrations.jira.missing_issue_type", project=project, type=issue_type, available=", ".join(str(item) for item in types[:8])))
-    _write({**credentials, "project": project, "project_name": found.get("name"), "issue_type": issue_type,
-            "account": me.get("accountId"), "saved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "saved_by": by})
-    _log.info("jira_configured", extra={"user": by, "reason": f"{host}/{project}"})
+    found = {"site": host, "email": email.strip(), "token": token}
+    me = (http or _http)(found, "GET", "/rest/api/3/myself")
+    _write({**found, "account": me.get("accountId"), "saved_at": _stamp(), "saved_by": by})
+    _log.info("jira_configured", extra={"user": by, "reason": host})
     return status()
 
 
@@ -122,7 +140,7 @@ def forget() -> None:
 # ------------------------------------------------------------------ HTTP
 
 def _http(credentials: dict, method: str, path: str, body: dict | None = None) -> dict:
-    """A request to the REST API v3. Errors become our own messages, never exposing the raw response."""
+    """A request to the REST API v3. Errors become our own messages; Jira's field errors travel as a raw parameter."""
     token = base64.b64encode(f"{credentials['email']}:{credentials['token']}".encode()).decode("ascii")
     request = Request(f"https://{credentials['site']}{path}", method=method,
                       data=json.dumps(body).encode("utf-8") if body is not None else None,
@@ -132,163 +150,252 @@ def _http(credentials: dict, method: str, path: str, body: dict | None = None) -
         with http.opener().open(request, timeout=15) as response:
             raw = response.read(RESPONSE_LIMIT + 1)
     except HTTPError as exc:
-        detail = ""
+        detail, retry_after = "", None
+        try:
+            retry_after = int(exc.headers.get("Retry-After") or 0) or None
+        except (ValueError, TypeError, AttributeError):
+            retry_after = None
         try:
             payload = json.loads(exc.read(20_000) or b"{}")
             messages = list((payload.get("errors") or {}).items())[:3]
-            detail = "; ".join(f"{field}: {text}" for field, text in messages) or "; ".join(payload.get("errorMessages", [])[:2])
-        except (ValueError, OSError, AttributeError):
+            detail = "; ".join(f"{field}: {reason}" for field, reason in messages) or "; ".join(payload.get("errorMessages", [])[:2])
+        except (ValueError, OSError, AttributeError, TypeError):
             pass
         finally:
             exc.close()
         if exc.code in (401, 403):
-            raise JiraError(msg("integrations.jira.rejected_credential")) from None
+            raise JiraError(msg("integrations.jira.rejected_credential"), status=exc.code) from None
         if exc.code == 404:
-            raise JiraError(msg("integrations.jira.not_found")) from None
-        raise JiraError(msg("integrations.jira.http_error_detail", code=exc.code, detail=detail[:300]) if detail
-                        else msg("integrations.jira.http_error", code=exc.code)) from None
+            raise JiraError(msg("integrations.jira.not_found"), status=404) from None
+        if exc.code == 429:
+            raise JiraError(msg("integrations.jira.rate_limited"), status=429, retry_after=retry_after) from None
+        raise JiraError(msg("integrations.jira.http_error_detail", code=exc.code, detail=str(detail)[:300]) if detail
+                        else msg("integrations.jira.http_error", code=exc.code), status=exc.code) from None
     except (URLError, TimeoutError, OSError):
         raise JiraError(msg("integrations.jira.unreachable")) from None
     if len(raw) > RESPONSE_LIMIT:
-        raise JiraError(msg("integrations.jira.too_large"))
+        raise JiraError(msg("integrations.jira.too_large"), status=200)
     try:
         payload = json.loads(raw or b"{}")
     except ValueError:
-        raise JiraError(msg("integrations.jira.unreadable")) from None
+        raise JiraError(msg("integrations.jira.unreadable"), status=200) from None
     return payload if isinstance(payload, dict) else {}
 
 
-# ------------------------------------------------------ issues
+def _client(http):
+    return http or _http
 
-def _adf(text: str) -> dict:
-    """Minimal Atlassian Document Format: one paragraph per line, headings in bold."""
+
+def _query(path: str, **params) -> str:
+    return f"{path}?{urlencode({key: value for key, value in params.items() if value is not None})}"
+
+
+def _name(value) -> str:
+    return " ".join(str(value or "").split())[:NAME_MAX]
+
+
+# ------------------------------------------------------------- discovery
+
+def project_ref(value) -> str:
+    """A project key (SEC) or numeric id, as the only thing that goes into its URL paths."""
+    ref = value.strip() if isinstance(value, str) else ""
+    ref = ref.upper() if not ref.isdigit() else ref
+    if not PROJECT_REF.fullmatch(ref):
+        raise JiraError(msg("integrations.jira.invalid_project"))
+    return ref
+
+
+def _issue_type_ref(value) -> str:
+    ref = value.strip() if isinstance(value, str) else ""
+    if not NUMERIC_ID.fullmatch(ref):
+        raise JiraError(msg("integrations.jira.invalid_issue_type"))
+    return ref
+
+
+def projects(query: str = "", start: int = 0, limit: int = PAGE, *, http=None) -> dict:
+    """A page of the projects the credential can see (name or key containing `query`)."""
+    query = " ".join(query.split())[:80] if isinstance(query, str) else ""
+    start, limit = max(0, min(int(start), 10_000)), max(1, min(int(limit), PAGE))
+    page = _client(http)(credentials(), "GET", _query("/rest/api/3/project/search", query=query or None, startAt=start,
+                                                      maxResults=limit, orderBy="key"))
+    items = [{"id": str(item["id"]), "key": str(item["key"]), "name": _name(item.get("name"))}
+             for item in (page.get("values") or [])[:limit]
+             if isinstance(item, dict) and NUMERIC_ID.fullmatch(str(item.get("id", ""))) and PROJECT_PATTERN.fullmatch(str(item.get("key", "")))]
+    total = page.get("total") if isinstance(page.get("total"), int) else start + len(items)
+    return {"items": items, "total": total, "start": start, "limit": limit, "last": bool(page.get("isLast", start + len(items) >= total))}
+
+
+def project(ref, *, http=None) -> dict:
+    found = _client(http)(credentials(), "GET", f"/rest/api/3/project/{quote(project_ref(ref), safe='')}")
+    if not NUMERIC_ID.fullmatch(str(found.get("id", ""))) or not PROJECT_PATTERN.fullmatch(str(found.get("key", ""))):
+        raise JiraError(msg("integrations.jira.unexpected"))
+    return {"id": str(found["id"]), "key": str(found["key"]), "name": _name(found.get("name"))}
+
+
+def _pages(http, path: str, key: str, cap: int) -> tuple[list[dict], bool]:
+    """Follows startAt/maxResults up to `cap` items. Returns the items and whether there were more."""
+    client, found, start = _client(http), [], 0
+    while len(found) < cap:
+        page = client(credentials(), "GET", _query(path, startAt=start, maxResults=PAGE))
+        values = page.get(key)
+        if values is None:
+            values = page.get("values") or []
+        values = [item for item in values if isinstance(item, dict)] if isinstance(values, list) else []
+        found.extend(values)
+        total = page.get("total") if isinstance(page.get("total"), int) else None
+        start += len(values)
+        if not values or (total is not None and start >= total) or (total is None and len(values) < PAGE):
+            return found[:cap], False
+    return found[:cap], True
+
+
+def issue_types(ref, *, http=None) -> dict:
+    """The issue types a project lets the credential create (create metadata)."""
+    items, truncated = _pages(http, f"/rest/api/3/issue/createmeta/{quote(project_ref(ref), safe='')}/issuetypes",
+                              "issueTypes", MAX_ISSUE_TYPES)
+    return {"items": [{"id": str(item["id"]), "name": _name(item.get("name")), "subtask": bool(item.get("subtask"))}
+                      for item in items if NUMERIC_ID.fullmatch(str(item.get("id", "")))], "truncated": truncated}
+
+
+def create_fields(ref, issue_type, *, http=None, allowed_limit: int = MAX_ALLOWED_VALUES) -> dict:
+    """The fields on the create screen of an issue type, normalized (see `normalize_field`).
+
+    `allowed_limit`: how many allowed values to keep per field; validation asks for all of them (MAX_ALLOWED_CHECKED)."""
+    path = f"/rest/api/3/issue/createmeta/{quote(project_ref(ref), safe='')}/issuetypes/{quote(_issue_type_ref(issue_type), safe='')}"
+    items, truncated = _pages(http, path, "fields", MAX_FIELDS)
+    fields = [field for field in (normalize_field(item, allowed_limit=allowed_limit) for item in items) if field]
+    return {"fields": fields, "truncated": truncated}
+
+
+def field_values(ref, issue_type, field_id: str, query: str = "", *, limit: int = MAX_VALUE_RESULTS, http=None) -> dict:
+    """Allowed values of one field whose name contains `query` (ignoring case): for lists too long to send whole."""
+    if not isinstance(field_id, str) or not FIELD_ID.fullmatch(field_id):
+        raise JiraError(msg("integrations.jira.invalid_field"))
+    needle = " ".join(str(query or "").split()).lower()[:100]
+    limit = max(1, min(int(limit), MAX_VALUE_RESULTS))
+    fields = create_fields(ref, issue_type, http=http, allowed_limit=MAX_ALLOWED_CHECKED)["fields"]
+    field = next((item for item in fields if item["id"] == field_id), None)
+    if field is None:
+        raise JiraError(msg("integrations.jira.invalid_field"))
+    matches = [item for item in field["allowed"] if needle in item["name"].lower()]
+    return {"items": matches[:limit], "total": len(matches), "truncated": len(matches) > limit}
+
+
+RICH_SYSTEM = ("description", "environment")
+UNSETTABLE = ("project", "issuetype", "attachment", "issuelinks", "parent", "reporter")
+
+
+def normalize_field(raw: dict, *, allowed_limit: int = MAX_ALLOWED_VALUES) -> dict | None:
+    """One create field as Tamandua sees it: id, name, required, `type` (what can be put in it) and its allowed values.
+
+    Types Tamandua fills: text, rich_text (ADF), number, date, datetime, option, options (several, by id), priority,
+    labels and strings. Everything else (users, cascading selects, links…) is `unsupported`: it can only be left empty.
+    `project` and `issuetype` are `managed`: the destination sets them."""
+    identifier = str(raw.get("fieldId") or raw.get("key") or "")
+    if not FIELD_ID.fullmatch(identifier):
+        return None
+    schema = raw.get("schema") if isinstance(raw.get("schema"), dict) else {}
+    kind_, items = str(schema.get("type") or ""), str(schema.get("items") or "")
+    system, custom = str(schema.get("system") or ""), str(schema.get("custom") or "")
+    if identifier in ("project", "issuetype"):
+        kind = "managed"
+    elif identifier in UNSETTABLE:
+        kind = "unsupported"
+    elif kind_ == "string":
+        kind = "rich_text" if system in RICH_SYSTEM or custom.endswith(":textarea") else "text"
+    elif kind_ in ("number", "date", "datetime", "priority"):
+        kind = kind_
+    elif kind_ in ("option", "securitylevel"):
+        kind = "option"
+    elif kind_ == "array" and items in ("option", "component", "version"):
+        kind = "options"
+    elif kind_ == "array" and items == "string":
+        kind = "labels" if system == "labels" or custom.endswith(":labels") else "strings"
+    else:
+        kind = "unsupported"
+    allowed = []
+    for value in (raw.get("allowedValues") or [])[:allowed_limit] if isinstance(raw.get("allowedValues"), list) else []:
+        if isinstance(value, dict) and value.get("id") is not None and re.fullmatch(r"[A-Za-z0-9_.\-]{1,64}", str(value["id"])):
+            allowed.append({"id": str(value["id"]), "name": _name(value.get("name") or value.get("value") or value["id"])})
+    total_allowed = len(raw["allowedValues"]) if isinstance(raw.get("allowedValues"), list) else 0
+    return {"id": identifier, "name": _name(raw.get("name") or identifier), "required": bool(raw.get("required")),
+            "has_default": bool(raw.get("hasDefaultValue")), "type": kind,
+            "schema": {"type": kind_[:40], "items": items[:40] or None, "system": system[:40] or None, "custom": custom[:120] or None},
+            "allowed": allowed, "allowed_truncated": total_allowed > len(allowed),
+            "fillable": kind not in ("unsupported", "managed")}
+
+
+# ------------------------------------------------------------------- issues
+
+def label_for(fingerprint: str) -> str:
+    return f"appsec-{fingerprint[:16]}"
+
+
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
+
+
+def plain(value, limit: int) -> str:
+    """One line of plain text (summary, text fields): no control characters, no line breaks."""
+    return " ".join(_CONTROL.sub(" ", str(value or "")).split())[:limit]
+
+
+def adf(value: str) -> dict:
+    """Atlassian Document Format from plain text: one paragraph per line, Markdown headings in bold. Only text nodes
+    with a strong mark are built: nothing in the text can become a link, a macro or any other node."""
     content = []
-    for line in text.splitlines()[:200]:
+    for line in _CONTROL.sub(" ", str(value or "")).splitlines()[:300]:
         line = line.rstrip()[:2000]
         if not line:
             continue
         bold = line.startswith("#")
         clean = line.lstrip("#").strip().replace("**", "").replace("`", "")
-        node = {"type": "text", "text": clean}
+        if not clean:
+            continue
+        node: dict = {"type": "text", "text": clean}
         if bold:
             node["marks"] = [{"type": "strong"}]
         content.append({"type": "paragraph", "content": [node]})
     return {"type": "doc", "version": 1, "content": content or [{"type": "paragraph", "content": [{"type": "text", "text": "—"}]}]}
 
 
-def label_for(fingerprint: str) -> str:
-    return f"appsec-{fingerprint[:16]}"
+def search_labels(project_key: str, fingerprints: list[str], *, http=None) -> str | None:
+    """The key of an issue in the project carrying one of these findings' labels (created earlier or elsewhere)."""
+    labels = ", ".join(f'"{label_for(item)}"' for item in fingerprints if re.fullmatch(r"[0-9a-f]{64}", item))
+    if not labels:
+        return None
+    found = _client(http)(credentials(), "POST", "/rest/api/3/search/jql",
+                          {"jql": f'project = "{check_project_key(project_key)}" AND labels in ({labels})', "maxResults": 1, "fields": ["key"]})
+    issues = [item for item in found.get("issues") or [] if isinstance(item, dict) and ISSUE_KEY.fullmatch(str(item.get("key", "")))]
+    return issues[0]["key"] if issues else None
 
 
-def export(tickets: list[dict], fingerprints: list, known: dict, remember, *, by: str, run_id: str, http=None,
-           locale: str | None = None) -> dict:
-    """Creates the Jira issues for the requested tickets. Returns the created, existing and failed ones.
-
-    `known`: the links already recorded for these findings (fingerprint → link); `remember(fingerprint, link)` records a
-    new one. The issues are read by the whole team, so they speak TAMANDUA_DEFAULT_LOCALE unless told otherwise."""
-    locale = locale or default_locale()
-    credentials = _load()
-    if not credentials:
-        raise JiraError(msg("integrations.jira.not_configured"))
-    if (not isinstance(fingerprints, list) or not 1 <= len(fingerprints) <= MAX_BATCH
-            or not all(isinstance(item, str) and re.fullmatch(r"[0-9a-f]{64}", item) for item in fingerprints)):
-        raise JiraError(msg("integrations.jira.batch_size", max=MAX_BATCH))
-    by_fingerprint = {ticket["fingerprint"]: ticket for ticket in tickets}
-    missing = [item for item in fingerprints if item not in by_fingerprint]
-    if missing:
-        raise JiraError(msg("integrations.jira.not_pending"))
-    client = http or _http
-    base = f"https://{credentials['site']}/browse/"
-    created, existing, failed = [], [], []
-    state = {"priority": True}
-    for group in _work_items([by_fingerprint[item] for item in dict.fromkeys(fingerprints)]):
-        prints = [ticket["fingerprint"] for ticket in group]
-        try:
-            link = next((known[item] for item in prints if item in known), None)
-            if link is None:
-                # Another installation or an earlier export may have created it: search by the labels.
-                labels = ", ".join(f'"{label_for(item)}"' for item in prints)
-                found = client(credentials, "POST", "/rest/api/3/search/jql",
-                               {"jql": f'project = "{credentials["project"]}" AND labels in ({labels})', "maxResults": 1, "fields": ["key"]})
-                issues = found.get("issues") or []
-                if issues:
-                    link = {"key": issues[0]["key"], "url": base + issues[0]["key"], "linked_at": _stamp(), "by": by}
-            if link is not None:
-                for item in prints:
-                    if item not in known:
-                        remember(item, link)
-                existing.extend({"fingerprint": item, **link} for item in prints)
-                continue
-            result = _create(client, credentials, _issue_fields(credentials, group, locale), state)
-            link = {"key": result["key"], "url": base + result["key"], "linked_at": _stamp(), "by": by}
-            for item in prints:
-                remember(item, link)
-            created.extend({"fingerprint": item, **link} for item in prints)
-        except (JiraError, KeyError, TypeError) as exc:
-            message = exc.message if isinstance(exc, JiraError) else msg("integrations.jira.unexpected")
-            failed.extend({"fingerprint": item, "error": message} for item in prints)
-    _log.info("jira_export", extra={"user": by, "run_id": run_id,
-                                    "reason": f"{len(created)} creadas, {len(existing)} ya existían, {len(failed)} fallos"})
-    return {"created": created, "existing": existing, "failed": failed}
+def create_issue(fields: dict, *, http=None) -> str:
+    result = _client(http)(credentials(), "POST", "/rest/api/3/issue", {"fields": fields})
+    key = str(result.get("key", ""))
+    if not ISSUE_KEY.fullmatch(key):
+        raise JiraError(msg("integrations.jira.unexpected"), status=200)
+    return key
 
 
-SEVERITY_ORDER = ("critical", "high", "medium", "low", "info")
-PRIORITY_ORDER = ("Highest", "High", "Medium", "Low")
+def browse_url(key: str) -> str:
+    return f"https://{credentials()['site']}/browse/{key}"
 
 
-def _work_items(tickets: list[dict]) -> list[list[dict]]:
-    """Groups by installed package; everything else is one job per finding."""
-    groups: dict[str, list[dict]] = {}
-    for ticket in tickets:
-        package = ticket.get("package") or {}
-        key = f"pkg:{package.get('ecosystem')}:{package.get('name')}@{package.get('version')}" if package.get("name") else ticket["fingerprint"]
-        groups.setdefault(key, []).append(ticket)
-    return list(groups.values())
-
-
-def _issue_fields(credentials: dict, group: list[dict], locale: str) -> dict:
-    first = group[0]
-    severity = min((ticket["severity"] for ticket in group), key=lambda item: SEVERITY_ORDER.index(item) if item in SEVERITY_ORDER else 9)
-    priority = min((ticket["priority"] for ticket in group), key=lambda item: PRIORITY_ORDER.index(item) if item in PRIORITY_ORDER else 9)
-    package = first.get("package") or {}
-    if len(group) > 1 and package.get("name"):
-        fixes = [ticket["package"]["fixed_version"] for ticket in group if (ticket.get("package") or {}).get("fixed_version")]
-        target = None
-        for version in fixes:
-            if target is None or compare_versions(version, target) > 0:
-                target = version
-        names = {"severity": severity.upper(), "package": package["name"], "version": package.get("version"), "count": len(group)}
-        summary = (t("integrations.jira.issue.group_summary", locale, target=target, **names) if target
-                   else t("integrations.jira.issue.group_summary_unfixed", locale, **names))
-        header = [t("integrations.jira.issue.package", locale, package=package["name"], version=package.get("version"),
-                    ecosystem=package.get("ecosystem")),
-                  t("integrations.jira.issue.fix_closes", locale, target=target, count=len(fixes)) if target else
-                  t("integrations.jira.issue.no_fix", locale), ""]
-        description = "\n".join(header) + "\n\n".join(text(ticket["description"], locale) for ticket in group)
-    else:
-        summary, description = text(first["summary"], locale), text(first["description"], locale)
-    labels = {label_for(ticket["fingerprint"]) for ticket in group}
-    for ticket in group:
-        labels.update(re.sub(r"[^A-Za-z0-9_.-]", "-", item)[:60] for item in ticket["labels"])
-    trace = "\n".join(t("integrations.jira.issue.fingerprint", locale, fingerprint=ticket["fingerprint"]) for ticket in group)
-    return {"project": {"key": credentials["project"]}, "issuetype": {"name": credentials["issue_type"]},
-            "summary": summary[:255], "priority": {"name": priority},
-            "description": _adf(f"{description}\n\n{t('integrations.jira.issue.origin', locale, source=text(first['source'], locale), run_id=first['run_id'])}\n{trace}"),
-            "labels": sorted(labels)}
-
-
-def _create(client, credentials: dict, fields: dict, state: dict) -> dict:
-    # Many projects don't expose the priority field on the create screen: retry without it.
-    if not state["priority"]:
-        fields.pop("priority", None)
-    try:
-        return client(credentials, "POST", "/rest/api/3/issue", {"fields": fields})
-    except JiraError as exc:
-        if "priority" not in str(exc) or "priority" not in fields:
-            raise
-        state["priority"] = False
-        fields.pop("priority")
-        return client(credentials, "POST", "/rest/api/3/issue", {"fields": fields})
+def comment(key: str, body: str, marker: dict, *, http=None) -> bool:
+    """Adds a comment unless one with the same marker (a comment property) is already there. Returns whether it wrote.
+    The outbox delivers at least once: the marker is what keeps a retried delivery from commenting twice."""
+    if not ISSUE_KEY.fullmatch(key):
+        raise JiraError(msg("integrations.jira.not_found"), status=404)
+    client, found = _client(http), credentials()
+    recent = client(found, "GET", _query(f"/rest/api/3/issue/{quote(key, safe='')}/comment", orderBy="-created", maxResults=50,
+                                         expand="properties"))
+    for item in recent.get("comments") or []:
+        for prop in (item.get("properties") or []) if isinstance(item, dict) else []:
+            if isinstance(prop, dict) and prop.get("key") == COMMENT_PROPERTY and prop.get("value") == marker:
+                return False
+    client(found, "POST", f"/rest/api/3/issue/{quote(key, safe='')}/comment",
+           {"body": adf(body), "properties": [{"key": COMMENT_PROPERTY, "value": marker}]})
+    return True
 
 
 def _stamp() -> str:

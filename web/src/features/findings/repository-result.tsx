@@ -12,7 +12,8 @@ import { Menu, MenuContent, MenuGroup, MenuItem, MenuTrigger } from '@/shared/ui
 import { AuditReportDialog } from '@/features/findings/audit-report'
 import { Pagination } from '@/shared/ui/pagination'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
-import { JiraExportDialog, useJiraStatus, type TicketLink } from '@/features/integrations/jira'
+import { JiraExportDialog, JiraFindingAction, type TicketLink } from '@/features/integrations/jira-export'
+import { useJiraAvailability } from '@/features/integrations/jira-availability'
 import { SUPPRESSED, TRIAGE_LABEL, TriageActions, TriageBadge, TriageDialog, TriageHistory, type TriageState, type TriageStatus } from '@/features/findings/triage'
 import { api, query as buildQuery } from '@/shared/api/http'
 import {} from '@/shared/i18n'
@@ -84,16 +85,32 @@ function groupFindings(findings: RepositoryFinding[], t: TFunction): Group[] {
 
 // Remediado automáticamente (el registro ya no lo ve) cuenta igual que remediado a mano.
 const statusOf = (finding: RepositoryFinding): TriageStatus => finding.lifecycle?.status === 'fixed' ? 'fixed' : finding.triage?.status ?? 'open'
+const PAGE = 50
+// Whether a finding shows under a status view: 'all', 'active' (not dismissed) or one status.
+const inView = (finding: RepositoryFinding, view: string) => view === 'all' || (view === 'active' ? !SUPPRESSED.includes(statusOf(finding)) : statusOf(finding) === view)
+// Still work to do: only these can get a Jira issue.
+const isPending = (finding: RepositoryFinding) => finding.lifecycle?.status !== 'excluded' && !SUPPRESSED.includes(statusOf(finding))
 
-export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView = 'active', exportStatus = 'open' }: { run: RepositoryRun; onNew: () => void; onChanged: () => void; canAccept: boolean; initialView?: string; exportStatus?: 'open' | 'fixed' | 'excluded' | 'all' }) {
+// `focus`: a finding to open and scroll to (links from Jira issues carry its fingerprint).
+export function RepositoryResult({ run, onNew, onChanged, canAccept, canManage = canAccept, initialView = 'active', exportStatus = 'open', focus = null }: { run: RepositoryRun; onNew: () => void; onChanged: () => void; canAccept: boolean; canManage?: boolean; initialView?: string; exportStatus?: 'open' | 'fixed' | 'excluded' | 'all'; focus?: string | null }) {
   const { t } = useTranslation('findings')
   const [query, setQuery] = useState('')
   const [severity, setSeverity] = useState('all')
   const [action, setAction] = useState('all')
   const [scanner, setScanner] = useState('all')
   const [deadline, setDeadline] = useState('all')
-  const [open, setOpen] = useState<string | null>(null)
-  const [triageView, setTriageView] = useState(initialView)
+  const findings = useMemo(() => run.findings ?? [], [run.findings])
+  // A linked finding opens in its group and page, with the status view that shows it (computed once, on arrival).
+  const [arrival] = useState(() => {
+    const target = focus ? findings.find(item => item.fingerprint === focus) : undefined
+    if (!target) return null
+    const view = initialView !== 'all' && !inView(target, initialView) ? 'all' : initialView
+    const list = groupFindings(findings.filter(item => inView(item, view)), t)
+    const index = list.findIndex(group => group.findings.some(item => item.fingerprint === target.fingerprint))
+    return index < 0 ? null : { view, open: list[index].key, offset: Math.floor(index / PAGE) * PAGE, fingerprint: target.fingerprint }
+  })
+  const [open, setOpen] = useState<string | null>(arrival?.open ?? null)
+  const [triageView, setTriageView] = useState(arrival?.view ?? initialView)
   const [auditOpen, setAuditOpen] = useState(false)
   // Filtros secundarios plegados; se abren solos si alguno ya está en uso.
   const hiddenActive = Number(triageView !== initialView) + Number(action !== 'all') + Number(scanner !== 'all') + Number(deadline !== 'all')
@@ -101,12 +118,13 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [decision, setDecision] = useState<{ status: TriageStatus; fingerprints: string[] } | null>(null)
   const [exporting, setExporting] = useState<string[] | null>(null)
-  const [jira] = useJiraStatus()
-  const [offset, setOffset] = useState(0)
+  // The asset as the server routes it (key and name), for where its Jira issues go.
+  const source = run.source as { id?: string; uid?: string | null; name?: string } | undefined
+  const assetRef = source ? { key: source.uid || source.id || source.name || '', name: source.name } : null
+  const jira = useJiraAvailability(canManage, assetRef)
+  const [offset, setOffset] = useState(arrival?.offset ?? 0)
   const [downloadError, setDownloadError] = useState('')
   const [downloading, setDownloading] = useState<string | null>(null)
-  const PAGE = 50
-  const findings = useMemo(() => run.findings ?? [], [run.findings])
   // Los plazos solo existen en el estado del registro (lo pendiente con fecha de detección), no en una ejecución suelta.
   const hasSla = useMemo(() => findings.some(item => item.sla), [findings])
   // El SBOM sale de un análisis completo terminado (o del último, en el estado del activo); una revisión de PR no lo tiene.
@@ -116,13 +134,21 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   const count = (predicate: (item: RepositoryFinding) => boolean) => active.filter(predicate).length
   const discarded = findings.length - active.length
   const groups = useMemo(() => groupFindings(findings.filter(item =>
-    (triageView === 'all' || (triageView === 'active' ? !SUPPRESSED.includes(statusOf(item)) : statusOf(item) === triageView))
+    inView(item, triageView)
     && (severity === 'all' || item.severity === severity) && (action === 'all' || item.priority?.action === action) && (scanner === 'all' || item.scanner === scanner)
     && (deadline === 'all' || (deadline === 'overdue' ? item.sla?.state === 'overdue' : item.sla?.state === 'overdue' || item.sla?.state === 'soon'))
     && (!query.trim() || `${item.title} ${item.package?.name ?? ''} ${item.path} ${item.cve.join(' ')} ${item.ghsa.join(' ')}`.toLowerCase().includes(query.trim().toLowerCase()))), t), [findings, triageView, severity, action, scanner, deadline, query, t])
   const page = groups.slice(offset, offset + PAGE)
+  useEffect(() => {
+    if (!arrival) return
+    const element = document.getElementById(`finding-${arrival.fingerprint}`)
+    element?.scrollIntoView?.({ block: 'center' }); element?.focus({ preventScroll: true })
+  }, [arrival])
   const pageFingerprints = page.flatMap(group => group.findings.map(item => item.fingerprint))
   const toggle = (fingerprints: string[], on: boolean) => setSelected(previous => { const next = new Set(previous); for (const item of fingerprints) { if (on) next.add(item); else next.delete(item) } return next })
+  // Why the selection can't go to Jira, said next to the button (a title alone reaches neither keyboard nor touch).
+  const jiraBlocked = jira.blocked ?? (selected.size > 50 ? t('selection.jira_limit')
+    : findings.some(item => selected.has(item.fingerprint) && !isPending(item)) ? t('selection.jira_dismissed') : null)
   const allOnPage = pageFingerprints.length > 0 && pageFingerprints.every(item => selected.has(item))
   const decided = () => { setDecision(null); setSelected(new Set()); onChanged() }
   // Mientras alguna verificación está en curso, se refresca la vista (una sola vez para todos los hallazgos).
@@ -187,7 +213,8 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
       {selected.size > 0 && <div className="sticky top-16 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-panel px-4 py-2.5 shadow-lg">
         <span className="text-sm font-medium">{t('selection.count', { count: selected.size })}</span>
         <TriageActions canAccept={canAccept} onPick={status => setDecision({ status, fingerprints: [...selected] })} />
-        {jira?.configured && <Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={selected.size > 50 || findings.some(item => selected.has(item.fingerprint) && SUPPRESSED.includes(statusOf(item)))} title={selected.size > 50 ? t('selection.jira_limit') : undefined} onClick={() => setExporting([...selected])}><Ticket />{t('selection.jira')}</Button>}
+        {jira.configured && <span className="inline-flex flex-wrap items-center gap-1.5"><Button size="sm" variant="outline" className="border-app-line bg-app-soft" disabled={!!jiraBlocked} aria-describedby={jiraBlocked ? 'jira-bulk-blocked' : undefined} onClick={() => setExporting([...selected])}><Ticket />{t('selection.jira')}</Button>
+          {jiraBlocked && <span id="jira-bulk-blocked" className="text-xs text-app-subtle">{jiraBlocked}</span>}</span>}
         <Button size="sm" variant="outline" className="border-app-line bg-app-soft" onClick={() => setAuditOpen(true)}><FileCheck2 />{t('selection.report')}</Button>
         <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())} className="ml-auto">{t('selection.clear')}</Button>
       </div>}
@@ -210,7 +237,8 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
                 <span className="font-mono text-xs text-app-muted">{group.epss !== null ? formatNumber(group.epss, { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'}</span>
                 <span className="text-xs text-app-muted">{labelOf(t, SCANNER_LABEL, group.scanner)}{group.findings[0].tool ? <span className="block text-[11px] text-app-subtle">{toolsOf(t, group.findings[0])}</span> : null}</span>
               </button>
-              {expanded && <div className="space-y-3 border-t border-app-line bg-inset py-4 pr-4 pl-3">{group.findings.map(finding => <FindingDetail key={finding.finding_id} finding={finding} runId={run.id} demo={(run.source as { id?: string } | undefined)?.id === 'local:demo-ejemplos'} canAccept={canAccept} onChanged={onChanged} onPick={status => setDecision({ status, fingerprints: [finding.fingerprint] })} />)}</div>}
+              {expanded && <div className="space-y-3 border-t border-app-line bg-inset py-4 pr-4 pl-3">{group.findings.map(finding => <FindingDetail key={finding.finding_id} finding={finding} runId={run.id} demo={(run.source as { id?: string } | undefined)?.id === 'local:demo-ejemplos'} canAccept={canAccept} onChanged={onChanged} onPick={status => setDecision({ status, fingerprints: [finding.fingerprint] })}
+                jira={<JiraFindingAction ticket={finding.ticket} pending={isPending(finding)} availability={jira} name={finding.advisory?.summary || finding.title} onCreate={() => setExporting([finding.fingerprint])} />} />)}</div>}
               </div>
             </div> })}
           <Pagination total={groups.length} limit={PAGE} offset={Math.min(offset, Math.max(0, groups.length - 1))} onPrev={() => setOffset(current => Math.max(0, current - PAGE))} onNext={() => setOffset(current => current + PAGE)} noun={t('table.pagination', { count: findings.length })} />
@@ -226,7 +254,9 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
     {auditOpen && <AuditReportDialog open onClose={() => setAuditOpen(false)} name={(run.source as { name?: string } | undefined)?.name ?? t('export.file_fallback')}
       target={run.type === 'asset_state' ? { asset: (run.source as { id?: string } | undefined)?.id ?? '', status: exportStatus === 'fixed' || exportStatus === 'all' ? exportStatus : 'open' } : { runId: run.id }}
       selected={[...selected]} filtered={groups.flatMap(group => group.findings.map(item => item.fingerprint))} total={findings.length} />}
-    <JiraExportDialog key={exporting?.join(',') ?? 'none'} runId={run.id} fingerprints={exporting} onClose={() => { setExporting(null); setSelected(new Set()) }} onDone={onChanged} />
+    <JiraExportDialog key={exporting?.join(',') ?? 'none'} selection={run.type === 'asset_state' && source?.id ? { asset: source.id } : { runId: run.id }} target={jira.target}
+      findings={exporting && exporting.map(fingerprint => { const item = findings.find(entry => entry.fingerprint === fingerprint); return { fingerprint, label: item ? item.advisory?.summary || item.title : fingerprint.slice(0, 12) } })}
+      onClose={() => { setExporting(null); setSelected(new Set()) }} onDone={onChanged} />
     <TriageDialog key={decision ? `${decision.status}:${decision.fingerprints.length}` : 'none'} runId={run.id} status={decision?.status ?? null} fingerprints={decision?.fingerprints ?? []} onClose={() => setDecision(null)} onDone={decided} />
 
     {run.progress?.length ? <details className="group rounded-2xl border border-app-line bg-panel"><summary className="flex cursor-pointer list-none items-center gap-2 px-5 py-4 text-sm font-medium"><ChevronRight className="size-4 text-app-subtle transition group-open:rotate-90" />{t('log.title')}<span className="ml-2 text-xs font-normal text-app-subtle">{t('log.events', { count: run.progress.length })}{run.started_at && run.finished_at ? ` · ${t('log.seconds', { seconds: Math.round((Date.parse(run.finished_at) - Date.parse(run.started_at)) / 1000) })}` : ''}</span></summary><div className="space-y-1 px-5 pb-5 font-mono text-xs leading-6">{run.progress.map((event, index) => <div key={index} className="flex gap-3"><span className="shrink-0 text-app-subtle">{formatTime(event.at)}</span><span className={event.level === 'ok' ? 'text-brand' : event.level === 'warn' ? 'text-warning' : event.level === 'error' ? 'text-danger' : 'text-app-secondary'}>{event.message}</span></div>)}</div></details> : null}
@@ -234,11 +264,11 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, initialView
   </div>
 }
 
-function FindingDetail({ finding, runId, demo, canAccept, onPick, onChanged }: { finding: RepositoryFinding; runId: string; demo: boolean; canAccept: boolean; onPick: (status: TriageStatus) => void; onChanged: () => void }) {
+function FindingDetail({ finding, runId, demo, canAccept, onPick, onChanged, jira }: { finding: RepositoryFinding; runId: string; demo: boolean; canAccept: boolean; onPick: (status: TriageStatus) => void; onChanged: () => void; jira: React.ReactNode }) {
   const { t } = useTranslation('findings')
   const advisory = finding.advisory
   const pkg = finding.package
-  return <div className="rounded-xl border border-app-line bg-panel p-4">
+  return <div id={`finding-${finding.fingerprint}`} tabIndex={-1} className="rounded-xl border border-app-line bg-panel p-4">
     <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="text-sm font-medium">{advisory?.summary || finding.title}</p><p className="mt-1 flex flex-wrap gap-x-2 font-mono text-xs text-app-subtle"><span className="text-app-secondary">{finding.rule_id}</span>{finding.cve.filter(id => id !== finding.rule_id).map(id => <a key={id} href={`https://www.cve.org/CVERecord?id=${id}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">{id}</a>)}{finding.ghsa.filter(id => id !== finding.rule_id).map(id => <a key={id} href={`https://github.com/advisories/${id}`} target="_blank" rel="noreferrer" className="text-brand hover:underline">{id}</a>)}{finding.cwe.map(id => <a key={id} href={`https://cwe.mitre.org/data/definitions/${id}.html`} target="_blank" rel="noreferrer" className="hover:underline">CWE-{id}</a>)}</p></div><Badge variant="outline" className={severityClass(finding.severity)}>{labelOf(t, SEVERITY_LABEL, finding.severity)}{advisory?.cvss_score !== null && advisory?.cvss_score !== undefined ? ` · ${advisory.cvss_score}` : ''}</Badge></div>
     <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
       {pkg?.dev && <Fact label={t('detail.type')}><span className="rounded border border-app-line px-1.5 py-0.5 text-xs">{t('detail.dev_dependency')}</span> <span className="text-xs text-app-subtle">{t('detail.dev_hint')}</span></Fact>}
@@ -264,7 +294,7 @@ function FindingDetail({ finding, runId, demo, canAccept, onPick, onChanged }: {
       : finding.source.name} · {finding.source.license}{finding.source.terms === 'non-commercial' && <span className="text-attention"> · {t('detail.non_commercial')}</span>}</p>}
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-app-line bg-inset p-3">
       <div className="min-w-0 text-xs text-app-muted"><span className="font-medium text-app-secondary">{t('detail.triage', { status: finding.triage?.expired ? t('detail.triage_expired') : t(TRIAGE_LABEL[statusOf(finding)]) })}</span>{finding.triage?.by ? ` · ${finding.triage.by}` : ''}{finding.triage?.expires_at ? ` · ${t('triage.expires_on', { date: finding.triage.expires_at })}` : ''}{finding.triage?.reason ? <span className="mt-0.5 block">{finding.triage.reason}</span> : null}</div>
-      <div className="flex flex-wrap items-center gap-2">{finding.ticket && <a href={finding.ticket.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-mono text-xs text-brand hover:underline"><Ticket className="size-3" />{finding.ticket.key}</a>}<TriageActions current={statusOf(finding)} canAccept={canAccept} onPick={onPick} size="xs" /></div>
+      <div className="flex flex-wrap items-center gap-2">{jira}<TriageActions current={statusOf(finding)} canAccept={canAccept} onPick={onPick} size="xs" /></div>
     </div>
     {finding.lifecycle && <p className="mt-2 text-xs leading-5 text-app-subtle"><span className="font-medium text-app-muted">{t('lifecycle.label')} </span>{finding.lifecycle.origin?.kind === 'pr'
       ? (finding.lifecycle.origin.branch

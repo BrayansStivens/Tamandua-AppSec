@@ -35,6 +35,8 @@ export function Findings({ user, requestedRun, onNew, onOpenPolicies }: { user: 
   useEffect(() => { if (asset) setRouteParam('repo', asset.key) }, [asset])
   useEffect(() => { setRouteParam('run', run === CURRENT ? null : run) }, [run])
   const [empty, setEmpty] = useState(false)
+  // A finding linked from outside (a Jira issue: #/hallazgos?repo=…&finding=…), opened once its repository loads.
+  const [focus, setFocus] = useState(() => ({ repo: readRoute().params.get('repo'), finding: readRoute().params.get('finding') }))
 
   const searchAssets = useCallback(async (text: string) => {
     const page = await api.get<Page<Asset>>(`/api/assets?${query({ q: text || undefined, limit: 50 })}`)
@@ -88,7 +90,7 @@ export function Findings({ user, requestedRun, onNew, onOpenPolicies }: { user: 
   return <div className="space-y-5">
     <div className="grid gap-3 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
       <div className="space-y-1"><span className="text-xs text-app-muted">{t('page.asset')}</span><Combobox label={t('page.asset')} placeholder={t('page.asset_placeholder')} value={asset ? assetOption(assetView?.key === asset.key ? assetView : asset) : null}
-        search={searchAssets} onSelect={option => { void searchAssets(option.label).then(result => { const next = result.items.find(item => item.key === option.id); if (next) { setAsset(next); setRun(CURRENT); setRunLabel(null) } }) }} /></div>
+        search={searchAssets} onSelect={option => { void searchAssets(option.label).then(result => { const next = result.items.find(item => item.key === option.id); if (next) { setAsset(next); setRun(CURRENT); setRunLabel(null); if (focus.finding) { setFocus({ repo: null, finding: null }); setRouteParam('finding', null) } } }) }} /></div>
       <div className="space-y-1"><span className="text-xs text-app-muted">{t('page.run')}</span><Combobox label={t('page.run')} placeholder={t('page.current')} value={run === CURRENT ? { id: CURRENT, label: t('page.current'), hint: t('page.current_hint_short') } : runLabel}
         search={searchRuns} onSelect={option => { setRun(option.id); setRunLabel(option.id === CURRENT ? null : option) }} emptyText={t('page.no_runs')} /></div>
     </div>
@@ -102,7 +104,8 @@ export function Findings({ user, requestedRun, onNew, onOpenPolicies }: { user: 
     {loading && !detail ? <Skeleton tiles={6} rows={5} />
       : detail && (detail.status === 'queued' || detail.status === 'running' || detail.status === 'failed')
         ? <RunProgress run={detail as unknown as RunningRun} onFinished={() => void load()} />
-        : detail ? <RepositoryResult key={`${run}:${tab}`} run={detail} onNew={onNew} canAccept={user.role === 'admin'} onChanged={() => void load()} initialView={run === CURRENT && tab !== 'open' ? 'all' : 'active'} exportStatus={tab} /> : null}
+        : detail ? <RepositoryResult key={`${run}:${tab}`} run={detail} onNew={onNew} canAccept={user.role === 'admin'} canManage={user.role === 'admin'} onChanged={() => void load()} initialView={run === CURRENT && tab !== 'open' ? 'all' : 'active'} exportStatus={tab}
+          focus={run === CURRENT && asset && focus.repo === asset.key ? focus.finding : null} /> : null}
   </div>
 }
 

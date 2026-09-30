@@ -56,7 +56,7 @@ Tamandua lee el código de tus repositorios y guarda credenciales de GitHub, IA 
 | Registro de imágenes y base de Trivy | Nada propio | Al construir y cuando Trivy actualiza su base. |
 | Registros de contenedores (Docker Hub, GHCR, ECR…) | Petición de la imagen que pides analizar, con tu token si lo guardaste | Al analizar una imagen. Los registros con IP privada se bloquean salvo `TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1`, para que el formulario no sirva de puente a tu red interna (SSRF). La comprobación se repite al empezar el análisis, y el contenedor del motor recibe la dirección comprobada para el nombre del registro, así que una respuesta que cambie entre medias (DNS rebinding) no se sigue. |
 | `api.osv.dev` | Nombres y versiones de tus dependencias | **Solo si lo autorizas** en cada análisis. Por defecto no se usa. |
-| Tu sitio de Jira | Título, descripción y prioridad de las incidencias que exportas | Solo si conectas Jira y pulsas exportar. |
+| Tu sitio de Jira | Los campos que asignas a cada incidencia (por defecto título, descripción, prioridad, etiquetas y plazo de corrección) y comentarios cuando se verifica la corrección de un hallazgo o reaparece | Solo si conectas Jira: cuando alguien exporta, o por su cuenta con reglas de enrutamiento automáticas. |
 | `api.openai.com`, `api.anthropic.com` | Tu clave, para comprobar que es válida | Solo al guardarla o probarla. Hoy la IA no recibe código ni hallazgos. |
 | Tus dominios | Un `HEAD` HTTPS y una consulta DNS TXT | Solo cuando estén disponibles las pruebas dinámicas (en desarrollo). Solo a direcciones públicas. |
 

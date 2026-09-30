@@ -1,6 +1,8 @@
-"""The Jira issue linked to each finding, per asset and fingerprint (`jira-links`), and the export that creates them.
+"""The Jira issue linked to each finding, per asset and fingerprint (`jira-links`).
 
-The connector (credentials, HTTP, issue fields) is `integrations/jira.py`; this side knows run records and assets.
+A link is {key, url, linked_at, by, destination, project} and, once Tamandua commented on the issue, `sync`: "fixed"
+after the verified-fix comment, "open" after the reappeared one. Creating issues is `runs/jira_sync.py`; the connector,
+`integrations/jira.py`.
 """
 
 from __future__ import annotations
@@ -8,7 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from tamandua.modules.findings.kinds import FINDING_RUNS
-from tamandua.modules.integrations import jira
 from tamandua.modules.sources.assets import asset_key
 from tamandua.shared import documents
 
@@ -25,6 +26,17 @@ def _remember(data_dir: Path, asset: str, fingerprint: str, link: dict) -> None:
         documents.save(data_dir, "jira-links", links)
 
 
+remember = _remember
+
+
+def mark(data_dir: Path, asset: str, key: str, state: str, run_id: str) -> None:
+    """Records on every finding linked to issue `key` what Tamandua last told the issue (see the module notes)."""
+    with documents.edit(data_dir, "jira-links", {}) as payload:
+        for link in (payload.get(asset) or {}).values():
+            if isinstance(link, dict) and link.get("key") == key:
+                link["sync"], link["sync_run"] = state, run_id
+
+
 def annotate(data_dir: Path, record: dict) -> dict:
     """Adds to each finding the ticket already created for it, if any."""
     if record.get("type") not in (*FINDING_RUNS, "asset_state"):
@@ -34,15 +46,6 @@ def annotate(data_dir: Path, record: dict) -> dict:
         return record
     return {**record, "findings": [{**item, "ticket": links[item["fingerprint"]]} if item["fingerprint"] in links else item
                                    for item in record.get("findings", [])]}
-
-
-def export(data_dir: Path, record: dict, tickets: list[dict], fingerprints: list, *, by: str, http=None,
-           locale: str | None = None) -> dict:
-    """Creates the requested tickets' issues in Jira (see `jira.export`), remembering each link under the asset."""
-    asset = asset_key(record)
-    return jira.export(tickets, fingerprints, load_links(data_dir).get(asset, {}),
-                       lambda fingerprint, link: _remember(data_dir, asset, fingerprint, link),
-                       by=by, run_id=record["id"], http=http, locale=locale)
 
 
 def rename_assets(data_dir: Path, moved: dict[str, str]) -> None:

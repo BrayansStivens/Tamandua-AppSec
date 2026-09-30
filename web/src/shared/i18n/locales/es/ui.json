@@ -15,6 +15,9 @@
   "combobox": {
     "empty": "Nada coincide",
     "placeholder": "Escribe para buscar…",
-    "more": "{{remaining}} más: sigue escribiendo para acotar"
+    "more": "{{remaining}} más: sigue escribiendo para acotar",
+    "error": "No se pudo buscar: inténtalo de nuevo",
+    "min_chars_one": "Escribe al menos {{count}} carácter",
+    "min_chars_other": "Escribe al menos {{count}} caracteres"
   }
 }

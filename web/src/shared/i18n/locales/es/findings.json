@@ -98,6 +98,7 @@
     "count_one": "{{count}} seleccionado", "count_other": "{{count}} seleccionados",
     "jira": "Crear en Jira",
     "jira_limit": "Hasta 50 por exportación",
+    "jira_dismissed": "Los hallazgos descartados o excluidos no van a Jira",
     "report": "Informe de los seleccionados",
     "clear": "Quitar selección"
   },

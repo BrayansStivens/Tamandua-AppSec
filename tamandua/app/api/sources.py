@@ -1,9 +1,8 @@
-"""Code sources (GitHub App and tokens), domains, AI provider keys and Jira."""
+"""Code sources (GitHub App and tokens), domains and AI provider keys. Jira is `jira.py`."""
 
 from __future__ import annotations
 
 import html
-import json
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -14,22 +13,17 @@ from tamandua.app.api.deps import ApiError, Context, Policy, body, documented, g
 from tamandua.app.api.deps import problem
 from tamandua.app.api.schemas import AS_RETURNED, MANY, Open
 from tamandua.app.api.security import public_url
-from tamandua.modules.findings import triage
-from tamandua.modules.runs.registry import resolve
-from tamandua.modules.findings import tickets
-from tamandua.modules.integrations import code_tokens, jira
+from tamandua.modules.integrations import code_tokens
 from tamandua.modules.integrations.ai_providers import PROVIDERS, ProviderError, check_provider, forget_provider_key, provider_status, save_provider_key
 from tamandua.modules.integrations.github import (REQUIRED_PERMISSIONS, GitHubAppError, app_installations, app_permissions,
                                                   config as github_config, forget as forget_installation, forget_app, forget_catalog,
                                                   install_url, installation_details, permission_review, save_credentials, verify_app)
 from tamandua.modules.integrations.installations import clear_github, github_connections, github_installations, save_github
-from tamandua.modules.findings.kinds import FINDING_RUNS
-from tamandua.modules.runs.store import render_tickets
 from tamandua.modules.sources.assets import with_scan_branches
 from tamandua.modules.sources.domains import DomainError, check_reachability, list_domains, locked, register_domain, verify_domain
 from tamandua.modules.sources.repositories import SourceError, find_source, list_repositories, source_page
 from tamandua.shared import log as logging_setup
-from tamandua.shared.i18n import default_locale, msg, t, text
+from tamandua.shared.i18n import msg, t, text
 
 router = APIRouter(tags=["sources"])
 
@@ -127,25 +121,6 @@ class GitHubStatus(Open):
 
 class InstallLink(BaseModel):
     url: str
-
-
-class JiraStatus(Open):
-    configured: bool
-    site: str | None = None
-    email: str | None = None
-    project: str | None = None
-    project_name: str | None = None
-    issue_type: str | None = None
-    last4: str | None = None
-    saved_at: str | None = None
-    saved_by: str | None = None
-
-
-class JiraExport(BaseModel):
-    """Each finding exported: an issue created, one that already existed, or why it failed."""
-    created: list[dict[str, Any]] = Field(max_length=jira.MAX_BATCH)
-    existing: list[dict[str, Any]] = Field(max_length=jira.MAX_BATCH)
-    failed: list[dict[str, Any]] = Field(max_length=jira.MAX_BATCH)
 
 
 def server_port(request: Request) -> int:
@@ -476,65 +451,3 @@ def github_callback(request: Request, installation_id: str = "", context: Contex
         return _landing(locale, port, msg("integrations.github.landing.failed"), problem(exc))
     throttle.succeeded(scope)
     return _landing(locale, port, msg("integrations.github.landing.available"), msg("integrations.github.landing.available_detail"))
-
-
-# --- Jira -----------------------------------------------------------------------------------------------------------
-
-class JiraRemoveIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    action: Literal["remove"]
-
-
-class JiraSaveIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    action: Literal["save"]
-    site: Any
-    email: Any
-    token: Any
-    project: Any
-    issue_type: Any = "Task"
-
-
-class JiraExportIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    run_id: str
-    fingerprints: Any
-
-
-@router.get("/api/integrations/jira", response_model=JiraStatus, **AS_RETURNED)
-def jira_status(context: Context = Depends(guard())) -> Any:
-    return context.render(jira.status())
-
-
-@router.post("/api/integrations/jira", openapi_extra=documented(JiraSaveIn, JiraRemoveIn), response_model=JiraStatus, **AS_RETURNED)
-def jira_configure(context: Context = Depends(guard(Policy(admin=True, action="connect-jira", body=1024))),
-                   data: JiraSaveIn | JiraRemoveIn = Depends(body(JiraSaveIn | JiraRemoveIn,
-                                                                  msg("integrations.jira.invalid_request")))) -> Any:
-    if isinstance(data, JiraRemoveIn):
-        jira.forget()
-        context.state.log.info("jira_removed", extra={"user": context.user["username"]})
-        return context.render(jira.status())
-    try:
-        return context.render(jira.configure(data.site, data.email, data.token, data.project, data.issue_type, by=context.user["username"]))
-    except jira.JiraError as exc:
-        raise ApiError(400, problem(exc)) from exc
-    except OSError as exc:
-        raise ApiError(500, msg("api.save_settings_failed")) from exc
-
-
-@router.post("/api/integrations/jira/issues", openapi_extra=documented(JiraExportIn), response_model=JiraExport, **AS_RETURNED)
-def jira_export(context: Context = Depends(guard(Policy(action="export-jira", body=6000))),
-                data: JiraExportIn = Depends(body(JiraExportIn, msg("integrations.jira.invalid_export")))) -> Any:
-    try:
-        record = resolve(context.data_dir, data.run_id)
-        record = record if record.get("type") == "asset_state" else triage.annotate(context.data_dir, record)
-    except (ValueError, OSError, json.JSONDecodeError) as exc:
-        raise ApiError(404, msg("api.run_not_found")) from exc
-    if record.get("type") not in (*FINDING_RUNS, "asset_state"):
-        raise ApiError(400, msg("integrations.jira.code_only"))
-    try:
-        # Issues are read by the whole team: TAMANDUA_DEFAULT_LOCALE, not the requester's language.
-        return context.render(tickets.export(context.data_dir, record, render_tickets(record, locale=default_locale()), data.fingerprints,
-                                             by=context.user["username"]))
-    except jira.JiraError as exc:
-        raise ApiError(400, problem(exc)) from exc

@@ -33,7 +33,7 @@ from urllib.request import Request
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
-from tamandua.modules.integrations.tables import outbox
+from tamandua.modules.integrations.tables import JIRA_CHANNEL, outbox
 from tamandua.shared import db, http, settings
 from tamandua.shared import log as logging_setup
 from tamandua.shared.i18n import default_locale, msg, t, text
@@ -346,7 +346,8 @@ def drain(data_dir: Path, *, sender=None, limit: int = 20) -> int:
     channels = _vault()
     with db.transaction(data_dir) as connection:
         rows = connection.execute(select(outbox.c.id, outbox.c.channel_id, outbox.c.payload, outbox.c.attempts)
-                                  .where(outbox.c.tenant_id == db.TENANT, outbox.c.status == "pending", outbox.c.next_attempt_at <= func.now())
+                                  .where(outbox.c.tenant_id == db.TENANT, outbox.c.status == "pending", outbox.c.next_attempt_at <= func.now(),
+                                         outbox.c.channel_id != JIRA_CHANNEL)
                                   .order_by(outbox.c.created_at).limit(limit).with_for_update(skip_locked=True)).all()
         if rows:
             connection.execute(update(outbox).where(outbox.c.tenant_id == db.TENANT, outbox.c.id.in_([row.id for row in rows]))

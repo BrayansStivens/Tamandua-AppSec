@@ -3361,7 +3361,7 @@
     "/api/integrations/jira": {
       "get": {
         "tags": [
-          "sources"
+          "jira"
         ],
         "summary": "Jira Status",
         "operationId": "jira_status_api_integrations_jira_get",
@@ -3380,7 +3380,7 @@
       },
       "post": {
         "tags": [
-          "sources"
+          "jira"
         ],
         "summary": "Jira Configure",
         "operationId": "jira_configure_api_integrations_jira_post",
@@ -3409,8 +3409,7 @@
                         "title": "Project"
                       },
                       "issue_type": {
-                        "title": "Issue Type",
-                        "default": "Task"
+                        "title": "Issue Type"
                       }
                     },
                     "additionalProperties": false,
@@ -3419,10 +3418,10 @@
                       "action",
                       "site",
                       "email",
-                      "token",
-                      "project"
+                      "token"
                     ],
-                    "title": "JiraSaveIn"
+                    "title": "JiraSaveIn",
+                    "description": "The credential. `project` and `issue_type` (earlier panels): also a destination and the default rule."
                   },
                   {
                     "properties": {
@@ -3459,12 +3458,897 @@
         }
       }
     },
+    "/api/integrations/jira/projects": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Projects",
+        "description": "Projects the credential can see, by name or key (`q`), a page at a time.",
+        "operationId": "jira_projects_api_integrations_jira_projects_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Start"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraProjectPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/projects/{project}/issue-types": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Issue Types",
+        "operationId": "jira_issue_types_api_integrations_jira_projects__project__issue_types_get",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraIssueTypes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/projects/{project}/issue-types/{issue_type}/fields": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Fields",
+        "description": "The create screen's fields, normalized, and the mapping Tamandua suggests for them.",
+        "operationId": "jira_fields_api_integrations_jira_projects__project__issue_types__issue_type__fields_get",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "issue_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraFields"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/projects/{project}/issue-types/{issue_type}/fields/{field}/values": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Field Values",
+        "description": "Searches a field's allowed values by name: for fields whose `allowed_truncated` is true.",
+        "operationId": "jira_field_values_api_integrations_jira_projects__project__issue_types__issue_type__fields__field__values_get",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project"
+            }
+          },
+          {
+            "name": "issue_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Type"
+            }
+          },
+          {
+            "name": "field",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Field"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraFieldValues"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/variables": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Variables",
+        "operationId": "jira_variables_api_integrations_jira_variables_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraVariables"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/routing": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Routing",
+        "operationId": "jira_routing_api_integrations_jira_routing_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRouting"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/destinations": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Destination Save",
+        "description": "Creates (no `id`) or updates a destination, validated against Jira's live create metadata.",
+        "operationId": "jira_destination_save_api_integrations_jira_destinations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 12
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Id"
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "title": "Name"
+                  },
+                  "project": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "title": "Project"
+                  },
+                  "issue_type": {
+                    "type": "string",
+                    "maxLength": 60,
+                    "title": "Issue Type"
+                  },
+                  "mapping": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "enum": [
+                                    "tamandua",
+                                    "fixed",
+                                    "template"
+                                  ],
+                                  "title": "Source"
+                                },
+                                "key": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "title": "Key"
+                                },
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    {
+                                      "type": "integer"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "items": {
+                                        "type": "string",
+                                        "maxLength": 255
+                                      },
+                                      "type": "array",
+                                      "maxItems": 20
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "title": "Value"
+                                },
+                                "text": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 2000
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "title": "Text"
+                                }
+                              },
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "source"
+                              ],
+                              "title": "JiraMappingIn"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "type": "object",
+                        "maxProperties": 50
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Mapping"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "project",
+                  "issue_type"
+                ],
+                "title": "JiraDestinationIn",
+                "description": "`project`: key or id; `issue_type`: id (or name). No `mapping`: Tamandua's suggested one."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraDestinationSaved"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/destinations/remove": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Destination Remove",
+        "operationId": "jira_destination_remove_api_integrations_jira_destinations_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 12,
+                    "title": "Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "title": "JiraIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRouting"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/rules": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Rule Save",
+        "description": "Creates (no `id`) or updates a rule. An automatic rule with backfill starts its backfill when saved new,\nenabled or changed in what it covers (`backfill` in the answer).",
+        "operationId": "jira_rule_save_api_integrations_jira_rules_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 12
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Id"
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 60
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Name"
+                  },
+                  "assets": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 200,
+                    "title": "Assets"
+                  },
+                  "patterns": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 20,
+                    "title": "Patterns"
+                  },
+                  "destination": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 12
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Destination"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "manual",
+                      "auto"
+                    ],
+                    "title": "Mode",
+                    "default": "manual"
+                  },
+                  "min_severity": {
+                    "type": "string",
+                    "enum": [
+                      "critical",
+                      "high",
+                      "medium",
+                      "low",
+                      "info"
+                    ],
+                    "title": "Min Severity",
+                    "default": "high"
+                  },
+                  "backfill": {
+                    "type": "boolean",
+                    "title": "Backfill",
+                    "default": false
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "Enabled",
+                    "default": true
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "JiraRuleIn",
+                "description": "A rule; `id` \"default\" edits the last rule (its assets are all of them)."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRuleSaved"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/rules/remove": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Rule Remove",
+        "operationId": "jira_rule_remove_api_integrations_jira_rules_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 12,
+                    "title": "Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "title": "JiraIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRouting"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/rules/order": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Rule Order",
+        "description": "The rules in their new order (all but `default`, which stays last).",
+        "operationId": "jira_rule_order_api_integrations_jira_rules_order_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 50,
+                    "title": "Ids"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "title": "JiraOrderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRouting"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/rules/preview": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Rule Preview",
+        "description": "How many open findings this rule (as sent, saved or not) would backfill. Nothing is queued.",
+        "operationId": "jira_rule_preview_api_integrations_jira_rules_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 12
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Id"
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 60
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Name"
+                  },
+                  "assets": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 200,
+                    "title": "Assets"
+                  },
+                  "patterns": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array",
+                    "maxItems": 20,
+                    "title": "Patterns"
+                  },
+                  "destination": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 12
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Destination"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "manual",
+                      "auto"
+                    ],
+                    "title": "Mode",
+                    "default": "manual"
+                  },
+                  "min_severity": {
+                    "type": "string",
+                    "enum": [
+                      "critical",
+                      "high",
+                      "medium",
+                      "low",
+                      "info"
+                    ],
+                    "title": "Min Severity",
+                    "default": "high"
+                  },
+                  "backfill": {
+                    "type": "boolean",
+                    "title": "Backfill",
+                    "default": false
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "title": "Enabled",
+                    "default": true
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "title": "JiraRuleIn",
+                "description": "A rule; `id` \"default\" edits the last rule (its assets are all of them)."
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraRulePreview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/rules/backfill": {
+      "post": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Rule Backfill",
+        "description": "Runs an automatic rule's backfill again (what already has an issue is skipped).",
+        "operationId": "jira_rule_backfill_api_integrations_jira_rules_backfill_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 12,
+                    "title": "Id"
+                  }
+                },
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "title": "JiraIdIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraBackfill"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/backfill": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Backfill Status",
+        "operationId": "jira_backfill_status_api_integrations_jira_backfill_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraBackfills"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/integrations/jira/issues": {
       "post": {
         "tags": [
-          "sources"
+          "jira"
         ],
         "summary": "Jira Export",
+        "description": "Creates the issues of the selected findings, each in the destination its asset's rules pick.",
         "operationId": "jira_export_api_integrations_jira_issues_post",
         "requestBody": {
           "content": {
@@ -3472,20 +4356,93 @@
               "schema": {
                 "properties": {
                   "run_id": {
-                    "type": "string",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 400
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
                     "title": "Run Id"
+                  },
+                  "asset": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Asset"
                   },
                   "fingerprints": {
                     "title": "Fingerprints"
+                  },
+                  "selections": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "properties": {
+                            "run_id": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 400
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "title": "Run Id"
+                            },
+                            "asset": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 300
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "title": "Asset"
+                            },
+                            "fingerprints": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array",
+                              "maxItems": 50,
+                              "minItems": 1,
+                              "title": "Fingerprints"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "fingerprints"
+                          ],
+                          "title": "JiraSelectionIn",
+                          "description": "Findings of one run (`run_id`, or `asset:<key>` for an asset's state) or of one asset (`asset`)."
+                        },
+                        "type": "array",
+                        "maxItems": 50
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Selections"
                   }
                 },
                 "additionalProperties": false,
                 "type": "object",
-                "required": [
-                  "run_id",
-                  "fingerprints"
-                ],
-                "title": "JiraExportIn"
+                "title": "JiraExportIn",
+                "description": "One selection (`run_id` or `asset` + `fingerprints`) or several (`selections`), up to 50 findings in all."
               }
             }
           },
@@ -8162,12 +9119,248 @@
         ],
         "title": "InstallLink"
       },
+      "JiraAllowedValue": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "JiraAllowedValue"
+      },
+      "JiraBackfill": {
+        "properties": {
+          "rule": {
+            "type": "string",
+            "title": "Rule"
+          },
+          "batch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch"
+          },
+          "by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "queued": {
+            "type": "integer",
+            "title": "Queued",
+            "default": 0
+          },
+          "findings": {
+            "type": "integer",
+            "title": "Findings",
+            "default": 0
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created",
+            "default": 0
+          },
+          "existing": {
+            "type": "integer",
+            "title": "Existing",
+            "default": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          },
+          "pending": {
+            "type": "integer",
+            "title": "Pending",
+            "default": 0
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "rule"
+        ],
+        "title": "JiraBackfill",
+        "description": "One rule's last backfill: issues queued and what became of them (`pending` still in the queue)."
+      },
+      "JiraBackfills": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JiraBackfill"
+            },
+            "type": "array",
+            "maxItems": 51,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "JiraBackfills"
+      },
+      "JiraDestination": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "project": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Project"
+          },
+          "issue_type": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Issue Type"
+          },
+          "mapping": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Mapping"
+          },
+          "fields": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fields"
+          },
+          "legacy": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "project",
+          "issue_type",
+          "mapping"
+        ],
+        "title": "JiraDestination",
+        "description": "Project + issue type + mapping. `fields`: the snapshot of the mapped fields (null for one migrated from the\nsingle project of earlier versions, `legacy`, until it is saved again)."
+      },
+      "JiraDestinationSaved": {
+        "properties": {
+          "destination": {
+            "$ref": "#/components/schemas/JiraDestination"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/JiraFieldError"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Warnings"
+          },
+          "routing": {
+            "$ref": "#/components/schemas/JiraRouting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "destination",
+          "warnings",
+          "routing"
+        ],
+        "title": "JiraDestinationSaved"
+      },
       "JiraExport": {
         "properties": {
           "created": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/JiraExportItem"
             },
             "type": "array",
             "maxItems": 50,
@@ -8175,8 +9368,7 @@
           },
           "existing": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/JiraExportItem"
             },
             "type": "array",
             "maxItems": 50,
@@ -8184,8 +9376,7 @@
           },
           "failed": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/JiraExportItem"
             },
             "type": "array",
             "maxItems": 50,
@@ -8200,6 +9391,571 @@
         ],
         "title": "JiraExport",
         "description": "Each finding exported: an issue created, one that already existed, or why it failed."
+      },
+      "JiraExportItem": {
+        "properties": {
+          "fingerprint": {
+            "type": "string",
+            "title": "Fingerprint"
+          },
+          "asset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "fingerprint"
+        ],
+        "title": "JiraExportItem"
+      },
+      "JiraField": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "has_default": {
+            "type": "boolean",
+            "title": "Has Default"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "rich_text",
+              "number",
+              "date",
+              "datetime",
+              "option",
+              "options",
+              "priority",
+              "labels",
+              "strings",
+              "unsupported",
+              "managed"
+            ],
+            "title": "Type"
+          },
+          "schema": {
+            "$ref": "#/components/schemas/JiraFieldSchema"
+          },
+          "allowed": {
+            "items": {
+              "$ref": "#/components/schemas/JiraAllowedValue"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Allowed"
+          },
+          "allowed_truncated": {
+            "type": "boolean",
+            "title": "Allowed Truncated"
+          },
+          "fillable": {
+            "type": "boolean",
+            "title": "Fillable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "required",
+          "has_default",
+          "type",
+          "schema",
+          "allowed",
+          "allowed_truncated",
+          "fillable"
+        ],
+        "title": "JiraField",
+        "description": "A create field. `type` says what Tamandua can put in it; `fillable` false: it can only be left empty."
+      },
+      "JiraFieldError": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "error"
+        ],
+        "title": "JiraFieldError"
+      },
+      "JiraFieldSchema": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Items"
+          },
+          "system": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System"
+          },
+          "custom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "JiraFieldSchema"
+      },
+      "JiraFieldValues": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JiraAllowedValue"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "truncated"
+        ],
+        "title": "JiraFieldValues",
+        "description": "Allowed values of one field matching a search (lists too long for `allowed`)."
+      },
+      "JiraFields": {
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/JiraField"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Fields"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "suggested": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Suggested"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fields",
+          "truncated",
+          "suggested"
+        ],
+        "title": "JiraFields",
+        "description": "The fields of an issue type's create screen and the mapping Tamandua proposes for them."
+      },
+      "JiraIssueType": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "subtask": {
+            "type": "boolean",
+            "title": "Subtask"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "subtask"
+        ],
+        "title": "JiraIssueType"
+      },
+      "JiraIssueTypes": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JiraIssueType"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Items"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "JiraIssueTypes"
+      },
+      "JiraProject": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name"
+        ],
+        "title": "JiraProject"
+      },
+      "JiraProjectPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JiraProject"
+            },
+            "type": "array",
+            "maxItems": 50,
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "last": {
+            "type": "boolean",
+            "title": "Last"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "start",
+          "limit",
+          "last"
+        ],
+        "title": "JiraProjectPage"
+      },
+      "JiraRouting": {
+        "properties": {
+          "destinations": {
+            "items": {
+              "$ref": "#/components/schemas/JiraDestination"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Destinations"
+          },
+          "rules": {
+            "items": {
+              "$ref": "#/components/schemas/JiraRule"
+            },
+            "type": "array",
+            "maxItems": 51,
+            "title": "Rules"
+          },
+          "history": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "History"
+          },
+          "limits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "destinations",
+          "rules",
+          "history",
+          "limits"
+        ],
+        "title": "JiraRouting"
+      },
+      "JiraRule": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default"
+          },
+          "assets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Assets"
+          },
+          "patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Patterns"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "auto"
+            ],
+            "title": "Mode"
+          },
+          "min_severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "info"
+            ],
+            "title": "Min Severity"
+          },
+          "backfill": {
+            "type": "boolean",
+            "title": "Backfill"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "assets",
+          "patterns",
+          "mode",
+          "min_severity",
+          "backfill",
+          "enabled"
+        ],
+        "title": "JiraRule",
+        "description": "A routing rule; the last one (`default`) matches every asset. First enabled match wins."
+      },
+      "JiraRulePreview": {
+        "properties": {
+          "assets": {
+            "type": "integer",
+            "title": "Assets"
+          },
+          "findings": {
+            "type": "integer",
+            "title": "Findings"
+          },
+          "issues": {
+            "type": "integer",
+            "title": "Issues"
+          },
+          "linked": {
+            "type": "integer",
+            "title": "Linked"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assets",
+          "findings",
+          "issues",
+          "linked",
+          "truncated"
+        ],
+        "title": "JiraRulePreview",
+        "description": "What a backfill of this rule would queue now (up to the backfill limit)."
+      },
+      "JiraRuleSaved": {
+        "properties": {
+          "rule": {
+            "$ref": "#/components/schemas/JiraRule"
+          },
+          "backfill": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JiraBackfill"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "routing": {
+            "$ref": "#/components/schemas/JiraRouting"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rule",
+          "backfill",
+          "routing"
+        ],
+        "title": "JiraRuleSaved"
       },
       "JiraStatus": {
         "properties": {
@@ -8228,6 +9984,39 @@
               }
             ],
             "title": "Email"
+          },
+          "last4": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last4"
+          },
+          "saved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved At"
+          },
+          "saved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved By"
           },
           "project": {
             "anyOf": [
@@ -8262,38 +10051,38 @@
             ],
             "title": "Issue Type"
           },
-          "last4": {
+          "destinations": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Last4"
+            "title": "Destinations"
           },
-          "saved_at": {
+          "rules": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Saved At"
+            "title": "Rules"
           },
-          "saved_by": {
+          "automatic": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Saved By"
+            "title": "Automatic"
           }
         },
         "additionalProperties": true,
@@ -8301,7 +10090,98 @@
         "required": [
           "configured"
         ],
-        "title": "JiraStatus"
+        "title": "JiraStatus",
+        "description": "The credential (never the token: its last four characters) and, for earlier panels, the default destination."
+      },
+      "JiraVariable": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "rich_text",
+              "number",
+              "date",
+              "datetime",
+              "labels"
+            ],
+            "title": "Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "type",
+          "label"
+        ],
+        "title": "JiraVariable"
+      },
+      "JiraVariables": {
+        "properties": {
+          "variables": {
+            "items": {
+              "$ref": "#/components/schemas/JiraVariable"
+            },
+            "type": "array",
+            "maxItems": 16,
+            "title": "Variables"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Sources"
+          },
+          "fits": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "maxItems": 16
+            },
+            "type": "object",
+            "title": "Fits"
+          },
+          "by_name": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "maxItems": 2
+            },
+            "type": "object",
+            "title": "By Name"
+          },
+          "limits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variables",
+          "sources",
+          "fits",
+          "by_name",
+          "limits"
+        ],
+        "title": "JiraVariables",
+        "description": "What a mapping can use: Tamandua's variables (`source: tamandua`, or `{{key}}` in a template)."
       },
       "LinkInfo": {
         "properties": {
@@ -11232,6 +13112,26 @@
             "type": "string",
             "title": "Error",
             "description": "In the reader's language."
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 100,
+            "description": "When the error is about fields, one per field.",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "error"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

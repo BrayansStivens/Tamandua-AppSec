@@ -95,12 +95,28 @@ def _watch_and_registry_to_tables(data_dir: Path) -> int:
     return moved
 
 
+def _jira_routing(data_dir: Path) -> int:
+    """The single Jira project and issue type became a destination and the default rule (manual); the credential stays
+    in the vault as it was."""
+    from tamandua.modules.integrations import jira_routing
+    from tamandua.shared.vault import VaultError, get
+    try:
+        stored = get("jira")
+    except VaultError:
+        return 0
+    if not isinstance(stored, dict) or not isinstance(stored.get("project"), str) or not stored["project"]:
+        return 0
+    return int(jira_routing.adopt_legacy(data_dir, {"key": stored["project"], "name": stored.get("project_name")},
+                                         {"name": stored.get("issue_type") or "Task"}, by=stored.get("saved_by") or "tamandua"))
+
+
 MIGRATIONS: tuple[Migration, ...] = (
     Migration("cra_opt_in", (), _cra_opt_in),
     Migration("seal_totp_seeds", (), _seal_totp_seeds),
     Migration("vault_to_database", (), _vault_to_database),
     Migration("cve_copy_to_database", (), _cve_copy_to_database),
     Migration("watch_and_registry_to_tables", (), _watch_and_registry_to_tables),
+    Migration("jira_routing", (), _jira_routing),
 )
 LATEST = len(MIGRATIONS)
 

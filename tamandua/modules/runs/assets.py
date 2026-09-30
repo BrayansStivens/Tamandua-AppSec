@@ -15,6 +15,7 @@ from pathlib import Path
 from tamandua.modules.findings import registry as findings_registry
 from tamandua.modules.findings import tickets, triage
 from tamandua.modules.findings.kinds import FINDING_RUNS, FULL_SCANS
+from tamandua.modules.integrations import jira_routing
 from tamandua.modules.runs.store import delete_runs, find_runs, load_run, save_record
 from tamandua.modules.sources import assets as source_assets
 from tamandua.modules.sources.assets import asset_key
@@ -51,6 +52,7 @@ def backfill(data_dir: Path, repositories: list[dict]) -> int:
     for old_key, uid in moved.items():
         triage.rename_asset(data_dir, old_key, uid)
     tickets.rename_assets(data_dir, moved)
+    jira_routing.rename_assets(data_dir, moved)
     if updated:
         _log.info("assets_backfilled", extra={"reason": f"{updated} ejecuciones con identidad estable"})
     return updated

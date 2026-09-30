@@ -142,13 +142,18 @@ def save_and_apply(data_dir: Path, scan: RunRecord, *, run_id: str | None = None
         saved = _persist(data_dir, record, report, sarif, replace=run_id is not None)
         # Every finished run, wherever it comes from (worker or CLI), updates the findings registry.
         changes = apply(data_dir, saved)
-        # What is new and matters goes to the configured channels (Slack, Teams, webhook) through the outbox.
-        if changes.get("new"):
+        # What is new and matters goes to the configured channels (Slack, Teams, webhook) through the outbox, and to
+        # Jira: issues for automatic rules, comments on fixed or reappeared findings (runs/jira_sync.py).
+        if changes.get("new") or changes.get("fixed_now") or changes.get("reopened"):
             from tamandua.modules.integrations import notifications
             from tamandua.modules.findings import triage
-            opened = set(changes["new"])
-            active = [item for item in triage.annotate(data_dir, saved).get("findings", []) if item["fingerprint"] in opened and triage.is_active(item)]
-            notifications.on_run(saved, active, data_dir=data_dir)
+            from tamandua.modules.runs import jira_sync
+            opened = set(changes.get("new") or [])
+            active = [item for item in triage.annotate(data_dir, saved).get("findings", []) if item["fingerprint"] in opened and triage.is_active(item)] \
+                if opened else []
+            if opened:
+                notifications.on_run(saved, active, data_dir=data_dir)
+            jira_sync.on_run(data_dir, saved, changes, active)
     return saved, changes
 
 

@@ -15,6 +15,9 @@
   "combobox": {
     "empty": "No matches",
     "placeholder": "Type to search…",
-    "more": "{{remaining}} more: keep typing to narrow it down"
+    "more": "{{remaining}} more: keep typing to narrow it down",
+    "error": "Couldn't search: try again",
+    "min_chars_one": "Type at least {{count}} character",
+    "min_chars_other": "Type at least {{count}} characters"
   }
 }

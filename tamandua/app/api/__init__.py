@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from tamandua.app.api import assets, auth, compliance, cron, findings, images, imports, intel, metrics, notifications, onboarding, pullrequests, reporting, repositories, runs, scanning, sources, static, system, threats
+from tamandua.app.api import assets, auth, compliance, cron, findings, images, imports, intel, jira, metrics, notifications, onboarding, pullrequests, reporting, repositories, runs, scanning, sources, static, system, threats
 from tamandua.app.api.deps import ApiError
 from tamandua.app.api.security import DEFAULT_CSP, State, host_allowed, public_url
 from tamandua.modules.identity.auth import COOKIE_NAME
@@ -25,7 +25,7 @@ from tamandua.shared.i18n import localize, msg, negotiate
 from tamandua.shared.vault import VaultError
 from tamandua.version import VERSION
 
-ROUTERS = (auth, system, metrics, cron, reporting, intel, findings, compliance, pullrequests, repositories, scanning, sources, threats, runs, assets, images, imports, notifications, onboarding, static)
+ROUTERS = (auth, system, metrics, cron, reporting, intel, findings, compliance, pullrequests, repositories, scanning, sources, jira, threats, runs, assets, images, imports, notifications, onboarding, static)
 
 
 def _security_headers(response, port: int) -> None:
@@ -130,7 +130,10 @@ def _invalid_parameters_as_400(document: dict) -> None:
     for name in ("HTTPValidationError", "ValidationError"):
         schemas.pop(name, None)
     schemas["Error"] = {"title": "Error", "type": "object", "required": ["error"],
-                        "properties": {"error": {"type": "string", "title": "Error", "description": "In the reader's language."}}}
+                        "properties": {"error": {"type": "string", "title": "Error", "description": "In the reader's language."},
+                                       "errors": {"type": "array", "maxItems": 100, "description": "When the error is about fields, one per field.",
+                                                  "items": {"type": "object", "required": ["field", "error"],
+                                                            "properties": {"field": {"type": "string"}, "error": {"type": "string"}}}}}}
     for operations in document.get("paths", {}).values():
         for operation in operations.values():
             responses = operation.get("responses", {})

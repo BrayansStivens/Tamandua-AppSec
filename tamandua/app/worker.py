@@ -41,7 +41,7 @@ def start_periodic(data_dir: Path, jobs: ScanJobs) -> list:
 
 
 class OutboxDrainer:
-    """Delivers the notification outbox every few seconds (with retries; see notifications.drain)."""
+    """Delivers the outbox every few seconds, with retries: notifications (notifications.drain) and Jira (jira_sync.drain)."""
 
     def __init__(self, data_dir: Path, interval: float = 10.0):
         self.data_dir, self.interval = data_dir, interval
@@ -56,12 +56,14 @@ class OutboxDrainer:
 
     def _loop(self) -> None:
         from tamandua.modules.integrations import notifications
+        from tamandua.modules.runs import jira_sync
         log = logging_setup.get("outbox")
         while not self._stop.wait(self.interval):
-            try:
-                notifications.drain(self.data_dir)
-            except Exception:  # noqa: BLE001 — a channel or the database being down doesn't stop the worker
-                log.exception("outbox_drain_failed")
+            for drain in (notifications.drain, jira_sync.drain):
+                try:
+                    drain(self.data_dir)
+                except Exception:  # noqa: BLE001 — a channel or the database being down doesn't stop the worker
+                    log.exception("outbox_drain_failed")
 
 
 LEADER_CHECK_SECONDS = 30

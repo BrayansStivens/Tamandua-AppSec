@@ -56,7 +56,7 @@ Tamandua reads your repositories' code and stores GitHub, AI and Jira credential
 | Image registry and Trivy database | Nothing of yours | At build time and when Trivy updates its database. |
 | Container registries (Docker Hub, GHCR, ECR…) | A request for the image you asked to scan, with your token if you saved one | When scanning an image. Registries on private IPs are blocked unless `TAMANDUA_ALLOW_PRIVATE_REGISTRIES=1`, so the form can't be used as a bridge into your internal network (SSRF). The check runs again when the scan starts, and the engine's container gets the checked address for the registry's name, so an answer that changes in between (DNS rebinding) isn't followed. |
 | `api.osv.dev` | Your dependencies' names and versions | **Only if you allow it**, per scan. Not used by default. |
-| Your Jira site | Title, description and priority of the issues you export | Only if you connect Jira and click export. |
+| Your Jira site | The fields you map for each issue (by default title, description, priority, labels and due date), and comments when a finding is verified fixed or reappears | Only if you connect Jira: when someone exports, or on its own for automatic routing rules. |
 | `api.openai.com`, `api.anthropic.com` | Your key, to check that it's valid | Only when you save or test it. Today the AI receives no code and no findings. |
 | Your domains | An HTTPS `HEAD` and a DNS TXT lookup | Only once dynamic testing is available (in development). Only to public addresses. |
 

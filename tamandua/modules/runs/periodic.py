@@ -33,7 +33,17 @@ class Task:
 
 def _outbox(data_dir: Path, jobs) -> object:
     from tamandua.modules.integrations import notifications
-    return notifications.drain(data_dir)
+    from tamandua.modules.runs import jira_sync
+    # Each queue on its own: a channel failing doesn't hold Jira's back, nor the other way round.
+    sent, failure = 0, None
+    for drain in (notifications.drain, jira_sync.drain):
+        try:
+            sent += drain(data_dir)
+        except Exception as exc:  # noqa: BLE001 — re-raised once both queues had their turn
+            failure = exc
+    if failure is not None:
+        raise failure
+    return sent
 
 
 def _pull_requests(data_dir: Path, jobs) -> object:
