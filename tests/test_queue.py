@@ -3,6 +3,7 @@
 import json
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -168,7 +169,11 @@ class QueueTests(unittest.TestCase):
             self.assertTrue(first.execute(acquire, {"key": LEADER_KEY}).scalar())
             self.assertFalse(second.execute(acquire, {"key": LEADER_KEY}).scalar())
             first.invalidate()  # the leader dies: its connection truly closes (not back to the pool), freeing the lock
-            self.assertTrue(second.execute(acquire, {"key": LEADER_KEY}).scalar())
+            # PostgreSQL frees it when that backend notices the closed socket: moments later, not at once.
+            deadline = time.monotonic() + 5
+            while not (acquired := second.execute(acquire, {"key": LEADER_KEY}).scalar()) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertTrue(acquired)
         finally:
             second.close()
 
