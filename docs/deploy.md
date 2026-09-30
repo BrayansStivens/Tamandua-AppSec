@@ -10,7 +10,7 @@ Tamandua has three pieces, and each one can live wherever suits you:
 | **Worker** | A long-running process that runs the analysis engines. | `ghcr.io/brayansstivens/tamandua-worker` (engines inside), or the API image with the Docker socket |
 | **PostgreSQL** | Version 16 or later, managed or in a container. | — |
 
-Each version tag publishes the images, signed and multi-architecture (the first ones: `0.9.0` and `0.9.1`). You can also build them from the repository (`make build`, or `docker build --target worker-standalone -f docker/app/Dockerfile .` for the worker).
+Each version tag publishes the images, signed and multi-architecture (use `0.10.0` or later: in `0.9.0` and `0.9.1` the `tamandua` image started the worker instead of the API). You can also build them from the repository (`make build`, or `docker build --target worker-standalone -f docker/app/Dockerfile .` for the worker).
 
 ## Access while the repository is private
 

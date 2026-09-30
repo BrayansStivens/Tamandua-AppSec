@@ -10,7 +10,7 @@ English · [Español](README.es.md)
 
 Tamandua scans your repositories and container images, tells you **what to fix first and how** (the exact command or a code example), confirms the fix landed and **keeps watching** whatever changes next. Everything runs on your machine with your credentials: your code never reaches any service of ours.
 
-> Status: **beta (v0.9)**. It works and is tested, but the API and the `data/` formats may still change between releases.
+> Status: **beta (v0.10)**. It works and is tested, but the API and the `data/` formats may still change between releases.
 
 ## Why Tamandua
 

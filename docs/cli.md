@@ -103,7 +103,7 @@ It prints one line per tool. Exit codes: `0` imported, `2` usage, document or se
 
 ## In CI
 
-In CI, Tamandua runs from the published worker image, `ghcr.io/brayansstivens/tamandua-worker:0.9`, which carries
+In CI, Tamandua runs from the published worker image, `ghcr.io/brayansstivens/tamandua-worker:0.10`, which carries
 the engines and runs them as processes of its own: no build, and no Docker socket.
 
 ### GitHub Actions
@@ -132,7 +132,7 @@ jobs:
           fetch-depth: 0              # history is needed to compare against the base
           persist-credentials: false
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.9   # pin it to the tag's commit SHA, as with the other actions
+        uses: BrayansStivens/appsec-agent@v0.10.0   # pin it to the tag's commit SHA, as with the other actions
         with:
           exclude: |
             fixtures/
@@ -154,7 +154,7 @@ in English unless the step sets `env: TAMANDUA_DEFAULT_LOCALE: es`.
 | `exclude` | empty | One pattern per line; each becomes an `--exclude`. |
 | `name` | the repository's name | Like `--name`. |
 | `sarif` | `$RUNNER_TEMP/tamandua.sarif` | Where to write the SARIF (relative paths start at the workspace). |
-| `image` | `ghcr.io/brayansstivens/tamandua-worker:0.9` | Worker image. Pin it by digest (`…@sha256:…`) if you want nothing to move under you. |
+| `image` | `ghcr.io/brayansstivens/tamandua-worker:0.10` | Worker image. Pin it by digest (`…@sha256:…`) if you want nothing to move under you. |
 | `allow-incomplete` | `false` | `true`: like `--allow-incomplete`. |
 | `scan` | `true` | `false`: skip the scan and only import (below). |
 | `import-sarif` | empty | SARIF files from other tools to send to a Tamandua server, one per line. |
@@ -190,7 +190,7 @@ logs in with `--password-stdin` and throws the credential away after the pull:
     steps:
       # …
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.9
+        uses: BrayansStivens/appsec-agent@v0.10.0
         with:
           registry-token: ${{ secrets.GHCR_TOKEN }}   # or ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -207,7 +207,7 @@ own scan:
         run: |
           python -m pip install semgrep   # pin the version
           semgrep scan --config p/ci --metrics off --sarif --output semgrep.sarif
-      - uses: BrayansStivens/appsec-agent@v0.9
+      - uses: BrayansStivens/appsec-agent@v0.10.0
         if: always()
         with:
           scan: false
@@ -216,8 +216,7 @@ own scan:
           token: ${{ secrets.TAMANDUA_IMPORT_TOKEN }}
 ```
 
-Leave `scan` at `true` to scan and import in the same step. The import needs `import-sarif` in the image, which
-arrives with the next release after 0.9.1.
+Leave `scan` at `true` to scan and import in the same step.
 
 ### GitLab CI
 
@@ -227,7 +226,7 @@ user. No Docker socket and no Docker-in-Docker.
 ```yaml
 tamandua:
   stage: test
-  image: ghcr.io/brayansstivens/tamandua-worker:0.9
+  image: ghcr.io/brayansstivens/tamandua-worker:0.10
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
@@ -245,7 +244,7 @@ the `shell` executor, use `docker run` as the Action does, without the socket:
 ```sh
 mkdir -p /tmp/tamandua-data   # created by you, not by Docker: it must belong to your user
 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/src:ro -v /tmp/tamandua-data:/data \
-  ghcr.io/brayansstivens/tamandua-worker:0.9 python -m tamandua scan /src --name "$CI_PROJECT_NAME" --base "origin/$BASE"
+  ghcr.io/brayansstivens/tamandua-worker:0.10 python -m tamandua scan /src --name "$CI_PROJECT_NAME" --base "origin/$BASE"
 ```
 
 > Tamandua's own repository runs the Action in [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), and also

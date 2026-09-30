@@ -10,7 +10,7 @@
 
 Tamandua analiza tus repositorios e imágenes de contenedor, te dice **qué corregir primero y cómo** (el comando exacto o un ejemplo de código), comprueba que quedó corregido y **vigila solo** lo que cambia después. Todo corre en tu máquina, con tus credenciales: tu código no va a ningún servicio nuestro.
 
-> Estado: **beta (v0.9)**. Funcional y con pruebas, pero la API y los formatos de `data/` aún pueden cambiar entre versiones.
+> Estado: **beta (v0.10)**. Funcional y con pruebas, pero la API y los formatos de `data/` aún pueden cambiar entre versiones.
 
 ## Por qué Tamandua
 

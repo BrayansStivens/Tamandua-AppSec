@@ -11,7 +11,7 @@ services:
     name: tamandua-api
     runtime: image
     image:
-      url: ghcr.io/brayansstivens/tamandua:0.9
+      url: ghcr.io/brayansstivens/tamandua:0.10
     healthCheckPath: /api/health
     envVars:
       - key: PORT
@@ -40,7 +40,7 @@ services:
     name: tamandua-worker
     runtime: image
     image:
-      url: ghcr.io/brayansstivens/tamandua-worker:0.9
+      url: ghcr.io/brayansstivens/tamandua-worker:0.10
     envVars:
       - key: TAMANDUA_DATABASE_URL
         fromDatabase:

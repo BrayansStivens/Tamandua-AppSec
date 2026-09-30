@@ -8,7 +8,7 @@ With a fresh server and a DNS record already pointing at it, it's four commands:
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9.1                                   # the release you want (see Upgrades)
+git checkout v0.10.0                                   # the release you want (see Upgrades)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS with Caddy + published images
 make up                                             # prints https://tamandua.example.com and the setup code
 ```
@@ -102,7 +102,7 @@ As the `tamandua` user (while the repository is private, log in to `ghcr.io` fir
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
-git checkout v0.9.1
+git checkout v0.10.0
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
 ```
@@ -134,7 +134,7 @@ Keep a copy of `.env` in your password manager: it holds the database password, 
 With the published images, check their signatures first ([cosign](https://docs.sigstore.dev/cosign/system_config/installation/) installed):
 
 ```bash
-make verify-images    # Signed by BrayansStivens/appsec-agent: ghcr.io/brayansstivens/tamandua:0.9 …
+make verify-images    # Signed by BrayansStivens/appsec-agent: ghcr.io/brayansstivens/tamandua:0.10 …
 make up
 ```
 
