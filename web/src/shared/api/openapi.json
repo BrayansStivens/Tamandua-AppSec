@@ -4437,6 +4437,11 @@
                       }
                     ],
                     "title": "Selections"
+                  },
+                  "force": {
+                    "type": "boolean",
+                    "title": "Force",
+                    "default": false
                   }
                 },
                 "additionalProperties": false,
@@ -4523,6 +4528,11 @@
                     "maxItems": 100,
                     "minItems": 1,
                     "title": "Selections"
+                  },
+                  "force": {
+                    "type": "boolean",
+                    "title": "Force",
+                    "default": false
                   }
                 },
                 "additionalProperties": false,
@@ -4531,7 +4541,7 @@
                   "selections"
                 ],
                 "title": "JiraQueueIn",
-                "description": "A large selection (up to 5000 findings): its issues are created in the background."
+                "description": "A large selection (up to 5000 findings): its issues are created in the background. `force`: also for findings\nthat already have an issue (a new one replaces the link)."
               }
             }
           },
@@ -4544,6 +4554,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/JiraQueued"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/integrations/jira/issues/batches": {
+      "get": {
+        "tags": [
+          "jira"
+        ],
+        "summary": "Jira Export Batches",
+        "description": "My queued selections: what the panel shows as work in the background.",
+        "operationId": "jira_export_batches_api_integrations_jira_issues_batches_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JiraBatches"
                 }
               }
             }
@@ -9399,6 +9431,24 @@
         ],
         "title": "JiraBackfills"
       },
+      "JiraBatches": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JiraQueued"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "JiraBatches",
+        "description": "The requester's recent queued selections, newest first."
+      },
       "JiraDestination": {
         "properties": {
           "id": {
@@ -9972,6 +10022,19 @@
             "type": "array",
             "maxItems": 5000,
             "title": "Rejected"
+          },
+          "linked_items": {
+            "items": {
+              "$ref": "#/components/schemas/JiraExportItem"
+            },
+            "type": "array",
+            "maxItems": 5000,
+            "title": "Linked Items"
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "default": false
           }
         },
         "type": "object",

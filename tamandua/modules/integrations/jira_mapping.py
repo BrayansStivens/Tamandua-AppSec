@@ -15,11 +15,11 @@ ones. A snapshot of the mapped fields is kept with the destination, so creating 
 Variables (one issue may cover several findings of one package: the notes say what a group takes):
 
 ======================  ==========  ==========================================================================
-``summary``             text        Tamandua's issue title: ``[SEVERITY] title``, or the package upgrade for a group
+``summary``             text        Tamandua's issue title: ``Severity: title in path:line``, or the package update
 ``title``               text        The finding's title (for a group, the package upgrade without the severity)
 ``severity``            text        critical, high, medium, low or info (a group: the highest)
 ``jira_priority``       text        Highest, High or Medium, from Tamandua's priority (act, attend, track)
-``description``         rich_text   The full description Tamandua writes today (how to fix, origin, fingerprints)
+``description``         rich_text   The developer's brief (runs/jira_brief.py): problem, where, fix, verify, deadline
 ``cwe``                 text        CWE-79, CWE-89 (a group: all of them)
 ``cve``                 text        The CVE identifiers (a group: all of them)
 ``package``             text        Package and installed version, e.g. ``lodash 4.17.20``
@@ -308,6 +308,8 @@ def _value(kind: str, field: dict, spec: dict, values: dict):
         if kind == "datetime":
             return _jira_datetime(value)
         return value
+    if kind == "rich_text" and source == "tamandua" and spec["key"] == "description" and values.get("_description_adf"):
+        return values["_description_adf"]  # the developer's brief, structured (runs/jira_brief.py)
     raw = substitute(spec["text"], values) if source == "template" else values.get(spec["key"])
     if raw is None or raw == "" or raw == []:
         return None

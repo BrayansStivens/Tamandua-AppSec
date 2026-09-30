@@ -375,7 +375,7 @@ class ExportTests(JiraCase):
         result = jira_sync.export(self.data_dir, [(self.annotated(record), [FP_A, FP_C])], by="analista")
         self.assertEqual({item["key"] for item in result["created"]}, {"SEC-101"})
         issue = self.fake.issues["SEC-101"]
-        self.assertEqual(issue["summary"], "[CRITICAL] Actualizar axios 1.0.0 a 1.2.0 · 2 avisos")
+        self.assertEqual(issue["summary"], "Crítica: actualizar axios 1.0.0 a 1.2.0 (2 vulnerabilidades)")
         self.assertEqual(issue["priority"], {"id": "2"})  # High, matched by name among the allowed values
         self.assertTrue({jira.label_for(FP_A), jira.label_for(FP_C)} <= set(issue["labels"]))
 
@@ -631,6 +631,57 @@ class QueuedExportTests(JiraCase):
         self.rule(id="default", destination=self.sec["id"], enabled=False)
         queued = jira_sync.queue_export(self.data_dir, [(triage.annotate(self.data_dir, record), [FP_A])], by="Ana")
         self.assertEqual((queued["queued"], [item["fingerprint"] for item in queued["rejected"]]), (0, [FP_A]))
+
+
+class DuplicateTests(QueuedExportTests):
+    def test_two_people_creating_the_same_issue_at_once_get_one(self):
+        import threading
+        import time
+        record = triage.annotate(self.data_dir, self.scan("org/api", [_finding(FP_A)]))
+        original, start = self.fake.__call__, threading.Barrier(2)
+
+        def slow(credentials, method, path, body=None):
+            if path == "/rest/api/3/issue":
+                time.sleep(0.3)  # Jira takes a while, and its search doesn't know the new issue yet
+            return original(credentials, method, path, body)
+
+        results = []
+        with patch.object(jira, "_http", slow):
+            def person(name):
+                start.wait()
+                results.append(jira_sync.export(self.data_dir, [(record, [FP_A])], by=name))
+            threads = [threading.Thread(target=person, args=(name,)) for name in ("ana", "luis")]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+        self.assertEqual(len(self.fake.issues), 1)
+        self.assertEqual(sorted(len(item["created"]) for item in results), [0, 1])
+
+    def test_create_anyway_replaces_the_link_and_remembers_the_old_issue(self):
+        record = triage.annotate(self.data_dir, self.scan("org/api", [_finding(FP_A)]))
+        jira_sync.export(self.data_dir, [(record, [FP_A])], by="ana")
+        again = jira_sync.export(self.data_dir, [(record, [FP_A])], by="ana")
+        self.assertEqual((len(again["created"]), len(again["existing"])), (0, 1))
+        forced = jira_sync.export(self.data_dir, [(record, [FP_A])], by="ana", force=True)
+        self.assertEqual((forced["created"][0]["key"], len(self.fake.issues)), ("SEC-102", 2))
+        link = jira_links.load_links(self.data_dir)["github:org/api"][FP_A]
+        self.assertEqual((link["key"], link["replaces"]), ("SEC-102", ["SEC-101"]))
+
+    def test_the_queue_lists_what_was_already_linked_and_can_force_it(self):
+        prints = [f"{index:064x}" for index in range(1, 61)]
+        record = triage.annotate(self.data_dir, self.scan("org/api", [_finding(item, package=f"pkg{index}") for index, item in enumerate(prints)]))
+        jira_sync.export(self.data_dir, [(record, prints[:2])], by="ana")
+        queued = jira_sync.queue_export(self.data_dir, [(record, prints)], by="ana", user="ana")
+        self.assertEqual((queued["queued"], queued["linked"], [item["key"] for item in queued["linked_items"]]), (58, 2, ["SEC-101", "SEC-102"]))
+        self.drain()
+        forced = jira_sync.queue_export(self.data_dir, [(record, prints[:2])], by="ana", user="ana", force=True)
+        self.assertEqual((forced["queued"], forced["linked"]), (2, 0))
+        self.drain()
+        self.assertEqual(len(self.fake.issues), 62)
+        mine = jira_sync.manual_batches(self.data_dir, "ana")
+        self.assertEqual([item["batch"] for item in mine], [forced["batch"], queued["batch"]])
+        self.assertEqual(jira_sync.manual_batches(self.data_dir, "luis"), [])
 
 
 class RouteTests(HttpCase):

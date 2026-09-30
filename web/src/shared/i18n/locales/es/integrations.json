@@ -271,12 +271,9 @@
       "submit_other": "Crear incidencias"
     },
     "queue": {
-      "intro": "Más de {{max}} hallazgos pasan por la cola: Tamandua crea las incidencias en segundo plano, con unos segundos entre una y otra, y puedes cerrar esta ventana.",
-      "background": "Tamandua crea estas incidencias en segundo plano, con unos segundos entre una y otra, y reintenta si Jira falla. Puedes cerrar esta ventana: sigue avanzando.",
+      "intro": "Más de {{max}} hallazgos pasan por la cola: esta ventana se cierra y Tamandua crea las incidencias en segundo plano, con unos segundos entre una y otra. Síguelas desde el indicador de Jira arriba.",
       "progress_one": "{{done}} de {{total}} incidencias · {{pending}} en cola",
       "progress_other": "{{done}} de {{total}} incidencias · {{pending}} en cola",
-      "finished_one": "Terminado: {{count}} incidencia procesada",
-      "finished_other": "Terminado: {{count}} incidencias procesadas",
       "progress_label": "Incidencias procesadas",
       "findings_one": "{{count}} hallazgo",
       "findings_other": "{{count}} hallazgos",
@@ -289,6 +286,40 @@
       "last_error": "Último error: {{error}}",
       "rejected_one": "{{count}} hallazgo sin poner en cola:",
       "rejected_other": "{{count}} hallazgos sin poner en cola:"
+    },
+    "background": {
+      "started_one": "Creando {{count}} incidencia en Jira en segundo plano",
+      "started_other": "Creando {{count}} incidencias en Jira en segundo plano",
+      "nothing_one": "Nada que crear: {{count}} hallazgo ya tenía incidencia",
+      "nothing_other": "Nada que crear: {{count}} hallazgos ya tenían incidencia",
+      "finished_one": "Jira: {{count}} incidencia creada",
+      "finished_other": "Jira: {{count}} incidencias creadas",
+      "finished_failed_one": "Jira: {{count}} incidencia creada · {{failed}} con error",
+      "finished_failed_other": "Jira: {{count}} incidencias creadas · {{failed}} con error",
+      "label": "Jira {{done}}/{{total}} · incidencias creándose en segundo plano",
+      "label_done": "Jira · incidencias creadas en segundo plano",
+      "chip": "Jira {{done}}/{{total}}",
+      "title": "Incidencias de Jira en segundo plano",
+      "help": "Tus selecciones grandes. Siguen avanzando aunque cierres o recargues la página.",
+      "batch_done_one": "Terminado: {{created}} de {{count}} incidencia creada",
+      "batch_done_other": "Terminado: {{created}} de {{count}} incidencias creadas",
+      "forced": "incidencias nuevas aunque ya hubiera enlace",
+      "started_at": "empezó el {{date}}",
+      "finished_at": "terminó el {{date}}",
+      "review": "Revisar",
+      "linked_list": "Incidencias que ya tienen estos hallazgos",
+      "force_queued_one": "{{count}} incidencia nueva en cola.",
+      "force_queued_other": "{{count}} incidencias nuevas en cola.",
+      "none_routed": "Nada que poner en cola: ninguna regla envía estos hallazgos a Jira"
+    },
+    "force": {
+      "title": "Crear incidencias nuevas de todos modos",
+      "action_one": "Crear una incidencia nueva de todos modos",
+      "action_other": "Crear incidencias nuevas de todos modos",
+      "explain_one": "Tamandua crea una incidencia nueva para este hallazgo y la enlaza en lugar de la actual. La actual sigue en Jira, sin cambios.",
+      "explain_other": "Tamandua crea una incidencia nueva para cada uno de estos {{count}} hallazgos y la enlaza en lugar de la actual. Las actuales siguen en Jira, sin cambios.",
+      "confirm_one": "Crear {{count}} incidencia nueva",
+      "confirm_other": "Crear {{count}} incidencias nuevas"
     }
   },
   "notifications": {

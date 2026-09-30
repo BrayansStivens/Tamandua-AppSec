@@ -271,12 +271,9 @@
       "submit_other": "Create issues"
     },
     "queue": {
-      "intro": "More than {{max}} findings go through the queue: Tamandua creates the issues in the background, a few seconds apart, and you can close this window.",
-      "background": "Tamandua creates these issues in the background, a few seconds apart, retrying if Jira fails. You can close this window: it keeps going.",
+      "intro": "More than {{max}} findings go through the queue: this window closes and Tamandua creates the issues in the background, a few seconds apart. Follow them from the Jira indicator at the top.",
       "progress_one": "{{done}} of {{total}} issues · {{pending}} in the queue",
       "progress_other": "{{done}} of {{total}} issues · {{pending}} in the queue",
-      "finished_one": "Done: {{count}} issue processed",
-      "finished_other": "Done: {{count}} issues processed",
       "progress_label": "Issues processed",
       "findings_one": "{{count}} finding",
       "findings_other": "{{count}} findings",
@@ -289,6 +286,40 @@
       "last_error": "Last error: {{error}}",
       "rejected_one": "{{count}} finding not queued:",
       "rejected_other": "{{count}} findings not queued:"
+    },
+    "background": {
+      "started_one": "Creating {{count}} issue in Jira in the background",
+      "started_other": "Creating {{count}} issues in Jira in the background",
+      "nothing_one": "Nothing to create: {{count}} finding already had an issue",
+      "nothing_other": "Nothing to create: {{count}} findings already had an issue",
+      "finished_one": "Jira: {{count}} issue created",
+      "finished_other": "Jira: {{count}} issues created",
+      "finished_failed_one": "Jira: {{count}} issue created · {{failed}} failed",
+      "finished_failed_other": "Jira: {{count}} issues created · {{failed}} failed",
+      "label": "Jira {{done}}/{{total}} · issues being created in the background",
+      "label_done": "Jira · issues created in the background",
+      "chip": "Jira {{done}}/{{total}}",
+      "title": "Jira issues in the background",
+      "help": "Your large selections. They keep going if you close or reload the page.",
+      "batch_done_one": "Finished: {{created}} of {{count}} issue created",
+      "batch_done_other": "Finished: {{created}} of {{count}} issues created",
+      "forced": "new issues even if already linked",
+      "started_at": "started {{date}}",
+      "finished_at": "finished {{date}}",
+      "review": "Review",
+      "linked_list": "Issues these findings already have",
+      "force_queued_one": "{{count}} new issue queued.",
+      "force_queued_other": "{{count}} new issues queued.",
+      "none_routed": "Nothing to queue: no rule sends these findings to Jira"
+    },
+    "force": {
+      "title": "Create new issues anyway",
+      "action_one": "Create a new issue anyway",
+      "action_other": "Create new issues anyway",
+      "explain_one": "Tamandua creates a new issue for this finding and links it instead of the current one. The current issue stays in Jira, untouched.",
+      "explain_other": "Tamandua creates a new issue for each of these {{count}} findings and links it instead of the current one. The current issues stay in Jira, untouched.",
+      "confirm_one": "Create {{count}} new issue",
+      "confirm_other": "Create {{count}} new issues"
     }
   },
   "notifications": {

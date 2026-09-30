@@ -358,6 +358,65 @@ def adf(value: str) -> dict:
     return {"type": "doc", "version": 1, "content": content or [{"type": "paragraph", "content": [{"type": "text", "text": "—"}]}]}
 
 
+HTTPS_URL = re.compile(r"https://[^\s<>\"']{1,500}")
+CODE_LANGUAGE = re.compile(r"[a-z0-9+#.-]{1,20}")
+DOC_TEXT_MAX = 4000
+DOC_BLOCKS_MAX = 200
+
+
+def _inline(item) -> dict | None:
+    """One inline node: plain text, {"strong"}, {"code"} or {"link", "url"} (https only; anything else stays text)."""
+    if isinstance(item, str):
+        value, marks = item, []
+    elif isinstance(item, dict) and "link" in item:
+        value = str(item["link"])
+        url = str(item.get("url") or "")
+        marks = [{"type": "link", "attrs": {"href": url}}] if HTTPS_URL.fullmatch(url) else []
+    elif isinstance(item, dict) and ("strong" in item or "code" in item):
+        kind = "strong" if "strong" in item else "code"
+        value, marks = str(item[kind]), [{"type": kind}]
+    else:
+        return None
+    value = " ".join(_CONTROL.sub(" ", value).split())[:DOC_TEXT_MAX]  # one line: a paragraph's text
+    if not value:
+        return None
+    return {"type": "text", "text": value, **({"marks": marks} if marks else {})}
+
+
+def _paragraph(items) -> dict | None:
+    content = [node for node in (_inline(item) for item in (items if isinstance(items, list) else [items])) if node]
+    return {"type": "paragraph", "content": content} if content else None
+
+
+def adf_document(blocks: list[dict]) -> dict:
+    """Atlassian Document Format from Tamandua's own structure, never from Markdown: `{"heading": text}`,
+    `{"paragraph": [inline…]}`, `{"bullets"|"ordered": [[inline…], …]}` and `{"code": text, "language": …}`.
+    Every node is built here, so no text a finding carries (a title, a path, an advisory) can become a link, a macro
+    or any other node; links are only the https URLs Tamandua itself puts in."""
+    content: list[dict] = []
+    for block in blocks[:DOC_BLOCKS_MAX]:
+        if "heading" in block:
+            text_ = _CONTROL.sub(" ", str(block["heading"]))[:200]
+            if text_:
+                content.append({"type": "heading", "attrs": {"level": 3}, "content": [{"type": "text", "text": text_}]})
+        elif "paragraph" in block:
+            node = _paragraph(block["paragraph"])
+            if node:
+                content.append(node)
+        elif "bullets" in block or "ordered" in block:
+            kind = "bulletList" if "bullets" in block else "orderedList"
+            items = [paragraph for paragraph in (_paragraph(item) for item in (block.get("bullets") or block.get("ordered") or [])[:50]) if paragraph]
+            if items:
+                content.append({"type": kind, "content": [{"type": "listItem", "content": [item]} for item in items]})
+        elif "code" in block:
+            code = _CONTROL.sub(" ", str(block["code"]).replace("\r", ""))[:DOC_TEXT_MAX]
+            language = str(block.get("language") or "").lower()
+            if code.strip():
+                content.append({"type": "codeBlock", **({"attrs": {"language": language}} if CODE_LANGUAGE.fullmatch(language) else {}),
+                                "content": [{"type": "text", "text": code}]})
+    return {"type": "doc", "version": 1, "content": content or [{"type": "paragraph", "content": [{"type": "text", "text": "-"}]}]}
+
+
 def search_labels(project_key: str, fingerprints: list[str], *, http=None) -> str | None:
     """The key of an issue in the project carrying one of these findings' labels (created earlier or elsewhere)."""
     labels = ", ".join(f'"{label_for(item)}"' for item in fingerprints if re.fullmatch(r"[0-9a-f]{64}", item))

@@ -14,6 +14,7 @@ import { Pagination } from '@/shared/ui/pagination'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/shared/ui/select'
 import { JIRA_QUEUE_MAX, JiraExportDialog, JiraFindingAction, type TicketLink } from '@/features/integrations/jira-export'
 import { useJiraAvailability } from '@/features/integrations/jira-availability'
+import { useJiraSettled } from '@/features/integrations/jira-batches'
 import { SUPPRESSED, TRIAGE_LABEL, TriageActions, TriageBadge, TriageDialog, TriageHistory, type TriageState, type TriageStatus } from '@/features/findings/triage'
 import { api, query as buildQuery } from '@/shared/api/http'
 import {} from '@/shared/i18n'
@@ -122,6 +123,8 @@ export function RepositoryResult({ run, onNew, onChanged, canAccept, canManage =
   const source = run.source as { id?: string; uid?: string | null; name?: string } | undefined
   const assetRef = source ? { key: source.uid || source.id || source.name || '', name: source.name } : null
   const jira = useJiraAvailability(canManage, assetRef)
+  // Issues queued in the background land in the findings when their batch finishes.
+  useJiraSettled(() => onChanged())
   const [offset, setOffset] = useState(arrival?.offset ?? 0)
   const [downloadError, setDownloadError] = useState('')
   const [downloading, setDownloading] = useState<string | null>(null)

@@ -26,7 +26,7 @@ export const keys = {
   jira: ['jira'] as const,
   jiraRouting: ['jira', 'routing'] as const,
   jiraBackfill: ['jira', 'backfill'] as const,
-  jiraBatch: (batch: string) => ['jira', 'batch', batch] as const,
+  jiraBatches: ['jira', 'batches'] as const,
   jiraVariables: ['jira', 'variables'] as const,
   jiraProjects: (q: string) => ['jira', 'projects', q] as const,
   jiraIssueTypes: (project: string) => ['jira', 'issue-types', project] as const,
@@ -126,10 +126,21 @@ export const jiraFieldValuesQuery = (project: string, issueType: string, field: 
   queryKey: keys.jiraFieldValues(project, issueType, field, q), staleTime: 60_000,
   queryFn: ({ signal }) => api.get<JiraFieldValues>(`/api/integrations/jira/projects/${encodeURIComponent(project)}/issue-types/${encodeURIComponent(issueType)}/fields/${encodeURIComponent(field)}/values?${query({ q, limit: 50 })}`, { signal }),
 })
-// A large selection queued for Jira: polled only while issues are still waiting in the queue.
+// Large selections queued for Jira (the requester's, newest first). Polled only while one still has issues waiting.
+// `linked_items` and `rejected` only come in the queue's answer: they are kept across polls.
 export type JiraQueued = components['schemas']['JiraQueued']
-export const jiraBatchQuery = (batch: string) => queryOptions({
-  queryKey: keys.jiraBatch(batch),
-  queryFn: ({ signal }) => api.get<JiraQueued>(`/api/integrations/jira/issues/batches/${encodeURIComponent(batch)}`, { signal }),
-  refetchInterval: query => (query.state.data?.pending ?? 1) > 0 ? 3000 : false,
+export type JiraBatches = components['schemas']['JiraBatches']
+const keepDetail = (previous: unknown, next: unknown): unknown => {
+  const before = new Map(((previous as JiraBatches | undefined)?.items ?? []).map(item => [item.batch, item]))
+  const merged = (next as JiraBatches).items.map(item => {
+    const known = before.get(item.batch)
+    return { ...item, linked_items: item.linked_items ?? known?.linked_items, rejected: item.rejected ?? known?.rejected }
+  })
+  return { ...(next as JiraBatches), items: merged }
+}
+export const jiraBatchesQuery = () => queryOptions({
+  queryKey: keys.jiraBatches,
+  queryFn: ({ signal }) => api.get<JiraBatches>('/api/integrations/jira/issues/batches', { signal }),
+  structuralSharing: keepDetail,
+  refetchInterval: query => (query.state.data?.items ?? []).some(item => item.pending > 0) ? 3000 : false,
 })

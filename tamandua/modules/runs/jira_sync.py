@@ -34,6 +34,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from tamandua.modules.findings import registry, sla, tickets, triage
+from tamandua.modules.runs.jira_brief import brief, severity_label
 from tamandua.modules.findings.kinds import ADVISORY_RUNS, FULL_SCANS, IMPORT_RUNS
 from tamandua.modules.integrations import jira, jira_routing as routing
 from tamandua.modules.integrations.jira_mapping import build
@@ -109,7 +110,8 @@ def _first_seen(data_dir: Path, key: str, findings: dict, fallback: str) -> dict
     return seen
 
 
-def values(group: list[dict], findings: dict, *, key: str, asset: str, first_seen: dict, days: dict, locale: str) -> dict:
+def values(group: list[dict], findings: dict, *, key: str, asset: str, first_seen: dict, days: dict, locale: str,
+           source: dict | None = None) -> dict:
     """Every Tamandua variable (see `jira_mapping`) for one issue: a ticket group and its localized findings."""
     first = group[0]
     finding = findings.get(first["fingerprint"]) or {}
@@ -126,17 +128,24 @@ def values(group: list[dict], findings: dict, *, key: str, asset: str, first_see
         names = {"package": package["name"], "version": package.get("version"), "count": len(group)}
         title = (t("integrations.jira.issue.group_title", locale, target=target, **names) if target
                  else t("integrations.jira.issue.group_title_unfixed", locale, **names))
-        summary = (t("integrations.jira.issue.group_summary", locale, target=target, severity=severity.upper(), **names) if target
-                   else t("integrations.jira.issue.group_summary_unfixed", locale, severity=severity.upper(), **names))
-        header = [t("integrations.jira.issue.package", locale, package=package["name"], version=package.get("version"),
-                    ecosystem=package.get("ecosystem")),
-                  t("integrations.jira.issue.fix_closes", locale, target=target, count=len(fixes)) if target else
-                  t("integrations.jira.issue.no_fix", locale), ""]
-        description = "\n".join(header) + "\n\n".join(text(ticket["description"], locale) for ticket in group)
+        summary = (t("integrations.jira.issue.group_summary", locale, target=target, severity=severity_label(severity, locale), **names)
+                   if target else t("integrations.jira.issue.group_summary_unfixed", locale, severity=severity_label(severity, locale), **names))
+    elif package.get("name"):
+        # One advisory of a package: the action (update to…), not the advisory's title, like a group.
+        identifier = next(iter(finding.get("cve") or finding.get("ghsa") or [finding.get("rule_id") or ""]), "")
+        names = {"package": package["name"], "version": package.get("version") or "?", "id": identifier,
+                 "severity": severity_label(severity, locale)}
+        title = text(finding.get("title"), locale)
+        summary = (t("integrations.jira.issue.package_summary", locale, target=target, **names) if target
+                   else t("integrations.jira.issue.package_summary_unfixed", locale, **names))
     else:
-        title, summary, description = text(finding.get("title"), locale), text(first["summary"], locale), text(first["description"], locale)
-    trace = "\n".join(t("integrations.jira.issue.fingerprint", locale, fingerprint=ticket["fingerprint"]) for ticket in group)
-    description = f"{description}\n\n{t('integrations.jira.issue.origin', locale, source=text(first['source'], locale), run_id=first['run_id'])}\n{trace}"
+        title = text(finding.get("title"), locale)
+        where = f"{finding.get('path')}:{finding['line']}" if isinstance(finding.get("line"), int) and finding.get("line") else finding.get("path")
+        summary = t("integrations.jira.issue.summary", locale, severity=severity_label(severity, locale), title=title, where=where or "?") \
+            if where else t("integrations.jira.issue.summary_nowhere", locale, severity=severity_label(severity, locale), title=title)
+    written = brief(group, findings, asset=asset, source=source, first_seen=first_seen, days=days,
+                    panel_url=_finding_link(key, first["fingerprint"]), locale=locale)
+    description = written["text"]
     labels: list[str] = []
     for ticket in group:
         labels.extend(item for item in ticket["labels"] if item not in labels)
@@ -147,6 +156,7 @@ def values(group: list[dict], findings: dict, *, key: str, asset: str, first_see
     deadlines = sorted(filter(None, ((sla.deadline(ticket["severity"], first_seen.get(ticket["fingerprint"]), days) or {}).get("due")
                                      for ticket in group)))
     return {"summary": summary, "title": title, "severity": severity, "jira_priority": priority, "description": description,
+            "_description_adf": jira.adf_document(written["blocks"]),
             "cwe": ", ".join(cwes) or None, "cve": ", ".join(cves) or None,
             "package": f"{package['name']} {package.get('version') or ''}".strip() if package.get("name") else None,
             "fixed_version": target, "path": finding.get("path"), "line": finding.get("line") if isinstance(finding.get("line"), int) else None,
@@ -177,22 +187,34 @@ def _create(destination: dict, fields: dict, http) -> str:
         return jira.create_issue(fields, http=http)
 
 
-def _deliver(data_dir: Path, key: str, group: list[dict], issue_values: dict, destination: dict, *, by: str, http) -> tuple[str, dict]:
-    """Links or creates the issue of one group. Returns ("created" | "existing", link)."""
+def _deliver(data_dir: Path, key: str, group: list[dict], issue_values: dict, destination: dict, *, by: str, http,
+             force: bool = False) -> tuple[str, dict]:
+    """Links or creates the issue of one group. Returns ("created" | "existing", link).
+
+    Its findings stay locked (PostgreSQL, across workers and replicas) from the check to the stored link: two people
+    creating the same issue at once wait for each other, and the second finds the first's link. Jira's search lags a
+    few seconds behind a new issue, so the stored link is what really prevents the duplicate. `force`: a person asked
+    for a new issue although one exists (closed, wrong project): the new link replaces the old one, remembered."""
     prints = [ticket["fingerprint"] for ticket in group]
-    known = tickets.load_links(data_dir).get(key, {})
-    link = next((known[item] for item in prints if item in known), None)
-    outcome = "existing"
-    if link is None:
-        found = jira.search_labels(destination["project"]["key"], prints, http=http)
-        if found is None:
-            found = _create(destination, build(destination, issue_values, prints), http)
-            outcome = "created"
-        link = {"key": found, "url": jira.browse_url(found), "linked_at": _stamp(), "by": by, "destination": destination["id"],
-                "project": destination["project"]["key"]}
-    for item in prints:
-        if item not in known:
-            tickets.remember(data_dir, key, item, link)
+    with db.transaction(data_dir) as connection:
+        for item in sorted(set(prints)):
+            db.lock(connection, "jira-issue", key, item)
+        known = tickets.load_links(data_dir).get(key, {})
+        link = None if force else next((known[item] for item in prints if item in known), None)
+        outcome = "existing"
+        if link is None:
+            found = None if force else jira.search_labels(destination["project"]["key"], prints, http=http)
+            if found is None:
+                found = _create(destination, build(destination, issue_values, prints), http)
+                outcome = "created"
+            link = {"key": found, "url": jira.browse_url(found), "linked_at": _stamp(), "by": by, "destination": destination["id"],
+                    "project": destination["project"]["key"]}
+            previous = sorted({known[item]["key"] for item in prints if isinstance(known.get(item), dict) and known[item].get("key")})
+            if force and previous:
+                link["replaces"] = previous
+        for item in prints:
+            if force or item not in known:
+                tickets.remember(data_dir, key, item, link)
     return outcome, link
 
 
@@ -200,7 +222,8 @@ def _public(link: dict) -> dict:
     return {name: link.get(name) for name in ("key", "url", "linked_at", "by", "project", "destination")}
 
 
-def export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, http=None, locale: str | None = None) -> dict:
+def export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, http=None, locale: str | None = None,
+           force: bool = False) -> dict:
     """Creates (or links) the issues of the selected findings: [(record, fingerprints)], a record being a run annotated
     with triage or an asset's state. Returns the created, existing and failed ones, each with its project."""
     locale = locale or default_locale()
@@ -228,8 +251,9 @@ def export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, http
             continue
         for group in _groups([by_fingerprint[item] for item in prints]):
             try:
-                issue = values(group, findings, key=key, asset=text(name, locale) or key, first_seen=seen, days=days, locale=locale)
-                outcome, link = _deliver(data_dir, key, group, issue, target, by=by, http=http)
+                issue = values(group, findings, key=key, asset=text(name, locale) or key, first_seen=seen, days=days, locale=locale,
+                               source=record.get("source"))
+                outcome, link = _deliver(data_dir, key, group, issue, target, by=by, http=http, force=force)
             except (jira.JiraError, KeyError, TypeError) as exc:
                 message = exc.message if isinstance(exc, jira.JiraError) else msg("integrations.jira.unexpected")
                 failed.extend({"fingerprint": ticket["fingerprint"], "asset": key, "error": message} for ticket in group)
@@ -240,7 +264,7 @@ def export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, http
     return {"created": created, "existing": existing, "failed": failed}
 
 
-def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str) -> dict:
+def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str, user: str = "", force: bool = False) -> dict:
     """A selection too big to create while the browser waits: each issue is queued (spaced, retried, idempotent) and
     `manual_status` follows it. Findings no rule routes fail right away, like in `export`."""
     jira.credentials()
@@ -250,6 +274,7 @@ def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str
         raise jira.JiraError(msg("integrations.jira.batch_size", max=MANUAL_MAX))
     state, locale = routing.load(data_dir), default_locale()
     queued, links, work, failed, linked = _queued_creates(data_dir), tickets.load_links(data_dir), [], [], 0
+    linked_items: list[dict] = []
     for record, prints in selections:
         by_fingerprint, _, _, _ = _prepared(data_dir, record, locale)
         if any(item not in by_fingerprint for item in prints):
@@ -260,15 +285,18 @@ def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str
         if target is None:
             failed += [{"fingerprint": item, "asset": key, "error": msg("integrations.jira.no_destination")} for item in prints]
             continue
-        already = links.get(key, {})
+        already = {} if force else links.get(key, {})
+        for item in dict.fromkeys(prints):
+            if item in already and len(linked_items) < MANUAL_MAX:
+                linked_items.append({"fingerprint": item, "asset": key, **_public(already[item])})
         linked += sum(1 for item in dict.fromkeys(prints) if item in already)
         wanted = [by_fingerprint[item] for item in dict.fromkeys(prints) if (key, item) not in queued and item not in already]
         work += [(key, target["id"], [ticket["fingerprint"] for ticket in group]) for group in _groups(wanted)]
     batch, now = uuid.uuid4().hex[:16], datetime.now(timezone.utc)
     rows = [{"payload": {"type": "create", "trigger": "manual", "asset": key, "destination": destination, "batch": batch,
-                         "by": str(by)[:80], "fingerprints": prints},
+                         "by": str(by)[:80], "force": force, "fingerprints": prints},
              "next_attempt_at": now + timedelta(seconds=index * BACKFILL_SPACING)} for index, (key, destination, prints) in enumerate(work)]
-    entry = {"batch": batch, "by": str(by)[:80], "started_at": _stamp(), "finished_at": None if rows else _stamp(), "queued": len(rows),
+    entry = {"batch": batch, "by": str(by)[:80], "user": str(user)[:80], "force": force, "started_at": _stamp(), "finished_at": None if rows else _stamp(), "queued": len(rows),
              "findings": sum(len(prints) for _, _, prints in work), "linked": linked, "created": 0, "existing": 0, "skipped": 0,
              "failed": 0, "last_error": None}
     with db.transaction(data_dir):
@@ -278,7 +306,15 @@ def queue_export(data_dir: Path, selections: list[tuple[dict, list]], *, by: str
                 status.pop(old, None)
         _queue(data_dir, rows)
     _log.info("jira_export_queued", extra={"user": by, "reason": f"{len(rows)} issues, {entry['findings']} findings, {len(failed)} failed"})
-    return {**entry, "pending": len(rows), "rejected": failed}
+    return {**entry, "pending": len(rows), "rejected": failed, "linked_items": linked_items}
+
+
+def manual_batches(data_dir: Path, user: str) -> list[dict]:
+    """This person's recent queued selections, newest first, with their pending counts (the panel's background tasks)."""
+    status = documents.load(data_dir, MANUAL_DOCUMENT, {})
+    mine = [entry for entry in (status.values() if isinstance(status, dict) else []) if isinstance(entry, dict) and entry.get("user") == user]
+    return [found for found in (manual_status(data_dir, entry["batch"]) for entry in
+            sorted(mine, key=lambda item: str(item.get("started_at")), reverse=True)) if found is not None]
 
 
 def manual_status(data_dir: Path, batch: str) -> dict | None:
@@ -556,8 +592,10 @@ def _deliver_create(data_dir: Path, payload: dict, http) -> str:
     group = [by_fingerprint[item] for item in payload.get("fingerprints") or [] if item in by_fingerprint]
     if not group:
         return "skipped"  # fixed, dismissed or excluded meanwhile
-    issue = values(group, findings, key=key, asset=text(name, locale) or key, first_seen=seen, days=days, locale=locale)
-    outcome, _ = _deliver(data_dir, key, group, issue, target, by=payload.get("by") or "tamandua", http=http)
+    issue = values(group, findings, key=key, asset=text(name, locale) or key, first_seen=seen, days=days, locale=locale,
+                   source=view.get("source"))
+    outcome, _ = _deliver(data_dir, key, group, issue, target, by=payload.get("by") or "tamandua", http=http,
+                          force=bool(payload.get("force")) and payload.get("trigger") == "manual")
     return outcome
 
 

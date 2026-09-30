@@ -1,6 +1,7 @@
 """The Jira issue linked to each finding, per asset and fingerprint (`jira-links`).
 
-A link is {key, url, linked_at, by, destination, project} and, once Tamandua commented on the issue, `sync`: "fixed"
+A link is {key, url, linked_at, by, destination, project} (plus `replaces`, the earlier issues, when someone asked to
+create a new one anyway) and, once Tamandua commented on the issue, `sync`: "fixed"
 after the verified-fix comment, "open" after the reappeared one. Creating issues is `runs/jira_sync.py`; the connector,
 `integrations/jira.py`.
 """

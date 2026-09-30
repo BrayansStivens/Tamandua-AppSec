@@ -1448,6 +1448,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/integrations/jira/issues/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jira Export Batches
+         * @description My queued selections: what the panel shows as work in the background.
+         */
+        get: operations["jira_export_batches_api_integrations_jira_issues_batches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/integrations/jira/issues/batches/{batch}": {
         parameters: {
             query?: never;
@@ -2933,6 +2953,14 @@ export interface components {
             items: components["schemas"]["JiraBackfill"][];
         };
         /**
+         * JiraBatches
+         * @description The requester's recent queued selections, newest first.
+         */
+        JiraBatches: {
+            /** Items */
+            items: components["schemas"]["JiraQueued"][];
+        };
+        /**
          * JiraDestination
          * @description Project + issue type + mapping. `fields`: the snapshot of the mapped fields (null for one migrated from the
          *     single project of earlier versions, `legacy`, until it is saved again).
@@ -3149,6 +3177,13 @@ export interface components {
             last_error: string | null;
             /** Rejected */
             rejected?: components["schemas"]["JiraExportItem"][];
+            /** Linked Items */
+            linked_items?: components["schemas"]["JiraExportItem"][];
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
         };
         /** JiraRouting */
         JiraRouting: {
@@ -6867,6 +6902,11 @@ export interface operations {
                         /** Fingerprints */
                         fingerprints: string[];
                     }[] | null;
+                    /**
+                     * Force
+                     * @default false
+                     */
+                    force?: boolean;
                 };
             };
         };
@@ -6901,6 +6941,11 @@ export interface operations {
                         /** Fingerprints */
                         fingerprints: string[];
                     }[];
+                    /**
+                     * Force
+                     * @default false
+                     */
+                    force?: boolean;
                 };
             };
         };
@@ -6912,6 +6957,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JiraQueued"];
+                };
+            };
+        };
+    };
+    jira_export_batches_api_integrations_jira_issues_batches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JiraBatches"];
                 };
             };
         };

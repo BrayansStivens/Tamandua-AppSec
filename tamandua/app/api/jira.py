@@ -236,6 +236,14 @@ class JiraQueued(BaseModel):
     pending: int
     last_error: str | None
     rejected: list[JiraExportItem] = Field(default_factory=list, max_length=jira_sync.MANUAL_MAX)
+    # The findings skipped because they already have an issue (only in the queue's first answer): «create anyway».
+    linked_items: list[JiraExportItem] = Field(default_factory=list, max_length=jira_sync.MANUAL_MAX)
+    force: bool = False
+
+
+class JiraBatches(BaseModel):
+    """The requester's recent queued selections, newest first."""
+    items: list[JiraQueued] = Field(max_length=jira_sync.MANUAL_KEPT)
 
 
 # --- requests ------------------------------------------------------------------------------------------------------
@@ -313,9 +321,11 @@ class JiraQueueSelectionIn(JiraSelectionIn):
 
 
 class JiraQueueIn(BaseModel):
-    """A large selection (up to 5000 findings): its issues are created in the background."""
+    """A large selection (up to 5000 findings): its issues are created in the background. `force`: also for findings
+    that already have an issue (a new one replaces the link)."""
     model_config = ConfigDict(extra="forbid")
     selections: list[JiraQueueSelectionIn] = Field(min_length=1, max_length=100)
+    force: bool = False
 
 
 class JiraExportIn(BaseModel):
@@ -325,6 +335,7 @@ class JiraExportIn(BaseModel):
     asset: str | None = Field(None, max_length=300)
     fingerprints: Any = None
     selections: list[JiraSelectionIn] | None = Field(None, max_length=jira.MAX_BATCH)
+    force: bool = False  # create new issues even for findings that already have one
 
 
 # --- helpers -------------------------------------------------------------------------------------------------------
@@ -579,7 +590,7 @@ def jira_export(context: Context = Depends(guard(Policy(action="export-jira", bo
         selections = [(_record(context, data.run_id, data.asset), data.fingerprints)]
     try:
         # Issues are read by the whole team: TAMANDUA_DEFAULT_LOCALE, not the requester's language.
-        return context.render(jira_sync.export(context.data_dir, selections, by=_by(context), locale=default_locale()))
+        return context.render(jira_sync.export(context.data_dir, selections, by=_by(context), locale=default_locale(), force=data.force))
     except jira.JiraError as exc:
         raise ApiError(400, problem(exc)) from exc
 
@@ -591,9 +602,15 @@ def jira_export_queue(context: Context = Depends(guard(Policy(action="export-jir
     """Queues the issues of a large selection; `GET …/issues/batches/{batch}` follows them."""
     selections = [(_record(context, item.run_id, item.asset), item.fingerprints) for item in data.selections]
     try:
-        return context.render(jira_sync.queue_export(context.data_dir, selections, by=_by(context)))
+        return context.render(jira_sync.queue_export(context.data_dir, selections, by=_by(context), user=_by(context), force=data.force))
     except jira.JiraError as exc:
         raise ApiError(400, problem(exc)) from exc
+
+
+@router.get("/api/integrations/jira/issues/batches", response_model=JiraBatches)
+def jira_export_batches(context: Context = Depends(guard(Policy()))) -> Any:
+    """My queued selections: what the panel shows as work in the background."""
+    return context.render({"items": jira_sync.manual_batches(context.data_dir, _by(context))})
 
 
 @router.get("/api/integrations/jira/issues/batches/{batch}", response_model=JiraQueued, responses={404: {"description": "Unknown batch"}})
