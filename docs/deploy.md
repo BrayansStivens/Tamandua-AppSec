@@ -10,7 +10,44 @@ Tamandua has three pieces, and each one can live wherever suits you:
 | **Worker** | A long-running process that runs the analysis engines. | `ghcr.io/brayansstivens/tamandua-worker` (engines inside), or the API image with the Docker socket |
 | **PostgreSQL** | Version 16 or later, managed or in a container. | — |
 
-The published images appear with the first tagged release. Until then, build them from the repository (`make build`, or `docker build --target worker-standalone -f docker/app/Dockerfile .` for the worker).
+Each version tag publishes the images, signed and multi-architecture (the first ones: `0.9.0` and `0.9.1`). You can also build them from the repository (`make build`, or `docker build --target worker-standalone -f docker/app/Dockerfile .` for the worker).
+
+## Access while the repository is private
+
+For now the repository and its images on GitHub's registry are private. Without access, `git clone` answers
+*Repository not found* and pulling an image answers *denied*. Once the maintainer has given you access, use two
+read-only credentials, one per job:
+
+| For | Credential | Permission |
+| --- | --- | --- |
+| Pulling the images | Classic personal access token, with an expiration date (GitHub's registry doesn't take fine-grained tokens) | Only `read:packages` |
+| Cloning the code | Deploy key: an SSH key the maintainer adds to the repository | Read-only, this repository only |
+
+On the server, as the user that runs Docker:
+
+```bash
+read -rs GHCR_TOKEN && printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u <your-github-user> --password-stdin
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/tamandua-deploy   # send ~/.ssh/tamandua-deploy.pub to the maintainer
+```
+
+The maintainer adds it under *Settings → Deploy keys* without *Allow write access*. Then clone with it, and keep it
+for the upgrades' `git fetch`:
+
+```bash
+export GIT_SSH_COMMAND='ssh -i ~/.ssh/tamandua-deploy -o IdentitiesOnly=yes'
+git clone git@github.com:BrayansStivens/appsec-agent.git && cd appsec-agent
+git config core.sshCommand "$GIT_SSH_COMMAND"
+```
+
+- `docker login` keeps the token in `~/.docker/config.json`, encoded but not encrypted: that's why it only reads
+  packages. `make up`, `make update` and `make verify-images` use it; no need to repeat it.
+- **One-file Compose** needs the same login. Take `deploy/compose.yaml` from the clone.
+- **Coolify, Dokploy, Render, Railway and other platforms:** add `ghcr.io` as a private registry in the platform, with
+  your user and the packages token.
+- **CI** (the `git clone` in [cli.md](cli.md)): store a deploy key as a secret and clone with it.
+
+When the repository becomes public, none of this is needed: revoke the token, ask for the deploy key to be removed and
+run `docker logout ghcr.io`.
 
 ## Pick a target
 

@@ -91,7 +91,9 @@ make setup DOMAIN=appsec.tu-dominio.com   # Caddy con HTTPS automático
 make up
 ```
 
-Así las imágenes se construyen en el servidor. Cuando haya una versión publicada, `PREBUILT=1` usa en su lugar las imágenes publicadas y firmadas.
+Así las imágenes se construyen en el servidor; `make setup DOMAIN=… PREBUILT=1` usa en su lugar las imágenes publicadas y firmadas.
+Mientras el repositorio sea privado, clonar y descargar necesitan acceso y credenciales de solo lectura: mira
+[Acceso mientras el repositorio sea privado](docs/es/despliegue.md#acceso-mientras-el-repositorio-sea-privado).
 
 A partir de ahí solo se llega a la API a través de Caddy, HTTP redirige a HTTPS y el certificado se renueva solo. La guía cubre dimensionado, sistema y cortafuegos, copias fuera del servidor y restauración, actualizaciones, métricas para Prometheus, y Coolify y Dokploy: [docs/es/despliegue-vps.md](docs/es/despliegue-vps.md).
 

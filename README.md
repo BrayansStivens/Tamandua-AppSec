@@ -91,7 +91,9 @@ make setup DOMAIN=appsec.your-domain.com   # Caddy with automatic HTTPS
 make up
 ```
 
-This builds the images on the server. Once a release is tagged, `PREBUILT=1` runs the published, signed images instead.
+This builds the images on the server; `make setup DOMAIN=… PREBUILT=1` runs the published, signed images instead.
+While the repository is private, cloning and pulling need access and read-only credentials: see
+[Access while the repository is private](docs/deploy.md#access-while-the-repository-is-private).
 
 The API is then reachable only through Caddy, HTTP redirects to HTTPS and the certificate renews itself. The guide covers sizing, OS and firewall, backups offsite and restore, upgrades, Prometheus metrics, and Coolify and Dokploy: [docs/deploy-vps.md](docs/deploy-vps.md).
 

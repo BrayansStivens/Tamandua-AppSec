@@ -13,8 +13,8 @@ make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS with Caddy + publish
 make up                                             # prints https://tamandua.example.com and the setup code
 ```
 
-Until the first release is tagged there are no published images yet: skip `git checkout` and `PREBUILT=1`, and the
-server builds from `main`.
+While the repository is private, `git clone` and the published images need access and two read-only credentials: set them
+up first as shown in [Access while the repository is private](deploy.md#access-while-the-repository-is-private).
 
 The rest of this page covers what to prepare before, and what to do after.
 
@@ -97,7 +97,8 @@ Optionally, a CAA record `0 issue "letsencrypt.org"` limits who can issue certif
 
 ## 4. Configure
 
-As the `tamandua` user:
+As the `tamandua` user (while the repository is private, log in to `ghcr.io` first and clone with the deploy key, as in
+[Access while the repository is private](deploy.md#access-while-the-repository-is-private)):
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent

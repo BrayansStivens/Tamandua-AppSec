@@ -13,8 +13,8 @@ make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS con Caddy + imágene
 make up                                             # muestra https://tamandua.example.com y el código de configuración
 ```
 
-Hasta que se etiquete la primera versión no hay imágenes publicadas: sáltate `git checkout` y `PREBUILT=1`, y el
-servidor construye desde `main`.
+Mientras el repositorio sea privado, `git clone` y las imágenes publicadas necesitan acceso y dos credenciales de solo
+lectura: prepáralas antes como explica [Acceso mientras el repositorio sea privado](despliegue.md#acceso-mientras-el-repositorio-sea-privado).
 
 El resto de la página cuenta qué preparar antes y qué hacer después.
 
@@ -97,7 +97,8 @@ Si quieres, un registro CAA `0 issue "letsencrypt.org"` limita quién puede emit
 
 ## 4. Configurar
 
-Con el usuario `tamandua`:
+Con el usuario `tamandua` (mientras el repositorio sea privado, inicia sesión antes en `ghcr.io` y clona con la
+deploy key, como explica [Acceso mientras el repositorio sea privado](despliegue.md#acceso-mientras-el-repositorio-sea-privado)):
 
 ```bash
 git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
