@@ -33,7 +33,7 @@ Variables (one issue may cover several findings of one package: the notes say wh
 ``labels``              labels      Tamandua's labels: appsec, scanner, severity, cisa-kev, fix-available
 ======================  ==========  ==========================================================================
 
-The ``appsec-<fingerprint>`` label of each finding is always added when the labels field is on the screen, whatever
+One identity label per issue (``jira.identity_label``: the finding's, or the package's) is always added when the labels field is on the screen, whatever
 the mapping: it is how an issue is found again (idempotency).
 """
 
@@ -332,7 +332,7 @@ def _value(kind: str, field: dict, spec: dict, values: dict):
     return None
 
 
-def build(destination: dict, values: dict, fingerprints: list[str]) -> dict:
+def build(destination: dict, values: dict, fingerprints: list[str], *, identity: str | None = None) -> dict:
     """The `fields` of the create request for a destination (see `jira_routing`) and the values of one issue."""
     project, issue_type = destination["project"], destination["issue_type"]
     fields: dict = {"project": {"id": project["id"]} if project.get("id") else {"key": project["key"]},
@@ -349,5 +349,5 @@ def build(destination: dict, values: dict, fingerprints: list[str]) -> dict:
         fields["summary"] = fields["summary"][:SUMMARY_MAX]
     if "labels" in snapshot:
         labels: list = fields["labels"] if isinstance(fields.get("labels"), list) else []
-        fields["labels"] = sorted({*labels, *(label_for(item) for item in fingerprints)})
+        fields["labels"] = sorted({*labels, identity or label_for(fingerprints[0])})
     return fields

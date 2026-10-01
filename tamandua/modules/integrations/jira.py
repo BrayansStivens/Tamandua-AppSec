@@ -14,6 +14,7 @@ creating issues from findings, `runs/jira_sync.py`.
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import re
 from datetime import datetime, timezone
@@ -331,6 +332,14 @@ def label_for(fingerprint: str) -> str:
     return f"appsec-{fingerprint[:16]}"
 
 
+def identity_label(asset: str, group: str) -> str:
+    """The one label that identifies an issue, so it can be found again: a finding's own (its fingerprint), or for one
+    package's advisories, one derived from the repository and the package, whichever advisories an export carries."""
+    if re.fullmatch(r"[0-9a-f]{64}", group):
+        return label_for(group)
+    return "appsec-" + hashlib.sha256(f"{asset}\x1f{group}".encode()).hexdigest()[:16]
+
+
 _CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f]")
 
 
@@ -417,9 +426,12 @@ def adf_document(blocks: list[dict]) -> dict:
     return {"type": "doc", "version": 1, "content": content or [{"type": "paragraph", "content": [{"type": "text", "text": "-"}]}]}
 
 
-def search_labels(project_key: str, fingerprints: list[str], *, http=None) -> str | None:
-    """The key of an issue in the project carrying one of these findings' labels (created earlier or elsewhere)."""
-    labels = ", ".join(f'"{label_for(item)}"' for item in fingerprints if re.fullmatch(r"[0-9a-f]{64}", item))
+def search_labels(project_key: str, fingerprints: list[str], *, identity: str | None = None, http=None) -> str | None:
+    """The key of an issue in the project carrying this issue's identity label, or one of its findings' own labels
+    (how earlier versions labelled every finding of a group), created earlier or elsewhere."""
+    wanted = ([identity] if identity and re.fullmatch(r"appsec-[0-9a-f]{16}", identity) else []) \
+        + [label_for(item) for item in fingerprints[:50] if re.fullmatch(r"[0-9a-f]{64}", item)]
+    labels = ", ".join(f'"{item}"' for item in dict.fromkeys(wanted))
     if not labels:
         return None
     found = _client(http)(credentials(), "POST", "/rest/api/3/search/jql",

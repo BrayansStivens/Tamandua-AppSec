@@ -353,7 +353,7 @@ class ExportTests(JiraCase):
         self.assertEqual([item["key"] for item in result["existing"]], ["SEC-7"])
         issue = self.fake.issues["SEC-101"]
         self.assertEqual((issue["project"], issue["issuetype"]), ({"id": "10000"}, {"id": "10001"}))
-        self.assertIn(jira.label_for(FP_A), issue["labels"])
+        self.assertIn(jira.identity_label("github:org/api", "pkg:npm:axios@1.0.0"), issue["labels"])
         self.assertEqual(issue["description"]["type"], "doc")
         due = (datetime.fromisoformat(self.api["created_at"]).date() + timedelta(days=30)).isoformat()
         self.assertEqual(issue["duedate"], due)  # first detection + the high SLA (30 days)
@@ -383,7 +383,11 @@ class ExportTests(JiraCase):
         issue = self.fake.issues["SEC-101"]
         self.assertEqual(issue["summary"], "Crítica: actualizar axios 1.0.0 a 1.2.0 (2 vulnerabilidades)")
         self.assertEqual(issue["priority"], {"id": "2"})  # High, matched by name among the allowed values
-        self.assertTrue({jira.label_for(FP_A), jira.label_for(FP_C)} <= set(issue["labels"]))
+        # One identity label for the package's issue, not one per advisory.
+        identity = jira.identity_label("github:org/web", "pkg:npm:axios@1.0.0")
+        self.assertEqual([item for item in issue["labels"] if item.startswith("appsec-")], [identity])
+        # A later export of another advisory of the same package finds that issue by it.
+        self.assertEqual(jira.search_labels("SEC", [FP_B], identity=identity, http=lambda *args: {"issues": [{"key": "SEC-101"}]}), "SEC-101")
 
 
 class MigrationTests(JiraCase):
@@ -406,7 +410,7 @@ class MigrationTests(JiraCase):
         result = jira_sync.export(self.data_dir, [(triage.annotate(self.data_dir, record), [FP_A])], by="analista")
         issue = self.fake.issues[result["created"][0]["key"]]
         self.assertEqual((issue["project"], issue["issuetype"], "priority" in issue), ({"key": "SEC"}, {"name": "Task"}, False))
-        self.assertIn(jira.label_for(FP_A), issue["labels"])
+        self.assertIn(jira.identity_label("github:org/api", "pkg:npm:axios@1.0.0"), issue["labels"])
 
     def test_nothing_to_migrate_without_a_project(self):
         from tamandua.app import data_migrations

@@ -3,7 +3,7 @@
 * **Routing.** Each finding goes where the first matching rule of its asset says (`integrations/jira_routing.py`), so
   one export may create issues in several projects. No enabled rule: the finding fails with "no destination".
 * **One issue per remediation job.** Advisories of one installed package go together; code and secrets, one by one.
-* **Idempotent.** Before creating, the stored link (`findings/tickets.py`) and the `appsec-<fingerprint>` label (JQL in
+* **Idempotent.** Before creating, the stored link (`findings/tickets.py`) and the issue's identity label (`jira.identity_label`; JQL in
   the destination's project) are checked; exporting or delivering twice doesn't duplicate.
 * **Automatic creation.** When a run adds new open findings to the registry, a rule in `auto` mode matching the asset
   queues their creation in the outbox (channel `jira`) for the findings at or above its minimum severity. Runs that
@@ -203,9 +203,10 @@ def _deliver(data_dir: Path, key: str, group: list[dict], issue_values: dict, de
         link = None if force else next((known[item] for item in prints if item in known), None)
         outcome = "existing"
         if link is None:
-            found = None if force else jira.search_labels(destination["project"]["key"], prints, http=http)
+            identity = jira.identity_label(key, _group_key(group[0]))
+            found = None if force else jira.search_labels(destination["project"]["key"], prints, identity=identity, http=http)
             if found is None:
-                found = _create(destination, build(destination, issue_values, prints), http)
+                found = _create(destination, build(destination, issue_values, prints, identity=identity), http)
                 outcome = "created"
             link = {"key": found, "url": jira.browse_url(found), "linked_at": _stamp(), "by": by, "destination": destination["id"],
                     "project": destination["project"]["key"]}
