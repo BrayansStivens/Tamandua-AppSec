@@ -140,7 +140,7 @@ jobs:
           fetch-depth: 0              # hace falta la historia para comparar con la base
           persist-credentials: false
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.1   # fíjala al SHA del commit de la etiqueta, como las demás
+        uses: BrayansStivens/Tamandua-AppSec@v0.10.1   # fíjala al SHA del commit de la etiqueta, como las demás
         with:
           exclude: |
             fixtures/
@@ -200,7 +200,7 @@ La Action inicia sesión con `--password-stdin` y descarta la credencial despué
     steps:
       # …
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.1
+        uses: BrayansStivens/Tamandua-AppSec@v0.10.1
         with:
           registry-token: ${{ secrets.GHCR_TOKEN }}   # o ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -217,7 +217,7 @@ sin el análisis propio de Tamandua:
         run: |
           python -m pip install semgrep   # fija la versión
           semgrep scan --config p/ci --metrics off --sarif --output semgrep.sarif
-      - uses: BrayansStivens/appsec-agent@v0.10.1
+      - uses: BrayansStivens/Tamandua-AppSec@v0.10.1
         if: always()
         with:
           scan: false

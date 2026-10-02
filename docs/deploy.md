@@ -35,7 +35,7 @@ for the upgrades' `git fetch`:
 
 ```bash
 export GIT_SSH_COMMAND='ssh -i ~/.ssh/tamandua-deploy -o IdentitiesOnly=yes'
-git clone git@github.com:BrayansStivens/appsec-agent.git && cd appsec-agent
+git clone git@github.com:BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
 git config core.sshCommand "$GIT_SSH_COMMAND"
 ```
 
@@ -79,7 +79,7 @@ session signing key. Keep it in the platform's secrets manager, with a copy apar
 repository and no Docker socket (the worker runs the engines inside its own image).
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/BrayansStivens/appsec-agent/main/deploy/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/BrayansStivens/Tamandua-AppSec/main/deploy/compose.yaml
 printf 'TAMANDUA_DB_PASSWORD=%s\nTAMANDUA_MASTER_KEY=%s\nTAMANDUA_PUBLIC_URL=%s\n' \
   "$(openssl rand -hex 24)" "$(openssl rand -base64 32)" "https://tamandua.example.com" > .env
 docker compose --profile https up -d        # --profile https: Caddy gets the certificate (skip it behind your own proxy)

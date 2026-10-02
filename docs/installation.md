@@ -19,8 +19,8 @@ You don't need to install Python, Node or the scanning engines: everything runs 
 ## First install
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git
-cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
+cd Tamandua-AppSec
 make up
 ```
 

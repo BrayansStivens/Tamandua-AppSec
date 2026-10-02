@@ -14,7 +14,7 @@ Fixing findings and the `pre-push` hook need Docker and a copy of Tamandua (in `
 ## Install
 
 ```bash
-npx skills add BrayansStivens/appsec-agent
+npx skills add BrayansStivens/Tamandua-AppSec
 ```
 
 Or by hand: copy the skill's folder into your agent's skills folder (in Claude Code, `~/.claude/skills/` or the

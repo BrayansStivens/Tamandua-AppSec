@@ -19,8 +19,8 @@ No hace falta instalar Python, Node ni los motores de análisis: todo va en cont
 ## Primera instalación
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git
-cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
+cd Tamandua-AppSec
 make up
 ```
 

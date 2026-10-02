@@ -20,8 +20,8 @@ You **don't** need Python or Node to use it, only to develop it (`make dev-setup
 ## Start it
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git
-cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
+cd Tamandua-AppSec
 make up
 ```
 

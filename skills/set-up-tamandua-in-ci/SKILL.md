@@ -4,7 +4,7 @@ description: Add Tamandua (self-hosted, open source application security scanner
 license: AGPL-3.0-only
 metadata:
   author: tamandua
-  homepage: https://github.com/BrayansStivens/appsec-agent
+  homepage: https://github.com/BrayansStivens/Tamandua-AppSec
 ---
 
 # Tamandua in CI and before pushing
@@ -12,7 +12,7 @@ metadata:
 A single CI step that scans what the pull request introduces (not what was already there) and blocks from the
 severity the team chooses. CI uses the published worker image (`ghcr.io/brayansstivens/tamandua-worker`), which runs
 the engines (Opengrep with the Tamandua rules, Gitleaks, Trivy, OSV-Scanner, Checkov, zizmor) inside it: nothing to
-build and **no Docker socket**. On GitHub it is the Tamandua Action (`uses: BrayansStivens/appsec-agent@v0.10.1`).
+build and **no Docker socket**. On GitHub it is the Tamandua Action (`uses: BrayansStivens/Tamandua-AppSec@v0.10.1`).
 
 ## 1. Start from the official template
 

@@ -24,7 +24,7 @@ from tamandua.modules.reporting.design import coverage_gaps
 from tamandua.shared.i18n import default_locale, t
 
 SPEC = "1.6"
-TOOL_URL = "https://github.com/BrayansStivens/appsec-agent"
+TOOL_URL = "https://github.com/BrayansStivens/Tamandua-AppSec"
 
 
 def _stamp(now: datetime | None) -> str:

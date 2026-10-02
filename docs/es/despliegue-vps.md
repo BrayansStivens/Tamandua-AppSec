@@ -7,7 +7,7 @@ Esta guía deja Tamandua en un servidor propio (Hetzner, DigitalOcean, Hostinger
 Con un servidor recién creado y un registro DNS que ya apunte a él, son cuatro comandos:
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
 git checkout v0.10.1                                   # la versión que quieras (ver Actualizar)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS con Caddy + imágenes publicadas
 make up                                             # muestra https://tamandua.example.com y el código de configuración
@@ -101,7 +101,7 @@ Con el usuario `tamandua` (mientras el repositorio sea privado, inicia sesión a
 deploy key, como explica [Acceso mientras el repositorio sea privado](despliegue.md#acceso-mientras-el-repositorio-sea-privado)):
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
 git checkout v0.10.1
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
@@ -134,7 +134,7 @@ Guarda una copia de `.env` en tu gestor de contraseñas: contiene la contraseña
 Con las imágenes publicadas, comprueba antes sus firmas (con [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) instalado):
 
 ```bash
-make verify-images    # Signed by BrayansStivens/appsec-agent: ghcr.io/brayansstivens/tamandua:0.10 …
+make verify-images    # Signed by BrayansStivens/Tamandua-AppSec: ghcr.io/brayansstivens/tamandua:0.10 …
 make up
 ```
 
@@ -162,13 +162,13 @@ Una instancia son tres cosas: la **base de datos** (ejecuciones, hallazgos, tria
 **Con cron, desde el host.** `make backup` hace lo mismo, pero detiene la API unos segundos para que `data/` también sea coherente; se niega si hay análisis en curso (cron lo reintenta al día siguiente):
 
 ```cron
-30 3 * * * cd /home/tamandua/appsec-agent && make backup >> backups/cron.log 2>&1
+30 3 * * * cd /home/tamandua/Tamandua-AppSec && make backup >> backups/cron.log 2>&1
 ```
 
 **Fuera del servidor, siempre.** Una copia en el mismo disco no sobrevive al servidor. `config.tgz` lleva la clave maestra junto al almacén que abre, así que la copia externa tiene que ir **cifrada**. Por ejemplo con [restic](https://restic.net) a cualquier bucket compatible con S3 (Backblaze B2, Hetzner Object Storage, R2…):
 
 ```cron
-0 4 * * * cd /home/tamandua/appsec-agent && restic backup backups/ --tag tamandua && restic forget --keep-daily 14 --keep-weekly 8 --prune
+0 4 * * * cd /home/tamandua/Tamandua-AppSec && restic backup backups/ --tag tamandua && restic forget --keep-daily 14 --keep-weekly 8 --prune
 ```
 
 (`RESTIC_REPOSITORY`, `RESTIC_PASSWORD_FILE` y las credenciales del bucket en el entorno del crontab; la contraseña de restic, fuera del servidor.) En local basta con guardar unos días: `find backups -maxdepth 1 -name '20*' -mtime +7 -exec rm -rf {} +`.

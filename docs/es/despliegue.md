@@ -35,7 +35,7 @@ configurada para el `git fetch` de las actualizaciones:
 
 ```bash
 export GIT_SSH_COMMAND='ssh -i ~/.ssh/tamandua-deploy -o IdentitiesOnly=yes'
-git clone git@github.com:BrayansStivens/appsec-agent.git && cd appsec-agent
+git clone git@github.com:BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
 git config core.sshCommand "$GIT_SSH_COMMAND"
 ```
 
@@ -79,7 +79,7 @@ copias de la base. `tamandua check-config` revisa toda la configuración y dice 
 construir, sin el repositorio y sin el socket de Docker (el worker ejecuta los motores dentro de su propia imagen).
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/BrayansStivens/appsec-agent/main/deploy/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/BrayansStivens/Tamandua-AppSec/main/deploy/compose.yaml
 printf 'TAMANDUA_DB_PASSWORD=%s\nTAMANDUA_MASTER_KEY=%s\nTAMANDUA_PUBLIC_URL=%s\n' \
   "$(openssl rand -hex 24)" "$(openssl rand -base64 32)" "https://tamandua.example.com" > .env
 docker compose --profile https up -d        # --profile https: Caddy obtiene el certificado (sin él, detrás de tu proxy)

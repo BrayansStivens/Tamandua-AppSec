@@ -17,7 +17,9 @@ PREBUILT ?=
 FROM ?=
 SERVICE ?= api
 # Who signs the published images (cosign keyless, GitHub OIDC): the repository whose release workflow built them.
-SIGNER ?= BrayansStivens/appsec-agent
+# Images up to v0.10.1 were signed while the repository was still called appsec-agent: both names are accepted.
+SIGNER ?= BrayansStivens/Tamandua-AppSec
+SIGNER_BEFORE ?= BrayansStivens/appsec-agent
 OPENGREP_VERSION := $(shell sed -n 's/^ARG OPENGREP_VERSION=//p' docker/engines/opengrep/Dockerfile)
 VENV := .venv
 export TAMANDUA_VERSION := $(VERSION)
@@ -123,7 +125,7 @@ verify-images: ## Check the cosign signatures of the published images (TAMANDUA_
 	command -v cosign >/dev/null || { echo 'Install cosign first: https://docs.sigstore.dev/cosign/system_config/installation/'; exit 2; }; \
 	for ref in "$$image:$(VERSION)" "$$image-opengrep:$(OPENGREP_VERSION)"; do \
 	  cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-	    --certificate-identity-regexp '^https://github\.com/$(SIGNER)/\.github/workflows/release\.yml@refs/tags/v' "$$ref" >/dev/null \
+	    --certificate-identity-regexp '^https://github\.com/($(SIGNER)|$(SIGNER_BEFORE))/\.github/workflows/release\.yml@refs/tags/v' "$$ref" >/dev/null \
 	    && echo "Signed by $(SIGNER): $$ref" || { echo "NOT verified: $$ref"; exit 1; }; \
 	done
 

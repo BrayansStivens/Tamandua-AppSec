@@ -143,7 +143,7 @@ jobs:
           fetch-depth: 0              # history is needed to compare against the base
           persist-credentials: false
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.1   # pin it to the tag's commit SHA, as with the other actions
+        uses: BrayansStivens/Tamandua-AppSec@v0.10.1   # pin it to the tag's commit SHA, as with the other actions
         with:
           exclude: |
             fixtures/
@@ -203,7 +203,7 @@ logs in with `--password-stdin` and throws the credential away after the pull:
     steps:
       # …
       - id: tamandua
-        uses: BrayansStivens/appsec-agent@v0.10.1
+        uses: BrayansStivens/Tamandua-AppSec@v0.10.1
         with:
           registry-token: ${{ secrets.GHCR_TOKEN }}   # or ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -220,7 +220,7 @@ own scan:
         run: |
           python -m pip install semgrep   # pin the version
           semgrep scan --config p/ci --metrics off --sarif --output semgrep.sarif
-      - uses: BrayansStivens/appsec-agent@v0.10.1
+      - uses: BrayansStivens/Tamandua-AppSec@v0.10.1
         if: always()
         with:
           scan: false

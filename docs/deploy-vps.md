@@ -7,7 +7,7 @@ This guide puts Tamandua on its own server (Hetzner, DigitalOcean, Hostinger, OV
 With a fresh server and a DNS record already pointing at it, it's four commands:
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
 git checkout v0.10.1                                   # the release you want (see Upgrades)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS with Caddy + published images
 make up                                             # prints https://tamandua.example.com and the setup code
@@ -101,7 +101,7 @@ As the `tamandua` user (while the repository is private, log in to `ghcr.io` fir
 [Access while the repository is private](deploy.md#access-while-the-repository-is-private)):
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git && cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
 git checkout v0.10.1
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
@@ -134,7 +134,7 @@ Keep a copy of `.env` in your password manager: it holds the database password, 
 With the published images, check their signatures first ([cosign](https://docs.sigstore.dev/cosign/system_config/installation/) installed):
 
 ```bash
-make verify-images    # Signed by BrayansStivens/appsec-agent: ghcr.io/brayansstivens/tamandua:0.10 …
+make verify-images    # Signed by BrayansStivens/Tamandua-AppSec: ghcr.io/brayansstivens/tamandua:0.10 …
 make up
 ```
 
@@ -162,13 +162,13 @@ Three things make up an instance: the **database** (runs, findings, triage, user
 **With cron, from the host.** `make backup` does the same, stopping the API for a few seconds so `data/` is consistent too; it refuses to run while scans are in progress (and then cron retries the next day):
 
 ```cron
-30 3 * * * cd /home/tamandua/appsec-agent && make backup >> backups/cron.log 2>&1
+30 3 * * * cd /home/tamandua/Tamandua-AppSec && make backup >> backups/cron.log 2>&1
 ```
 
 **Offsite, always.** A backup on the same disk doesn't survive the server. `config.tgz` holds the master key next to the vault it opens, so the offsite copy must be **encrypted**. For example with [restic](https://restic.net) to any S3-compatible bucket (Backblaze B2, Hetzner Object Storage, R2…):
 
 ```cron
-0 4 * * * cd /home/tamandua/appsec-agent && restic backup backups/ --tag tamandua && restic forget --keep-daily 14 --keep-weekly 8 --prune
+0 4 * * * cd /home/tamandua/Tamandua-AppSec && restic backup backups/ --tag tamandua && restic forget --keep-daily 14 --keep-weekly 8 --prune
 ```
 
 (`RESTIC_REPOSITORY`, `RESTIC_PASSWORD_FILE` and the bucket credentials in the crontab environment; keep the restic password outside the server.) Keep old copies locally only for a few days: `find backups -maxdepth 1 -name '20*' -mtime +7 -exec rm -rf {} +`.

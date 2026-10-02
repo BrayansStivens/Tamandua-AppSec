@@ -10,8 +10,8 @@ pueden dejar para después.
 Necesitas Docker (Engine 24+ con Compose v2.24+), `make` y `git`. `make doctor` comprueba que todo está.
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git
-cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
+cd Tamandua-AppSec
 make up
 ```
 

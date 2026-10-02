@@ -20,8 +20,8 @@ Python y Node **no** hacen falta para usarlo: solo para desarrollar (`make dev-s
 ## Levantarlo
 
 ```bash
-git clone https://github.com/BrayansStivens/appsec-agent.git
-cd appsec-agent
+git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
+cd Tamandua-AppSec
 make up
 ```
 

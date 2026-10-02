@@ -15,7 +15,7 @@ You sign it only once, by commenting on your first pull request as the bot instr
 - **"Owner"**: whoever maintains the Tamandua project, currently the person who controls the GitHub account [BrayansStivens](https://github.com/BrayansStivens), and any successor or assignee under section 8.
 - **"You"**: the individual who accepts this agreement or, if you contribute on behalf of an organization, that organization.
 - **"Contribution"**: any work (code, documentation, rules, designs or other material) that you submit to the Owner for inclusion in the project, by pull request, issue, patch or any other means, unless you clearly mark it in writing as "Not a Contribution".
-- **"Project"**: the Tamandua software (formerly called AppSec Agent; repository `appsec-agent`) and its documentation, in any version or edition.
+- **"Project"**: the Tamandua software (formerly called AppSec Agent; repository `Tamandua-AppSec`, formerly `appsec-agent`) and its documentation, in any version or edition.
 
 ## 2. Copyright license
 

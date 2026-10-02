@@ -15,7 +15,7 @@ Se firma una sola vez comentando en tu primer pull request, tal y como indica el
 - **«Titular»**: quien mantiene el proyecto Tamandua, hoy la persona que controla la cuenta de GitHub [BrayansStivens](https://github.com/BrayansStivens), y cualquier sucesor o cesionario conforme a la sección 8.
 - **«Tú»**: la persona física que acepta este acuerdo o, si contribuyes en nombre de una organización, esa organización.
 - **«Contribución»**: cualquier obra (código, documentación, reglas, diseños u otro material) que envíes al Titular para su inclusión en el proyecto, por pull request, issue, parche o cualquier otro medio, salvo que la marques claramente por escrito como «No es una contribución».
-- **«Proyecto»**: el software Tamandua (antes llamado AppSec Agent; repositorio `appsec-agent`) y su documentación, en cualquier versión o edición.
+- **«Proyecto»**: el software Tamandua (antes llamado AppSec Agent; repositorio `Tamandua-AppSec`, antes `appsec-agent`) y su documentación, en cualquier versión o edición.
 
 ## 2. Licencia de derechos de autor
 
