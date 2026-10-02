@@ -161,7 +161,7 @@ class StandaloneComposeTests(unittest.TestCase):
         self.assertNotIn("docker.sock", completed.stdout)
         self.assertTrue(all(volume["type"] == "volume" or volume["target"] == "/backups"
                             for service in services.values() for volume in service.get("volumes", [])))
-        self.assertEqual(services["worker"]["image"], f"ghcr.io/brayansstivens/tamandua-worker:{VERSION}")
+        self.assertEqual(services["worker"]["image"], f"ghcr.io/tamandua-appsec/tamandua-worker:{VERSION}")
         # `config` shows the content still escaped; when the service starts, Compose turns $$ into $ (checked by hand
         # with a throwaway container), so Caddy reads {$TAMANDUA_PUBLIC_URL} and the script its own variables.
         self.assertIn("{$$TAMANDUA_PUBLIC_URL}", document["configs"]["caddyfile"]["content"])

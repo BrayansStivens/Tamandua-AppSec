@@ -6,7 +6,7 @@
 
 **Tamandua** es el oso hormiguero de collar (*Tamandua tetradactyla*), que vive en Colombia y en buena parte de Sudamérica. Se alimenta de hormigas y termitas —de *bugs*— que saca de donde nadie mira con una lengua larga y precisa, y lleva un «chaleco» negro natural que parece una armadura. Es pequeño, paciente y muy eficaz: justo lo que queremos ser para equipos pequeños.
 
-Se escribe **Tamandua**, sin tilde, en la marca; en texto en español se puede decir «el tamandúa». El nombre técnico también es `tamandua`: paquete, CLI, variables `TAMANDUA_*`, imágenes, contenedor y estado de commit en GitHub. El repositorio de GitHub es `Tamandua-AppSec`; antes se llamaba `appsec-agent` y la dirección antigua redirige a él.
+Se escribe **Tamandua**, sin tilde, en la marca; en texto en español se puede decir «el tamandúa». El nombre técnico también es `tamandua`: paquete, CLI, variables `TAMANDUA_*`, imágenes, contenedor y estado de commit en GitHub. El repositorio de GitHub es `tamandua`, en la organización `Tamandua-AppSec`; antes era `BrayansStivens/appsec-agent` y la dirección antigua redirige a él.
 
 ## Mascota y logo
 

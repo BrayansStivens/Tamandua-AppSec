@@ -111,7 +111,7 @@ En el panel, **Nuevo análisis → Importar SARIF** hace lo mismo desde el naveg
 
 ## En CI
 
-En CI, Tamandua corre desde la imagen publicada del worker, `ghcr.io/brayansstivens/tamandua-worker:0.10`, que trae
+En CI, Tamandua corre desde la imagen publicada del worker, `ghcr.io/tamandua-appsec/tamandua-worker:0.10`, que trae
 los motores dentro y los ejecuta como procesos propios: nada que construir y sin socket de Docker.
 
 ### GitHub Actions
@@ -140,7 +140,7 @@ jobs:
           fetch-depth: 0              # hace falta la historia para comparar con la base
           persist-credentials: false
       - id: tamandua
-        uses: BrayansStivens/Tamandua-AppSec@v0.10.1   # fíjala al SHA del commit de la etiqueta, como las demás
+        uses: Tamandua-AppSec/tamandua@v0.10.2   # fíjala al SHA del commit de la etiqueta, como las demás
         with:
           exclude: |
             fixtures/
@@ -162,7 +162,7 @@ log, en inglés salvo que el paso ponga `env: TAMANDUA_DEFAULT_LOCALE: es`.
 | `exclude` | vacío | Un patrón por línea; cada uno se convierte en un `--exclude`. |
 | `name` | el nombre del repositorio | Como `--name`. |
 | `sarif` | `$RUNNER_TEMP/tamandua.sarif` | Dónde escribir el SARIF (las rutas relativas parten del workspace). |
-| `image` | `ghcr.io/brayansstivens/tamandua-worker:0.10` | Imagen del worker. Fíjala por digest (`…@sha256:…`) si no quieres que nada cambie sin avisar. |
+| `image` | `ghcr.io/tamandua-appsec/tamandua-worker:0.10` | Imagen del worker. Fíjala por digest (`…@sha256:…`) si no quieres que nada cambie sin avisar. |
 | `allow-incomplete` | `false` | `true`: como `--allow-incomplete`. |
 | `scan` | `true` | `false`: no analiza, solo importa (más abajo). |
 | `import-sarif` | vacío | SARIF de otras herramientas que se envían a un servidor Tamandua, uno por línea. |
@@ -200,7 +200,7 @@ La Action inicia sesión con `--password-stdin` y descarta la credencial despué
     steps:
       # …
       - id: tamandua
-        uses: BrayansStivens/Tamandua-AppSec@v0.10.1
+        uses: Tamandua-AppSec/tamandua@v0.10.2
         with:
           registry-token: ${{ secrets.GHCR_TOKEN }}   # o ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -217,7 +217,7 @@ sin el análisis propio de Tamandua:
         run: |
           python -m pip install semgrep   # fija la versión
           semgrep scan --config p/ci --metrics off --sarif --output semgrep.sarif
-      - uses: BrayansStivens/Tamandua-AppSec@v0.10.1
+      - uses: Tamandua-AppSec/tamandua@v0.10.2
         if: always()
         with:
           scan: false
@@ -236,7 +236,7 @@ Sin socket de Docker y sin Docker-in-Docker.
 ```yaml
 tamandua:
   stage: test
-  image: ghcr.io/brayansstivens/tamandua-worker:0.10
+  image: ghcr.io/tamandua-appsec/tamandua-worker:0.10
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
@@ -254,7 +254,7 @@ con ejecutor `shell`, usa `docker run` como hace la Action, sin el socket:
 ```sh
 mkdir -p /tmp/tamandua-data   # la creas tú, no Docker: tiene que ser de tu usuario
 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/src:ro -v /tmp/tamandua-data:/data \
-  ghcr.io/brayansstivens/tamandua-worker:0.10 python -m tamandua scan /src --name "$CI_PROJECT_NAME" --base "origin/$BASE"
+  ghcr.io/tamandua-appsec/tamandua-worker:0.10 python -m tamandua scan /src --name "$CI_PROJECT_NAME" --base "origin/$BASE"
 ```
 
 > El propio repositorio de Tamandua usa la Action en [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml), y

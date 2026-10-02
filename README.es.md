@@ -4,7 +4,7 @@
 
 <h1 align="center">Tamandua</h1>
 
-<p align="center"><a href="https://github.com/BrayansStivens/Tamandua-AppSec/actions/workflows/ci.yml"><img src="https://github.com/BrayansStivens/Tamandua-AppSec/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a></p>
+<p align="center"><a href="https://github.com/Tamandua-AppSec/tamandua/actions/workflows/ci.yml"><img src="https://github.com/Tamandua-AppSec/tamandua/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a></p>
 
 <p align="center"><strong>Se come tus bugs.</strong> Seguridad de aplicaciones autoalojada, libre y sin enviar tu código a nadie.</p>
 
@@ -37,8 +37,8 @@ Tamandua analiza tus repositorios e imágenes de contenedor, te dice **qué corr
 Necesitas **Docker** (Engine 24+ con Compose v2.24+), **make** y **git**, 4 GB de memoria y 8 GB de disco. `make doctor` lo comprueba.
 
 ```bash
-git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
-cd Tamandua-AppSec
+git clone https://github.com/Tamandua-AppSec/tamandua.git
+cd tamandua
 make up
 make demo
 ```

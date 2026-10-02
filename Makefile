@@ -17,8 +17,8 @@ PREBUILT ?=
 FROM ?=
 SERVICE ?= api
 # Who signs the published images (cosign keyless, GitHub OIDC): the repository whose release workflow built them.
-# Images up to v0.10.1 were signed while the repository was still called appsec-agent: both names are accepted.
-SIGNER ?= BrayansStivens/Tamandua-AppSec
+# Images up to v0.10.1 were signed while the repository was BrayansStivens/appsec-agent: both identities are accepted.
+SIGNER ?= Tamandua-AppSec/tamandua
 SIGNER_BEFORE ?= BrayansStivens/appsec-agent
 OPENGREP_VERSION := $(shell sed -n 's/^ARG OPENGREP_VERSION=//p' docker/engines/opengrep/Dockerfile)
 VENV := .venv

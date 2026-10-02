@@ -112,7 +112,7 @@ sys.exit(int(codes[calls]) if calls < len(codes) and codes[calls] else 0)
 
 class ActionDefinitionTests(unittest.TestCase):
     def test_the_default_image_is_this_version(self):
-        self.assertEqual(defaults(ACTION)["image"], f"ghcr.io/brayansstivens/tamandua-worker:{VERSION}")
+        self.assertEqual(defaults(ACTION)["image"], f"ghcr.io/tamandua-appsec/tamandua-worker:{VERSION}")
 
     def test_scripts_never_interpolate_expressions(self):
         for path in (ROOT / "action.yml", *WORKFLOWS):

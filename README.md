@@ -4,7 +4,7 @@ English · [Español](README.es.md)
 
 <h1 align="center">Tamandua</h1>
 
-<p align="center"><a href="https://github.com/BrayansStivens/Tamandua-AppSec/actions/workflows/ci.yml"><img src="https://github.com/BrayansStivens/Tamandua-AppSec/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a></p>
+<p align="center"><a href="https://github.com/Tamandua-AppSec/tamandua/actions/workflows/ci.yml"><img src="https://github.com/Tamandua-AppSec/tamandua/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a></p>
 
 <p align="center"><strong>Eats your bugs.</strong> Self-hosted, open-source application security that never sends your code anywhere.</p>
 
@@ -37,8 +37,8 @@ Tamandua scans your repositories and container images, tells you **what to fix f
 You need **Docker** (Engine 24+ with Compose v2.24+), **make** and **git**, 4 GB of memory and 8 GB of disk. `make doctor` checks all of it.
 
 ```bash
-git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
-cd Tamandua-AppSec
+git clone https://github.com/Tamandua-AppSec/tamandua.git
+cd tamandua
 make up
 make demo
 ```

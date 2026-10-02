@@ -22,8 +22,8 @@ ARG VERSION=dev
 ARG DOCKER_CLI_VERSION=27.5.1
 LABEL org.opencontainers.image.title="Tamandua" \
       org.opencontainers.image.description="Self-hosted application security: SAST, secrets, dependencies, PRs and CVE tracker" \
-      org.opencontainers.image.source="https://github.com/BrayansStivens/Tamandua-AppSec" \
-      org.opencontainers.image.documentation="https://github.com/BrayansStivens/Tamandua-AppSec/tree/main/docs" \
+      org.opencontainers.image.source="https://github.com/Tamandua-AppSec/tamandua" \
+      org.opencontainers.image.documentation="https://github.com/Tamandua-AppSec/tamandua/tree/main/docs" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="${VERSION}"
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 LANG=C.UTF-8 \

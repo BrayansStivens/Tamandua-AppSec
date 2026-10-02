@@ -34,7 +34,7 @@ inputs:
     default: ""
   image:
     description: Tamandua worker image.
-    default: ghcr.io/brayansstivens/tamandua-worker:0.10
+    default: ghcr.io/tamandua-appsec/tamandua-worker:0.10
   allow-incomplete:
     description: "`true`: don't fail if an engine couldn't run."
     default: "false"

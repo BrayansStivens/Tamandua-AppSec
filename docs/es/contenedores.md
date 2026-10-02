@@ -20,8 +20,8 @@ Python y Node **no** hacen falta para usarlo: solo para desarrollar (`make dev-s
 ## Levantarlo
 
 ```bash
-git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
-cd Tamandua-AppSec
+git clone https://github.com/Tamandua-AppSec/tamandua.git
+cd tamandua
 make up
 ```
 
@@ -103,7 +103,7 @@ scripts/
 | `caddy` | Docker Hub, fijada por digest; solo con `compose.prod.yaml` | 50 MB |
 | Destino `worker-standalone` | `docker/app/Dockerfile`: la app más todos los motores, copiados por digest de las imágenes de arriba (Checkov instalado con pip) | 1,8 GB |
 
-**Imágenes publicadas.** Cada etiqueta de versión construye `ghcr.io/brayansstivens/tamandua:<versión>`, `ghcr.io/brayansstivens/tamandua-worker:<versión>` (motores dentro) y `ghcr.io/brayansstivens/tamandua-opengrep:<versión del motor>` para amd64 y arm64, con SBOM y procedencia SLSA, firmadas con cosign sin claves (`.github/workflows/release.yml`). `compose.images.yaml` las usa en lugar de construirlas; `make verify-images` comprueba las firmas. Todas las imágenes de motores que se usan tienen también variante arm64.
+**Imágenes publicadas.** Cada etiqueta de versión construye `ghcr.io/tamandua-appsec/tamandua:<versión>`, `ghcr.io/tamandua-appsec/tamandua-worker:<versión>` (motores dentro) y `ghcr.io/tamandua-appsec/tamandua-opengrep:<versión del motor>` para amd64 y arm64, con SBOM y procedencia SLSA, firmadas con cosign sin claves (`.github/workflows/release.yml`). `compose.images.yaml` las usa en lugar de construirlas; `make verify-images` comprueba las firmas. Todas las imágenes de motores que se usan tienen también variante arm64.
 
 Las bases (`node`, `python`, `debian`) van fijadas por digest, de modo que dos construcciones de la misma versión usan exactamente las mismas capas. Las etiquetas OCI de la imagen de la app declaran versión, licencia y repositorio (`docker inspect tamandua`).
 

@@ -4,7 +4,7 @@ description: Find and fix security vulnerabilities in the current repository wit
 license: AGPL-3.0-only
 metadata:
   author: tamandua
-  homepage: https://github.com/BrayansStivens/Tamandua-AppSec
+  homepage: https://github.com/Tamandua-AppSec/tamandua
 ---
 
 # Fix findings with Tamandua and prove the fix
@@ -20,7 +20,7 @@ Tamandua runs in Docker from its own folder (`~/tamandua` by default; honor `TAM
 TAMANDUA_DIR="${TAMANDUA_DIR:-$HOME/tamandua}"; test -f "$TAMANDUA_DIR/Makefile" && echo ready
 ```
 
-If it is missing, **ask before** installing it: cloning `https://github.com/BrayansStivens/Tamandua-AppSec` into that
+If it is missing, **ask before** installing it: cloning `https://github.com/Tamandua-AppSec/tamandua` into that
 folder and running `make -C "$TAMANDUA_DIR" build` downloads Docker images (several hundred MB). It does not work
 without Docker.
 

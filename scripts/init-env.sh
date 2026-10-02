@@ -26,7 +26,7 @@ if [ -n "$DOMAIN" ] && ! printf '%s' "$DOMAIN" | grep -Eq '^[A-Za-z0-9]([A-Za-z0
 fi
 case "$PREBUILT" in
   ''|0) image= ;;
-  1) image=ghcr.io/brayansstivens/tamandua ;;
+  1) image=ghcr.io/tamandua-appsec/tamandua ;;
   *) image=$PREBUILT ;;
 esac
 # A registry may carry a port (registry.example.com:5000/tamandua); the name itself, no tag or digest.

@@ -6,8 +6,8 @@ Tamandua tiene tres piezas, y cada una puede vivir donde más te convenga:
 
 | Pieza | Qué necesita | Imagen |
 | --- | --- | --- |
-| **API y panel** | HTTP y la base de datos. Sin disco propio: todo el estado está en PostgreSQL. | `ghcr.io/brayansstivens/tamandua` |
-| **Worker** | Un proceso permanente que ejecuta los motores de análisis. | `ghcr.io/brayansstivens/tamandua-worker` (motores dentro), o la imagen de la API con el socket de Docker |
+| **API y panel** | HTTP y la base de datos. Sin disco propio: todo el estado está en PostgreSQL. | `ghcr.io/tamandua-appsec/tamandua` |
+| **Worker** | Un proceso permanente que ejecuta los motores de análisis. | `ghcr.io/tamandua-appsec/tamandua-worker` (motores dentro), o la imagen de la API con el socket de Docker |
 | **PostgreSQL** | Versión 16 o superior, gestionada o en un contenedor. | — |
 
 Cada etiqueta de versión publica las imágenes, firmadas y multiarquitectura (usa la `0.10.0` o posterior: en la `0.9.0` y la `0.9.1` la imagen `tamandua` arrancaba el worker en lugar de la API). También puedes construirlas desde el repositorio (`make build`, o `docker build --target worker-standalone -f docker/app/Dockerfile .` para el worker).
@@ -35,7 +35,7 @@ configurada para el `git fetch` de las actualizaciones:
 
 ```bash
 export GIT_SSH_COMMAND='ssh -i ~/.ssh/tamandua-deploy -o IdentitiesOnly=yes'
-git clone git@github.com:BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
+git clone git@github.com:Tamandua-AppSec/tamandua.git && cd tamandua
 git config core.sshCommand "$GIT_SSH_COMMAND"
 ```
 
@@ -79,7 +79,7 @@ copias de la base. `tamandua check-config` revisa toda la configuración y dice 
 construir, sin el repositorio y sin el socket de Docker (el worker ejecuta los motores dentro de su propia imagen).
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/BrayansStivens/Tamandua-AppSec/main/deploy/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/Tamandua-AppSec/tamandua/main/deploy/compose.yaml
 printf 'TAMANDUA_DB_PASSWORD=%s\nTAMANDUA_MASTER_KEY=%s\nTAMANDUA_PUBLIC_URL=%s\n' \
   "$(openssl rand -hex 24)" "$(openssl rand -base64 32)" "https://tamandua.example.com" > .env
 docker compose --profile https up -d        # --profile https: Caddy obtiene el certificado (sin él, detrás de tu proxy)
@@ -111,8 +111,8 @@ Dos servicios con las imágenes publicadas, más el PostgreSQL de la plataforma:
 
 | Servicio | Imagen | Variables, además de las cuatro de arriba |
 | --- | --- | --- |
-| api | `ghcr.io/brayansstivens/tamandua:<versión>` | `TAMANDUA_BIND=0.0.0.0`, `TAMANDUA_EMBEDDED_WORKER=0`, `TAMANDUA_FORWARDED_ALLOW_IPS=*`, puerto 8766 |
-| worker | `ghcr.io/brayansstivens/tamandua-worker:<versión>` | ninguna |
+| api | `ghcr.io/tamandua-appsec/tamandua:<versión>` | `TAMANDUA_BIND=0.0.0.0`, `TAMANDUA_EMBEDDED_WORKER=0`, `TAMANDUA_FORWARDED_ALLOW_IPS=*`, puerto 8766 |
+| worker | `ghcr.io/tamandua-appsec/tamandua-worker:<versión>` | ninguna |
 
 En Railway, referencia la base como `TAMANDUA_DATABASE_URL=${{Postgres.DATABASE_URL}}`. Dale al worker al menos 2 GB de
 memoria. Sus cachés (las bases de datos de los motores) pueden ir en disco efímero: se vuelven a descargar tras un

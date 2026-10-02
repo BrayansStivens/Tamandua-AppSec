@@ -43,7 +43,7 @@ Every variable is optional and goes in `.env` (a copy of `.env.example`). After 
 | --- | --- | --- |
 | `TAMANDUA_DOMAIN` | — | Domain Caddy gets the certificate for (`compose.prod.yaml`). The public URL and allowed origins become `https://<domain>`. |
 | `COMPOSE_FILE` | `compose.yaml` | Compose files every command uses, e.g. `compose.yaml:compose.prod.yaml:compose.images.yaml`. |
-| `TAMANDUA_IMAGE` | — | Published image to run instead of building (`compose.images.yaml`), e.g. `ghcr.io/brayansstivens/tamandua`. |
+| `TAMANDUA_IMAGE` | — | Published image to run instead of building (`compose.images.yaml`), e.g. `ghcr.io/tamandua-appsec/tamandua`. |
 | `TAMANDUA_IMAGE_TAG` | the code's version | Tag of that image; accepts a digest (`0.10@sha256:…`). |
 | `COMPOSE_PROFILES` | — | `backup` turns on the scheduled backups service. |
 | `TAMANDUA_BACKUP_DIR` | `./backups` | Where the backup service writes. |

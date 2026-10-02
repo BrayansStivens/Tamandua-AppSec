@@ -7,7 +7,7 @@ Esta guía deja Tamandua en un servidor propio (Hetzner, DigitalOcean, Hostinger
 Con un servidor recién creado y un registro DNS que ya apunte a él, son cuatro comandos:
 
 ```bash
-git clone https://github.com/BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
+git clone https://github.com/Tamandua-AppSec/tamandua.git && cd tamandua
 git checkout v0.10.1                                   # la versión que quieras (ver Actualizar)
 make setup DOMAIN=tamandua.example.com PREBUILT=1   # HTTPS con Caddy + imágenes publicadas
 make up                                             # muestra https://tamandua.example.com y el código de configuración
@@ -101,7 +101,7 @@ Con el usuario `tamandua` (mientras el repositorio sea privado, inicia sesión a
 deploy key, como explica [Acceso mientras el repositorio sea privado](despliegue.md#acceso-mientras-el-repositorio-sea-privado)):
 
 ```bash
-git clone https://github.com/BrayansStivens/Tamandua-AppSec.git && cd Tamandua-AppSec
+git clone https://github.com/Tamandua-AppSec/tamandua.git && cd tamandua
 git checkout v0.10.1
 make setup DOMAIN=tamandua.example.com PREBUILT=1
 make doctor
@@ -114,7 +114,7 @@ make doctor
 | `TAMANDUA_DOMAIN` | tu dominio | Certificado y sitio de Caddy. |
 | `TAMANDUA_PUBLIC_URL` / `TAMANDUA_ALLOWED_ORIGINS` | `https://<dominio>` | Cookies `Secure`, HSTS, CSRF y `Host` permitido. El overlay los deriva del dominio de todas formas. |
 | `COMPOSE_FILE` | `compose.yaml:compose.prod.yaml[:compose.images.yaml]` | Que todos los comandos usen los overlays. |
-| `TAMANDUA_IMAGE` | `ghcr.io/brayansstivens/tamandua` | Solo con `PREBUILT`. Para un fork: `PREBUILT=ghcr.io/tu-usuario/tamandua`. |
+| `TAMANDUA_IMAGE` | `ghcr.io/tamandua-appsec/tamandua` | Solo con `PREBUILT`. Para un fork: `PREBUILT=ghcr.io/tu-usuario/tamandua`. |
 | `TAMANDUA_METRICS_TOKEN` | 64 caracteres aleatorios | Activa `/api/metrics` (mira [Monitorización](#monitorización)). |
 
 Sin `PREBUILT`, el servidor construye las imágenes a partir del código (unos minutos, y más memoria mientras tanto). Las dos opciones ejecutan el mismo código.
@@ -134,7 +134,7 @@ Guarda una copia de `.env` en tu gestor de contraseñas: contiene la contraseña
 Con las imágenes publicadas, comprueba antes sus firmas (con [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) instalado):
 
 ```bash
-make verify-images    # Signed by BrayansStivens/Tamandua-AppSec: ghcr.io/brayansstivens/tamandua:0.10 …
+make verify-images    # Signed by Tamandua-AppSec/tamandua: ghcr.io/tamandua-appsec/tamandua:0.10 …
 make up
 ```
 
@@ -162,13 +162,13 @@ Una instancia son tres cosas: la **base de datos** (ejecuciones, hallazgos, tria
 **Con cron, desde el host.** `make backup` hace lo mismo, pero detiene la API unos segundos para que `data/` también sea coherente; se niega si hay análisis en curso (cron lo reintenta al día siguiente):
 
 ```cron
-30 3 * * * cd /home/tamandua/Tamandua-AppSec && make backup >> backups/cron.log 2>&1
+30 3 * * * cd /home/tamandua/tamandua && make backup >> backups/cron.log 2>&1
 ```
 
 **Fuera del servidor, siempre.** Una copia en el mismo disco no sobrevive al servidor. `config.tgz` lleva la clave maestra junto al almacén que abre, así que la copia externa tiene que ir **cifrada**. Por ejemplo con [restic](https://restic.net) a cualquier bucket compatible con S3 (Backblaze B2, Hetzner Object Storage, R2…):
 
 ```cron
-0 4 * * * cd /home/tamandua/Tamandua-AppSec && restic backup backups/ --tag tamandua && restic forget --keep-daily 14 --keep-weekly 8 --prune
+0 4 * * * cd /home/tamandua/tamandua && restic backup backups/ --tag tamandua && restic forget --keep-daily 14 --keep-weekly 8 --prune
 ```
 
 (`RESTIC_REPOSITORY`, `RESTIC_PASSWORD_FILE` y las credenciales del bucket en el entorno del crontab; la contraseña de restic, fuera del servidor.) En local basta con guardar unos días: `find backups -maxdepth 1 -name '20*' -mtime +7 -exec rm -rf {} +`.
@@ -243,7 +243,7 @@ Recógelas a través del dominio (la API solo acepta su `Host` público). Alerta
 - **Acota quién llega** si tu equipo tiene direcciones fijas: permite el 443 solo desde ellas en el cortafuegos del proveedor.
 - **La dirección real del cliente.** Detrás de Caddy, la API se fía de `X-Forwarded-For` (`TAMANDUA_FORWARDED_ALLOW_IPS`, que pone el overlay) porque solo Caddy, el worker y PostgreSQL llegan a ella, y Caddy sustituye cualquier `X-Forwarded-For` que mande un cliente. Así, el límite de intentos de inicio de sesión y el log de auditoría ven la dirección de cada persona y no la del proxy.
 - **Lo que añade el proxy.** Redirección de HTTP a HTTPS, HTTP/2 y HTTP/3, un límite de 2 MB por petición (el de la app es 1 MB), tiempos máximos para cabeceras y cuerpo, compresión solo para los ficheros estáticos del panel, y sin cabeceras `Server` ni `Via`. Las cabeceras de seguridad (CSP, HSTS, nosniff, frame, referrer) siguen siendo las de la app, así que hay un único juego coherente.
-- **Imágenes.** Todo lo de terceros va fijado por digest; las imágenes publicadas están firmadas y llevan SBOM y procedencia SLSA (`docker buildx imagetools inspect ghcr.io/brayansstivens/tamandua:0.9 --format '{{json .SBOM}}'`).
+- **Imágenes.** Todo lo de terceros va fijado por digest; las imágenes publicadas están firmadas y llevan SBOM y procedencia SLSA (`docker buildx imagetools inspect ghcr.io/tamandua-appsec/tamandua:0.9 --format '{{json .SBOM}}'`).
 
 ## Coolify y Dokploy
 

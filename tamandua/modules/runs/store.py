@@ -490,7 +490,7 @@ def render_repository_sarif(record: dict, *, locale: str | None = None) -> dict:
                                "owasp": item["owasp"]}} for item in findings]
     return {"$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
             "version": "2.1.0", "runs": [{"tool": {"driver": {"name": "Tamandua", "version": VERSION,
-                                                     "informationUri": "https://github.com/BrayansStivens/Tamandua-AppSec",
+                                                     "informationUri": "https://github.com/Tamandua-AppSec/tamandua",
                                                      "rules": list(rules.values())}}, "results": results}]}
 
 

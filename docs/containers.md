@@ -20,8 +20,8 @@ You **don't** need Python or Node to use it, only to develop it (`make dev-setup
 ## Start it
 
 ```bash
-git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
-cd Tamandua-AppSec
+git clone https://github.com/Tamandua-AppSec/tamandua.git
+cd tamandua
 make up
 ```
 
@@ -103,7 +103,7 @@ scripts/
 | `ghcr.io/zizmorcore/zizmor` | GHCR, pinned by digest | 15 MB |
 | `caddy` | Docker Hub, pinned by digest; only with `compose.prod.yaml` | 50 MB |
 
-**Published images.** Each version tag builds `ghcr.io/brayansstivens/tamandua:<version>`, `ghcr.io/brayansstivens/tamandua-worker:<version>` (engines inside) and `ghcr.io/brayansstivens/tamandua-opengrep:<engine version>` for amd64 and arm64, with an SBOM and SLSA provenance, signed with cosign keyless (`.github/workflows/release.yml`). `compose.images.yaml` runs them instead of building; `make verify-images` checks the signatures. Every engine image used has an arm64 variant too.
+**Published images.** Each version tag builds `ghcr.io/tamandua-appsec/tamandua:<version>`, `ghcr.io/tamandua-appsec/tamandua-worker:<version>` (engines inside) and `ghcr.io/tamandua-appsec/tamandua-opengrep:<engine version>` for amd64 and arm64, with an SBOM and SLSA provenance, signed with cosign keyless (`.github/workflows/release.yml`). `compose.images.yaml` runs them instead of building; `make verify-images` checks the signatures. Every engine image used has an arm64 variant too.
 
 The base images (`node`, `python`, `debian`) are pinned by digest, so two builds of the same version use exactly the same layers. The app image's OCI labels declare the version, license and repository (`docker inspect tamandua`).
 

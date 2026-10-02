@@ -6,7 +6,7 @@ English · [Español](es/marca.md)
 
 **Tamandua** is the southern tamandua (*Tamandua tetradactyla*), a small anteater that lives in Colombia and across much of South America. It eats ants and termites — *bugs* — digging them out of places nobody looks with a long, precise tongue, and it wears a natural black "vest" that looks like armor. It's small, patient and very effective: exactly what we want to be for small teams.
 
-The brand is written **Tamandua**, with no accent; in Spanish prose you can say «el tamandúa». The technical name is also `tamandua`: package, CLI, `TAMANDUA_*` variables, images, container and the GitHub commit status. The GitHub repository is `Tamandua-AppSec`; it used to be `appsec-agent`, and the old address redirects to it.
+The brand is written **Tamandua**, with no accent; in Spanish prose you can say «el tamandúa». The technical name is also `tamandua`: package, CLI, `TAMANDUA_*` variables, images, container and the GitHub commit status. The GitHub repository is `tamandua`, in the `Tamandua-AppSec` organization; it used to be `BrayansStivens/appsec-agent`, and the old address redirects to it.
 
 ## Mascot and logo
 

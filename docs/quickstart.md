@@ -10,8 +10,8 @@ You need Docker (Engine 24+ with Compose v2.24+), `make` and `git`. `make doctor
 place.
 
 ```bash
-git clone https://github.com/BrayansStivens/Tamandua-AppSec.git
-cd Tamandua-AppSec
+git clone https://github.com/Tamandua-AppSec/tamandua.git
+cd tamandua
 make up
 ```
 

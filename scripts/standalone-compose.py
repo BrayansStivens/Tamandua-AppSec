@@ -112,7 +112,7 @@ services:
 
   api:
     <<: *app
-    image: "${{TAMANDUA_IMAGE:-ghcr.io/brayansstivens/tamandua}}:${{TAMANDUA_VERSION:-{version()}}}"
+    image: "${{TAMANDUA_IMAGE:-ghcr.io/tamandua-appsec/tamandua}}:${{TAMANDUA_VERSION:-{version()}}}"
     environment:
       <<: *env
       TAMANDUA_EMBEDDED_WORKER: "0"
@@ -129,7 +129,7 @@ services:
 
   worker:
     <<: *app
-    image: "${{TAMANDUA_IMAGE:-ghcr.io/brayansstivens/tamandua}}-worker:${{TAMANDUA_VERSION:-{version()}}}"
+    image: "${{TAMANDUA_IMAGE:-ghcr.io/tamandua-appsec/tamandua}}-worker:${{TAMANDUA_VERSION:-{version()}}}"
     environment:
       <<: *env
       # Engines write their temporary files (image layers, databases) to disk, not to the small in-memory /tmp.
