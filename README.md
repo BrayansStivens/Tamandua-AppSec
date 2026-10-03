@@ -1,6 +1,6 @@
 English · [Español](README.es.md)
 
-<p align="center"><img src="docs/assets/tamandua.svg" width="112" alt="Tamandua, a collared anteater catching a bug with its tongue"></p>
+<p align="center"><img src="docs/assets/tamandua.svg" width="112" alt="Tamandua, a collared anteater catching a beetle with its tongue"></p>
 
 <h1 align="center">Tamandua</h1>
 

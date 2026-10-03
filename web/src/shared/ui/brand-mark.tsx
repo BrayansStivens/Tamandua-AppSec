@@ -2,8 +2,8 @@ import { useId } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BRAND } from '@/shared/lib/brand'
 
-// Tamandúa (oso hormiguero de collar, nativo de Colombia) atrapando un bug con la lengua.
-// Los identificadores del degradado van por instancia: hay varias marcas en la misma página.
+// The tamandua (collared anteater, native to Colombia) catching a beetle with its tongue.
+// The gradient's ids are per instance: there can be several marks on the same page.
 export function BrandMark({ size = 40, className, decorative = false }: { size?: number; className?: string; decorative?: boolean }) {
   const { t } = useTranslation('ui')
   const id = useId().replace(/:/g, '')
@@ -15,11 +15,15 @@ export function BrandMark({ size = 40, className, decorative = false }: { size?:
     <g clipPath={`url(#${id}-clip)`}>
       <rect width="64" height="64" fill={`url(#${id}-bg)`} />
       <path d="M54.2 39C57.5 43 58 48.5 54.5 51.5" fill="none" stroke="#F9A8D4" strokeWidth="1.8" strokeLinecap="round" />
-      <g transform="translate(51.5 53.8) rotate(-35)">
-        <path d="M-3.6-1.2-5-2.2M-3.8 1.2-5.2 2.2M3.6-1.2 5-2.2M3.8 1.2 5.2 2.2M0-2.6 0-4M-1.8-2.2-2.6-3.6M1.8-2.2 2.6-3.6" stroke="#1E1433" strokeWidth=".9" strokeLinecap="round" />
-        <ellipse rx="4" ry="2.9" fill="#FCD34D" />
-        <path d="M-4 0H4" stroke="#1E1433" strokeWidth=".8" />
-        <circle cx="-1.8" cy="-1.2" r=".6" fill="#1E1433" /><circle cx="1.8" cy="1.2" r=".6" fill="#1E1433" />
+      <g transform="translate(51.6 54) rotate(35) scale(.9)">
+        <path d="M1.5 -1.7 2.9 -2.5 4 -3.7 M-1.5 -1.7 -2.9 -2.5 -4 -3.7 M2.5 .1 4 .3 5.2 -.6 M-2.5 .1 -4 .3 -5.2 -.6 M2.3 2 3.8 3.3 4.5 4.6 M-2.3 2 -3.8 3.3 -4.5 4.6 M.45 -3.6 C1 -4.3 1.6 -4.6 2.2 -4.7 M-.45 -3.6 C-1 -4.3 -1.6 -4.6 -2.2 -4.7" fill="none" stroke="#1E1433" strokeWidth=".6" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="2.35" cy="-4.72" r=".38" fill="#1E1433" /><circle cx="-2.35" cy="-4.72" r=".38" fill="#1E1433" />
+        <path d="M0 -1.2 C2.6 -1.3 3.2 .8 3 2.3 C2.8 3.8 1.5 4.6 0 4.6 C-1.5 4.6 -2.8 3.8 -3 2.3 C-3.2 .8 -2.6 -1.3 0 -1.2 Z" fill="#FCD34D" stroke="#1E1433" strokeWidth=".45" />
+        <path d="M0 -.8 V4.55" stroke="#1E1433" strokeWidth=".45" />
+        <circle cx="-1.35" cy=".7" r=".45" fill="#1E1433" /><circle cx="1.45" cy=".9" r=".42" fill="#1E1433" />
+        <circle cx="-1.1" cy="2.75" r=".4" fill="#1E1433" /><circle cx="1.05" cy="3.05" r=".36" fill="#1E1433" />
+        <ellipse cy="-1.9" rx="1.9" ry="1.15" fill="#E9B949" stroke="#1E1433" strokeWidth=".45" />
+        <ellipse cy="-3.15" rx="1.05" ry=".72" fill="#1E1433" />
       </g>
       <path d="M2 64C3 48 13 39 25 38C35 37.5 41 44 43 64Z" fill="#FFF3DE" />
       <path d="M2 64C3 50 10 42 19 40C24 44 27 52 27 64Z" fill="#1E1433" />
@@ -34,7 +38,7 @@ export function BrandMark({ size = 40, className, decorative = false }: { size?:
   </svg>
 }
 
-// Marca con nombre: barra lateral, acceso y pantalla de carga.
+// Mark with the name: sidebar, sign-in and loading screen.
 export function BrandLockup({ subtitle, size = 40 }: { subtitle?: string; size?: number }) {
   return <div className="flex items-center gap-3">
     <BrandMark size={size} decorative />

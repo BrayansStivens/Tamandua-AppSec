@@ -12,9 +12,9 @@ The brand is written **Tamandua**, with no accent; in Spanish prose you can say 
 
 <img src="assets/tamandua.svg" width="96" alt="Tamandua logo">
 
-The tamandua, in profile, catches a yellow bug with its tongue on a rounded violet square. The source file is [`assets/tamandua.svg`](assets/tamandua.svg) (the same one the panel uses as its favicon); in the panel it is drawn by `web/src/shared/ui/brand-mark.tsx`.
+The tamandua, in profile, catches a small yellow beetle with its tongue on a rounded violet square. The source file is [`assets/tamandua.svg`](assets/tamandua.svg) (the same one the panel uses as its favicon); in the panel it is drawn by `web/src/shared/ui/brand-mark.tsx`.
 
-- Minimum size: 16 px (favicon). Below 24 px the bug stops being legible, but the silhouette is still recognizable.
+- Minimum size: 16 px (favicon). Below 24 px the beetle stops being legible, but the silhouette is still recognizable.
 - Don't stretch it, rotate it or change its colors; on violet backgrounds, place the logo on white or black.
 - Next to the name: the logo on the left and "Tamandua" in semibold, with a gap equal to a quarter of the logo's side.
 
@@ -28,7 +28,9 @@ We chose violet because security products barely use it (blues and grays dominat
 | Logo gradient | `#8B5CF6` → `#5B21B6` | same | logo only |
 | Mascot cream | `#FFF3DE` | same | logo only |
 | Vest | `#1E1433` | same | logo only |
-| Bug | `#FCD34D` | same | logo only |
+| Beetle | `#FCD34D` · thorax `#E9B949` | same | logo only |
+| Tongue and cheek | `#F9A8D4` | same | logo only |
+| Inner ear | `#F2C9A0` | same | logo only |
 
 Accent contrast: 6.1:1 on white and 8.5:1 on the dark theme's cards (WCAG AA for text). The accent never colors severity text or chart series: those have their own validated palette.
 

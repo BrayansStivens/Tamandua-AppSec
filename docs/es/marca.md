@@ -12,9 +12,9 @@ Se escribe **Tamandua**, sin tilde, en la marca; en texto en español se puede d
 
 <img src="../assets/tamandua.svg" width="96" alt="Logo de Tamandua">
 
-El tamandúa, de perfil, atrapa un bug amarillo con la lengua sobre un cuadrado violeta redondeado. El archivo fuente es [`assets/tamandua.svg`](../assets/tamandua.svg) (el mismo que usa el panel como favicon); en el panel lo dibuja `web/src/shared/ui/brand-mark.tsx`.
+El tamandúa, de perfil, atrapa un pequeño escarabajo amarillo con la lengua sobre un cuadrado violeta redondeado. El archivo fuente es [`assets/tamandua.svg`](../assets/tamandua.svg) (el mismo que usa el panel como favicon); en el panel lo dibuja `web/src/shared/ui/brand-mark.tsx`.
 
-- Tamaño mínimo: 16 px (favicon). Por debajo de 24 px el bug deja de leerse, pero la silueta se reconoce.
+- Tamaño mínimo: 16 px (favicon). Por debajo de 24 px el escarabajo deja de leerse, pero la silueta se reconoce.
 - No se deforma, no se gira y no se cambian sus colores; sobre fondos violetas usa el logo sobre blanco o negro.
 - Junto al nombre: el logo a la izquierda y «Tamandua» en semibold, con un espacio igual a un cuarto del lado del logo.
 
@@ -28,7 +28,9 @@ El violeta se eligió porque apenas se usa en seguridad (dominan los azules y gr
 | Degradado del logo | `#8B5CF6` → `#5B21B6` | igual | solo en el logo |
 | Crema de la mascota | `#FFF3DE` | igual | solo en el logo |
 | Chaleco | `#1E1433` | igual | solo en el logo |
-| Bug | `#FCD34D` | igual | solo en el logo |
+| Escarabajo | `#FCD34D` · tórax `#E9B949` | igual | solo en el logo |
+| Lengua y mejilla | `#F9A8D4` | igual | solo en el logo |
+| Interior de la oreja | `#F2C9A0` | igual | solo en el logo |
 
 Contraste del acento: 6,1:1 sobre blanco y 8,5:1 sobre las tarjetas del tema oscuro (WCAG AA para texto). El acento nunca pinta texto de severidad ni series de gráficas: esas tienen su propia paleta validada.
 

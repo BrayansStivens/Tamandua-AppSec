@@ -1,6 +1,6 @@
 [English](README.md) · Español
 
-<p align="center"><img src="docs/assets/tamandua.svg" width="112" alt="Tamandua, un oso hormiguero de collar atrapando un bug con la lengua"></p>
+<p align="center"><img src="docs/assets/tamandua.svg" width="112" alt="Tamandua, un oso hormiguero de collar atrapando un escarabajo con la lengua"></p>
 
 <h1 align="center">Tamandua</h1>
 

@@ -5,27 +5,31 @@
   </defs>
   <g clip-path="url(#c)">
     <rect width="64" height="64" fill="url(#bg)"/>
-    <!-- lengua que atrapa un bug -->
+    <!-- the tongue catching a beetle -->
     <path d="M54.2 39 C57.5 43 58 48.5 54.5 51.5" fill="none" stroke="#F9A8D4" stroke-width="1.8" stroke-linecap="round"/>
-    <g transform="translate(51.5 53.8) rotate(-35)">
-      <path d="M-3.6 -1.2 -5 -2.2 M-3.8 1.2 -5.2 2.2 M3.6 -1.2 5 -2.2 M3.8 1.2 5.2 2.2 M0 -2.6 0 -4 M-1.8 -2.2 -2.6 -3.6 M1.8 -2.2 2.6 -3.6" stroke="#1E1433" stroke-width=".9" stroke-linecap="round"/>
-      <ellipse rx="4" ry="2.9" fill="#FCD34D"/>
-      <path d="M-4 0 H4" stroke="#1E1433" stroke-width=".8"/>
-      <circle cx="-1.8" cy="-1.2" r=".6" fill="#1E1433"/><circle cx="1.8" cy="1.2" r=".6" fill="#1E1433"/>
+    <g transform="translate(51.6 54) rotate(35) scale(.9)">
+      <path d="M1.5 -1.7 2.9 -2.5 4 -3.7 M-1.5 -1.7 -2.9 -2.5 -4 -3.7 M2.5 .1 4 .3 5.2 -.6 M-2.5 .1 -4 .3 -5.2 -.6 M2.3 2 3.8 3.3 4.5 4.6 M-2.3 2 -3.8 3.3 -4.5 4.6 M.45 -3.6 C1 -4.3 1.6 -4.6 2.2 -4.7 M-.45 -3.6 C-1 -4.3 -1.6 -4.6 -2.2 -4.7" fill="none" stroke="#1E1433" stroke-width=".6" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="2.35" cy="-4.72" r=".38" fill="#1E1433"/><circle cx="-2.35" cy="-4.72" r=".38" fill="#1E1433"/>
+      <path d="M0 -1.2 C2.6 -1.3 3.2 .8 3 2.3 C2.8 3.8 1.5 4.6 0 4.6 C-1.5 4.6 -2.8 3.8 -3 2.3 C-3.2 .8 -2.6 -1.3 0 -1.2 Z" fill="#FCD34D" stroke="#1E1433" stroke-width=".45"/>
+      <path d="M0 -.8 V4.55" stroke="#1E1433" stroke-width=".45"/>
+      <circle cx="-1.35" cy=".7" r=".45" fill="#1E1433"/><circle cx="1.45" cy=".9" r=".42" fill="#1E1433"/>
+      <circle cx="-1.1" cy="2.75" r=".4" fill="#1E1433"/><circle cx="1.05" cy="3.05" r=".36" fill="#1E1433"/>
+      <ellipse cy="-1.9" rx="1.9" ry="1.15" fill="#E9B949" stroke="#1E1433" stroke-width=".45"/>
+      <ellipse cy="-3.15" rx="1.05" ry=".72" fill="#1E1433"/>
     </g>
-    <!-- cuerpo y chaleco -->
+    <!-- body and vest -->
     <path d="M2 64 C3 48 13 39 25 38 C35 37.5 41 44 43 64 Z" fill="#FFF3DE"/>
     <path d="M2 64 C3 50 10 42 19 40 C24 44 27 52 27 64 Z" fill="#1E1433"/>
-    <!-- oreja -->
+    <!-- ear -->
     <ellipse cx="17.5" cy="21" rx="4.2" ry="5" transform="rotate(-18 17.5 21)" fill="#FFF3DE"/>
     <ellipse cx="17.8" cy="21.6" rx="2" ry="2.8" transform="rotate(-18 17.8 21.6)" fill="#F2C9A0"/>
-    <!-- cabeza y hocico -->
+    <!-- head and snout -->
     <path d="M13 31 C13 23.5 19 19.5 25.5 20 C31 20.4 34.5 23 38 25.5 C44 29.5 50 33.5 54.3 36.4 C55.6 37.3 55.1 39.3 53.5 39.3 C47 39.4 40.5 39.8 35 40.8 C30 41.8 24 43 19 41.5 C15 40.3 13 36 13 31 Z" fill="#FFF3DE"/>
     <circle cx="53.8" cy="37.9" r="1.7" fill="#1E1433"/>
-    <!-- ojo -->
+    <!-- eye -->
     <circle cx="27.5" cy="28.5" r="2.4" fill="#1E1433"/>
     <circle cx="28.3" cy="27.7" r=".8" fill="#fff"/>
-    <!-- mejilla -->
+    <!-- cheek -->
     <ellipse cx="24" cy="35" rx="2.6" ry="1.6" fill="#F9A8D4" opacity=".55"/>
   </g>
 </svg>
